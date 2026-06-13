@@ -8,8 +8,12 @@ gets a generated id and can pick their account from any device, exactly like the
 front-end mock store, but shared via the server.
 """
 
+import asyncio
 import json
+import logging
+import os
 import threading
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Optional, Any, Dict, List
 
@@ -17,9 +21,12 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse, HTMLResponse
 from pydantic import BaseModel
 
+import sync
+from db import engine
+from models import Base
 from wc_data import generate_wc_data
 
-app = FastAPI(title="Wheesht — World Cup Sweepstake 2026")
+log = logging.getLogger(__name__)
 
 # Generate the tournament scenario once at startup (teams, fixtures, demo field…)
 _wc_data = generate_wc_data()
@@ -32,6 +39,7 @@ _HTML_TEMPLATE = Path("templates/index.html").read_text(encoding="utf-8")
 
 _DATA_DIR = Path("data")
 _PARTICIPANTS_FILE = _DATA_DIR / "participants.json"
+_ADMIN_FILE = _DATA_DIR / "admin.json"
 _lock = threading.Lock()
 
 
@@ -48,6 +56,22 @@ def _save_participants(rows: List[Dict[str, Any]]) -> None:
     _DATA_DIR.mkdir(exist_ok=True)
     _PARTICIPANTS_FILE.write_text(
         json.dumps(rows, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+
+
+def _load_admin() -> Dict[str, Any]:
+    if _ADMIN_FILE.exists():
+        try:
+            return json.loads(_ADMIN_FILE.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            pass
+    return {"teams": {}, "fixtures": {}, "predictions": {}, "meta": {}}
+
+
+def _save_admin(data: Dict[str, Any]) -> None:
+    _DATA_DIR.mkdir(exist_ok=True)
+    _ADMIN_FILE.write_text(
+        json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8"
     )
 
 
@@ -69,6 +93,27 @@ def _state() -> Dict[str, Any]:
     meta["out"] = sum(1 for p in people if not p.get("alive"))
     data["meta"] = meta
     data["pot"] = len(people) * data["fee"]
+
+    # Use live fixture cache if populated (from sync worker), else fall back to
+    # the statically generated fixtures from wc_data.
+    data["fixtures"] = sync.fixture_cache if sync.fixture_cache else _wc_data["fixtures"]
+
+    # admin-overrides: merge data/admin.json fixture score corrections if present.
+    admin = _load_admin()
+    admin_fixtures = admin.get("fixtures") or {}
+    if admin_fixtures:
+        patched = []
+        for f in data["fixtures"]:
+            override = admin_fixtures.get(f["id"])
+            if override:
+                f = dict(f)
+                if "score" in override:
+                    f["score"] = override["score"]
+                if "status" in override:
+                    f["status"] = override["status"]
+            patched.append(f)
+        data["fixtures"] = patched
+
     return data
 
 
@@ -81,6 +126,49 @@ def _build_html() -> str:
         + ";window.WC_LIVE = true;</script>"
     )
     return _HTML_TEMPLATE.replace("<!-- WC_DATA_INJECTION -->", injection)
+
+
+# ── Lifespan ──────────────────────────────────────────────────────────────────
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Create DB tables (no-op if they already exist).
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+
+    # Select adapter.
+    api_key = os.environ.get("FOOTBALL_DATA_API_KEY", "")
+    if api_key:
+        from adapters.football_data_org import FootballDataOrgAdapter
+        adapter = FootballDataOrgAdapter(api_key)
+        log.info("Using FootballDataOrgAdapter")
+    else:
+        from adapters.mock import MockAdapter
+        adapter = MockAdapter()
+        log.warning(
+            "FOOTBALL_DATA_API_KEY not set — using MockAdapter (no live data)"
+        )
+
+    tournament_id = _wc_data["meta"]["id"]
+    comp_code = _wc_data["meta"]["competitionCode"]
+
+    task = asyncio.create_task(
+        sync.start_sync(adapter, tournament_id, comp_code)
+    )
+
+    yield
+
+    task.cancel()
+    try:
+        await task
+    except asyncio.CancelledError:
+        pass
+    await engine.dispose()
+
+
+# ── App ───────────────────────────────────────────────────────────────────────
+
+app = FastAPI(title="Wheesht — World Cup Sweepstake 2026", lifespan=lifespan)
 
 
 # ── Routes ───────────────────────────────────────────────────────────────────
@@ -146,6 +234,17 @@ async def update_participant(participant_id: str, payload: Participant):
     return {"ok": True, "participant": payload.model_dump()}
 
 
+@app.delete("/api/participants/{participant_id}")
+async def delete_participant(participant_id: str):
+    with _lock:
+        rows = _load_participants()
+        new_rows = [r for r in rows if r.get("id") != participant_id]
+        if len(new_rows) == len(rows):
+            raise HTTPException(status_code=404, detail="participant not found")
+        _save_participants(new_rows)
+    return {"ok": True}
+
+
 class PickPayload(BaseModel):
     key: str
     value: Any
@@ -163,6 +262,20 @@ async def set_pick(participant_id: str, payload: PickPayload):
         rows[idx]["picks"] = picks
         _save_participants(rows)
     return {"ok": True, "picks": rows[idx]["picks"]}
+
+
+class AdminPayload(BaseModel):
+    teams: Dict[str, Any] = {}
+    fixtures: Dict[str, Any] = {}
+    predictions: Dict[str, Any] = {}
+    meta: Dict[str, Any] = {}
+
+
+@app.put("/api/admin")
+async def put_admin(payload: AdminPayload):
+    """Persist admin overrides (score corrections etc.) to data/admin.json."""
+    _save_admin(payload.model_dump())
+    return {"ok": True}
 
 
 # ── Static file serving ───────────────────────────────────────────────────────
