@@ -22,6 +22,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse, HTMLResponse
 from pydantic import BaseModel
 
+import standings
 import sync
 from db import engine
 from models import Base
@@ -106,24 +107,17 @@ def _merged_people() -> List[Dict[str, Any]]:
 def _state() -> Dict[str, Any]:
     data = dict(_wc_data)
     people = _merged_people()
-    data["people"] = people
-    meta = dict(data["meta"])
-    meta["groupSize"] = len(people)
-    meta["stillIn"] = sum(1 for p in people if p.get("alive"))
-    meta["out"] = sum(1 for p in people if not p.get("alive"))
-    data["meta"] = meta
-    data["pot"] = len(people) * data["fee"]
 
     # Use live fixture cache if populated (from sync worker), else fall back to
     # the statically generated fixtures from wc_data.
-    data["fixtures"] = sync.fixture_cache if sync.fixture_cache else _wc_data["fixtures"]
+    fixtures = sync.fixture_cache if sync.fixture_cache else _wc_data["fixtures"]
 
-    # admin-overrides: merge data/admin.json fixture score corrections if present.
+    # admin-overrides: merge data/admin.json fixture corrections if present.
     admin = _load_admin()
     admin_fixtures = admin.get("fixtures") or {}
     if admin_fixtures:
         patched = []
-        for f in data["fixtures"]:
+        for f in fixtures:
             override = admin_fixtures.get(f["id"])
             if override:
                 f = dict(f)
@@ -131,8 +125,27 @@ def _state() -> Dict[str, Any]:
                     f["score"] = override["score"]
                 if "status" in override:
                     f["status"] = override["status"]
+                if "winner" in override:
+                    f["winner"] = override["winner"]
             patched.append(f)
-        data["fixtures"] = patched
+        fixtures = patched
+    data["fixtures"] = fixtures
+
+    # Rules engine: recompute each team's alive/stage/rounds from finished
+    # fixtures, then mirror that status onto the participants who hold them.
+    stage_ladder = _wc_data["meta"]["stageLadder"]
+    teams = standings.compute_team_status(_wc_data["teams"], fixtures, stage_ladder)
+    data["teams"] = teams
+    people = standings.apply_to_people(people, teams)
+    data["people"] = people
+
+    meta = dict(data["meta"])
+    meta["groupSize"] = len(people)
+    meta["stillIn"] = sum(1 for p in people if p.get("alive"))
+    meta["out"] = sum(1 for p in people if not p.get("alive"))
+    meta["teamsLeft"] = sum(1 for t in teams if t.get("alive"))
+    data["meta"] = meta
+    data["pot"] = len(people) * data["fee"]
 
     return data
 

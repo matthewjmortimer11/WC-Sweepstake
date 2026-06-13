@@ -63,6 +63,9 @@ def _to_frontend(f: CanonicalFixture) -> dict[str, Any]:
         "venue": f.venue,
         "status": f.status,
         "score": score,
+        # winner (HOME/AWAY/DRAW) preserved so the rules engine can resolve
+        # knockout ties decided on penalties, where full-time score is level.
+        "winner": f.winner,
     }
 
 
