@@ -31,6 +31,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse, HTMLResponse
 from pydantic import BaseModel
 from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 
 import standings
 import sync
@@ -451,7 +452,12 @@ async def create_league(payload: LeagueCreate):
             password_hash=_hash_password(payload.password), seeded=False, created_at=_now(),
         )
         session.add(league)
-        await session.commit()
+        try:
+            await session.commit()
+        except IntegrityError:
+            # Another request claimed this code between our check and commit.
+            await session.rollback()
+            raise HTTPException(status_code=409, detail="That code is already taken")
         return {"league": _league_public(league)}
 
 
