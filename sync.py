@@ -66,6 +66,26 @@ def _to_frontend(f: CanonicalFixture) -> dict[str, Any]:
     }
 
 
+def _next_sleep(fixtures: list[CanonicalFixture]) -> int:
+    """Decide how long to wait before the next poll.
+
+      60 s  — a match is live now, or kicks off within the next 20 min
+              (so we catch the upcoming→live transition promptly).
+      900 s — more matches still to come within ~12 h (tournament day).
+      3600 s— nothing imminent (quiet period / off-season).
+    """
+    now = datetime.now(tz=timezone.utc)
+    if any(f.status == "live" for f in fixtures):
+        return 60
+    soon = now + timedelta(minutes=20)
+    if any(f.status == "upcoming" and now <= f.kickoff_utc <= soon for f in fixtures):
+        return 60
+    today = now + timedelta(hours=12)
+    if any(f.status == "upcoming" and now <= f.kickoff_utc <= today for f in fixtures):
+        return 900
+    return 3600
+
+
 def _rebuild_cache(fixtures: list[CanonicalFixture]) -> None:
     """Sort fixtures by (dateISO, time) and repopulate fixture_cache."""
     global fixture_cache
@@ -183,8 +203,7 @@ async def start_sync(adapter, tournament_id: str, comp_code: str) -> None:
             async with AsyncSessionLocal() as session:
                 await _upsert(fixtures, session)
 
-            any_live = any(f.status == "live" for f in fixtures)
-            sleep_seconds = 60 if any_live else 3600
+            sleep_seconds = _next_sleep(fixtures)
             log.info(
                 "Cache updated (%d fixtures). Next sync in %ds.",
                 len(fixtures), sleep_seconds,
