@@ -48,6 +48,10 @@ stage_label = "Group Stage"   # label for the current phase
 kickoff = "Thu 11 June"
 final_venue = "MetLife Stadium, New Jersey"
 final_date = "Sun 19 July"
+# Soft gate on the organiser tools (results, eliminations, chat moderation,
+# tournament reset). Not real auth — just stops casual taps on a shared link
+# from wiping the sweepstake. Change this before sharing.
+admin_pin = "1966"
 
 # --- Fixture schedule generation -------------------------------------------
 # The group-stage fixtures are generated as a round-robin per group. These are

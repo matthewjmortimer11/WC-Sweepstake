@@ -310,6 +310,18 @@ async def get_chat():
     return _load_chat()[-100:]
 
 
+@app.delete("/api/chat/{message_id}")
+async def delete_chat(message_id: str):
+    """Remove a single chat message (organiser moderation)."""
+    with _lock:
+        messages = _load_chat()
+        kept = [m for m in messages if m.get("id") != message_id]
+        if len(kept) == len(messages):
+            raise HTTPException(status_code=404, detail="message not found")
+        _save_chat(kept)
+    return {"ok": True}
+
+
 @app.post("/api/chat")
 async def post_chat(payload: ChatPayload):
     """Append a message from the given participant."""

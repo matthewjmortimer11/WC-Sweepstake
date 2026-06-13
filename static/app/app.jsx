@@ -239,7 +239,7 @@ function App(){
       onDone={()=>{ const wasReplay=draw.replay; setDraw(null); if(!wasReplay){ setTab('me'); setTimeout(()=>window.wcConfetti&&window.wcConfetti({y:.4}),200);} }}/>}
     {overlay==='result' && <window.ResultMoment onDone={()=>setOverlay(null)}/>}
     {overlay==='final' && <window.FinalMoment onDone={()=>setOverlay(null)}/>}
-    {admin && <window.AdminPanel onClose={()=>setAdmin(false)}/>}
+    {admin && <window.AdminGate onClose={()=>setAdmin(false)}/>}
 
     <window.ToastLayer/>
     <window.ConfettiLayer/>

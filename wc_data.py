@@ -188,6 +188,7 @@ def generate_wc_data(tournament: str | None = None) -> dict:
         "kickoff": m["kickoff"],
         "finalVenue": m["final_venue"],
         "finalDate": m["final_date"],
+        "adminPin": str(m.get("admin_pin", "")),
         "predictionsLocked": False,
         # Config-derived, additive — lets the UI/grader stop hardcoding the
         # bracket and home-nation logic (consumed from Phase 3 onward).
