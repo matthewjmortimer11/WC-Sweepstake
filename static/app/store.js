@@ -85,18 +85,34 @@
     WC.meta.teamsLeft = WC.TEAM_LIST.filter(function (t) { return t.alive; }).length;
   }
 
-  function persistAdmin() {
+  function persistAdmin(nextAdmin) {
+    var payload = nextAdmin || admin;
     if (LIVE) {
-      var c = leagueCode(); if (!c) return;
-      try { fetch(api('/admin'), { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(admin) }); } catch (e) {}
-    } else {
-      lsSet(K.admin, admin);
+      var c = leagueCode();
+      if (!c) return Promise.reject(new Error('Join a league before changing organiser settings'));
+      return fetch(api('/admin'), { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+        .then(function (r) {
+          return r.json().catch(function () { return {}; }).then(function (j) {
+            if (!r.ok) throw new Error(j.detail || 'Could not save organiser settings');
+            return j;
+          });
+        });
     }
+    lsSet(K.admin, payload);
+    return Promise.resolve({ ok: true });
   }
   // After any admin edit: LIVE → push + re-pull resolved state; MOCK → apply locally.
   function commitAdmin() {
-    if (LIVE) { persistAdmin(); Store.refresh(); }
-    else { applyAdmin(); persistAdmin(); rebuild(); emit(); }
+    var nextAdmin = JSON.parse(JSON.stringify(admin));
+    if (LIVE) {
+      return persistAdmin(nextAdmin)
+        .then(function () { return Store.refresh(); })
+        .catch(function (e) {
+          if (window.wcToast) window.wcToast(e.message || 'Could not save organiser settings', 'crying');
+        });
+    }
+    applyAdmin(); persistAdmin(nextAdmin); rebuild(); emit();
+    return Promise.resolve();
   }
 
   if (!LIVE) applyAdmin();

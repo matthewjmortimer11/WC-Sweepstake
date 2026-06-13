@@ -299,7 +299,7 @@ function PeopleAdmin() {
          ? <Ca flat style={{ textAlign: 'center', padding: '24px 14px' }}>
              <Wa mood="neutral" size={56} animate />
              <div className="dh" style={{ fontSize: 16, marginTop: 6 }}>{all.length ? 'No match.' : 'No entrants yet.'}</div>
-             <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--ink2)', marginTop: 3 }}>{all.length ? 'Try a different name.' : 'They'll appear here as people sign up.'}</div>
+             <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--ink2)', marginTop: 3 }}>{all.length ? 'Try a different name.' : "They'll appear here as people sign up."}</div>
            </Ca>
          : <Ca flat style={{ padding: '2px 13px' }}>
              {list.map((p, i) => {
@@ -407,7 +407,7 @@ function AdminGate(props) {
          <Wa mood={bad ? 'shocked' : 'mischievous'} size={92} animate />
          <div className="dh" style={{ fontSize: 24, marginTop: 10 }}>Organiser only.</div>
          <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--ink2)', marginTop: 6, lineHeight: 1.45 }}>
-           {bad ? 'Wrong code. Wheesht is watching. Try again.' : 'Enter the organiser code. Wheesht doesn't hand the clipboard to just anyone.'}
+           {bad ? 'Wrong code. Wheesht is watching. Try again.' : "Enter the organiser code. Wheesht doesn't hand the clipboard to just anyone."}
          </div>
          <input
            autoFocus
