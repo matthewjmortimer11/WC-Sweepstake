@@ -204,6 +204,7 @@ class Participant(BaseModel):
     alive: bool = True
     isYou: bool = False
     isDemo: bool = False
+    isOI: bool = False
     picks: Dict[str, Any] = {}
     predScore: int = 0
     joinedAt: Optional[int] = None

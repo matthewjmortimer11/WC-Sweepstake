@@ -241,6 +241,12 @@
       var d = this.deviceIds();
       if (d.indexOf(id) < 0) { d.push(id); lsSet(K.device, d); }
       lsSet(K.active, id);
+      // Copy into mine so update()/setPick() can find them and sync to the server.
+      var alreadyMine = mine.some(function(p) { return p.id === id; });
+      if (!alreadyMine) {
+        var person = this.getSync(id);
+        if (person) { mine = mine.concat([person]); lsSet(K.mine, mine); }
+      }
       emit();
     },
 
