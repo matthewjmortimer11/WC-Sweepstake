@@ -21,6 +21,7 @@ body{
   font-family:var(--body); color:var(--ink); background:#201f1c;
   background:radial-gradient(120% 90% at 50% 0%, #2b2925 0%, #1a1916 80%);
   display:flex; align-items:center; justify-content:center; overflow:hidden;
+  -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale; text-rendering:optimizeLegibility;
 }
 button{font-family:inherit;}
 .dh{font-family:var(--disp); font-weight:800; letter-spacing:-.02em; line-height:.98;}
@@ -48,12 +49,19 @@ button{font-family:inherit;}
 .notch{position:absolute;top:11px;left:50%;transform:translateX(-50%);width:108px;height:30px;background:#0e0d0c;border-radius:18px;z-index:40;}
 
 /* ---------- scroll body ---------- */
-.scroll{flex:1 1 auto; overflow-y:auto; overflow-x:hidden; position:relative; -webkit-overflow-scrolling:touch;}
+.scroll{flex:1 1 auto; overflow-y:auto; overflow-x:hidden; position:relative; -webkit-overflow-scrolling:touch;
+  overscroll-behavior-y:contain;}
 .scroll::-webkit-scrollbar{width:0;height:0;}
-.pad{padding:6px 18px 120px;}
+.pad{padding:6px 18px 124px;}
 
 /* ---------- top app bar ---------- */
-.appbar{display:flex;align-items:center;gap:11px;padding:4px 18px 12px;}
+/* Sticky + frosted so content scrolls cleanly beneath it (native feel). */
+.appbar{display:flex;align-items:center;gap:11px;padding:10px 18px 12px;position:sticky;top:0;z-index:20;
+  background:rgba(244,238,227,.82);-webkit-backdrop-filter:saturate(1.4) blur(14px);backdrop-filter:saturate(1.4) blur(14px);
+  -webkit-user-select:none;user-select:none;}
+.appbar::after{content:'';position:absolute;left:0;right:0;bottom:0;height:1px;
+  background:linear-gradient(90deg,transparent,var(--line) 18%,var(--line) 82%,transparent);opacity:0;transition:opacity .25s;}
+.appbar.is-stuck::after{opacity:1;}
 .appbar .mk{width:46px;height:46px;border-radius:50%;background:var(--yellow);border:2.5px solid var(--ink);
   display:flex;align-items:center;justify-content:center;overflow:hidden;flex:0 0 auto;box-shadow:0 3px 0 var(--ink);}
 .appbar h1{font-family:var(--disp);font-weight:800;font-size:18px;margin:0;line-height:1;letter-spacing:-.02em;}
@@ -61,7 +69,7 @@ button{font-family:inherit;}
 
 /* ---------- cards ---------- */
 .wc-card{background:var(--surface);border-radius:var(--r);padding:16px;
-  box-shadow:0 3px 0 var(--shadow), 0 14px 30px -18px rgba(26,26,26,.5);position:relative;}
+  box-shadow:0 3px 0 var(--shadow), 0 18px 36px -22px rgba(26,26,26,.42), inset 0 1px 0 rgba(255,255,255,.55);position:relative;}
 .wc-card--bd{border:2.5px solid var(--ink);box-shadow:0 5px 0 var(--ink);}
 .wc-card--flat{box-shadow:none;border:2px solid var(--line);}
 
@@ -121,13 +129,24 @@ button{font-family:inherit;}
 
 /* ---------- tab bar ---------- */
 .tabbar{position:absolute;left:0;right:0;bottom:0;height:84px;display:flex;align-items:flex-start;
-  padding:10px 12px 0;gap:2px;background:linear-gradient(180deg,rgba(244,238,227,0) 0%,var(--bg) 26%);z-index:25;}
+  padding:10px 12px 0;gap:2px;background:linear-gradient(180deg,rgba(244,238,227,0) 0%,var(--bg) 26%);z-index:25;
+  -webkit-user-select:none;user-select:none;}
 .tabbar button{flex:1;border:none;background:none;cursor:pointer;display:flex;flex-direction:column;
-  align-items:center;gap:3px;padding:6px 0;color:var(--ink2);font-weight:700;font-size:10.5px;font-family:var(--body);}
-.tabbar button.on{color:var(--ink);}
-.tabbar .ic{width:26px;height:26px;display:flex;align-items:center;justify-content:center;}
-.tabbar button.on .ic svg{transform:scale(1.06);}
-.tabdot{width:5px;height:5px;border-radius:50%;background:var(--red);margin-top:1px;}
+  align-items:center;gap:3px;padding:6px 0;color:var(--ink2);font-weight:700;font-size:10.5px;font-family:var(--body);
+  transition:color .2s ease;}
+.tabbar button.on{color:var(--ink);font-weight:800;}
+.tabbar .ic{width:26px;height:26px;display:flex;align-items:center;justify-content:center;position:relative;z-index:1;
+  transition:transform .26s cubic-bezier(.2,1.3,.4,1);}
+/* soft capsule that pops in behind the active icon — no layout shift */
+.tabbar .ic::before{content:'';position:absolute;inset:-6px -13px;border-radius:999px;z-index:-1;
+  background:var(--yellow);box-shadow:inset 0 0 0 1.5px rgba(26,26,26,.10);
+  transform:scale(.6);opacity:0;transition:transform .26s cubic-bezier(.2,1.3,.4,1),opacity .2s ease;}
+.tabbar button.on .ic::before{transform:scale(1);opacity:1;}
+.tabbar button.on .ic{transform:translateY(-1px);}
+.tabbar button.on .ic svg{transform:scale(1.04);}
+.tabbar button:active .ic{transform:scale(.9);}
+.tabdot{width:5px;height:5px;border-radius:50%;background:var(--red);margin-top:1px;
+  box-shadow:0 0 0 2px var(--bg);}
 .tabbar--5 button{font-size:10px;}
 .tabbar--5 .ic{width:24px;height:24px;}
 .tabbar--5 .ic svg{width:23px;height:23px;}
@@ -285,6 +304,24 @@ body.motion-off .phone{animation:none;}
   .scroll{animation:none !important;}
 }
 
+/* ---------- polish: tactile feedback, focus, inputs ---------- */
+/* Springy press for any tappable row/card that opts in. */
+.tap{transition:transform .12s cubic-bezier(.2,.8,.2,1);cursor:pointer;}
+.tap:active{transform:scale(.98);}
+.wc-chip{transition:transform .1s ease;}
+.wc-chip:active{transform:scale(.94);}
+/* Accessible, on-brand focus ring for keyboard users (mouse/touch stay clean). */
+input,textarea,select{transition:border-color .15s ease,box-shadow .15s ease;}
+input:focus-visible,textarea:focus-visible,select:focus-visible{
+  border-color:var(--ink)!important;box-shadow:0 0 0 3px rgba(245,200,0,.45);outline:none;}
+button:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(245,200,0,.55);border-radius:12px;}
+/* Avatar button in the app bar gets a gentle press. */
+.appbar button{transition:transform .12s ease;}
+.appbar button:active{transform:scale(.92);}
+@media (prefers-reduced-motion:reduce){
+  .tabbar .ic,.tabbar .ic::before,.tabbar button{transition:none!important;}
+}
+
 /* ---------- responsive: full-screen on real phones ---------- */
 @media (max-width:560px){
   body{background:var(--bg);display:block;overflow:hidden;}
@@ -343,6 +380,7 @@ body.motion-off .phone{animation:none;}
 
 <!-- Single source of truth: generated from wc_data.py by scripts/build_snapshot.py.
      No-op when the server injects window.WC_DATA above (live mode). -->
+<script type="text/babel" src="tweaks-panel.jsx?v=20260613-ui-polish"></script>
 
 <script>
 /* ===========================================================================
@@ -429,6 +467,8 @@ body.motion-off .phone{animation:none;}
     WC.rate = rate;
     WC.FEE = d.fee;
     WC.POT = d.pot;
+    WC.charitySplit = d.charitySplit;
+    WC.CHARITY_SPLIT = d.charitySplit;
     WC.PAYOUTS = d.payouts;
     WC.LINES = d.lines;
     WC.predictions = d.predictions || [];
@@ -501,7 +541,8 @@ body.motion-off .phone{animation:none;}
 
   var BASE = {
     teams: {}, preds: {},
-    meta: { phase: WC.meta.phase, stageLabel: WC.meta.stageLabel },
+    fee: WC.FEE || 0,
+    meta: { phase: WC.meta.phase, stageLabel: WC.meta.stageLabel, includeDepartment: WC.meta.includeDepartment !== false },
   };
   WC.TEAM_LIST.forEach(function (t) { BASE.teams[t.code] = { alive: t.alive, stage: t.stage, rounds: t.rounds }; });
   (WC.PREDICTIONS || []).forEach(function (m) { BASE.preds[m.key] = m.answer; });
@@ -530,20 +571,45 @@ body.motion-off .phone{animation:none;}
     WC.meta.stageLabel = WC.meta.phase === 'pre' ? 'Group Stage'
       : WC.meta.phase === 'done' ? 'Tournament over' : 'In play';
     WC.meta.teamsLeft = WC.TEAM_LIST.filter(function (t) { return t.alive; }).length;
+    WC.meta.includeDepartment = !admin.meta || admin.meta.includeDepartment !== false;
+    var fee = admin.meta && admin.meta.entryFee != null ? Number(admin.meta.entryFee) : BASE.fee;
+    WC.FEE = isFinite(fee) && fee >= 0 ? fee : BASE.fee;
+    WC.POT = (WC.PEOPLE || []).length * WC.FEE;
   }
 
-  function persistAdmin() {
+  function charitySplitValue() {
+    var v = WC.charitySplit != null ? WC.charitySplit : WC.CHARITY_SPLIT;
+    return v == null ? CHARITY_SPLIT : Number(v);
+  }
+
+  function persistAdmin(nextAdmin) {
+    var payload = nextAdmin || admin;
     if (LIVE) {
-      var c = leagueCode(); if (!c) return;
-      try { fetch(api('/admin'), { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(admin) }); } catch (e) {}
-    } else {
-      lsSet(K.admin, admin);
+      var c = leagueCode();
+      if (!c) return Promise.reject(new Error('Join a league before changing organiser settings'));
+      return fetch(api('/admin'), { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+        .then(function (r) {
+          return r.json().catch(function () { return {}; }).then(function (j) {
+            if (!r.ok) throw new Error(j.detail || 'Could not save organiser settings');
+            return j;
+          });
+        });
     }
+    lsSet(K.admin, payload);
+    return Promise.resolve({ ok: true });
   }
   // After any admin edit: LIVE → push + re-pull resolved state; MOCK → apply locally.
   function commitAdmin() {
-    if (LIVE) { persistAdmin(); Store.refresh(); }
-    else { applyAdmin(); persistAdmin(); rebuild(); emit(); }
+    var nextAdmin = JSON.parse(JSON.stringify(admin));
+    if (LIVE) {
+      return persistAdmin(nextAdmin)
+        .then(function () { return Store.refresh(); })
+        .catch(function (e) {
+          if (window.wcToast) window.wcToast(e.message || 'Could not save organiser settings', 'crying');
+        });
+    }
+    applyAdmin(); persistAdmin(nextAdmin); rebuild(); emit();
+    return Promise.resolve();
   }
 
   if (!LIVE) applyAdmin();
@@ -608,7 +674,7 @@ body.motion-off .phone{animation:none;}
         if (m.answer == null) return;
         var pick = p.picks[m.key];
         if (pick == null) return;
-        if (m.kind === 'team2') { if (Array.isArray(pick) && Array.isArray(m.answer) && pick.slice().sort().join() === m.answer.slice().sort().join()) s += m.points; }
+        if (m.kind === 'team2') { if (Array.isArray(pick) && Array.isArray(m.answer) && pick.length === m.answer.length && pick.slice().sort().join() === m.answer.slice().sort().join()) s += m.points; }
         else if (pick === m.answer) s += m.points;
       });
       return s;
@@ -715,9 +781,9 @@ body.motion-off .phone{animation:none;}
     maxPredPoints: function () { return (WC.PREDICTIONS || []).reduce(function (a, m) { return a + m.points; }, 0); },
 
     gross: function () { return cache.length * (WC.FEE || 0); },
-    charity: function () { return cache.length * (WC.FEE || 0) * CHARITY_SPLIT; },
-    pot: function () { return cache.length * (WC.FEE || 0) * (1 - CHARITY_SPLIT); },
-    charitySplit: function () { return CHARITY_SPLIT; },
+    charity: function () { return cache.length * (WC.FEE || 0) * charitySplitValue(); },
+    pot: function () { return cache.length * (WC.FEE || 0) * (1 - charitySplitValue()); },
+    charitySplit: charitySplitValue,
 
     search: function (q) {
       q = (q || '').trim().toLowerCase();
@@ -802,8 +868,20 @@ body.motion-off .phone{animation:none;}
     adminState: function () { return admin; },
     teamsAlive: function () { return WC.TEAM_LIST.filter(function (t) { return t.alive; }).length; },
     phase: function () { return WC.meta.phase; },
+    entryFee: function () { return WC.FEE || 0; },
+    includeDepartment: function () { return !WC.meta || WC.meta.includeDepartment !== false; },
     setPhase: function (phase) {
       admin.meta = admin.meta || {}; admin.meta.phase = phase;
+      commitAdmin();
+    },
+    setEntryFee: function (fee) {
+      var n = Math.max(0, Math.round(Number(fee) * 100) / 100);
+      if (!isFinite(n)) return;
+      admin.meta = admin.meta || {}; admin.meta.entryFee = n;
+      commitAdmin();
+    },
+    setIncludeDepartment: function (on) {
+      admin.meta = admin.meta || {}; admin.meta.includeDepartment = !!on;
       commitAdmin();
     },
     setTeamOut: function (code, out) {
@@ -835,7 +913,8 @@ body.motion-off .phone{animation:none;}
       commitAdmin();
     },
     adminReset: function () {
-      admin = { teams: {}, fixtures: {}, predictions: {}, meta: {} };
+      var keep = admin.meta || {};
+      admin = { teams: {}, fixtures: {}, predictions: {}, meta: { entryFee: keep.entryFee, includeDepartment: keep.includeDepartment } };
       commitAdmin();
     }
   };
@@ -2424,9 +2503,9 @@ function StageFunnel(){
   const P = window.Store ? window.Store.allSync() : WC.PEOPLE;
   const stages = [
     {label:'Entered', n:P.length, sub:'the draw'},
-    {label:'Past groups', n:P.filter(p=>WC.TEAMS[p.team].rounds>=2).length, sub:'Top 2 + best 3rds'},
-    {label:'Past R32', n:P.filter(p=>WC.TEAMS[p.team].rounds>=3).length, sub:'Last 16'},
-    {label:'Into QFs', n:P.filter(p=>WC.TEAMS[p.team].rounds>=4).length, sub:'Last 8'},
+    {label:'Past groups', n:P.filter(p=>(WC.TEAMS[p.team]||{rounds:0}).rounds>=2).length, sub:'Top 2 + best 3rds'},
+    {label:'Past R32', n:P.filter(p=>(WC.TEAMS[p.team]||{rounds:0}).rounds>=3).length, sub:'Last 16'},
+    {label:'Into QFs', n:P.filter(p=>(WC.TEAMS[p.team]||{rounds:0}).rounds>=4).length, sub:'Last 8'},
   ];
   const max=P.length;
   return (
@@ -2448,14 +2527,15 @@ function StageFunnel(){
 }
 
 function PersonRow(props){
-  const p=props.person; const t=WC.TEAMS[p.team]; const you=props.you;
+  const p=props.person; const t=WC.TEAMS[p.team]||{code:p.team||'?',flag:'🏳️',rounds:0,stage:'group'}; const you=props.you;
   const pts = window.Store ? window.Store.predScoreOf(p) : (p.predScore||0);
+  const includeDept = window.Store && window.Store.includeDepartment ? window.Store.includeDepartment() : true;
   return (
     <div style={{display:'flex',alignItems:'center',gap:9,padding:'9px 4px',borderBottom:'1.5px solid var(--line)',opacity:p.alive?1:.62}}>
       <Avatar person={Object.assign({},p,{isYou:false})} size={34} dim={!p.alive}/>
       <div style={{flex:1,minWidth:0}}>
         <div style={{fontWeight:800,fontSize:14,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{p.name}{you&&' (you)'}</div>
-        <div style={{fontSize:11,fontWeight:600,color:'var(--ink2)',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{(p.location||p.city)}{p.department?' · '+p.department:''}{p.ltMember?' · LT':''}</div>
+        <div style={{fontSize:11,fontWeight:600,color:'var(--ink2)',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{(p.location||p.city)}{includeDept && p.department?' · '+p.department:''}{p.ltMember?' · LT':''}</div>
       </div>
       <div style={{display:'flex',alignItems:'center',gap:5}}>
         <Flag team={t} size={20}/>
@@ -2479,6 +2559,8 @@ function TrackerScreen(){
   const pre = WC.meta.phase === 'pre';
   const P = window.Store ? window.Store.allSync() : WC.PEOPLE;
   const youId = window.Store ? window.Store.activeId() : null;
+  const includeDept = window.Store && window.Store.includeDepartment ? window.Store.includeDepartment() : true;
+  React.useEffect(function(){ if(!includeDept) setDept(''); }, [includeDept]);
   const depts = Array.from(new Set(P.map(p=>p.department).filter(Boolean))).sort();
   const filters=[['all','Everyone'],['in','Still in'],['out','Out'],['London','London'],['Edinburgh','Edinburgh'],['lt','LT members']];
   let list=P.slice();
@@ -2486,8 +2568,8 @@ function TrackerScreen(){
   else if(filter==='out') list=list.filter(p=>!p.alive);
   else if(filter==='London'||filter==='Edinburgh') list=list.filter(p=>(p.location||p.city)===filter);
   else if(filter==='lt') list=list.filter(p=>p.ltMember||p.leadership);
-  if(dept) list=list.filter(p=>p.department===dept);
-  list.sort((a,b)=>{ if(a.id===youId)return -1; if(b.id===youId)return 1; return WC.TEAMS[b.team].rounds-WC.TEAMS[a.team].rounds; });
+  if(includeDept && dept) list=list.filter(p=>p.department===dept);
+  list.sort((a,b)=>{ if(a.id===youId)return -1; if(b.id===youId)return 1; return (WC.TEAMS[b.team]||{rounds:0}).rounds-(WC.TEAMS[a.team]||{rounds:0}).rounds; });
   const stillIn = P.filter(p=>p.alive).length;
   const filtersShown = pre ? filters.filter(f=>f[0]!=='out') : filters;
   return (
@@ -2512,13 +2594,13 @@ function TrackerScreen(){
           <button key={k} onClick={()=>setFilter(k)} className={'wc-chip'+(filter===k?' wc-chip--yellow':'')} style={{whiteSpace:'nowrap',cursor:'pointer',flex:'0 0 auto'}}>{lab}</button>
         ))}
       </div>
-      <div style={{display:'flex',gap:8,alignItems:'center',marginBottom:6}}>
+      {includeDept && <div style={{display:'flex',gap:8,alignItems:'center',marginBottom:6}}>
         <span style={{fontSize:12,fontWeight:800,color:'var(--ink2)'}}>Dept</span>
         <select value={dept} onChange={e=>setDept(e.target.value)} style={{flex:1,border:'2px solid var(--line)',borderRadius:10,padding:'7px 10px',fontFamily:'var(--body)',fontWeight:700,fontSize:13,background:'#fff',color:'var(--ink)'}}>
           <option value="">All departments</option>
           {depts.map(d=><option key={d} value={d}>{d}</option>)}
         </select>
-      </div>
+      </div>}
       <Card flat style={{padding:'4px 14px'}}>
         {list.map(p=><PersonRow key={p.id} person={p} you={p.id===youId} pre={pre}/>)}
       </Card>
@@ -2681,15 +2763,15 @@ function PreVerdict(){
       <div className="appbar" style={{padding:'2px 0 12px'}}>
         <div>
           <div className="dh" style={{fontSize:26}}>The Verdict</div>
-          <div style={{fontSize:13,fontWeight:600,color:'var(--ink2)'}}>Wheesht’s running commentary — once there’s something to comment on.</div>
+          <div style={{fontSize:13,fontWeight:600,color:'var(--ink2)'}}>Wheesht’s running commentary now the football has started.</div>
         </div>
       </div>
-      <Says2 mood="confident" label="pre-match" animate>Not a ball kicked yet. Wheesht is loosening the whistle, ironing the tartan, and watching every one of ye. Get yer predictions in.</Says2>
-      <SH2>Countdown</SH2>
+      <Says2 mood="broadcast" label="live" animate>The first whistle has gone. No hiding now: the sweepstake is live, the notes are being taken, and Wheesht is watching every one of ye.</Says2>
+      <SH2>Tournament status</SH2>
       <Card2 bordered style={{background:'var(--ink)',color:'#fff',textAlign:'center',padding:'22px 16px'}}>
-        <div style={{fontSize:11,fontWeight:800,letterSpacing:'.1em',color:'var(--yellow)',textTransform:'uppercase'}}>First whistle</div>
-        <div className="dh" style={{fontSize:34,margin:'4px 0 2px',color:'#fff'}}>{WC2.meta.kickoff || 'Soon'}</div>
-        <div style={{fontSize:13,fontWeight:600,opacity:.8}}>Group stage kicks off · {WC2.meta.season}</div>
+        <div style={{fontSize:11,fontWeight:800,letterSpacing:'.1em',color:'var(--yellow)',textTransform:'uppercase'}}>First whistle gone</div>
+        <div className="dh" style={{fontSize:34,margin:'4px 0 2px',color:'#fff'}}>Tournament live</div>
+        <div style={{fontSize:13,fontWeight:600,opacity:.8}}>Group stage underway · {WC2.meta.season}</div>
       </Card2>
       <SH2>Where it stands</SH2>
       <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:9}}>
@@ -2700,9 +2782,9 @@ function PreVerdict(){
           </Card2>
         ))}
       </div>
-      <SH2>Wheesht’s pre-match notes</SH2>
+      <SH2>Wheesht’s notes</SH2>
       {[
-        {m:'mischievous',t:'Predictions close at kick-off',d:'Every market’s open. After the first whistle, no takebacks. Wheesht has a long memory.'},
+        {m:'mischievous',t:'Predictions are closed',d:'The first whistle has gone. No takebacks now. Wheesht has a long memory.'},
         {m:'scottish',t:'The homeland watch',d:'Scotland are in the draw. Wheesht is, as ever, completely impartial about this.'},
         {m:'confident',t:'The pot grows with every sign-up',d:'Drag a colleague in. More entrants, bigger pot, more folk for Wheesht to judge.'},
       ].map((n,i)=>(
@@ -2998,6 +3080,7 @@ function CreateLeague(props) {
 function FindMyEntry(props) {
   const [q, setQ] = oState('');
   const results = q.trim() ? So.search(q) : [];
+  const includeDept = So.includeDepartment ? So.includeDepartment() : true;
   return (
     <div className="moment">
       <div className="mscroll" style={{ padding: '30px 22px 28px' }}>
@@ -3027,7 +3110,7 @@ function FindMyEntry(props) {
               <Ao person={p} size={38} />
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontWeight: 800, fontSize: 14.5 }}>{p.name}</div>
-                <div style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--ink2)' }}>{p.location}{p.department ? ' · ' + p.department : ''}</div>
+                <div style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--ink2)' }}>{p.location}{includeDept && p.department ? ' · ' + p.department : ''}</div>
               </div>
               {t && <Fo team={t} size={22} />}
               <span className="dh" style={{ fontSize: 16, color: 'var(--red)' }}>This is me →</span>
@@ -3045,7 +3128,12 @@ function OnboardingForm(props) {
   const [dept, setDept] = oState('');
   const [loc, setLoc] = oState('Edinburgh');
   const [lt, setLt] = oState(false);
+  const includeDept = So.includeDepartment ? So.includeDepartment() : true;
   const ok = name.trim().length > 0;
+  const split = So.charitySplit ? So.charitySplit() : 0.5;
+  const fee = WCo.FEE || 0;
+  const charityPerEntry = fee * split;
+  const winnerAfterEntry = (window.Store ? window.Store.pot() : WCo.POT * (1 - split)) + fee * (1 - split);
   return (
     <div className="moment">
       <div className="mscroll" style={{ padding: '28px 22px 30px' }}>
@@ -3061,11 +3149,11 @@ function OnboardingForm(props) {
             <Lab>Full name</Lab>
             <input autoFocus style={inp} value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Davie McAllister" />
           </div>
-          <div>
+          {includeDept && <div>
             <Lab opt>Team / department</Lab>
             <input style={inp} value={dept} onChange={e => setDept(e.target.value)} placeholder="e.g. Engineering" list="wh-depts" />
             <datalist id="wh-depts">{DEPTS.map(d => <option key={d} value={d} />)}</datalist>
-          </div>
+          </div>}
           <div>
             <Lab>Work location</Lab>
             <Seg value={loc} onChange={setLoc} options={[{ value: 'Edinburgh', label: 'Edinburgh' }, { value: 'London', label: 'London' }]} />
@@ -3078,12 +3166,12 @@ function OnboardingForm(props) {
 
         <Co bordered style={{ marginTop: 20, background: 'var(--yellow)' }}>
           <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: '.05em', textTransform: 'uppercase' }}>Your buy-in</div>
-          <div className="dh" style={{ fontSize: 28, margin: '2px 0 4px' }}>You're putting in £{WCo.FEE}.</div>
-          <div style={{ fontSize: 14, fontWeight: 600 }}><b>£{(WCo.FEE / 2).toFixed(2).replace(/\.00$/, '')} goes to charity</b>, the other half into a winner-takes-all pot — <b>{('£' + (((window.Store ? window.Store.pot() : WCo.POT * 0.5) + WCo.FEE * 0.5)).toLocaleString('en-GB'))}</b> once you're in, and growing with every sign-up.</div>
+          <div className="dh" style={{ fontSize: 28, margin: '2px 0 4px' }}>You're putting in £{fee}.</div>
+          <div style={{ fontSize: 14, fontWeight: 600 }}><b>£{charityPerEntry.toFixed(2).replace(/\.00$/, '')} goes to charity</b>, the rest into a winner-takes-all fund — <b>{'£' + Math.round(winnerAfterEntry).toLocaleString('en-GB')}</b> once you're in, and growing with every sign-up.</div>
         </Co>
 
         <div style={{ marginTop: 18 }}>
-          <Bo variant="ink" block onClick={() => ok && props.onSubmit({ name: name.trim(), department: dept.trim(), location: loc, ltMember: lt })}>
+          <Bo variant="ink" block onClick={() => ok && props.onSubmit({ name: name.trim(), department: includeDept ? dept.trim() : '', location: loc, ltMember: lt })}>
             {ok ? 'To the draw →' : 'Pop yer name in first'}
           </Bo>
         </div>
@@ -3298,18 +3386,21 @@ function stageName(t) {
   return 'Out · Group stage';
 }
 
+function dashTeam(code) { return WCd.TEAMS[code] || { code: code || '?', name: code || 'TBD', flag: '🏳️', rounds: 0, stage: 'group', odds: '0' }; }
+
 function overallRank(me) {
   const rows = Sd.allSync().slice().sort((a, b) => {
-    const ta = WCd.TEAMS[a.team], tb = WCd.TEAMS[b.team];
+    const ta = dashTeam(a.team), tb = dashTeam(b.team);
     if (tb.rounds !== ta.rounds) return tb.rounds - ta.rounds;
-    return parseInt(ta.odds.slice(1)) - parseInt(tb.odds.slice(1));
+    return parseInt(String(ta.odds).slice(1) || '0') - parseInt(String(tb.odds).slice(1) || '0');
   });
   const i = rows.findIndex(p => p.id === me.id);
   return { rank: i < 0 ? rows.length : i + 1, total: rows.length };
 }
 
 function ProfileHeader(props) {
-  const me = props.me; const t = WCd.TEAMS[me.team];
+  const me = props.me; const t = dashTeam(me.team);
+  const includeDept = Sd.includeDepartment ? Sd.includeDepartment() : true;
   return (
     <Cd bordered className="pop">
       <div style={{ display: 'flex', alignItems: 'center', gap: 13 }}>
@@ -3318,7 +3409,7 @@ function ProfileHeader(props) {
           <div className="dh" style={{ fontSize: 24, lineHeight: 1 }}>{me.name}</div>
           <div style={{ display: 'flex', gap: 6, marginTop: 7, flexWrap: 'wrap' }}>
             <Chd>{me.location}</Chd>
-            {me.department && <Chd>{me.department}</Chd>}
+            {includeDept && me.department && <Chd>{me.department}</Chd>}
             {me.ltMember && <Chd tone="yellow">LT</Chd>}
           </div>
         </div>
@@ -3334,6 +3425,7 @@ function EditProfile(props) {
   const [dept, setDept] = dState(me.department || '');
   const [loc, setLoc] = dState(me.location || 'London');
   const [lt, setLt] = dState(!!me.ltMember);
+  const includeDept = Sd.includeDepartment ? Sd.includeDepartment() : true;
   const fld = { width: '100%', border: '2.5px solid var(--ink)', borderRadius: 12, padding: '11px 13px', fontFamily: 'var(--body)', fontWeight: 600, fontSize: 15, marginTop: 6, outline: 'none' };
   function seg(val, set, opts) {
     return <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>{opts.map(o =>
@@ -3347,12 +3439,12 @@ function EditProfile(props) {
         <div className="dh" style={{ fontSize: 22, marginBottom: 14 }}>Edit your details</div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 13 }}>
           <div><label style={{ fontWeight: 800, fontSize: 13, fontFamily: 'var(--disp)' }}>Full name</label><input style={fld} value={name} onChange={e => setName(e.target.value)} /></div>
-          <div><label style={{ fontWeight: 800, fontSize: 13, fontFamily: 'var(--disp)' }}>Team / department</label><input style={fld} value={dept} onChange={e => setDept(e.target.value)} placeholder="optional" /></div>
+          {includeDept && <div><label style={{ fontWeight: 800, fontSize: 13, fontFamily: 'var(--disp)' }}>Team / department</label><input style={fld} value={dept} onChange={e => setDept(e.target.value)} placeholder="optional" /></div>}
           <div><label style={{ fontWeight: 800, fontSize: 13, fontFamily: 'var(--disp)' }}>Work location</label>{seg(loc, setLoc, [{ value: 'Edinburgh', label: 'Edinburgh' }, { value: 'London', label: 'London' }])}</div>
           <div><label style={{ fontWeight: 800, fontSize: 13, fontFamily: 'var(--disp)' }}>Leadership Team?</label>{seg(lt, setLt, [{ value: false, label: 'No' }, { value: true, label: 'Yes' }])}</div>
         </div>
         <div style={{ marginTop: 18 }}>
-          <Bd variant="ink" block onClick={() => { Sd.update(me.id, { name: name.trim() || me.name, department: dept.trim(), location: loc, city: loc, ltMember: lt, leadership: lt }); props.onClose(); }}>Save</Bd>
+          <Bd variant="ink" block onClick={() => { Sd.update(me.id, { name: name.trim() || me.name, department: includeDept ? dept.trim() : me.department, location: loc, city: loc, ltMember: lt, leadership: lt }); props.onClose(); }}>Save</Bd>
         </div>
       </div>
     </div>
@@ -3360,7 +3452,7 @@ function EditProfile(props) {
 }
 
 function TeamCard(props) {
-  const me = props.me; const t = WCd.TEAMS[me.team];
+  const me = props.me; const t = dashTeam(me.team);
   const nextTie = (WCd.R16 || []).find(x => (x.a === me.team || x.b === me.team) && !x.done);
   const opp = nextTie ? WCd.TEAMS[nextTie.a === me.team ? nextTie.b : nextTie.a] : null;
   const pre = PRE();
@@ -3437,7 +3529,7 @@ function PredCard(props) {
 }
 
 function WinningsCard(props) {
-  const me = props.me; const t = WCd.TEAMS[me.team];
+  const me = props.me; const t = dashTeam(me.team);
   const pot = Sd.pot ? Sd.pot() : (WCd.POT * 0.5);
   const charity = Sd.charity ? Sd.charity() : (WCd.POT * 0.5);
   const ov = overallRank(me);
@@ -3470,7 +3562,7 @@ function WinningsCard(props) {
 }
 
 function ActivityFeed(props) {
-  const me = props.me; const t = WCd.TEAMS[me.team];
+  const me = props.me; const t = dashTeam(me.team);
   const pre = PRE();
   const items = [];
   if (pre) {
@@ -3479,7 +3571,7 @@ function ActivityFeed(props) {
     items.push({ m: 'confident', t: 'You drew ' + t.name + ' ' + t.flag, d: 'Group ' + t.group + '. Locked in. May the football gods be kind.', when: 'just now' });
     if (submitted < totalMkts) items.push({ m: 'mischievous', t: 'Predictions are open', d: (totalMkts - submitted) + ' still to call before kick-off. Get them in.', when: 'now' });
     else items.push({ m: 'happy', t: 'All predictions in', d: 'Every market called. Wheesht has them in writing.', when: 'now' });
-    items.push({ m: 'broadcast', t: 'Tournament kicks off', d: (WCd.meta.kickoff || 'Soon') + ' — first whistle of the group stage.', when: 'upcoming' });
+    items.push({ m: 'broadcast', t: 'Tournament is underway', d: 'The first whistle has gone. Wheesht is taking notes.', when: 'live' });
     items.push({ m: 'neutral', t: 'You entered the sweepstake', d: 'Buy-in confirmed. £' + WCd.FEE + ' in the pot. Welcome aboard.', when: 'on joining' });
   } else {
     if (!t.alive) items.push({ m: 'crying', t: t.name + ' knocked out', d: stageName(t) + ' — your run ends here. The side game awaits.', when: '2h ago' });
@@ -3506,7 +3598,7 @@ function MeScreen(props) {
   const me = Sd.active();
   const [edit, setEdit] = dState(false);
   if (!me) return null;
-  const t = WCd.TEAMS[me.team];
+  const t = dashTeam(me.team);
   const pre = PRE();
   const greetMood = pre ? 'happy' : (t.alive ? 'happy' : 'crying');
   return (
@@ -3692,6 +3784,10 @@ const Sg = window.Store;
 const { Card: Cg, Btn: Bg, Flag: Fg, Chip: Chg, WheeshtSays: Saysg, SectionHead: SHg } = window;
 const { useState: gState } = React;
 
+function gameTeam(code) {
+  return WCg.TEAMS[code] || { code: code || 'TBD', name: code || 'To be decided', flag: '🏳️' };
+}
+
 function ownedSet() {
   var set = {};
   (Sg ? Sg.allSync() : WCg.PEOPLE).forEach(function (p) { set[p.team] = (set[p.team] || 0) + 1; });
@@ -3702,7 +3798,7 @@ function statusOf(f) {
 }
 
 function TeamLine(props) {
-  const t = WCg.TEAMS[props.code]; const owners = props.owners;
+  const t = gameTeam(props.code); const owners = props.owners;
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, flex: 1, minWidth: 0 }}>
       <span style={{ fontSize: 30, lineHeight: 1 }}>{t.flag}</span>
@@ -3747,7 +3843,7 @@ function FixtureRow(props) {
 
 function NextUp(props) {
   const f = props.f; if (!f) return null;
-  const ta = WCg.TEAMS[f.a], tb = WCg.TEAMS[f.b];
+  const ta = gameTeam(f.a), tb = gameTeam(f.b);
   return (
     <Cg bordered style={{ background: 'var(--ink)', color: '#fff' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -3806,7 +3902,7 @@ function GamesScreen() {
       </div>
 
       {nextMine
-        ? <NextUp f={nextMine} label={'Your ' + WCg.TEAMS[mineTeam].name + ' play next'} />
+        ? <NextUp f={nextMine} label={'Your ' + gameTeam(mineTeam).name + ' play next'} />
         : <NextUp f={nextOverall} label="First whistle" />}
 
       <div style={{ height: 12 }} />
@@ -3843,426 +3939,505 @@ window.GamesScreen = GamesScreen;
 
 <script type="text/babel">
 /* ===========================================================================
-   ADMIN — Wheesht's clipboard. Run the sweepstake through the tournament:
-   set the phase, mark teams out (owners flip to eliminated automatically),
-   enter match results (fixtures go live / done), and set prediction answers
-   (everyone's score + the league re-grade instantly). All changes persist via
-   Store and, in live mode, push to the backend so every device picks them up.
-   =========================================================================== */
+    ADMIN — Wheesht's clipboard. Run the sweepstake through the tournament:
+    set the phase, mark teams out (owners flip to eliminated automatically),
+    enter match results (fixtures go live / done), and set prediction answers
+    (everyone's score + the league re-grade instantly). All changes persist via
+    Store and, in live mode, push to the backend so every device picks them up.
+    =========================================================================== */
 const WCa = window.WC;
 const Wa = window.Wheesht;
 const Sa = window.Store;
 const { Card: Ca, Btn: Ba, Flag: Fa, Chip: Cha, SectionHead: SHa } = window;
 const { useState: aState2 } = React;
 
+function adminTeam(code) {
+  return WCa.TEAMS[code] || { code: code || 'TBD', name: code || 'To be decided', flag: '🏳️' };
+}
+
 /* ---- match banter ----------------------------------------------------------
-   When the organiser saves a full-time score, Wheesht pipes up in the house
-   voice: homeland bias for Scotland, dry "remaining professional" digs at
-   England, plain dry wit for everyone else. Returns {text, mood} for wcToast. */
+    When the organiser saves a full-time score, Wheesht pipes up in the house
+    voice: homeland bias for Scotland, dry "remaining professional" digs at
+    England, plain dry wit for everyone else. Returns {text, mood} for wcToast. */
 function matchBanter(f, a, b) {
-  const ta = WCa.TEAMS[f.a], tb = WCa.TEAMS[f.b];
-  const na = ta ? ta.name : f.a, nb = tb ? tb.name : f.b;
-  const draw = a === b, aWin = a > b, margin = Math.abs(a - b);
-  const wName = aWin ? na : nb, lName = aWin ? nb : na;
-  const pick = arr => arr[(Math.random() * arr.length) | 0];
+   const ta = WCa.TEAMS[f.a], tb = WCa.TEAMS[f.b];
+   const na = ta ? ta.name : f.a, nb = tb ? tb.name : f.b;
+   const draw = a === b, aWin = a > b, margin = Math.abs(a - b);
+   const wName = aWin ? na : nb, lName = aWin ? nb : na;
+   const pick = arr => arr[(Math.random() * arr.length) | 0];
 
-  if (f.a === 'SCO' || f.b === 'SCO') {
-    const scoWon = (f.a === 'SCO' && aWin) || (f.b === 'SCO' && !aWin);
-    const other = f.a === 'SCO' ? nb : na;
-    if (draw) return { text: pick([
-      'Scotland hold ' + other + ' to a draw. A point is a point. Wheesht will take it.',
-      'Honours even for Scotland. Wheesht is calling that a moral victory.'
-    ]), mood: 'confident' };
-    if (scoWon) return { text: pick([
-      'SCOTLAND WIN, ' + a + '–' + b + '. Wheesht is not greetin\'. Wheesht has something in its eye.',
-      'Scotland see off ' + other + '. Write it down. Frame it. Wheesht aye believed.',
-      'The homeland delivers. ' + other + ' sent homeward tae think again.'
-    ]), mood: 'scottish' };
-    return { text: pick([
-      'Scotland fall to ' + other + '. Wheesht expected nothing and is somehow still disappointed.',
-      'A gallant Scotland defeat — the most Scottish result there is. Wheesht endures.',
-      'Scotland lose. Wheesht is fine. Wheesht is always fine. (Wheesht is not fine.)'
-    ]), mood: 'crying' };
-  }
+   if (f.a === 'SCO' || f.b === 'SCO') {
+     const scoWon = (f.a === 'SCO' && aWin) || (f.b === 'SCO' && !aWin);
+     const other = f.a === 'SCO' ? nb : na;
+     if (draw) return { text: pick([
+       'Scotland hold ' + other + ' to a draw. A point is a point. Wheesht will take it.',
+       'Honours even for Scotland. Wheesht is calling that a moral victory.'
+     ]), mood: 'confident' };
+     if (scoWon) return { text: pick([
+       'SCOTLAND WIN, ' + a + '–' + b + '. Wheesht is not greetin\'. Wheesht has something in its eye.',
+       'Scotland see off ' + other + '. Write it down. Frame it. Wheesht aye believed.',
+       'The homeland delivers. ' + other + ' sent homeward tae think again.'
+     ]), mood: 'scottish' };
+     return { text: pick([
+       'Scotland fall to ' + other + '. Wheesht expected nothing and is somehow still disappointed.',
+       'A gallant Scotland defeat — the most Scottish result there is. Wheesht endures.',
+       'Scotland lose. Wheesht is fine. Wheesht is always fine. (Wheesht is not fine.)'
+     ]), mood: 'crying' };
+   }
 
-  if (f.a === 'ENG' || f.b === 'ENG') {
-    const engWon = (f.a === 'ENG' && aWin) || (f.b === 'ENG' && !aWin);
-    const other = f.a === 'ENG' ? nb : na;
-    if (draw) return { text: 'England draw with ' + other + '. Wheesht is remaining professional. Barely.', mood: 'mischievous' };
-    if (engWon) return { text: pick([
-      'England beat ' + other + '. Wheesht is noting it down. Without comment. For now.',
-      'England win. Wheesht is remaining professional. It is costing Wheesht dearly.'
-    ]), mood: 'mischievous' };
-    return { text: pick([
-      'England lose to ' + other + '. Wheesht is staying neutral. Wheesht is struggling.',
-      other + ' see off England. Wheesht has no comment — and a small, private smile.'
-    ]), mood: 'smug' };
-  }
+   if (f.a === 'ENG' || f.b === 'ENG') {
+     const engWon = (f.a === 'ENG' && aWin) || (f.b === 'ENG' && !aWin);
+     const other = f.a === 'ENG' ? nb : na;
+     if (draw) return { text: 'England draw with ' + other + '. Wheesht is remaining professional. Barely.', mood: 'mischievous' };
+     if (engWon) return { text: pick([
+       'England beat ' + other + '. Wheesht is noting it down. Without comment. For now.',
+       'England win. Wheesht is remaining professional. It is costing Wheesht dearly.'
+     ]), mood: 'mischievous' };
+     return { text: pick([
+       'England lose to ' + other + '. Wheesht is staying neutral. Wheesht is struggling.',
+       other + ' see off England. Wheesht has no comment — and a small, private smile.'
+     ]), mood: 'smug' };
+   }
 
-  if (draw) return { text: pick([
-    na + ' and ' + nb + ' share the points, ' + a + '–' + b + '. Wheesht has seen worse.',
-    'All square: ' + na + ' ' + a + '–' + b + ' ' + nb + '. Result logged.'
-  ]), mood: 'neutral' };
-  if (margin >= 3) return { text: pick([
-    wName + ' take ' + lName + ' apart, ' + a + '–' + b + '. Wheesht almost felt sorry for them. Almost.',
-    'A rout. ' + wName + ' run riot against ' + lName + '. Wheesht is impressed and a wee bit frightened.'
-  ]), mood: 'shocked' };
-  return { text: pick([
-    wName + ' edge ' + lName + ', ' + a + '–' + b + '. Result logged. Wheesht remembers everything.',
-    wName + ' take it. ' + lName + ' will have words in the dressing room. Wheesht logged it.'
-  ]), mood: 'confident' };
+   if (draw) return { text: pick([
+     na + ' and ' + nb + ' share the points, ' + a + '–' + b + '. Wheesht has seen worse.',
+     'All square: ' + na + ' ' + a + '–' + b + ' ' + nb + '. Result logged.'
+   ]), mood: 'neutral' };
+   if (margin >= 3) return { text: pick([
+     wName + ' take ' + lName + ' apart, ' + a + '–' + b + '. Wheesht almost felt sorry for them. Almost.',
+     'A rout. ' + wName + ' run riot against ' + lName + '. Wheesht is impressed and a wee bit frightened.'
+   ]), mood: 'shocked' };
+   return { text: pick([
+     wName + ' edge ' + lName + ', ' + a + '–' + b + '. Result logged. Wheesht remembers everything.',
+     wName + ' take it. ' + lName + ' will have words in the dressing room. Wheesht logged it.'
+   ]), mood: 'confident' };
 }
 
 function PhaseSeg() {
-  const cur = Sa.phase();
-  const opts = [['pre', 'Pre-kickoff'], ['live', 'In play'], ['done', 'Finished']];
-  return (
-    <div style={{ display: 'flex', gap: 8 }}>
-      {opts.map(([k, lab]) => (
-        <button key={k} onClick={() => Sa.setPhase(k)} className="wc-btn wc-btn--sm"
-          style={{ flex: 1, background: cur === k ? 'var(--yellow)' : '#fff', boxShadow: cur === k ? '0 4px 0 var(--ink)' : '0 4px 0 var(--shadow)' }}>{lab}</button>
-      ))}
-    </div>
-  );
+   const cur = Sa.phase();
+   const opts = [['pre', 'Pre-kickoff'], ['live', 'In play'], ['done', 'Finished']];
+   return (
+     <div style={{ display: 'flex', gap: 8 }}>
+       {opts.map(([k, lab]) => (
+         <button key={k} onClick={() => Sa.setPhase(k)} className="wc-btn wc-btn--sm"
+           style={{ flex: 1, background: cur === k ? 'var(--yellow)' : '#fff', boxShadow: cur === k ? '0 4px 0 var(--ink)' : '0 4px 0 var(--shadow)' }}>{lab}</button>
+       ))}
+     </div>
+   );
 }
 
 function TeamToggle(props) {
-  const t = props.t; const owners = props.owners;
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '8px 4px', borderBottom: '1.5px solid var(--line)', opacity: t.alive ? 1 : .6 }}>
-      <Fa team={t} size={22} />
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontWeight: 800, fontSize: 13.5, textDecoration: t.alive ? 'none' : 'line-through' }}>{t.name}</div>
-        {owners > 0 && <div style={{ fontSize: 10.5, fontWeight: 800, color: 'var(--red)' }}>{owners} in the draw</div>}
-      </div>
-      <button onClick={() => Sa.setTeamOut(t.code, t.alive)} className="wc-btn wc-btn--sm"
-        style={{ padding: '6px 12px', background: t.alive ? '#fff' : 'var(--ink)', color: t.alive ? 'var(--ink)' : '#fff', boxShadow: t.alive ? '0 3px 0 var(--shadow)' : '0 3px 0 #000' }}>
-        {t.alive ? 'Knock out' : 'Bring back'}
-      </button>
-    </div>
-  );
+   const t = props.t; const owners = props.owners;
+   return (
+     <div style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '8px 4px', borderBottom: '1.5px solid var(--line)', opacity: t.alive ? 1 : .6 }}>
+       <Fa team={t} size={22} />
+       <div style={{ flex: 1, minWidth: 0 }}>
+         <div style={{ fontWeight: 800, fontSize: 13.5, textDecoration: t.alive ? 'none' : 'line-through' }}>{t.name}</div>
+         {owners > 0 && <div style={{ fontSize: 10.5, fontWeight: 800, color: 'var(--red)' }}>{owners} in the draw</div>}
+       </div>
+       <button onClick={() => Sa.setTeamOut(t.code, t.alive)} className="wc-btn wc-btn--sm"
+         style={{ padding: '6px 12px', background: t.alive ? '#fff' : 'var(--ink)', color: t.alive ? 'var(--ink)' : '#fff', boxShadow: t.alive ? '0 3px 0 var(--shadow)' : '0 3px 0 #000' }}>
+         {t.alive ? 'Knock out' : 'Bring back'}
+       </button>
+     </div>
+   );
 }
 
 function ScoreStepper(props) {
-  const [a, setA] = aState2(props.a); const [b, setB] = aState2(props.b);
-  const ta = WCa.TEAMS[props.f.a], tb = WCa.TEAMS[props.f.b];
-  function step(box, setter, val, d) { var n = Math.max(0, val + d); setter(n); }
-  const num = { width: 34, textAlign: 'center', fontFamily: 'var(--disp)', fontWeight: 800, fontSize: 22 };
-  const sbtn = { width: 28, height: 28, borderRadius: 8, border: '2px solid var(--ink)', background: '#fff', fontWeight: 900, fontSize: 16, cursor: 'pointer', lineHeight: 1 };
-  return (
-    <div style={{ marginTop: 10, background: 'var(--bg)', borderRadius: 12, padding: '12px' }}>
-      {[[ta, a, setA], [tb, b, setB]].map(([t, v, set], i) => (
-        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: i === 0 ? 8 : 0 }}>
-          <span style={{ fontSize: 20 }}>{t.flag}</span>
-          <span style={{ flex: 1, fontWeight: 800, fontSize: 14 }}>{t.name}</span>
-          <button style={sbtn} onClick={() => step(i, set, v, -1)}>–</button>
-          <span style={num}>{v}</span>
-          <button style={sbtn} onClick={() => step(i, set, v, 1)}>+</button>
-        </div>
-      ))}
-      <div style={{ display: 'flex', gap: 8, marginTop: 11 }}>
-        <Ba variant="ink" sm block onClick={() => props.onSave(a, b)}>Save full-time</Ba>
-        <button onClick={props.onCancel} className="wc-btn wc-btn--sm" style={{ boxShadow: '0 4px 0 var(--shadow)', padding: '0 14px' }}>Cancel</button>
-      </div>
-    </div>
-  );
+   const [a, setA] = aState2(props.a); const [b, setB] = aState2(props.b);
+   const ta = adminTeam(props.f.a), tb = adminTeam(props.f.b);
+   function step(box, setter, val, d) { var n = Math.max(0, val + d); setter(n); }
+   const num = { width: 34, textAlign: 'center', fontFamily: 'var(--disp)', fontWeight: 800, fontSize: 22 };
+   const sbtn = { width: 28, height: 28, borderRadius: 8, border: '2px solid var(--ink)', background: '#fff', fontWeight: 900, fontSize: 16, cursor: 'pointer', lineHeight: 1 };
+   return (
+     <div style={{ marginTop: 10, background: 'var(--bg)', borderRadius: 12, padding: '12px' }}>
+       {[[ta, a, setA], [tb, b, setB]].map(([t, v, set], i) => (
+         <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: i === 0 ? 8 : 0 }}>
+           <span style={{ fontSize: 20 }}>{t.flag}</span>
+           <span style={{ flex: 1, fontWeight: 800, fontSize: 14 }}>{t.name}</span>
+           <button style={sbtn} onClick={() => step(i, set, v, -1)}>–</button>
+           <span style={num}>{v}</span>
+           <button style={sbtn} onClick={() => step(i, set, v, 1)}>+</button>
+         </div>
+       ))}
+       <div style={{ display: 'flex', gap: 8, marginTop: 11 }}>
+         <Ba variant="ink" sm block onClick={() => props.onSave(a, b)}>Save full-time</Ba>
+         <button onClick={props.onCancel} className="wc-btn wc-btn--sm" style={{ boxShadow: '0 4px 0 var(--shadow)', padding: '0 14px' }}>Cancel</button>
+       </div>
+     </div>
+   );
 }
 
 function FixtureAdminRow(props) {
-  const f = props.f; const [open, setOpen] = aState2(false);
-  const ta = WCa.TEAMS[f.a], tb = WCa.TEAMS[f.b];
-  const st = f.status || 'upcoming';
-  return (
-    <Ca flat style={{ padding: '11px 13px', marginBottom: 8 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <div style={{ display: 'flex', gap: 5, alignItems: 'center', flex: 1, minWidth: 0 }}>
-          <span style={{ fontSize: 18 }}>{ta.flag}</span>
-          <span style={{ fontWeight: 800, fontSize: 13, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{ta.code}</span>
-          <span style={{ color: 'var(--ink2)', fontWeight: 800, fontSize: 12, padding: '0 2px' }}>
-            {st === 'done' && f.score ? f.score[0] + '–' + f.score[1] : 'v'}
-          </span>
-          <span style={{ fontWeight: 800, fontSize: 13, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{tb.code}</span>
-          <span style={{ fontSize: 18 }}>{tb.flag}</span>
-        </div>
-        {st === 'done'
-          ? <Cha tone="ink">FT</Cha>
-          : st === 'live'
-            ? <span style={{ fontSize: 10.5, fontWeight: 800, color: 'var(--red)' }}>● LIVE</span>
-            : <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--ink2)' }}>{f.time}</span>}
-      </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginTop: 8 }}>
-        <span style={{ fontSize: 10.5, fontWeight: 700, color: 'var(--ink2)', flex: 1 }}>Gp {f.group} · {f.dateLabel}</span>
-        {st !== 'done' && <button onClick={() => Sa.setFixtureLive(f.id, st !== 'live')} className="wc-btn wc-btn--sm" style={{ padding: '5px 10px', boxShadow: '0 3px 0 var(--shadow)' }}>{st === 'live' ? 'Stop live' : 'Go live'}</button>}
-        <button onClick={() => setOpen(!open)} className="wc-btn wc-btn--sm" style={{ padding: '5px 10px', boxShadow: '0 3px 0 var(--shadow)' }}>{st === 'done' ? 'Edit score' : 'Enter score'}</button>
-        {st === 'done' && <button onClick={() => Sa.clearFixture(f.id)} className="wc-btn wc-btn--sm" style={{ padding: '5px 10px', boxShadow: '0 3px 0 var(--shadow)' }}>Undo</button>}
-      </div>
-      {open && <ScoreStepper f={f} a={f.score ? f.score[0] : 0} b={f.score ? f.score[1] : 0}
-        onSave={(a, b) => {
-          Sa.setFixtureResult(f.id, a, b);
-          setOpen(false);
-          const bn = matchBanter(f, a, b);
-          if (window.wcToast) window.wcToast(bn.text, bn.mood);
-        }} onCancel={() => setOpen(false)} />}
-    </Ca>
-  );
+   const f = props.f; const [open, setOpen] = aState2(false);
+   const ta = adminTeam(f.a), tb = adminTeam(f.b);
+   const st = f.status || 'upcoming';
+   return (
+     <Ca flat style={{ padding: '11px 13px', marginBottom: 8 }}>
+       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+         <div style={{ display: 'flex', gap: 5, alignItems: 'center', flex: 1, minWidth: 0 }}>
+           <span style={{ fontSize: 18 }}>{ta.flag}</span>
+           <span style={{ fontWeight: 800, fontSize: 13, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{ta.code}</span>
+           <span style={{ color: 'var(--ink2)', fontWeight: 800, fontSize: 12, padding: '0 2px' }}>
+             {st === 'done' && f.score ? f.score[0] + '–' + f.score[1] : 'v'}
+           </span>
+           <span style={{ fontWeight: 800, fontSize: 13, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{tb.code}</span>
+           <span style={{ fontSize: 18 }}>{tb.flag}</span>
+         </div>
+         {st === 'done'
+           ? <Cha tone="ink">FT</Cha>
+           : st === 'live'
+             ? <span style={{ fontSize: 10.5, fontWeight: 800, color: 'var(--red)' }}>● LIVE</span>
+             : <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--ink2)' }}>{f.time}</span>}
+       </div>
+       <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginTop: 8 }}>
+         <span style={{ fontSize: 10.5, fontWeight: 700, color: 'var(--ink2)', flex: 1 }}>Gp {f.group} · {f.dateLabel}</span>
+         {st !== 'done' && <button onClick={() => Sa.setFixtureLive(f.id, st !== 'live')} className="wc-btn wc-btn--sm" style={{ padding: '5px 10px', boxShadow: '0 3px 0 var(--shadow)' }}>{st === 'upcoming' ? 'Go live' : 'Go back'}</button>}
+         <button onClick={() => setOpen(!open)} className="wc-btn wc-btn--sm" style={{ padding: '5px 10px', boxShadow: '0 3px 0 var(--shadow)' }}>{st === 'done' ? 'Edit score' : 'Enter score'}</button>
+         {st === 'done' && <button onClick={() => Sa.clearFixture(f.id)} className="wc-btn wc-btn--sm" style={{ padding: '5px 10px', boxShadow: '0 3px 0 var(--shadow)' }}>Undo</button>}
+       </div>
+       {open && <ScoreStepper f={f} a={f.score ? f.score[0] : 0} b={f.score ? f.score[1] : 0}
+         onSave={(a, b) => {
+           Sa.setFixtureResult(f.id, a, b);
+           setOpen(false);
+           const bn = matchBanter(f, a, b);
+           if (window.wcToast) window.wcToast(bn.text, bn.mood);
+         }} onCancel={() => setOpen(false)} />}
+     </Ca>
+   );
 }
 
 function PredAdmin(props) {
-  const m = props.m;
-  function label(opt) {
-    if (m.kind === 'player') return opt.name;
-    if (m.kind === 'stage') return opt;
-    return WCa.TEAMS[opt] ? WCa.TEAMS[opt].name : opt;
-  }
-  function id(opt) { return m.kind === 'player' ? opt.id : opt; }
-  const isTwo = m.kind === 'team2';
-  const ans = m.answer;
-  function choose(oid) {
-    if (isTwo) {
-      let arr = Array.isArray(ans) ? ans.slice() : [];
-      if (arr.indexOf(oid) >= 0) arr = arr.filter(x => x !== oid); else { arr.push(oid); if (arr.length > 2) arr.shift(); }
-      Sa.setPredictionAnswer(m.key, arr.length ? arr : null);
-    } else Sa.setPredictionAnswer(m.key, ans === oid ? null : oid);
-  }
-  const picked = (oid) => isTwo ? (Array.isArray(ans) && ans.indexOf(oid) >= 0) : ans === oid;
-  return (
-    <Ca flat style={{ padding: '11px 13px', marginBottom: 8 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-        <div className="dh" style={{ fontSize: 15 }}>{m.q}</div>
-        <Cha tone={ans != null && (!isTwo || ans.length) ? 'green' : 'ghost'}>{ans != null && (!isTwo || ans.length) ? 'set' : 'open'}</Cha>
-      </div>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-        {m.options.map((opt, i) => {
-          const on = picked(id(opt));
-          return <button key={i} onClick={() => choose(id(opt))}
-            style={{ border: '2px solid ' + (on ? 'var(--ink)' : 'var(--line)'), background: on ? 'var(--yellow)' : '#fff', borderRadius: 10, padding: '6px 10px', fontFamily: 'var(--body)', fontWeight: 800, fontSize: 12.5, cursor: 'pointer' }}>{label(opt)}</button>;
-        })}
-      </div>
-    </Ca>
-  );
+   const m = props.m;
+   function label(opt) {
+     if (m.kind === 'player') return opt.name;
+     if (m.kind === 'stage') return opt;
+     return WCa.TEAMS[opt] ? WCa.TEAMS[opt].name : opt;
+   }
+   function id(opt) { return m.kind === 'player' ? opt.id : opt; }
+   const isTwo = m.kind === 'team2';
+   const ans = m.answer;
+   function choose(oid) {
+     if (isTwo) {
+       let arr = Array.isArray(ans) ? ans.slice() : [];
+       if (arr.indexOf(oid) >= 0) arr = arr.filter(x => x !== oid); else { arr.push(oid); if (arr.length > 2) arr.shift(); }
+       Sa.setPredictionAnswer(m.key, arr.length ? arr : null);
+     } else Sa.setPredictionAnswer(m.key, ans === oid ? null : oid);
+   }
+   const picked = (oid) => isTwo ? (Array.isArray(ans) && ans.indexOf(oid) >= 0) : ans === oid;
+   return (
+     <Ca flat style={{ padding: '11px 13px', marginBottom: 8 }}>
+       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+         <div className="dh" style={{ fontSize: 15 }}>{m.q}</div>
+         <Cha tone={ans != null && (!isTwo || ans.length) ? 'green' : 'ghost'}>{ans != null && (!isTwo || ans.length) ? 'set' : 'open'}</Cha>
+       </div>
+       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+         {m.options.map((opt, i) => {
+           const on = picked(id(opt));
+           return <button key={i} onClick={() => choose(id(opt))}
+             style={{ border: '2px solid ' + (on ? 'var(--ink)' : 'var(--line)'), background: on ? 'var(--yellow)' : '#fff', borderRadius: 10, padding: '6px 10px', fontFamily: 'var(--body)', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>{label(opt)}</button>;
+         })}
+       </div>
+     </Ca>
+   );
+}
+
+function moneyAdmin(n) {
+   return '£' + (Math.round(Number(n || 0) * 100) / 100).toLocaleString('en-GB', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+}
+
+function SettingsAdmin() {
+   const [, bump] = aState2(0);
+   React.useEffect(() => Sa.subscribe(() => bump(x => x + 1)), []);
+   const feeNow = Sa.entryFee ? Sa.entryFee() : WCa.FEE;
+   const [fee, setFee] = aState2(String(feeNow || 0));
+   React.useEffect(() => setFee(String(feeNow || 0)), [feeNow]);
+   const entrants = Sa.allSync().length;
+   const split = Sa.charitySplit ? Sa.charitySplit() : 0.5;
+   const n = Number(fee);
+   const feeNum = isFinite(n) && n >= 0 ? n : feeNow;
+   const gross = entrants * feeNum;
+   const charity = gross * split;
+   const winner = gross * (1 - split);
+   const includeDept = Sa.includeDepartment ? Sa.includeDepartment() : true;
+   const fld = { width: '100%', border: '2.5px solid var(--ink)', borderRadius: 12, padding: '11px 13px', fontFamily: 'var(--disp)', fontWeight: 800, fontSize: 22, outline: 'none', background: '#fff' };
+   function saveFee() {
+     const val = Number(fee);
+     if (!isFinite(val) || val < 0) { setFee(String(feeNow || 0)); return; }
+     Sa.setEntryFee(val);
+     if (window.wcToast) window.wcToast('Entry fee set to £' + val.toLocaleString('en-GB'), 'confident');
+   }
+   function toggleRow(onClick, on, title, text) {
+     return <button onClick={onClick} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 11, textAlign: 'left', border: '2px solid var(--line)', borderRadius: 13, background: '#fff', padding: '11px 12px', cursor: 'pointer' }}>
+       <span style={{ width: 42, height: 24, borderRadius: 999, background: on ? 'var(--green)' : 'var(--line)', border: '2px solid var(--ink)', position: 'relative', flex: '0 0 auto' }}>
+         <span style={{ position: 'absolute', top: 2, left: on ? 20 : 2, width: 16, height: 16, borderRadius: '50%', background: '#fff', border: '2px solid var(--ink)' }} />
+       </span>
+       <span style={{ flex: 1, minWidth: 0 }}>
+         <span className="dh" style={{ display: 'block', fontSize: 15 }}>{title}</span>
+         <span style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--ink2)', marginTop: 2, lineHeight: 1.3 }}>{text}</span>
+       </span>
+     </button>;
+   }
+   return (
+     <>
+       <Ca bordered style={{ background: 'var(--yellow)', marginBottom: 12 }}>
+         <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.06em', textTransform: 'uppercase' }}>Entry fee</div>
+         <div style={{ display: 'flex', gap: 9, alignItems: 'center', marginTop: 7 }}>
+           <span className="dh" style={{ fontSize: 24 }}>£</span>
+           <input type="number" min="0" step="0.5" value={fee} onChange={e => setFee(e.target.value)} onBlur={saveFee} style={fld} />
+           <button onClick={saveFee} className="wc-btn wc-btn--sm wc-btn--ink" style={{ flex: '0 0 auto' }}>Save</button>
+         </div>
+         <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--ink2)', marginTop: 9 }}>{entrants} entrants at {moneyAdmin(feeNum)} each.</div>
+       </Ca>
+
+       <Ca flat style={{ padding: '12px 13px', marginBottom: 12 }}>
+         {[
+           ['Total collected', gross, 'var(--ink)'],
+           ['Winner fund', winner, 'var(--green)'],
+           ['Charity fund', charity, 'var(--red)'],
+         ].map((r, i) => (
+           <div key={r[0]} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: i ? '8px 0 0' : '0', borderTop: i ? '1.5px solid var(--line)' : 'none', marginTop: i ? 8 : 0 }}>
+             <span style={{ flex: 1, fontSize: 13, fontWeight: 800, color: 'var(--ink2)' }}>{r[0]}</span>
+             <span className="dh" style={{ fontSize: 19, color: r[2] }}>{moneyAdmin(r[1])}</span>
+           </div>
+         ))}
+       </Ca>
+
+       <SHa>Signup fields</SHa>
+       {toggleRow(
+         () => Sa.setIncludeDepartment(!includeDept),
+         includeDept,
+         'Team / department field',
+         includeDept ? 'Shown on signup, profile editing and the directory.' : 'Hidden from signup, profile editing and directory filters.'
+       )}
+     </>
+   );
 }
 
 function AdminPanel(props) {
-  const [, bump] = aState2(0);
-  React.useEffect(() => Sa.subscribe(() => bump(x => x + 1)), []);
-  const [sec, setSec] = aState2('results');
-  const [mdFilter, setMdFilter] = aState2(0);
-  const owned = {};
-  Sa.allSync().forEach(p => { owned[p.team] = (owned[p.team] || 0) + 1; });
+   const [, bump] = aState2(0);
+   React.useEffect(() => Sa.subscribe(() => bump(x => x + 1)), []);
+   const [sec, setSec] = aState2('results');
+   const [mdFilter, setMdFilter] = aState2(0);
+   const owned = {};
+   const allPeople = Sa.allSync() || [];
+   allPeople.forEach(p => { owned[p.team] = (owned[p.team] || 0) + 1; });
 
-  const groups = 'ABCDEFGHIJKL'.split('');
-  const fixtures = (WCa.FIXTURES || []).filter(f => mdFilter === 0 || f.matchday === mdFilter);
-  // group fixtures by date
-  const byDate = []; const seen = {};
-  fixtures.forEach(f => { if (!seen[f.dateISO]) { seen[f.dateISO] = { label: f.dateLabel, items: [] }; byDate.push(seen[f.dateISO]); } seen[f.dateISO].items.push(f); });
+   const groups = 'ABCDEFGHIJKL'.split('');
+   const fixtures = (WCa.FIXTURES || []).filter(f => mdFilter === 0 || f.matchday === mdFilter);
+   const byDate = []; const seen = {};
+   fixtures.forEach(f => { if (!seen[f.dateISO]) { seen[f.dateISO] = { label: f.dateLabel, items: [] }; byDate.push(seen[f.dateISO]); } seen[f.dateISO].items.push(f); });
 
-  const secs = [['results', 'Results'], ['teams', 'Teams'], ['predict', 'Predictions'], ['people', 'People'], ['chat', 'Chat']];
+   const secs = [['results', 'Results'], ['teams', 'Teams'], ['predict', 'Predictions'], ['people', 'People'], ['chat', 'Chat'], ['settings', 'Settings']];
 
-  return (
-    <div className="moment" style={{ background: 'var(--bg)' }}>
-      <div style={{ position: 'sticky', top: 0, zIndex: 5, background: 'var(--ink)', color: '#fff', padding: '16px 18px 12px', display: 'flex', alignItems: 'center', gap: 11 }}>
-        <Wa mood="confident" size={44} />
-        <div style={{ flex: 1 }}>
-          <div className="dh" style={{ fontSize: 20, color: '#fff', lineHeight: 1 }}>Wheesht's clipboard</div>
-          <div style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--yellow)' }}>{(Sa.activeLeague && Sa.activeLeague()) ? Sa.activeLeague().name : 'Admin'} · {Sa.allSync().length} entrants</div>
-        </div>
-        <button onClick={props.onClose} style={{ border: 'none', background: 'rgba(255,255,255,.16)', color: '#fff', width: 34, height: 34, borderRadius: 10, fontSize: 18, fontWeight: 900, cursor: 'pointer' }}>×</button>
-      </div>
+   return (
+     <div className="moment" style={{ background: 'var(--bg)' }}>
+       <div style={{ position: 'sticky', top: 0, zIndex: 5, background: 'var(--ink)', color: '#fff', padding: '16px 18px 12px', display: 'flex', alignItems: 'center', gap: 11 }}>
+         <Wa mood="confident" size={44} />
+         <div style={{ flex: 1 }}>
+           <div className="dh" style={{ fontSize: 20, color: '#fff', lineHeight: 1 }}>Wheesht's clipboard</div>
+           <div style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--yellow)' }}>{(Sa.activeLeague && Sa.activeLeague()) ? Sa.activeLeague().name : 'Admin'} · {allPeople.length} entrants</div>
+         </div>
+         <button onClick={props.onClose} style={{ border: 'none', background: 'rgba(255,255,255,.16)', color: '#fff', width: 34, height: 34, borderRadius: 10, fontSize: 18, fontWeight: 900, cursor: 'pointer', padding: 0 }}>✕</button>
+       </div>
 
-      <div className="mscroll" style={{ padding: '16px 18px 30px' }}>
-        <SHa>Tournament phase</SHa>
-        <PhaseSeg />
+       <div className="mscroll" style={{ padding: '16px 18px 30px' }}>
+         <SHa>Tournament phase</SHa>
+         <PhaseSeg />
 
-        <div style={{ display: 'flex', gap: 7, margin: '20px 0 14px' }}>
-          {secs.map(([k, lab]) => (
-            <button key={k} onClick={() => setSec(k)} className={'wc-chip' + (sec === k ? ' wc-chip--yellow' : '')} style={{ flex: 1, cursor: 'pointer', textAlign: 'center' }}>{lab}</button>
-          ))}
-        </div>
+         <div style={{ display: 'flex', gap: 7, margin: '20px 0 14px', flexWrap: 'wrap' }}>
+           {secs.map(([k, lab]) => (
+             <button key={k} onClick={() => setSec(k)} className={'wc-chip' + (sec === k ? ' wc-chip--yellow' : '')} style={{ flex: '1 0 30%', cursor: 'pointer', textAlign: 'center', justifyContent: 'center' }}>{lab}</button>
+           ))}
+         </div>
 
-        {sec === 'results' && <>
-          <div style={{ display: 'flex', gap: 6, marginBottom: 12, overflowX: 'auto' }}>
-            {[[0, 'All'], [1, 'MD1'], [2, 'MD2'], [3, 'MD3']].map(([k, lab]) => (
-              <button key={k} onClick={() => setMdFilter(k)} className={'wc-chip' + (mdFilter === k ? ' wc-chip--yellow' : '')} style={{ cursor: 'pointer', flex: '0 0 auto' }}>{lab}</button>
-            ))}
-          </div>
-          {byDate.map((d, i) => (
-            <div key={i}>
-              <div style={{ fontFamily: 'var(--disp)', fontWeight: 800, fontSize: 12, color: 'var(--ink2)', margin: '10px 2px 8px', letterSpacing: '.04em' }}>{d.label.toUpperCase()}</div>
-              {d.items.map(f => <FixtureAdminRow key={f.id} f={f} owned={owned} />)}
-            </div>
-          ))}
-        </>}
+         {sec === 'results' && <>
+           <div style={{ display: 'flex', gap: 6, marginBottom: 12, overflowX: 'auto' }}>
+             {[[0, 'All'], [1, 'MD1'], [2, 'MD2'], [3, 'MD3']].map(([k, lab]) => (
+               <button key={k} onClick={() => setMdFilter(k)} className={'wc-chip' + (mdFilter === k ? ' wc-chip--yellow' : '')} style={{ cursor: 'pointer', flex: '0 0 auto' }}>{lab}</button>
+             ))}
+           </div>
+           {byDate.map((d, i) => (
+             <div key={i}>
+               <div style={{ fontFamily: 'var(--disp)', fontWeight: 800, fontSize: 12, color: 'var(--ink2)', margin: '10px 2px 8px', letterSpacing: '.04em' }}>{d.label.toUpperCase()}</div>
+               {d.items.map(f => <FixtureAdminRow key={f.id} f={f} owned={owned} />)}
+             </div>
+           ))}
+         </>}
 
-        {sec === 'teams' && <>
-          <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--ink2)', marginBottom: 8 }}>Knock a team out and everyone holding it flips to eliminated automatically.</div>
-          {groups.map(g => {
-            const ts = WCa.TEAM_LIST.filter(t => t.group === g);
-            if (!ts.length) return null;
-            return <Ca key={g} flat style={{ padding: '8px 14px', marginBottom: 9 }}>
-              <div className="dh" style={{ fontSize: 14, marginBottom: 2 }}>Group {g}</div>
-              {ts.map(t => <TeamToggle key={t.code} t={t} owners={owned[t.code] || 0} />)}
-            </Ca>;
-          })}
-        </>}
+         {sec === 'teams' && <>
+           <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--ink2)', marginBottom: 8 }}>Knock a team out and everyone holding it flips to eliminated automatically.</div>
+           {groups.map(g => {
+             const ts = WCa.TEAM_LIST.filter(t => t.group === g);
+             if (!ts.length) return null;
+             return <Ca key={g} flat style={{ padding: '8px 14px', marginBottom: 9 }}>
+               <div className="dh" style={{ fontSize: 14, marginBottom: 2 }}>Group {g}</div>
+               {ts.map(t => <TeamToggle key={t.code} t={t} owners={owned[t.code] || 0} />)}
+             </Ca>;
+           })}
+         </>}
 
-        {sec === 'predict' && <>
-          <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--ink2)', marginBottom: 10 }}>Set the answer once it's known — every entrant's score and the league re-grade instantly.</div>
-          {(WCa.predictions || Sa.PREDICTIONS).map(m => <PredAdmin key={m.key} m={m} />)}
-        </>}
+         {sec === 'predict' && <>
+           <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--ink2)', marginBottom: 10 }}>Set the answer once it's known — every entrant's score and the league re-grade instantly.</div>
+           {(WCa.predictions || Sa.PREDICTIONS).map(m => <PredAdmin key={m.key} m={m} />)}
+         </>}
 
-        {sec === 'people' && <PeopleAdmin />}
+         {sec === 'people' && <PeopleAdmin />}
 
-        {sec === 'chat' && <ChatAdmin />}
+         {sec === 'chat' && <ChatAdmin />}
 
-        <div style={{ marginTop: 22, borderTop: '2px solid var(--line)', paddingTop: 16 }}>
-          <button onClick={() => { if (window.confirm('Reset ALL results, eliminations and answers back to pre-kickoff?')) Sa.adminReset(); }}
-            style={{ width: '100%', border: '2px solid var(--red)', borderRadius: 11, background: '#fff', color: 'var(--red)', fontFamily: 'var(--disp)', fontWeight: 800, fontSize: 13, padding: '11px', cursor: 'pointer' }}>Reset tournament to pre-kickoff</button>
-        </div>
-      </div>
-    </div>
-  );
+         {sec === 'settings' && <SettingsAdmin />}
+
+         <div style={{ marginTop: 22, borderTop: '2px solid var(--line)', paddingTop: 16 }}>
+           <button onClick={() => { if (window.confirm('Reset ALL results, eliminations and answers back to pre-kickoff?')) Sa.adminReset(); }}
+             style={{ width: '100%', border: '2px solid var(--red)', borderRadius: 11, background: '#fff', color: 'var(--red)', fontFamily: 'var(--disp)', fontWeight: 800, fontSize: 13, padding: '10px', cursor: 'pointer' }}>Reset everything</button>
+         </div>
+       </div>
+     </div>
+   );
 }
 
 function PeopleAdmin() {
-  const [q, setQ] = aState2('');
-  const all = Sa.allSync().slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-  const list = q.trim() ? all.filter(p => (p.name || '').toLowerCase().indexOf(q.toLowerCase()) >= 0) : all;
-  const fld = { width: '100%', border: '2.5px solid var(--ink)', borderRadius: 12, padding: '10px 13px', fontFamily: 'var(--body)', fontWeight: 600, fontSize: 15, outline: 'none', marginBottom: 12 };
-  function remove(p) {
-    if (window.confirm('Remove ' + (p.name || 'this entrant') + ' from the sweepstake? This frees their entry and adjusts the pot.')) Sa.removeParticipant(p.id);
-  }
-  return (
-    <>
-      <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--ink2)', marginBottom: 10 }}>Remove an entrant — say they dropped out or paid late. Frees their slot and trims the pot &amp; charity totals.</div>
-      <input style={fld} placeholder="Search entrants…" value={q} onChange={e => setQ(e.target.value)} />
-      {list.length === 0
-        ? <Ca flat style={{ textAlign: 'center', padding: '24px 14px' }}>
-            <Wa mood="neutral" size={56} animate />
-            <div className="dh" style={{ fontSize: 16, marginTop: 6 }}>{all.length ? 'No match.' : 'No entrants yet.'}</div>
-            <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--ink2)', marginTop: 3 }}>{all.length ? 'Try a different name.' : 'They’ll appear here as people sign up.'}</div>
-          </Ca>
-        : <Ca flat style={{ padding: '2px 13px' }}>
-            {list.map((p, i) => {
-              const t = WCa.TEAMS[p.team];
-              return <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 0', borderBottom: i < list.length - 1 ? '1.5px solid var(--line)' : 'none' }}>
-                {t && <Fa team={t} size={22} />}
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontWeight: 800, fontSize: 14, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name}</div>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--ink2)' }}>{(p.location || p.city || '')}{p.department ? ' · ' + p.department : ''}{t ? ' · ' + t.name : ''}</div>
-                </div>
-                <button onClick={() => remove(p)} className="wc-btn wc-btn--sm" style={{ padding: '6px 12px', background: '#fff', color: 'var(--red)', boxShadow: '0 3px 0 var(--shadow)' }}>Remove</button>
-              </div>;
-            })}
-          </Ca>}
-    </>
-  );
+   const [q, setQ] = aState2('');
+   const includeDept = Sa.includeDepartment ? Sa.includeDepartment() : true;
+   const all = Sa.allSync().slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+   const list = q.trim() ? all.filter(p => (p.name || '').toLowerCase().indexOf(q.toLowerCase()) >= 0) : all;
+   const fld = { width: '100%', border: '2.5px solid var(--ink)', borderRadius: 12, padding: '10px 13px', fontFamily: 'var(--body)', fontWeight: 600, fontSize: 15, outline: 'none', marginBottom: 12 };
+   function remove(p) {
+     if (window.confirm('Remove ' + (p.name || 'this entrant') + ' from the sweepstake? This frees their entry and adjusts the pot.')) Sa.removeParticipant(p.id);
+   }
+   return (
+     <>
+       <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--ink2)', marginBottom: 10 }}>Remove an entrant — say they dropped out or paid late. Frees their slot and trims the pot &amp; charity.</div>
+       <input style={fld} placeholder="Search entrants…" value={q} onChange={e => setQ(e.target.value)} />
+       {list.length === 0
+         ? <Ca flat style={{ textAlign: 'center', padding: '24px 14px' }}>
+             <Wa mood="neutral" size={56} animate />
+             <div className="dh" style={{ fontSize: 16, marginTop: 6 }}>{all.length ? 'No match.' : 'No entrants yet.'}</div>
+             <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--ink2)', marginTop: 3 }}>{all.length ? 'Try a different name.' : "They'll appear here as people sign up."}</div>
+           </Ca>
+         : <Ca flat style={{ padding: '2px 13px' }}>
+             {list.map((p, i) => {
+               const t = WCa.TEAMS[p.team];
+               return <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 0', borderBottom: i < list.length - 1 ? '1.5px solid var(--line)' : 'none' }}>
+                 {t && <Fa team={t} size={22} />}
+                 <div style={{ flex: 1, minWidth: 0 }}>
+                   <div style={{ fontWeight: 800, fontSize: 14, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name}</div>
+                   <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--ink2)' }}>{(p.location || p.city || '')}{includeDept && p.department ? ' · ' + p.department : ''}{t ? ' · ' + t.name : ''}</div>
+                 </div>
+                 <button onClick={() => remove(p)} className="wc-btn wc-btn--sm" style={{ padding: '6px 12px', background: '#fff', color: 'var(--red)', boxShadow: '0 3px 0 var(--shadow)' }}>Remove</button>
+               </div>;
+             })}
+           </Ca>}
+     </>
+   );
 }
 
 /* ---- chat moderation -------------------------------------------------------
-   Live only. Lists recent messages newest-first; the organiser can delete any
-   one (server removes it from data/chat.json). */
+    Live only. Lists recent messages newest-first; the organiser can delete any
+    one (server removes it from data/chat.json). */
 function ChatAdmin() {
-  const [msgs, setMsgs] = aState2([]);
-  const [loading, setLoading] = aState2(true);
-  const isLive = !!window.WC_LIVE;
+   const [msgs, setMsgs] = aState2([]);
+   const [loading, setLoading] = aState2(true);
+   const isLive = !!window.WC_LIVE;
 
-  function load() {
-    fetch(Sa.api('/chat')).then(r => r.json()).then(d => {
-      setMsgs((d || []).slice().reverse());
-      setLoading(false);
-    }).catch(() => setLoading(false));
-  }
-  React.useEffect(() => { if (isLive) load(); else setLoading(false); }, []);
+   function load() {
+     fetch(Sa.api('/chat')).then(r => r.json()).then(d => {
+       setMsgs((d || []).slice().reverse());
+       setLoading(false);
+     }).catch(() => setLoading(false));
+   }
+   React.useEffect(() => { if (isLive) load(); else setLoading(false); }, []);
 
-  function del(id) {
-    if (!window.confirm('Delete this message for everyone? This cannot be undone.')) return;
-    fetch(Sa.api('/chat/' + id), { method: 'DELETE' })
-      .then(() => setMsgs(prev => prev.filter(m => m.id !== id)))
-      .catch(() => {});
-  }
+   function del(id) {
+     if (!window.confirm('Delete this message for everyone? This cannot be undone.')) return;
+     fetch(Sa.api('/chat/' + id), { method: 'DELETE' })
+       .then(() => setMsgs(prev => prev.filter(m => m.id !== id)))
+       .catch(() => {});
+   }
 
-  if (!isLive) {
-    return <Ca flat style={{ textAlign: 'center', padding: '24px 14px' }}>
-      <Wa mood="neutral" size={56} animate />
-      <div className="dh" style={{ fontSize: 16, marginTop: 6 }}>Chat is server-only.</div>
-      <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--ink2)', marginTop: 3 }}>Moderation works once the app is connected to the sweepstake server.</div>
-    </Ca>;
-  }
+   if (!isLive) {
+     return <Ca flat style={{ textAlign: 'center', padding: '24px 14px' }}>
+       <Wa mood="neutral" size={56} animate />
+       <div className="dh" style={{ fontSize: 16, marginTop: 6 }}>Chat is server-only.</div>
+       <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--ink2)', marginTop: 3 }}>Moderation works once the app is connected to the sweepstake server.</div>
+     </Ca>;
+   }
 
-  return (
-    <>
-      <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--ink2)', marginBottom: 10 }}>Keep the wall civil — delete anything out of order. Removals are instant for everyone.</div>
-      {loading
-        ? <Ca flat style={{ textAlign: 'center', padding: '24px 14px', fontSize: 13, fontWeight: 600, color: 'var(--ink2)' }}>Loading messages…</Ca>
-        : msgs.length === 0
-          ? <Ca flat style={{ textAlign: 'center', padding: '24px 14px' }}>
-              <Wa mood="waiting" size={56} animate />
-              <div className="dh" style={{ fontSize: 16, marginTop: 6 }}>Nothing to moderate.</div>
-              <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--ink2)', marginTop: 3 }}>Messages will appear here as people chat.</div>
-            </Ca>
-          : <Ca flat style={{ padding: '2px 13px' }}>
-              {msgs.map((m, i) => {
-                const d = new Date(m.ts);
-                const timeStr = d.getHours().toString().padStart(2, '0') + ':' + d.getMinutes().toString().padStart(2, '0');
-                return <div key={m.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 0', borderBottom: i < msgs.length - 1 ? '1.5px solid var(--line)' : 'none' }}>
-                  <div style={{ width: 30, height: 30, borderRadius: '50%', background: m.color || '#333', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--disp)', fontWeight: 800, fontSize: 11, flexShrink: 0 }}>{m.initials || '?'}</div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--ink2)' }}>{m.author} · {timeStr}</div>
-                    <div style={{ fontSize: 13.5, fontWeight: 500, lineHeight: 1.4, wordBreak: 'break-word', marginTop: 2 }}>{m.text}</div>
-                  </div>
-                  <button onClick={() => del(m.id)} className="wc-btn wc-btn--sm" style={{ padding: '5px 11px', background: '#fff', color: 'var(--red)', boxShadow: '0 3px 0 var(--shadow)', flexShrink: 0 }}>Delete</button>
-                </div>;
-              })}
-            </Ca>}
-    </>
-  );
+   return (
+     <>
+       <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--ink2)', marginBottom: 10 }}>Keep the wall civil — delete anything out of order. Removals are instant for everyone.</div>
+       {loading
+         ? <Ca flat style={{ textAlign: 'center', padding: '24px 14px', fontSize: 13, fontWeight: 600, color: 'var(--ink2)' }}>Loading messages…</Ca>
+         : msgs.length === 0
+           ? <Ca flat style={{ textAlign: 'center', padding: '24px 14px' }}>
+               <Wa mood="neutral" size={56} animate />
+               <div className="dh" style={{ fontSize: 16, marginTop: 6 }}>Nothing to moderate.</div>
+               <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--ink2)', marginTop: 3 }}>Messages will appear here as people chat.</div>
+             </Ca>
+           : <Ca flat style={{ padding: '2px 13px' }}>
+               {msgs.map((m, i) => {
+                 const d = new Date(m.ts);
+                 const timeStr = d.getHours().toString().padStart(2, '0') + ':' + d.getMinutes().toString().padStart(2, '0');
+                 return <div key={m.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 0', borderBottom: i < msgs.length - 1 ? '1.5px solid var(--line)' : 'none' }}>
+                   <div style={{ width: 30, height: 30, borderRadius: '50%', background: m.color || '#333', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--disp)', fontWeight: 800, fontSize: 12, flex: '0 0 auto' }}>{m.initials}</div>
+                   <div style={{ flex: 1, minWidth: 0 }}>
+                     <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--ink2)' }}>{m.author} · {timeStr}</div>
+                     <div style={{ fontSize: 13.5, fontWeight: 500, lineHeight: 1.4, wordBreak: 'break-word', marginTop: 2 }}>{m.text}</div>
+                   </div>
+                   <button onClick={() => del(m.id)} className="wc-btn wc-btn--sm" style={{ padding: '5px 11px', background: '#fff', color: 'var(--red)', boxShadow: '0 3px 0 var(--shadow)', flexShrink: 0 }}>Delete</button>
+                 </div>;
+               })}
+             </Ca>}
+     </>
+   );
 }
 
 /* ---- PIN gate --------------------------------------------------------------
-   Soft gate in front of the clipboard. Not real auth — just stops a casual tap
-   on a shared link from wiping the sweepstake. PIN comes from the tournament
-   config (meta.adminPin); empty config means no gate. Unlock lasts the session. */
+    Soft gate in front of the clipboard. Not real auth — just stops a casual tap
+    on a shared link from wiping the sweepstake. PIN comes from the tournament
+    config (meta.adminPin); empty config means no gate. Unlock lasts the session. */
 function AdminGate(props) {
-  const PIN = (WCa.meta && WCa.meta.adminPin) || '';
-  const [ok, setOk] = aState2(() => {
-    if (!PIN) return true;
-    try { return sessionStorage.getItem('wheesht_admin_ok') === '1'; } catch (e) { return false; }
-  });
-  const [entry, setEntry] = aState2('');
-  const [bad, setBad] = aState2(false);
+   const PIN = (WCa.meta && WCa.meta.adminPin) || '';
+   const [ok, setOk] = aState2(() => {
+     if (!PIN) return true;
+     try { return sessionStorage.getItem('wheesht_admin_ok') === '1'; } catch (e) { return false; }
+   });
+   const [entry, setEntry] = aState2('');
+   const [bad, setBad] = aState2(false);
 
-  if (ok) return <AdminPanel onClose={props.onClose} />;
+   if (ok) return <AdminPanel onClose={props.onClose} />;
 
-  function submit() {
-    if (entry === PIN) {
-      try { sessionStorage.setItem('wheesht_admin_ok', '1'); } catch (e) {}
-      setOk(true);
-    } else { setBad(true); setEntry(''); }
-  }
+   function submit() {
+     if (entry === PIN) {
+       try { sessionStorage.setItem('wheesht_admin_ok', '1'); } catch (e) {}
+       setOk(true);
+     } else { setBad(true); setEntry(''); }
+   }
 
-  return (
-    <div className="moment" style={{ background: 'var(--bg)', alignItems: 'center', justifyContent: 'center', padding: '0 26px' }}>
-      <button onClick={props.onClose} style={{ position: 'absolute', top: 16, right: 16, border: 'none', background: 'var(--ink)', color: '#fff', width: 34, height: 34, borderRadius: 10, fontSize: 18, fontWeight: 900, cursor: 'pointer' }}>×</button>
-      <div className={'rise' + (bad ? ' shake' : '')} style={{ width: '100%', maxWidth: 340, textAlign: 'center' }}>
-        <Wa mood={bad ? 'shocked' : 'mischievous'} size={92} animate />
-        <div className="dh" style={{ fontSize: 24, marginTop: 10 }}>Organiser only.</div>
-        <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--ink2)', marginTop: 6, lineHeight: 1.45 }}>
-          {bad ? 'Wrong code. Wheesht is watching. Try again.' : 'Enter the organiser code. Wheesht doesn’t hand the clipboard to just anyone.'}
-        </div>
-        <input
-          autoFocus
-          type="password"
-          inputMode="numeric"
-          value={entry}
-          onChange={e => { setEntry(e.target.value); setBad(false); }}
-          onKeyDown={e => { if (e.key === 'Enter') submit(); }}
-          placeholder="Code"
-          style={{ width: '100%', border: '2.5px solid var(--ink)', borderRadius: 14, padding: '13px 16px', fontFamily: 'var(--disp)', fontWeight: 800, fontSize: 22, textAlign: 'center', letterSpacing: '.3em', outline: 'none', marginTop: 18, background: '#fff', color: 'var(--ink)' }}
-        />
-        <button onClick={submit} disabled={!entry} className="wc-btn wc-btn--ink wc-btn--block" style={{ marginTop: 14, opacity: entry ? 1 : 0.4 }}>Unlock the clipboard</button>
-      </div>
-    </div>
-  );
+   return (
+     <div className="moment" style={{ background: 'var(--bg)', alignItems: 'center', justifyContent: 'center', padding: '0 26px' }}>
+       <button onClick={props.onClose} style={{ position: 'absolute', top: 16, right: 16, border: 'none', background: 'var(--ink)', color: '#fff', width: 34, height: 34, borderRadius: 10, fontSize: 18, fontWeight: 900, cursor: 'pointer' }}>✕</button>
+       <div className={'rise' + (bad ? ' shake' : '')} style={{ width: '100%', maxWidth: 340, textAlign: 'center' }}>
+         <Wa mood={bad ? 'shocked' : 'mischievous'} size={92} animate />
+         <div className="dh" style={{ fontSize: 24, marginTop: 10 }}>Organiser only.</div>
+         <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--ink2)', marginTop: 6, lineHeight: 1.45 }}>
+           {bad ? 'Wrong code. Wheesht is watching. Try again.' : "Enter the organiser code. Wheesht doesn't hand the clipboard to just anyone."}
+         </div>
+         <input
+           autoFocus
+           type="password"
+           inputMode="numeric"
+           value={entry}
+           onChange={e => { setEntry(e.target.value); setBad(false); }}
+           onKeyDown={e => { if (e.key === 'Enter') submit(); }}
+           placeholder="Code"
+           style={{ width: '100%', border: '2.5px solid var(--ink)', borderRadius: 14, padding: '13px 16px', fontFamily: 'var(--disp)', fontWeight: 800, fontSize: 22, textAlign: 'center', letterSpacing: '.1em', marginTop: 14, outline: 'none' }}
+         />
+         <button onClick={submit} disabled={!entry} className="wc-btn wc-btn--ink wc-btn--block" style={{ marginTop: 14, opacity: entry ? 1 : 0.4 }}>Unlock the clipboard</button>
+       </div>
+     </div>
+   );
 }
 
 window.AdminPanel = AdminPanel;
@@ -4273,7 +4448,7 @@ window.AdminGate = AdminGate;
 <script type="text/babel">
 /* ===========================================================================
    APP SHELL — identity gate · onboarding flow · tab nav · account switcher ·
-   moment replays · admin tweaks.
+   admin tweaks.
    =========================================================================== */
 const A_WC = window.WC;
 const A_W = window.Wheesht;
@@ -4305,13 +4480,21 @@ function StatusBar(){
 
 function AppBar(props){
   const me = props.me;
-  return <div className="appbar">
+  const ref = React.useRef(null);
+  React.useEffect(()=>{
+    const bar = ref.current; if(!bar) return;
+    const sc = bar.closest('.scroll'); if(!sc) return;
+    const onScroll = ()=>{ bar.classList.toggle('is-stuck', sc.scrollTop>4); };
+    onScroll();
+    sc.addEventListener('scroll', onScroll, {passive:true});
+    return ()=> sc.removeEventListener('scroll', onScroll);
+  },[]);
+  return <div className="appbar" ref={ref}>
     <div className="mk"><A_W mood="confident" size={42}/></div>
     <div style={{flex:1,minWidth:0}}>
       <h1>{(A_WC.league&&A_WC.league.name)||A_WC.meta.name}</h1>
       <p>{A_WC.meta.season} · {A_WC.meta.stageLabel}</p>
     </div>
-    <button onClick={props.onMoments} className="wc-btn wc-btn--sm" style={{padding:'8px 11px',boxShadow:'0 4px 0 var(--shadow)'}}>Moments</button>
     {me && <button onClick={props.onAccount} style={{border:'none',background:'none',cursor:'pointer',padding:0,marginLeft:2}}>
       <window.Avatar person={Object.assign({},me,{isYou:false})} size={40}/>
     </button>}
@@ -4335,6 +4518,7 @@ function TabBar(props){
 function AccountSheet(props){
   const accounts = A_S.deviceAccounts();
   const activeId = A_S.activeId();
+  const includeDept = A_S.includeDepartment ? A_S.includeDepartment() : true;
   return <div style={{position:'absolute',inset:0,zIndex:70,display:'flex',flexDirection:'column',justifyContent:'flex-end'}}>
     <div onClick={props.onClose} style={{position:'absolute',inset:0,background:'rgba(26,26,26,.45)'}}/>
     <div className="rise" style={{position:'relative',background:'var(--bg)',borderRadius:'26px 26px 0 0',padding:'18px 18px 26px',boxShadow:'0 -20px 50px rgba(0,0,0,.3)'}}>
@@ -4349,7 +4533,7 @@ function AccountSheet(props){
               <window.Avatar person={Object.assign({},p,{isYou:false})} size={40}/>
               <div style={{flex:1,minWidth:0}}>
                 <div className="dh" style={{fontSize:16}}>{p.name}{on&&' ·'} {on&&<span style={{fontSize:11,color:'var(--ink2)'}}>active</span>}</div>
-                <div style={{fontSize:11.5,fontWeight:700,color:'var(--ink2)'}}>{p.location}{p.department?' · '+p.department:''}</div>
+                <div style={{fontSize:11.5,fontWeight:700,color:'var(--ink2)'}}>{p.location}{includeDept && p.department?' · '+p.department:''}</div>
               </div>
               {t&&<window.Flag team={t} size={24}/>}
             </button>
@@ -4370,35 +4554,6 @@ function AccountSheet(props){
   </div>;
 }
 
-/* ---- moments / replays ---- */
-function MomentMenu(props){
-  const me = props.me; const myTeam = me ? A_WC.TEAMS[me.team] : null;
-  const items=[
-    ['draw','See your draw again', myTeam?('You drew '+myTeam.name):'Your team reveal','confident'],
-    ['scotland','Replay: You drew Scotland','The full tartan meltdown','scottish'],
-    ['england','Replay: You drew England','Wheesht stays professional. Barely.','mischievous'],
-    ['result','Tonight’s result','Norway 2–1 England','shocked'],
-    ['final','The final','Spain vs France · the ceremony','celebrating'],
-  ];
-  return <div style={{position:'absolute',inset:0,zIndex:70,display:'flex',flexDirection:'column',justifyContent:'flex-end'}}>
-    <div onClick={props.onClose} style={{position:'absolute',inset:0,background:'rgba(26,26,26,.45)'}}/>
-    <div className="rise" style={{position:'relative',background:'var(--bg)',borderRadius:'26px 26px 0 0',padding:'18px 18px 28px',boxShadow:'0 -20px 50px rgba(0,0,0,.3)'}}>
-      <div style={{width:44,height:5,borderRadius:3,background:'var(--line)',margin:'0 auto 14px'}}/>
-      <div className="dh" style={{fontSize:22,marginBottom:4}}>Relive a moment</div>
-      <div style={{fontSize:13,fontWeight:600,color:'var(--ink2)',marginBottom:12}}>Every big beat of the sweepstake. Wheesht included, obviously.</div>
-      <div style={{display:'flex',flexDirection:'column',gap:9}}>
-        {items.map(it=>(
-          <button key={it[0]} onClick={()=>props.onPick(it[0])} style={{display:'flex',alignItems:'center',gap:12,background:'#fff',border:'2.5px solid var(--ink)',borderRadius:16,padding:'9px 13px',cursor:'pointer',textAlign:'left',boxShadow:'0 4px 0 var(--ink)'}}>
-            <A_W mood={it[3]} size={46}/>
-            <div style={{flex:1,minWidth:0}}><div className="dh" style={{fontSize:16}}>{it[1]}</div><div style={{fontSize:12,fontWeight:600,color:'var(--ink2)'}}>{it[2]}</div></div>
-            <span className="dh" style={{fontSize:20}}>→</span>
-          </button>
-        ))}
-      </div>
-    </div>
-  </div>;
-}
-
 const TW_DEFAULTS = /*EDITMODE-BEGIN*/{
   "celebration": 8,
   "accent": "#E8272A",
@@ -4412,8 +4567,6 @@ function App(){
   const [tab,setTab]=aState('me');
   const [flow,setFlow]=aState(me?'app':'gate'); // gate | find | form | app
   const [draw,setDraw]=aState(null);            // {forceTeam, replay}
-  const [overlay,setOverlay]=aState(null);       // 'result' | 'final'
-  const [menu,setMenu]=aState(false);
   const [account,setAccount]=aState(false);
   const [admin,setAdmin]=aState(false);
   const [organiser,setOrganiser]=aState(false); // true while creating a league
@@ -4502,18 +4655,10 @@ function App(){
   return <React.Fragment>
     <StatusBar/>
     <div className="scroll" key={tab+(me?me.id:'')}>
-      <AppBar me={me} onMoments={()=>setMenu(true)} onAccount={()=>setAccount(true)}/>
+      <AppBar me={me} onAccount={()=>setAccount(true)}/>
       {screens[tab]}
     </div>
     <TabBar tab={tab} setTab={setTab}/>
-
-    {menu && <MomentMenu me={me} onClose={()=>setMenu(false)} onPick={(m)=>{
-      setMenu(false);
-      if(m==='draw') setDraw({forceTeam:me.team,replay:true});
-      else if(m==='scotland') setDraw({forceTeam:'SCO',replay:true});
-      else if(m==='england') setDraw({forceTeam:'ENG',replay:true});
-      else setOverlay(m);
-    }}/>}
 
     {account && <AccountSheet onClose={()=>setAccount(false)}
       onAdd={()=>{setAccount(false);setFlow('form');}}
@@ -4523,8 +4668,6 @@ function App(){
 
     {draw && <window.DrawMoment participant={draw.participant} forceTeam={draw.forceTeam}
       onDone={()=>{ const wasReplay=draw.replay; setDraw(null); if(!wasReplay){ setTab('me'); setTimeout(()=>window.wcConfetti&&window.wcConfetti({y:.4}),200);} }}/>}
-    {overlay==='result' && <window.ResultMoment onDone={()=>setOverlay(null)}/>}
-    {overlay==='final' && <window.FinalMoment onDone={()=>setOverlay(null)}/>}
     {admin && <window.AdminGate onClose={()=>setAdmin(false)}/>}
 
     <window.ToastLayer/>

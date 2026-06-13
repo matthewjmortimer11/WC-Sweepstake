@@ -18,6 +18,7 @@ body{
   font-family:var(--body); color:var(--ink); background:#201f1c;
   background:radial-gradient(120% 90% at 50% 0%, #2b2925 0%, #1a1916 80%);
   display:flex; align-items:center; justify-content:center; overflow:hidden;
+  -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale; text-rendering:optimizeLegibility;
 }
 button{font-family:inherit;}
 .dh{font-family:var(--disp); font-weight:800; letter-spacing:-.02em; line-height:.98;}
@@ -45,12 +46,19 @@ button{font-family:inherit;}
 .notch{position:absolute;top:11px;left:50%;transform:translateX(-50%);width:108px;height:30px;background:#0e0d0c;border-radius:18px;z-index:40;}
 
 /* ---------- scroll body ---------- */
-.scroll{flex:1 1 auto; overflow-y:auto; overflow-x:hidden; position:relative; -webkit-overflow-scrolling:touch;}
+.scroll{flex:1 1 auto; overflow-y:auto; overflow-x:hidden; position:relative; -webkit-overflow-scrolling:touch;
+  overscroll-behavior-y:contain;}
 .scroll::-webkit-scrollbar{width:0;height:0;}
-.pad{padding:6px 18px 120px;}
+.pad{padding:6px 18px 124px;}
 
 /* ---------- top app bar ---------- */
-.appbar{display:flex;align-items:center;gap:11px;padding:4px 18px 12px;}
+/* Sticky + frosted so content scrolls cleanly beneath it (native feel). */
+.appbar{display:flex;align-items:center;gap:11px;padding:10px 18px 12px;position:sticky;top:0;z-index:20;
+  background:rgba(244,238,227,.82);-webkit-backdrop-filter:saturate(1.4) blur(14px);backdrop-filter:saturate(1.4) blur(14px);
+  -webkit-user-select:none;user-select:none;}
+.appbar::after{content:'';position:absolute;left:0;right:0;bottom:0;height:1px;
+  background:linear-gradient(90deg,transparent,var(--line) 18%,var(--line) 82%,transparent);opacity:0;transition:opacity .25s;}
+.appbar.is-stuck::after{opacity:1;}
 .appbar .mk{width:46px;height:46px;border-radius:50%;background:var(--yellow);border:2.5px solid var(--ink);
   display:flex;align-items:center;justify-content:center;overflow:hidden;flex:0 0 auto;box-shadow:0 3px 0 var(--ink);}
 .appbar h1{font-family:var(--disp);font-weight:800;font-size:18px;margin:0;line-height:1;letter-spacing:-.02em;}
@@ -58,7 +66,7 @@ button{font-family:inherit;}
 
 /* ---------- cards ---------- */
 .wc-card{background:var(--surface);border-radius:var(--r);padding:16px;
-  box-shadow:0 3px 0 var(--shadow), 0 14px 30px -18px rgba(26,26,26,.5);position:relative;}
+  box-shadow:0 3px 0 var(--shadow), 0 18px 36px -22px rgba(26,26,26,.42), inset 0 1px 0 rgba(255,255,255,.55);position:relative;}
 .wc-card--bd{border:2.5px solid var(--ink);box-shadow:0 5px 0 var(--ink);}
 .wc-card--flat{box-shadow:none;border:2px solid var(--line);}
 
@@ -118,13 +126,24 @@ button{font-family:inherit;}
 
 /* ---------- tab bar ---------- */
 .tabbar{position:absolute;left:0;right:0;bottom:0;height:84px;display:flex;align-items:flex-start;
-  padding:10px 12px 0;gap:2px;background:linear-gradient(180deg,rgba(244,238,227,0) 0%,var(--bg) 26%);z-index:25;}
+  padding:10px 12px 0;gap:2px;background:linear-gradient(180deg,rgba(244,238,227,0) 0%,var(--bg) 26%);z-index:25;
+  -webkit-user-select:none;user-select:none;}
 .tabbar button{flex:1;border:none;background:none;cursor:pointer;display:flex;flex-direction:column;
-  align-items:center;gap:3px;padding:6px 0;color:var(--ink2);font-weight:700;font-size:10.5px;font-family:var(--body);}
-.tabbar button.on{color:var(--ink);}
-.tabbar .ic{width:26px;height:26px;display:flex;align-items:center;justify-content:center;}
-.tabbar button.on .ic svg{transform:scale(1.06);}
-.tabdot{width:5px;height:5px;border-radius:50%;background:var(--red);margin-top:1px;}
+  align-items:center;gap:3px;padding:6px 0;color:var(--ink2);font-weight:700;font-size:10.5px;font-family:var(--body);
+  transition:color .2s ease;}
+.tabbar button.on{color:var(--ink);font-weight:800;}
+.tabbar .ic{width:26px;height:26px;display:flex;align-items:center;justify-content:center;position:relative;z-index:1;
+  transition:transform .26s cubic-bezier(.2,1.3,.4,1);}
+/* soft capsule that pops in behind the active icon — no layout shift */
+.tabbar .ic::before{content:'';position:absolute;inset:-6px -13px;border-radius:999px;z-index:-1;
+  background:var(--yellow);box-shadow:inset 0 0 0 1.5px rgba(26,26,26,.10);
+  transform:scale(.6);opacity:0;transition:transform .26s cubic-bezier(.2,1.3,.4,1),opacity .2s ease;}
+.tabbar button.on .ic::before{transform:scale(1);opacity:1;}
+.tabbar button.on .ic{transform:translateY(-1px);}
+.tabbar button.on .ic svg{transform:scale(1.04);}
+.tabbar button:active .ic{transform:scale(.9);}
+.tabdot{width:5px;height:5px;border-radius:50%;background:var(--red);margin-top:1px;
+  box-shadow:0 0 0 2px var(--bg);}
 .tabbar--5 button{font-size:10px;}
 .tabbar--5 .ic{width:24px;height:24px;}
 .tabbar--5 .ic svg{width:23px;height:23px;}
@@ -280,6 +299,24 @@ body.motion-off .phone{animation:none;}
   .kick-player,.kick-leg,.kick-ball,.kick-net,.kick-goal,.kick-arc{animation:none !important;}
   .kick-scene{display:none;}
   .scroll{animation:none !important;}
+}
+
+/* ---------- polish: tactile feedback, focus, inputs ---------- */
+/* Springy press for any tappable row/card that opts in. */
+.tap{transition:transform .12s cubic-bezier(.2,.8,.2,1);cursor:pointer;}
+.tap:active{transform:scale(.98);}
+.wc-chip{transition:transform .1s ease;}
+.wc-chip:active{transform:scale(.94);}
+/* Accessible, on-brand focus ring for keyboard users (mouse/touch stay clean). */
+input,textarea,select{transition:border-color .15s ease,box-shadow .15s ease;}
+input:focus-visible,textarea:focus-visible,select:focus-visible{
+  border-color:var(--ink)!important;box-shadow:0 0 0 3px rgba(245,200,0,.45);outline:none;}
+button:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(245,200,0,.55);border-radius:12px;}
+/* Avatar button in the app bar gets a gentle press. */
+.appbar button{transition:transform .12s ease;}
+.appbar button:active{transform:scale(.92);}
+@media (prefers-reduced-motion:reduce){
+  .tabbar .ic,.tabbar .ic::before,.tabbar button{transition:none!important;}
 }
 
 /* ---------- responsive: full-screen on real phones ---------- */
@@ -33765,6 +33802,8 @@ body.motion-off .phone{animation:none;}
     WC.rate = rate;
     WC.FEE = d.fee;
     WC.POT = d.pot;
+    WC.charitySplit = d.charitySplit;
+    WC.CHARITY_SPLIT = d.charitySplit;
     WC.PAYOUTS = d.payouts;
     WC.LINES = d.lines;
     WC.predictions = d.predictions || [];
@@ -33837,7 +33876,8 @@ body.motion-off .phone{animation:none;}
 
   var BASE = {
     teams: {}, preds: {},
-    meta: { phase: WC.meta.phase, stageLabel: WC.meta.stageLabel },
+    fee: WC.FEE || 0,
+    meta: { phase: WC.meta.phase, stageLabel: WC.meta.stageLabel, includeDepartment: WC.meta.includeDepartment !== false },
   };
   WC.TEAM_LIST.forEach(function (t) { BASE.teams[t.code] = { alive: t.alive, stage: t.stage, rounds: t.rounds }; });
   (WC.PREDICTIONS || []).forEach(function (m) { BASE.preds[m.key] = m.answer; });
@@ -33866,20 +33906,45 @@ body.motion-off .phone{animation:none;}
     WC.meta.stageLabel = WC.meta.phase === 'pre' ? 'Group Stage'
       : WC.meta.phase === 'done' ? 'Tournament over' : 'In play';
     WC.meta.teamsLeft = WC.TEAM_LIST.filter(function (t) { return t.alive; }).length;
+    WC.meta.includeDepartment = !admin.meta || admin.meta.includeDepartment !== false;
+    var fee = admin.meta && admin.meta.entryFee != null ? Number(admin.meta.entryFee) : BASE.fee;
+    WC.FEE = isFinite(fee) && fee >= 0 ? fee : BASE.fee;
+    WC.POT = (WC.PEOPLE || []).length * WC.FEE;
   }
 
-  function persistAdmin() {
+  function charitySplitValue() {
+    var v = WC.charitySplit != null ? WC.charitySplit : WC.CHARITY_SPLIT;
+    return v == null ? CHARITY_SPLIT : Number(v);
+  }
+
+  function persistAdmin(nextAdmin) {
+    var payload = nextAdmin || admin;
     if (LIVE) {
-      var c = leagueCode(); if (!c) return;
-      try { fetch(api('/admin'), { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(admin) }); } catch (e) {}
-    } else {
-      lsSet(K.admin, admin);
+      var c = leagueCode();
+      if (!c) return Promise.reject(new Error('Join a league before changing organiser settings'));
+      return fetch(api('/admin'), { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+        .then(function (r) {
+          return r.json().catch(function () { return {}; }).then(function (j) {
+            if (!r.ok) throw new Error(j.detail || 'Could not save organiser settings');
+            return j;
+          });
+        });
     }
+    lsSet(K.admin, payload);
+    return Promise.resolve({ ok: true });
   }
   // After any admin edit: LIVE → push + re-pull resolved state; MOCK → apply locally.
   function commitAdmin() {
-    if (LIVE) { persistAdmin(); Store.refresh(); }
-    else { applyAdmin(); persistAdmin(); rebuild(); emit(); }
+    var nextAdmin = JSON.parse(JSON.stringify(admin));
+    if (LIVE) {
+      return persistAdmin(nextAdmin)
+        .then(function () { return Store.refresh(); })
+        .catch(function (e) {
+          if (window.wcToast) window.wcToast(e.message || 'Could not save organiser settings', 'crying');
+        });
+    }
+    applyAdmin(); persistAdmin(nextAdmin); rebuild(); emit();
+    return Promise.resolve();
   }
 
   if (!LIVE) applyAdmin();
@@ -33944,7 +34009,7 @@ body.motion-off .phone{animation:none;}
         if (m.answer == null) return;
         var pick = p.picks[m.key];
         if (pick == null) return;
-        if (m.kind === 'team2') { if (Array.isArray(pick) && Array.isArray(m.answer) && pick.slice().sort().join() === m.answer.slice().sort().join()) s += m.points; }
+        if (m.kind === 'team2') { if (Array.isArray(pick) && Array.isArray(m.answer) && pick.length === m.answer.length && pick.slice().sort().join() === m.answer.slice().sort().join()) s += m.points; }
         else if (pick === m.answer) s += m.points;
       });
       return s;
@@ -34051,9 +34116,9 @@ body.motion-off .phone{animation:none;}
     maxPredPoints: function () { return (WC.PREDICTIONS || []).reduce(function (a, m) { return a + m.points; }, 0); },
 
     gross: function () { return cache.length * (WC.FEE || 0); },
-    charity: function () { return cache.length * (WC.FEE || 0) * CHARITY_SPLIT; },
-    pot: function () { return cache.length * (WC.FEE || 0) * (1 - CHARITY_SPLIT); },
-    charitySplit: function () { return CHARITY_SPLIT; },
+    charity: function () { return cache.length * (WC.FEE || 0) * charitySplitValue(); },
+    pot: function () { return cache.length * (WC.FEE || 0) * (1 - charitySplitValue()); },
+    charitySplit: charitySplitValue,
 
     search: function (q) {
       q = (q || '').trim().toLowerCase();
@@ -34138,8 +34203,20 @@ body.motion-off .phone{animation:none;}
     adminState: function () { return admin; },
     teamsAlive: function () { return WC.TEAM_LIST.filter(function (t) { return t.alive; }).length; },
     phase: function () { return WC.meta.phase; },
+    entryFee: function () { return WC.FEE || 0; },
+    includeDepartment: function () { return !WC.meta || WC.meta.includeDepartment !== false; },
     setPhase: function (phase) {
       admin.meta = admin.meta || {}; admin.meta.phase = phase;
+      commitAdmin();
+    },
+    setEntryFee: function (fee) {
+      var n = Math.max(0, Math.round(Number(fee) * 100) / 100);
+      if (!isFinite(n)) return;
+      admin.meta = admin.meta || {}; admin.meta.entryFee = n;
+      commitAdmin();
+    },
+    setIncludeDepartment: function (on) {
+      admin.meta = admin.meta || {}; admin.meta.includeDepartment = !!on;
       commitAdmin();
     },
     setTeamOut: function (code, out) {
@@ -34171,7 +34248,8 @@ body.motion-off .phone{animation:none;}
       commitAdmin();
     },
     adminReset: function () {
-      admin = { teams: {}, fixtures: {}, predictions: {}, meta: {} };
+      var keep = admin.meta || {};
+      admin = { teams: {}, fixtures: {}, predictions: {}, meta: { entryFee: keep.entryFee, includeDepartment: keep.includeDepartment } };
       commitAdmin();
     }
   };
@@ -37518,15 +37596,21 @@ function StageFunnel() {
     sub: 'the draw'
   }, {
     label: 'Past groups',
-    n: P.filter(p => WC.TEAMS[p.team].rounds >= 2).length,
+    n: P.filter(p => (WC.TEAMS[p.team] || {
+      rounds: 0
+    }).rounds >= 2).length,
     sub: 'Top 2 + best 3rds'
   }, {
     label: 'Past R32',
-    n: P.filter(p => WC.TEAMS[p.team].rounds >= 3).length,
+    n: P.filter(p => (WC.TEAMS[p.team] || {
+      rounds: 0
+    }).rounds >= 3).length,
     sub: 'Last 16'
   }, {
     label: 'Into QFs',
-    n: P.filter(p => WC.TEAMS[p.team].rounds >= 4).length,
+    n: P.filter(p => (WC.TEAMS[p.team] || {
+      rounds: 0
+    }).rounds >= 4).length,
     sub: 'Last 8'
   }];
   const max = P.length;
@@ -37593,9 +37677,15 @@ function StageFunnel() {
 }
 function PersonRow(props) {
   const p = props.person;
-  const t = WC.TEAMS[p.team];
+  const t = WC.TEAMS[p.team] || {
+    code: p.team || '?',
+    flag: '🏳️',
+    rounds: 0,
+    stage: 'group'
+  };
   const you = props.you;
   const pts = window.Store ? window.Store.predScoreOf(p) : p.predScore || 0;
+  const includeDept = window.Store && window.Store.includeDepartment ? window.Store.includeDepartment() : true;
   return /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
@@ -37633,7 +37723,7 @@ function PersonRow(props) {
       overflow: 'hidden',
       textOverflow: 'ellipsis'
     }
-  }, p.location || p.city, p.department ? ' · ' + p.department : '', p.ltMember ? ' · LT' : '')), /*#__PURE__*/React.createElement("div", {
+  }, p.location || p.city, includeDept && p.department ? ' · ' + p.department : '', p.ltMember ? ' · LT' : '')), /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
       alignItems: 'center',
@@ -37686,15 +37776,23 @@ function TrackerScreen() {
   const pre = WC.meta.phase === 'pre';
   const P = window.Store ? window.Store.allSync() : WC.PEOPLE;
   const youId = window.Store ? window.Store.activeId() : null;
+  const includeDept = window.Store && window.Store.includeDepartment ? window.Store.includeDepartment() : true;
+  React.useEffect(function () {
+    if (!includeDept) setDept('');
+  }, [includeDept]);
   const depts = Array.from(new Set(P.map(p => p.department).filter(Boolean))).sort();
   const filters = [['all', 'Everyone'], ['in', 'Still in'], ['out', 'Out'], ['London', 'London'], ['Edinburgh', 'Edinburgh'], ['lt', 'LT members']];
   let list = P.slice();
   if (filter === 'in') list = list.filter(p => p.alive);else if (filter === 'out') list = list.filter(p => !p.alive);else if (filter === 'London' || filter === 'Edinburgh') list = list.filter(p => (p.location || p.city) === filter);else if (filter === 'lt') list = list.filter(p => p.ltMember || p.leadership);
-  if (dept) list = list.filter(p => p.department === dept);
+  if (includeDept && dept) list = list.filter(p => p.department === dept);
   list.sort((a, b) => {
     if (a.id === youId) return -1;
     if (b.id === youId) return 1;
-    return WC.TEAMS[b.team].rounds - WC.TEAMS[a.team].rounds;
+    return (WC.TEAMS[b.team] || {
+      rounds: 0
+    }).rounds - (WC.TEAMS[a.team] || {
+      rounds: 0
+    }).rounds;
   });
   const stillIn = P.filter(p => p.alive).length;
   const filtersShown = pre ? filters.filter(f => f[0] !== 'out') : filters;
@@ -37753,7 +37851,7 @@ function TrackerScreen() {
       cursor: 'pointer',
       flex: '0 0 auto'
     }
-  }, lab))), /*#__PURE__*/React.createElement("div", {
+  }, lab))), includeDept && /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
       gap: 8,
@@ -38182,11 +38280,11 @@ function PreVerdict() {
       fontWeight: 600,
       color: 'var(--ink2)'
     }
-  }, "Wheesht\u2019s running commentary \u2014 once there\u2019s something to comment on."))), /*#__PURE__*/React.createElement(Says2, {
-    mood: "confident",
-    label: "pre-match",
+  }, "Wheesht\u2019s running commentary now the football has started."))), /*#__PURE__*/React.createElement(Says2, {
+    mood: "broadcast",
+    label: "live",
     animate: true
-  }, "Not a ball kicked yet. Wheesht is loosening the whistle, ironing the tartan, and watching every one of ye. Get yer predictions in."), /*#__PURE__*/React.createElement(SH2, null, "Countdown"), /*#__PURE__*/React.createElement(Card2, {
+  }, "The first whistle has gone. No hiding now: the sweepstake is live, the notes are being taken, and Wheesht is watching every one of ye."), /*#__PURE__*/React.createElement(SH2, null, "Tournament status"), /*#__PURE__*/React.createElement(Card2, {
     bordered: true,
     style: {
       background: 'var(--ink)',
@@ -38202,20 +38300,20 @@ function PreVerdict() {
       color: 'var(--yellow)',
       textTransform: 'uppercase'
     }
-  }, "First whistle"), /*#__PURE__*/React.createElement("div", {
+  }, "First whistle gone"), /*#__PURE__*/React.createElement("div", {
     className: "dh",
     style: {
       fontSize: 34,
       margin: '4px 0 2px',
       color: '#fff'
     }
-  }, WC2.meta.kickoff || 'Soon'), /*#__PURE__*/React.createElement("div", {
+  }, "Tournament live"), /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 13,
       fontWeight: 600,
       opacity: .8
     }
-  }, "Group stage kicks off \xB7 ", WC2.meta.season)), /*#__PURE__*/React.createElement(SH2, null, "Where it stands"), /*#__PURE__*/React.createElement("div", {
+  }, "Group stage underway \xB7 ", WC2.meta.season)), /*#__PURE__*/React.createElement(SH2, null, "Where it stands"), /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'grid',
       gridTemplateColumns: '1fr 1fr',
@@ -38239,10 +38337,10 @@ function PreVerdict() {
       fontWeight: 700,
       color: 'var(--ink2)'
     }
-  }, s[1])))), /*#__PURE__*/React.createElement(SH2, null, "Wheesht\u2019s pre-match notes"), [{
+  }, s[1])))), /*#__PURE__*/React.createElement(SH2, null, "Wheesht\u2019s notes"), [{
     m: 'mischievous',
-    t: 'Predictions close at kick-off',
-    d: 'Every market’s open. After the first whistle, no takebacks. Wheesht has a long memory.'
+    t: 'Predictions are closed',
+    d: 'The first whistle has gone. No takebacks now. Wheesht has a long memory.'
   }, {
     m: 'scottish',
     t: 'The homeland watch',
@@ -38978,6 +39076,7 @@ function CreateLeague(props) {
 function FindMyEntry(props) {
   const [q, setQ] = oState('');
   const results = q.trim() ? So.search(q) : [];
+  const includeDept = So.includeDepartment ? So.includeDepartment() : true;
   return /*#__PURE__*/React.createElement("div", {
     className: "moment"
   }, /*#__PURE__*/React.createElement("div", {
@@ -39103,7 +39202,7 @@ function FindMyEntry(props) {
         fontWeight: 700,
         color: 'var(--ink2)'
       }
-    }, p.location, p.department ? ' · ' + p.department : '')), t && /*#__PURE__*/React.createElement(Fo, {
+    }, p.location, includeDept && p.department ? ' · ' + p.department : '')), t && /*#__PURE__*/React.createElement(Fo, {
       team: t,
       size: 22
     }), /*#__PURE__*/React.createElement("span", {
@@ -39122,7 +39221,12 @@ function OnboardingForm(props) {
   const [dept, setDept] = oState('');
   const [loc, setLoc] = oState('Edinburgh');
   const [lt, setLt] = oState(false);
+  const includeDept = So.includeDepartment ? So.includeDepartment() : true;
   const ok = name.trim().length > 0;
+  const split = So.charitySplit ? So.charitySplit() : 0.5;
+  const fee = WCo.FEE || 0;
+  const charityPerEntry = fee * split;
+  const winnerAfterEntry = (window.Store ? window.Store.pot() : WCo.POT * (1 - split)) + fee * (1 - split);
   return /*#__PURE__*/React.createElement("div", {
     className: "moment"
   }, /*#__PURE__*/React.createElement("div", {
@@ -39183,7 +39287,7 @@ function OnboardingForm(props) {
     value: name,
     onChange: e => setName(e.target.value),
     placeholder: "e.g. Davie McAllister"
-  })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement(Lab, {
+  })), includeDept && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement(Lab, {
     opt: true
   }, "Team / department"), /*#__PURE__*/React.createElement("input", {
     style: inp,
@@ -39235,12 +39339,12 @@ function OnboardingForm(props) {
       fontSize: 28,
       margin: '2px 0 4px'
     }
-  }, "You're putting in \xA3", WCo.FEE, "."), /*#__PURE__*/React.createElement("div", {
+  }, "You're putting in \xA3", fee, "."), /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 14,
       fontWeight: 600
     }
-  }, /*#__PURE__*/React.createElement("b", null, "\xA3", (WCo.FEE / 2).toFixed(2).replace(/\.00$/, ''), " goes to charity"), ", the other half into a winner-takes-all pot \u2014 ", /*#__PURE__*/React.createElement("b", null, '£' + ((window.Store ? window.Store.pot() : WCo.POT * 0.5) + WCo.FEE * 0.5).toLocaleString('en-GB')), " once you're in, and growing with every sign-up.")), /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement("b", null, "\xA3", charityPerEntry.toFixed(2).replace(/\.00$/, ''), " goes to charity"), ", the rest into a winner-takes-all fund \u2014 ", /*#__PURE__*/React.createElement("b", null, '£' + Math.round(winnerAfterEntry).toLocaleString('en-GB')), " once you're in, and growing with every sign-up.")), /*#__PURE__*/React.createElement("div", {
     style: {
       marginTop: 18
     }
@@ -39249,7 +39353,7 @@ function OnboardingForm(props) {
     block: true,
     onClick: () => ok && props.onSubmit({
       name: name.trim(),
-      department: dept.trim(),
+      department: includeDept ? dept.trim() : '',
       location: loc,
       ltMember: lt
     })
@@ -39825,12 +39929,22 @@ function stageName(t) {
   if (t.stage === 'out-r32') return 'Out · Round of 32';
   return 'Out · Group stage';
 }
+function dashTeam(code) {
+  return WCd.TEAMS[code] || {
+    code: code || '?',
+    name: code || 'TBD',
+    flag: '🏳️',
+    rounds: 0,
+    stage: 'group',
+    odds: '0'
+  };
+}
 function overallRank(me) {
   const rows = Sd.allSync().slice().sort((a, b) => {
-    const ta = WCd.TEAMS[a.team],
-      tb = WCd.TEAMS[b.team];
+    const ta = dashTeam(a.team),
+      tb = dashTeam(b.team);
     if (tb.rounds !== ta.rounds) return tb.rounds - ta.rounds;
-    return parseInt(ta.odds.slice(1)) - parseInt(tb.odds.slice(1));
+    return parseInt(String(ta.odds).slice(1) || '0') - parseInt(String(tb.odds).slice(1) || '0');
   });
   const i = rows.findIndex(p => p.id === me.id);
   return {
@@ -39840,7 +39954,8 @@ function overallRank(me) {
 }
 function ProfileHeader(props) {
   const me = props.me;
-  const t = WCd.TEAMS[me.team];
+  const t = dashTeam(me.team);
+  const includeDept = Sd.includeDepartment ? Sd.includeDepartment() : true;
   return /*#__PURE__*/React.createElement(Cd, {
     bordered: true,
     className: "pop"
@@ -39873,7 +39988,7 @@ function ProfileHeader(props) {
       marginTop: 7,
       flexWrap: 'wrap'
     }
-  }, /*#__PURE__*/React.createElement(Chd, null, me.location), me.department && /*#__PURE__*/React.createElement(Chd, null, me.department), me.ltMember && /*#__PURE__*/React.createElement(Chd, {
+  }, /*#__PURE__*/React.createElement(Chd, null, me.location), includeDept && me.department && /*#__PURE__*/React.createElement(Chd, null, me.department), me.ltMember && /*#__PURE__*/React.createElement(Chd, {
     tone: "yellow"
   }, "LT"))), /*#__PURE__*/React.createElement("button", {
     onClick: props.onEdit,
@@ -39890,6 +40005,7 @@ function EditProfile(props) {
   const [dept, setDept] = dState(me.department || '');
   const [loc, setLoc] = dState(me.location || 'London');
   const [lt, setLt] = dState(!!me.ltMember);
+  const includeDept = Sd.includeDepartment ? Sd.includeDepartment() : true;
   const fld = {
     width: '100%',
     border: '2.5px solid var(--ink)',
@@ -39974,7 +40090,7 @@ function EditProfile(props) {
     style: fld,
     value: name,
     onChange: e => setName(e.target.value)
-  })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+  })), includeDept && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
     style: {
       fontWeight: 800,
       fontSize: 13,
@@ -40019,7 +40135,7 @@ function EditProfile(props) {
     onClick: () => {
       Sd.update(me.id, {
         name: name.trim() || me.name,
-        department: dept.trim(),
+        department: includeDept ? dept.trim() : me.department,
         location: loc,
         city: loc,
         ltMember: lt,
@@ -40031,7 +40147,7 @@ function EditProfile(props) {
 }
 function TeamCard(props) {
   const me = props.me;
-  const t = WCd.TEAMS[me.team];
+  const t = dashTeam(me.team);
   const nextTie = (WCd.R16 || []).find(x => (x.a === me.team || x.b === me.team) && !x.done);
   const opp = nextTie ? WCd.TEAMS[nextTie.a === me.team ? nextTie.b : nextTie.a] : null;
   const pre = PRE();
@@ -40280,7 +40396,7 @@ function PredCard(props) {
 }
 function WinningsCard(props) {
   const me = props.me;
-  const t = WCd.TEAMS[me.team];
+  const t = dashTeam(me.team);
   const pot = Sd.pot ? Sd.pot() : WCd.POT * 0.5;
   const charity = Sd.charity ? Sd.charity() : WCd.POT * 0.5;
   const ov = overallRank(me);
@@ -40402,7 +40518,7 @@ function WinningsCard(props) {
 }
 function ActivityFeed(props) {
   const me = props.me;
-  const t = WCd.TEAMS[me.team];
+  const t = dashTeam(me.team);
   const pre = PRE();
   const items = [];
   if (pre) {
@@ -40427,9 +40543,9 @@ function ActivityFeed(props) {
     });
     items.push({
       m: 'broadcast',
-      t: 'Tournament kicks off',
-      d: (WCd.meta.kickoff || 'Soon') + ' — first whistle of the group stage.',
-      when: 'upcoming'
+      t: 'Tournament is underway',
+      d: 'The first whistle has gone. Wheesht is taking notes.',
+      when: 'live'
     });
     items.push({
       m: 'neutral',
@@ -40503,7 +40619,7 @@ function MeScreen(props) {
   const me = Sd.active();
   const [edit, setEdit] = dState(false);
   if (!me) return null;
-  const t = WCd.TEAMS[me.team];
+  const t = dashTeam(me.team);
   const pre = PRE();
   const greetMood = pre ? 'happy' : t.alive ? 'happy' : 'crying';
   return /*#__PURE__*/React.createElement("div", {
@@ -40885,6 +41001,13 @@ const {
 const {
   useState: gState
 } = React;
+function gameTeam(code) {
+  return WCg.TEAMS[code] || {
+    code: code || 'TBD',
+    name: code || 'To be decided',
+    flag: '🏳️'
+  };
+}
 function ownedSet() {
   var set = {};
   (Sg ? Sg.allSync() : WCg.PEOPLE).forEach(function (p) {
@@ -40896,7 +41019,7 @@ function statusOf(f) {
   return f.status || 'upcoming';
 }
 function TeamLine(props) {
-  const t = WCg.TEAMS[props.code];
+  const t = gameTeam(props.code);
   const owners = props.owners;
   return /*#__PURE__*/React.createElement("div", {
     style: {
@@ -41035,8 +41158,8 @@ function FixtureRow(props) {
 function NextUp(props) {
   const f = props.f;
   if (!f) return null;
-  const ta = WCg.TEAMS[f.a],
-    tb = WCg.TEAMS[f.b];
+  const ta = gameTeam(f.a),
+    tb = gameTeam(f.b);
   return /*#__PURE__*/React.createElement(Cg, {
     bordered: true,
     style: {
@@ -41164,7 +41287,7 @@ function GamesScreen() {
     }
   }, all.length, " group-stage fixtures \xB7 kick-off ", WCg.meta.kickoff || 'soon'))), nextMine ? /*#__PURE__*/React.createElement(NextUp, {
     f: nextMine,
-    label: 'Your ' + WCg.TEAMS[mineTeam].name + ' play next'
+    label: 'Your ' + gameTeam(mineTeam).name + ' play next'
   }) : /*#__PURE__*/React.createElement(NextUp, {
     f: nextOverall,
     label: "First whistle"
@@ -41232,12 +41355,12 @@ window.GamesScreen = GamesScreen;
 
 <script>
 /* ===========================================================================
-   ADMIN — Wheesht's clipboard. Run the sweepstake through the tournament:
-   set the phase, mark teams out (owners flip to eliminated automatically),
-   enter match results (fixtures go live / done), and set prediction answers
-   (everyone's score + the league re-grade instantly). All changes persist via
-   Store and, in live mode, push to the backend so every device picks them up.
-   =========================================================================== */
+    ADMIN — Wheesht's clipboard. Run the sweepstake through the tournament:
+    set the phase, mark teams out (owners flip to eliminated automatically),
+    enter match results (fixtures go live / done), and set prediction answers
+    (everyone's score + the league re-grade instantly). All changes persist via
+    Store and, in live mode, push to the backend so every device picks them up.
+    =========================================================================== */
 const WCa = window.WC;
 const Wa = window.Wheesht;
 const Sa = window.Store;
@@ -41251,11 +41374,18 @@ const {
 const {
   useState: aState2
 } = React;
+function adminTeam(code) {
+  return WCa.TEAMS[code] || {
+    code: code || 'TBD',
+    name: code || 'To be decided',
+    flag: '🏳️'
+  };
+}
 
 /* ---- match banter ----------------------------------------------------------
-   When the organiser saves a full-time score, Wheesht pipes up in the house
-   voice: homeland bias for Scotland, dry "remaining professional" digs at
-   England, plain dry wit for everyone else. Returns {text, mood} for wcToast. */
+    When the organiser saves a full-time score, Wheesht pipes up in the house
+    voice: homeland bias for Scotland, dry "remaining professional" digs at
+    England, plain dry wit for everyone else. Returns {text, mood} for wcToast. */
 function matchBanter(f, a, b) {
   const ta = WCa.TEAMS[f.a],
     tb = WCa.TEAMS[f.b];
@@ -41377,8 +41507,8 @@ function TeamToggle(props) {
 function ScoreStepper(props) {
   const [a, setA] = aState2(props.a);
   const [b, setB] = aState2(props.b);
-  const ta = WCa.TEAMS[props.f.a],
-    tb = WCa.TEAMS[props.f.b];
+  const ta = adminTeam(props.f.a),
+    tb = adminTeam(props.f.b);
   function step(box, setter, val, d) {
     var n = Math.max(0, val + d);
     setter(n);
@@ -41457,8 +41587,8 @@ function ScoreStepper(props) {
 function FixtureAdminRow(props) {
   const f = props.f;
   const [open, setOpen] = aState2(false);
-  const ta = WCa.TEAMS[f.a],
-    tb = WCa.TEAMS[f.b];
+  const ta = adminTeam(f.a),
+    tb = adminTeam(f.b);
   const st = f.status || 'upcoming';
   return /*#__PURE__*/React.createElement(Ca, {
     flat: true,
@@ -41546,7 +41676,7 @@ function FixtureAdminRow(props) {
       padding: '5px 10px',
       boxShadow: '0 3px 0 var(--shadow)'
     }
-  }, st === 'live' ? 'Stop live' : 'Go live'), /*#__PURE__*/React.createElement("button", {
+  }, st === 'upcoming' ? 'Go live' : 'Go back'), /*#__PURE__*/React.createElement("button", {
     onClick: () => setOpen(!open),
     className: "wc-btn wc-btn--sm",
     style: {
@@ -41633,12 +41763,187 @@ function PredAdmin(props) {
         borderRadius: 10,
         padding: '6px 10px',
         fontFamily: 'var(--body)',
-        fontWeight: 800,
-        fontSize: 12.5,
+        fontWeight: 700,
+        fontSize: 13,
         cursor: 'pointer'
       }
     }, label(opt));
   })));
+}
+function moneyAdmin(n) {
+  return '£' + (Math.round(Number(n || 0) * 100) / 100).toLocaleString('en-GB', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2
+  });
+}
+function SettingsAdmin() {
+  const [, bump] = aState2(0);
+  React.useEffect(() => Sa.subscribe(() => bump(x => x + 1)), []);
+  const feeNow = Sa.entryFee ? Sa.entryFee() : WCa.FEE;
+  const [fee, setFee] = aState2(String(feeNow || 0));
+  React.useEffect(() => setFee(String(feeNow || 0)), [feeNow]);
+  const entrants = Sa.allSync().length;
+  const split = Sa.charitySplit ? Sa.charitySplit() : 0.5;
+  const n = Number(fee);
+  const feeNum = isFinite(n) && n >= 0 ? n : feeNow;
+  const gross = entrants * feeNum;
+  const charity = gross * split;
+  const winner = gross * (1 - split);
+  const includeDept = Sa.includeDepartment ? Sa.includeDepartment() : true;
+  const fld = {
+    width: '100%',
+    border: '2.5px solid var(--ink)',
+    borderRadius: 12,
+    padding: '11px 13px',
+    fontFamily: 'var(--disp)',
+    fontWeight: 800,
+    fontSize: 22,
+    outline: 'none',
+    background: '#fff'
+  };
+  function saveFee() {
+    const val = Number(fee);
+    if (!isFinite(val) || val < 0) {
+      setFee(String(feeNow || 0));
+      return;
+    }
+    Sa.setEntryFee(val);
+    if (window.wcToast) window.wcToast('Entry fee set to £' + val.toLocaleString('en-GB'), 'confident');
+  }
+  function toggleRow(onClick, on, title, text) {
+    return /*#__PURE__*/React.createElement("button", {
+      onClick: onClick,
+      style: {
+        width: '100%',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 11,
+        textAlign: 'left',
+        border: '2px solid var(--line)',
+        borderRadius: 13,
+        background: '#fff',
+        padding: '11px 12px',
+        cursor: 'pointer'
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        width: 42,
+        height: 24,
+        borderRadius: 999,
+        background: on ? 'var(--green)' : 'var(--line)',
+        border: '2px solid var(--ink)',
+        position: 'relative',
+        flex: '0 0 auto'
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        position: 'absolute',
+        top: 2,
+        left: on ? 20 : 2,
+        width: 16,
+        height: 16,
+        borderRadius: '50%',
+        background: '#fff',
+        border: '2px solid var(--ink)'
+      }
+    })), /*#__PURE__*/React.createElement("span", {
+      style: {
+        flex: 1,
+        minWidth: 0
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      className: "dh",
+      style: {
+        display: 'block',
+        fontSize: 15
+      }
+    }, title), /*#__PURE__*/React.createElement("span", {
+      style: {
+        display: 'block',
+        fontSize: 12,
+        fontWeight: 600,
+        color: 'var(--ink2)',
+        marginTop: 2,
+        lineHeight: 1.3
+      }
+    }, text)));
+  }
+  return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(Ca, {
+    bordered: true,
+    style: {
+      background: 'var(--yellow)',
+      marginBottom: 12
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      fontWeight: 800,
+      letterSpacing: '.06em',
+      textTransform: 'uppercase'
+    }
+  }, "Entry fee"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: 9,
+      alignItems: 'center',
+      marginTop: 7
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "dh",
+    style: {
+      fontSize: 24
+    }
+  }, "\xA3"), /*#__PURE__*/React.createElement("input", {
+    type: "number",
+    min: "0",
+    step: "0.5",
+    value: fee,
+    onChange: e => setFee(e.target.value),
+    onBlur: saveFee,
+    style: fld
+  }), /*#__PURE__*/React.createElement("button", {
+    onClick: saveFee,
+    className: "wc-btn wc-btn--sm wc-btn--ink",
+    style: {
+      flex: '0 0 auto'
+    }
+  }, "Save")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12.5,
+      fontWeight: 700,
+      color: 'var(--ink2)',
+      marginTop: 9
+    }
+  }, entrants, " entrants at ", moneyAdmin(feeNum), " each.")), /*#__PURE__*/React.createElement(Ca, {
+    flat: true,
+    style: {
+      padding: '12px 13px',
+      marginBottom: 12
+    }
+  }, [['Total collected', gross, 'var(--ink)'], ['Winner fund', winner, 'var(--green)'], ['Charity fund', charity, 'var(--red)']].map((r, i) => /*#__PURE__*/React.createElement("div", {
+    key: r[0],
+    style: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: 8,
+      padding: i ? '8px 0 0' : '0',
+      borderTop: i ? '1.5px solid var(--line)' : 'none',
+      marginTop: i ? 8 : 0
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      flex: 1,
+      fontSize: 13,
+      fontWeight: 800,
+      color: 'var(--ink2)'
+    }
+  }, r[0]), /*#__PURE__*/React.createElement("span", {
+    className: "dh",
+    style: {
+      fontSize: 19,
+      color: r[2]
+    }
+  }, moneyAdmin(r[1]))))), /*#__PURE__*/React.createElement(SHa, null, "Signup fields"), toggleRow(() => Sa.setIncludeDepartment(!includeDept), includeDept, 'Team / department field', includeDept ? 'Shown on signup, profile editing and the directory.' : 'Hidden from signup, profile editing and directory filters.'));
 }
 function AdminPanel(props) {
   const [, bump] = aState2(0);
@@ -41646,12 +41951,12 @@ function AdminPanel(props) {
   const [sec, setSec] = aState2('results');
   const [mdFilter, setMdFilter] = aState2(0);
   const owned = {};
-  Sa.allSync().forEach(p => {
+  const allPeople = Sa.allSync() || [];
+  allPeople.forEach(p => {
     owned[p.team] = (owned[p.team] || 0) + 1;
   });
   const groups = 'ABCDEFGHIJKL'.split('');
   const fixtures = (WCa.FIXTURES || []).filter(f => mdFilter === 0 || f.matchday === mdFilter);
-  // group fixtures by date
   const byDate = [];
   const seen = {};
   fixtures.forEach(f => {
@@ -41664,7 +41969,7 @@ function AdminPanel(props) {
     }
     seen[f.dateISO].items.push(f);
   });
-  const secs = [['results', 'Results'], ['teams', 'Teams'], ['predict', 'Predictions'], ['people', 'People'], ['chat', 'Chat']];
+  const secs = [['results', 'Results'], ['teams', 'Teams'], ['predict', 'Predictions'], ['people', 'People'], ['chat', 'Chat'], ['settings', 'Settings']];
   return /*#__PURE__*/React.createElement("div", {
     className: "moment",
     style: {
@@ -41702,7 +42007,7 @@ function AdminPanel(props) {
       fontWeight: 700,
       color: 'var(--yellow)'
     }
-  }, Sa.activeLeague && Sa.activeLeague() ? Sa.activeLeague().name : 'Admin', " \xB7 ", Sa.allSync().length, " entrants")), /*#__PURE__*/React.createElement("button", {
+  }, Sa.activeLeague && Sa.activeLeague() ? Sa.activeLeague().name : 'Admin', " \xB7 ", allPeople.length, " entrants")), /*#__PURE__*/React.createElement("button", {
     onClick: props.onClose,
     style: {
       border: 'none',
@@ -41713,9 +42018,10 @@ function AdminPanel(props) {
       borderRadius: 10,
       fontSize: 18,
       fontWeight: 900,
-      cursor: 'pointer'
+      cursor: 'pointer',
+      padding: 0
     }
-  }, "\xD7")), /*#__PURE__*/React.createElement("div", {
+  }, "\u2715")), /*#__PURE__*/React.createElement("div", {
     className: "mscroll",
     style: {
       padding: '16px 18px 30px'
@@ -41724,16 +42030,18 @@ function AdminPanel(props) {
     style: {
       display: 'flex',
       gap: 7,
-      margin: '20px 0 14px'
+      margin: '20px 0 14px',
+      flexWrap: 'wrap'
     }
   }, secs.map(([k, lab]) => /*#__PURE__*/React.createElement("button", {
     key: k,
     onClick: () => setSec(k),
     className: 'wc-chip' + (sec === k ? ' wc-chip--yellow' : ''),
     style: {
-      flex: 1,
+      flex: '1 0 30%',
       cursor: 'pointer',
-      textAlign: 'center'
+      textAlign: 'center',
+      justifyContent: 'center'
     }
   }, lab))), sec === 'results' && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     style: {
@@ -41803,7 +42111,7 @@ function AdminPanel(props) {
   }, "Set the answer once it's known \u2014 every entrant's score and the league re-grade instantly."), (WCa.predictions || Sa.PREDICTIONS).map(m => /*#__PURE__*/React.createElement(PredAdmin, {
     key: m.key,
     m: m
-  }))), sec === 'people' && /*#__PURE__*/React.createElement(PeopleAdmin, null), sec === 'chat' && /*#__PURE__*/React.createElement(ChatAdmin, null), /*#__PURE__*/React.createElement("div", {
+  }))), sec === 'people' && /*#__PURE__*/React.createElement(PeopleAdmin, null), sec === 'chat' && /*#__PURE__*/React.createElement(ChatAdmin, null), sec === 'settings' && /*#__PURE__*/React.createElement(SettingsAdmin, null), /*#__PURE__*/React.createElement("div", {
     style: {
       marginTop: 22,
       borderTop: '2px solid var(--line)',
@@ -41822,13 +42130,14 @@ function AdminPanel(props) {
       fontFamily: 'var(--disp)',
       fontWeight: 800,
       fontSize: 13,
-      padding: '11px',
+      padding: '10px',
       cursor: 'pointer'
     }
-  }, "Reset tournament to pre-kickoff"))));
+  }, "Reset everything"))));
 }
 function PeopleAdmin() {
   const [q, setQ] = aState2('');
+  const includeDept = Sa.includeDepartment ? Sa.includeDepartment() : true;
   const all = Sa.allSync().slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''));
   const list = q.trim() ? all.filter(p => (p.name || '').toLowerCase().indexOf(q.toLowerCase()) >= 0) : all;
   const fld = {
@@ -41852,7 +42161,7 @@ function PeopleAdmin() {
       color: 'var(--ink2)',
       marginBottom: 10
     }
-  }, "Remove an entrant \u2014 say they dropped out or paid late. Frees their slot and trims the pot & charity totals."), /*#__PURE__*/React.createElement("input", {
+  }, "Remove an entrant \u2014 say they dropped out or paid late. Frees their slot and trims the pot & charity."), /*#__PURE__*/React.createElement("input", {
     style: fld,
     placeholder: "Search entrants\u2026",
     value: q,
@@ -41880,7 +42189,7 @@ function PeopleAdmin() {
       color: 'var(--ink2)',
       marginTop: 3
     }
-  }, all.length ? 'Try a different name.' : 'They’ll appear here as people sign up.')) : /*#__PURE__*/React.createElement(Ca, {
+  }, all.length ? 'Try a different name.' : "They'll appear here as people sign up.")) : /*#__PURE__*/React.createElement(Ca, {
     flat: true,
     style: {
       padding: '2px 13px'
@@ -41918,7 +42227,7 @@ function PeopleAdmin() {
         fontWeight: 700,
         color: 'var(--ink2)'
       }
-    }, p.location || p.city || '', p.department ? ' · ' + p.department : '', t ? ' · ' + t.name : '')), /*#__PURE__*/React.createElement("button", {
+    }, p.location || p.city || '', includeDept && p.department ? ' · ' + p.department : '', t ? ' · ' + t.name : '')), /*#__PURE__*/React.createElement("button", {
       onClick: () => remove(p),
       className: "wc-btn wc-btn--sm",
       style: {
@@ -41932,8 +42241,8 @@ function PeopleAdmin() {
 }
 
 /* ---- chat moderation -------------------------------------------------------
-   Live only. Lists recent messages newest-first; the organiser can delete any
-   one (server removes it from data/chat.json). */
+    Live only. Lists recent messages newest-first; the organiser can delete any
+    one (server removes it from data/chat.json). */
 function ChatAdmin() {
   const [msgs, setMsgs] = aState2([]);
   const [loading, setLoading] = aState2(true);
@@ -42002,7 +42311,7 @@ function ChatAdmin() {
       padding: '24px 14px'
     }
   }, /*#__PURE__*/React.createElement(Wa, {
-    mood: "waiting",
+    mood: "neutral",
     size: 56,
     animate: true
   }), /*#__PURE__*/React.createElement("div", {
@@ -42047,10 +42356,10 @@ function ChatAdmin() {
         justifyContent: 'center',
         fontFamily: 'var(--disp)',
         fontWeight: 800,
-        fontSize: 11,
-        flexShrink: 0
+        fontSize: 12,
+        flex: '0 0 auto'
       }
-    }, m.initials || '?'), /*#__PURE__*/React.createElement("div", {
+    }, m.initials), /*#__PURE__*/React.createElement("div", {
       style: {
         flex: 1,
         minWidth: 0
@@ -42084,9 +42393,9 @@ function ChatAdmin() {
 }
 
 /* ---- PIN gate --------------------------------------------------------------
-   Soft gate in front of the clipboard. Not real auth — just stops a casual tap
-   on a shared link from wiping the sweepstake. PIN comes from the tournament
-   config (meta.adminPin); empty config means no gate. Unlock lasts the session. */
+    Soft gate in front of the clipboard. Not real auth — just stops a casual tap
+    on a shared link from wiping the sweepstake. PIN comes from the tournament
+    config (meta.adminPin); empty config means no gate. Unlock lasts the session. */
 function AdminGate(props) {
   const PIN = WCa.meta && WCa.meta.adminPin || '';
   const [ok, setOk] = aState2(() => {
@@ -42137,7 +42446,7 @@ function AdminGate(props) {
       fontWeight: 900,
       cursor: 'pointer'
     }
-  }, "\xD7"), /*#__PURE__*/React.createElement("div", {
+  }, "\u2715"), /*#__PURE__*/React.createElement("div", {
     className: 'rise' + (bad ? ' shake' : ''),
     style: {
       width: '100%',
@@ -42162,7 +42471,7 @@ function AdminGate(props) {
       marginTop: 6,
       lineHeight: 1.45
     }
-  }, bad ? 'Wrong code. Wheesht is watching. Try again.' : 'Enter the organiser code. Wheesht doesn’t hand the clipboard to just anyone.'), /*#__PURE__*/React.createElement("input", {
+  }, bad ? 'Wrong code. Wheesht is watching. Try again.' : "Enter the organiser code. Wheesht doesn't hand the clipboard to just anyone."), /*#__PURE__*/React.createElement("input", {
     autoFocus: true,
     type: "password",
     inputMode: "numeric",
@@ -42184,11 +42493,9 @@ function AdminGate(props) {
       fontWeight: 800,
       fontSize: 22,
       textAlign: 'center',
-      letterSpacing: '.3em',
-      outline: 'none',
-      marginTop: 18,
-      background: '#fff',
-      color: 'var(--ink)'
+      letterSpacing: '.1em',
+      marginTop: 14,
+      outline: 'none'
     }
   }), /*#__PURE__*/React.createElement("button", {
     onClick: submit,
@@ -42208,7 +42515,7 @@ window.AdminGate = AdminGate;
 function _extends() { return _extends = Object.assign ? Object.assign.bind() : function (n) { for (var e = 1; e < arguments.length; e++) { var t = arguments[e]; for (var r in t) ({}).hasOwnProperty.call(t, r) && (n[r] = t[r]); } return n; }, _extends.apply(null, arguments); }
 /* ===========================================================================
    APP SHELL — identity gate · onboarding flow · tab nav · account switcher ·
-   moment replays · admin tweaks.
+   admin tweaks.
    =========================================================================== */
 const A_WC = window.WC;
 const A_W = window.Wheesht;
@@ -42371,8 +42678,24 @@ function StatusBar() {
 }
 function AppBar(props) {
   const me = props.me;
+  const ref = React.useRef(null);
+  React.useEffect(() => {
+    const bar = ref.current;
+    if (!bar) return;
+    const sc = bar.closest('.scroll');
+    if (!sc) return;
+    const onScroll = () => {
+      bar.classList.toggle('is-stuck', sc.scrollTop > 4);
+    };
+    onScroll();
+    sc.addEventListener('scroll', onScroll, {
+      passive: true
+    });
+    return () => sc.removeEventListener('scroll', onScroll);
+  }, []);
   return /*#__PURE__*/React.createElement("div", {
-    className: "appbar"
+    className: "appbar",
+    ref: ref
   }, /*#__PURE__*/React.createElement("div", {
     className: "mk"
   }, /*#__PURE__*/React.createElement(A_W, {
@@ -42383,14 +42706,7 @@ function AppBar(props) {
       flex: 1,
       minWidth: 0
     }
-  }, /*#__PURE__*/React.createElement("h1", null, A_WC.league && A_WC.league.name || A_WC.meta.name), /*#__PURE__*/React.createElement("p", null, A_WC.meta.season, " \xB7 ", A_WC.meta.stageLabel)), /*#__PURE__*/React.createElement("button", {
-    onClick: props.onMoments,
-    className: "wc-btn wc-btn--sm",
-    style: {
-      padding: '8px 11px',
-      boxShadow: '0 4px 0 var(--shadow)'
-    }
-  }, "Moments"), me && /*#__PURE__*/React.createElement("button", {
+  }, /*#__PURE__*/React.createElement("h1", null, A_WC.league && A_WC.league.name || A_WC.meta.name), /*#__PURE__*/React.createElement("p", null, A_WC.meta.season, " \xB7 ", A_WC.meta.stageLabel)), me && /*#__PURE__*/React.createElement("button", {
     onClick: props.onAccount,
     style: {
       border: 'none',
@@ -42427,6 +42743,7 @@ function TabBar(props) {
 function AccountSheet(props) {
   const accounts = A_S.deviceAccounts();
   const activeId = A_S.activeId();
+  const includeDept = A_S.includeDepartment ? A_S.includeDepartment() : true;
   return /*#__PURE__*/React.createElement("div", {
     style: {
       position: 'absolute',
@@ -42539,7 +42856,7 @@ function AccountSheet(props) {
         fontWeight: 700,
         color: 'var(--ink2)'
       }
-    }, p.location, p.department ? ' · ' + p.department : '')), t && /*#__PURE__*/React.createElement(window.Flag, {
+    }, p.location, includeDept && p.department ? ' · ' + p.department : '')), t && /*#__PURE__*/React.createElement(window.Flag, {
       team: t,
       size: 24
     })), /*#__PURE__*/React.createElement("button", {
@@ -42614,105 +42931,6 @@ function AccountSheet(props) {
     d: "M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1"
   })), "Organiser tools")));
 }
-
-/* ---- moments / replays ---- */
-function MomentMenu(props) {
-  const me = props.me;
-  const myTeam = me ? A_WC.TEAMS[me.team] : null;
-  const items = [['draw', 'See your draw again', myTeam ? 'You drew ' + myTeam.name : 'Your team reveal', 'confident'], ['scotland', 'Replay: You drew Scotland', 'The full tartan meltdown', 'scottish'], ['england', 'Replay: You drew England', 'Wheesht stays professional. Barely.', 'mischievous'], ['result', 'Tonight’s result', 'Norway 2–1 England', 'shocked'], ['final', 'The final', 'Spain vs France · the ceremony', 'celebrating']];
-  return /*#__PURE__*/React.createElement("div", {
-    style: {
-      position: 'absolute',
-      inset: 0,
-      zIndex: 70,
-      display: 'flex',
-      flexDirection: 'column',
-      justifyContent: 'flex-end'
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    onClick: props.onClose,
-    style: {
-      position: 'absolute',
-      inset: 0,
-      background: 'rgba(26,26,26,.45)'
-    }
-  }), /*#__PURE__*/React.createElement("div", {
-    className: "rise",
-    style: {
-      position: 'relative',
-      background: 'var(--bg)',
-      borderRadius: '26px 26px 0 0',
-      padding: '18px 18px 28px',
-      boxShadow: '0 -20px 50px rgba(0,0,0,.3)'
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      width: 44,
-      height: 5,
-      borderRadius: 3,
-      background: 'var(--line)',
-      margin: '0 auto 14px'
-    }
-  }), /*#__PURE__*/React.createElement("div", {
-    className: "dh",
-    style: {
-      fontSize: 22,
-      marginBottom: 4
-    }
-  }, "Relive a moment"), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 13,
-      fontWeight: 600,
-      color: 'var(--ink2)',
-      marginBottom: 12
-    }
-  }, "Every big beat of the sweepstake. Wheesht included, obviously."), /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: 'flex',
-      flexDirection: 'column',
-      gap: 9
-    }
-  }, items.map(it => /*#__PURE__*/React.createElement("button", {
-    key: it[0],
-    onClick: () => props.onPick(it[0]),
-    style: {
-      display: 'flex',
-      alignItems: 'center',
-      gap: 12,
-      background: '#fff',
-      border: '2.5px solid var(--ink)',
-      borderRadius: 16,
-      padding: '9px 13px',
-      cursor: 'pointer',
-      textAlign: 'left',
-      boxShadow: '0 4px 0 var(--ink)'
-    }
-  }, /*#__PURE__*/React.createElement(A_W, {
-    mood: it[3],
-    size: 46
-  }), /*#__PURE__*/React.createElement("div", {
-    style: {
-      flex: 1,
-      minWidth: 0
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "dh",
-    style: {
-      fontSize: 16
-    }
-  }, it[1]), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 12,
-      fontWeight: 600,
-      color: 'var(--ink2)'
-    }
-  }, it[2])), /*#__PURE__*/React.createElement("span", {
-    className: "dh",
-    style: {
-      fontSize: 20
-    }
-  }, "\u2192"))))));
-}
 const TW_DEFAULTS = /*EDITMODE-BEGIN*/{
   "celebration": 8,
   "accent": "#E8272A",
@@ -42725,8 +42943,6 @@ function App() {
   const [tab, setTab] = aState('me');
   const [flow, setFlow] = aState(me ? 'app' : 'gate'); // gate | find | form | app
   const [draw, setDraw] = aState(null); // {forceTeam, replay}
-  const [overlay, setOverlay] = aState(null); // 'result' | 'final'
-  const [menu, setMenu] = aState(false);
   const [account, setAccount] = aState(false);
   const [admin, setAdmin] = aState(false);
   const [organiser, setOrganiser] = aState(false); // true while creating a league
@@ -42852,27 +43068,10 @@ function App() {
     key: tab + (me ? me.id : '')
   }, /*#__PURE__*/React.createElement(AppBar, {
     me: me,
-    onMoments: () => setMenu(true),
     onAccount: () => setAccount(true)
   }), screens[tab]), /*#__PURE__*/React.createElement(TabBar, {
     tab: tab,
     setTab: setTab
-  }), menu && /*#__PURE__*/React.createElement(MomentMenu, {
-    me: me,
-    onClose: () => setMenu(false),
-    onPick: m => {
-      setMenu(false);
-      if (m === 'draw') setDraw({
-        forceTeam: me.team,
-        replay: true
-      });else if (m === 'scotland') setDraw({
-        forceTeam: 'SCO',
-        replay: true
-      });else if (m === 'england') setDraw({
-        forceTeam: 'ENG',
-        replay: true
-      });else setOverlay(m);
-    }
   }), account && /*#__PURE__*/React.createElement(AccountSheet, {
     onClose: () => setAccount(false),
     onAdd: () => {
@@ -42904,10 +43103,6 @@ function App() {
         }), 200);
       }
     }
-  }), overlay === 'result' && /*#__PURE__*/React.createElement(window.ResultMoment, {
-    onDone: () => setOverlay(null)
-  }), overlay === 'final' && /*#__PURE__*/React.createElement(window.FinalMoment, {
-    onDone: () => setOverlay(null)
   }), admin && /*#__PURE__*/React.createElement(window.AdminGate, {
     onClose: () => setAdmin(false)
   }), /*#__PURE__*/React.createElement(window.ToastLayer, null), /*#__PURE__*/React.createElement(window.ConfettiLayer, null), /*#__PURE__*/React.createElement(window.TweaksPanel, {
