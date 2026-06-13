@@ -173,9 +173,17 @@ function App(){
   }
   function pickAccount(id){ A_S.setActive(id); setFlow('app'); setTab('me'); }
 
+  function claimOI(id){
+    A_S.claimOI(id);
+    const p=A_S.getSync(id);
+    const t=p&&A_WC.TEAMS[p.team];
+    setFlow('app');
+    setTimeout(()=>window.wcToast&&window.wcToast('Welcome, '+(p?p.name:'')+'! Yer team is '+((t&&t.flag)||'')+' '+(t?t.name:'')+'.',  'confident'),400);
+  }
+
   // -------- onboarding / identity flow --------
   if(flow==='gate') return <React.Fragment>
-    <window.AccountGate onPick={pickAccount} onNew={()=>setFlow('form')} onFind={()=>setFlow('find')}/>
+    <window.AccountGate onPick={pickAccount} onNew={()=>setFlow('form')} onFind={()=>setFlow('find')} onCode={()=>setFlow('oi-code')}/>
     <window.ToastLayer/><window.ConfettiLayer/>
   </React.Fragment>;
   if(flow==='find') return <React.Fragment>
@@ -184,6 +192,14 @@ function App(){
   </React.Fragment>;
   if(flow==='form') return <React.Fragment>
     <window.OnboardingForm onBack={()=>setFlow(me?'app':'gate')} onSubmit={onboardSubmit}/>
+    <window.ToastLayer/><window.ConfettiLayer/>
+  </React.Fragment>;
+  if(flow==='oi-code') return <React.Fragment>
+    <window.OICodeEntry onBack={()=>setFlow('gate')} onMatch={()=>setFlow('oi-roster')} onNew={()=>setFlow('form')}/>
+    <window.ToastLayer/><window.ConfettiLayer/>
+  </React.Fragment>;
+  if(flow==='oi-roster') return <React.Fragment>
+    <window.OIRosterPicker onBack={()=>setFlow('oi-code')} onClaim={claimOI}/>
     <window.ToastLayer/><window.ConfettiLayer/>
   </React.Fragment>;
 

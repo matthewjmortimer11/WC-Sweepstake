@@ -21,6 +21,17 @@ _DEFAULT_TOURNAMENT = "world-cup-2026"
 # Weekday/month labels for fixture date formatting (date.weekday(): Mon=0).
 _DOW = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 _MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+_COLORS = ["#E8272A", "#1a7a44", "#0a3b8c", "#7A3FB0", "#E07A1A", "#0d8a8a", "#C0246B", "#3a6ea5"]
+
+
+def _initials(name: str) -> str:
+    parts = name.strip().split()
+    if not parts:
+        return "?"
+    i = parts[0][0] if parts[0] else "?"
+    if len(parts) > 1 and parts[1] and parts[1][0].isalpha():
+        i += parts[1][0]
+    return i.upper()
 
 
 def load_config(tournament: str | None = None) -> dict:
@@ -90,6 +101,39 @@ def _build_fixtures(cfg: dict, teams: list[dict]) -> list[dict]:
     return fixtures
 
 
+def _build_people(cfg: dict, teams: list[dict]) -> list[dict]:
+    """Build the pre-seeded participant list from the [[roster]] config section."""
+    roster = cfg.get("roster", [])
+    team_map = {t["code"]: t for t in teams}
+    people = []
+    for i, entry in enumerate(roster):
+        code = entry["team"]
+        t = team_map.get(code, {})
+        name = entry["name"]
+        people.append({
+            "id": entry["id"],
+            "name": name,
+            "initials": _initials(name),
+            "team": code,
+            "color": _COLORS[i % len(_COLORS)],
+            "department": "",
+            "location": "Edinburgh",
+            "city": "Edinburgh",
+            "ltMember": False,
+            "leadership": False,
+            "gender": "—",
+            "stage": t.get("stage", "group"),
+            "alive": t.get("alive", True),
+            "isYou": False,
+            "isDemo": False,
+            "isOI": True,
+            "picks": {},
+            "predScore": 0,
+            "joinedAt": 0,
+        })
+    return people
+
+
 def _build_predictions(cfg: dict) -> list[dict]:
     # answer=None → still open; once a result is set, the grader settles each pick.
     out = []
@@ -107,11 +151,7 @@ def generate_wc_data(tournament: str | None = None) -> dict:
     teams = _build_teams(cfg)
     fixtures = _build_fixtures(cfg, teams)
     predictions = _build_predictions(cfg)
-
-    # Live mode starts with an EMPTY field — real sign-ups (persisted in
-    # data/participants.json and merged by main.py) populate it. The pot grows
-    # with each entrant; below ~maxTeams everyone gets a unique country, then shared.
-    people: list = []
+    people = _build_people(cfg, teams)
     r16: list = []  # no knockout fixtures until the group stage resolves
 
     fee = cfg["entry"]["fee"]

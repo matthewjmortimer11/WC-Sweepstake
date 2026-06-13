@@ -236,6 +236,14 @@
       return this.update(id, { picks: picks });
     },
 
+    // claim a pre-seeded OI roster entry (adds to device without re-creating the person)
+    claimOI: function (id) {
+      var d = this.deviceIds();
+      if (d.indexOf(id) < 0) { d.push(id); lsSet(K.device, d); }
+      lsSet(K.active, id);
+      emit();
+    },
+
     // live refresh (no-op in mock)
     refresh: function () {
       if (!LIVE) return Promise.resolve();

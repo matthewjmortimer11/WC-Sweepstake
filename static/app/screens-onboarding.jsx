@@ -64,6 +64,7 @@ function AccountGate(props) {
         <div style={{ marginTop: 22, display: 'flex', flexDirection: 'column', gap: 10 }}>
           <Bo variant="ink" block onClick={props.onNew}>{accounts.length ? 'Add someone new' : 'Join the sweepstake'} →</Bo>
           <button onClick={props.onFind} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 13.5, fontWeight: 800, color: 'var(--ink2)', textDecoration: 'underline', padding: '4px 0' }}>Already entered elsewhere? Find my entry</button>
+          <button onClick={props.onCode} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 13.5, fontWeight: 800, color: 'var(--ink2)', textDecoration: 'underline', padding: '4px 0' }}>Got a group code? Enter it here</button>
         </div>
       </div>
     </div>
@@ -295,4 +296,103 @@ function ScotlandTakeover(props) {
   );
 }
 
-Object.assign(window, { AccountGate, FindMyEntry, OnboardingForm, DrawMoment, ScotlandTakeover });
+/* =================== OI CODE ENTRY =================== */
+function OICodeEntry(props) {
+  const [code, setCode] = oState('');
+  const [err, setErr] = oState(false);
+
+  function submit() {
+    if (code.trim().toUpperCase() === 'OI') {
+      props.onMatch();
+    } else {
+      setErr(true);
+    }
+  }
+
+  return (
+    <div className="moment">
+      <div className="mscroll" style={{ padding: '30px 22px 28px' }}>
+        <button onClick={props.onBack} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, fontWeight: 800, color: 'var(--ink2)', padding: 0, marginBottom: 14 }}>← Back</button>
+        <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+          <Wo mood="mischievous" size={72} animate />
+          <div>
+            <div className="dh" style={{ fontSize: 24, lineHeight: 1 }}>Group code</div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink2)', marginTop: 4 }}>Enter the code for your sweepstake group to see your pre-assigned team.</div>
+          </div>
+        </div>
+        <div style={{ marginTop: 20 }}>
+          <Lab>Your code</Lab>
+          <input
+            autoFocus
+            style={{ ...inp, textTransform: 'uppercase', letterSpacing: '.14em', fontSize: 24, textAlign: 'center' }}
+            value={code}
+            onChange={e => { setCode(e.target.value); setErr(false); }}
+            onKeyDown={e => e.key === 'Enter' && submit()}
+            placeholder="e.g. OI"
+            maxLength={8}
+          />
+        </div>
+        {err && <div style={{ marginTop: 10, fontSize: 13, fontWeight: 700, color: 'var(--red)' }}>
+          That code disnae ring a bell. Try again, or{' '}
+          <button onClick={props.onNew} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--red)', fontWeight: 700, fontSize: 13, padding: 0, textDecoration: 'underline' }}>sign up normally</button>.
+        </div>}
+        <div style={{ marginTop: 18 }}>
+          <Bo variant="ink" block onClick={submit}>Find my group →</Bo>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* =================== OI ROSTER PICKER =================== */
+function OIRosterPicker(props) {
+  const all = So.allSync().filter(function(p) { return p.isOI; });
+  const myIds = new Set(So.deviceIds());
+
+  return (
+    <div className="moment">
+      <div className="mscroll" style={{ padding: '24px 22px 28px' }}>
+        <button onClick={props.onBack} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, fontWeight: 800, color: 'var(--ink2)', padding: 0, marginBottom: 12 }}>← Back</button>
+        <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 16 }}>
+          <Wo mood="confident" size={64} animate />
+          <div>
+            <div className="dh" style={{ fontSize: 24, lineHeight: 1 }}>Who are ye?</div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink2)', marginTop: 4 }}>Your team's already been drawn. Find yer name and tap it — Wheesht'll do the rest.</div>
+          </div>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {all.map(function(p) {
+            const t = WCo.TEAMS[p.team];
+            const mine = myIds.has(p.id);
+            return (
+              <button
+                key={p.id}
+                onClick={function() { if (!mine) props.onClaim(p.id); }}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 12,
+                  background: mine ? 'var(--yellow)' : '#fff',
+                  border: '2.5px solid var(--ink)', borderRadius: 16,
+                  padding: '11px 13px', cursor: mine ? 'default' : 'pointer',
+                  textAlign: 'left', boxShadow: '0 4px 0 var(--ink)',
+                }}
+              >
+                <span style={{ fontSize: 30, lineHeight: 1, flexShrink: 0 }}>{t ? t.flag : '🏳️'}</span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div className="dh" style={{ fontSize: 17 }}>{p.name}</div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--ink2)' }}>
+                    {t ? t.name : p.team} · Group {t ? t.group : '?'}
+                  </div>
+                </div>
+                {mine
+                  ? <span style={{ fontSize: 12, fontWeight: 800, color: 'var(--ink2)' }}>on device</span>
+                  : <span className="dh" style={{ fontSize: 18 }}>→</span>}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+Object.assign(window, { AccountGate, FindMyEntry, OnboardingForm, DrawMoment, ScotlandTakeover, OICodeEntry, OIRosterPicker });

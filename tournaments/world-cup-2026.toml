@@ -493,3 +493,201 @@ predLocked = "Predictions are locked. No takebacks. Wheesht has yer answers in w
 empty = "Nothing here yet. Wheesht is watching the space."
 error = "Something went wrong. Wheesht is investigating. Wheesht suspects foul play."
 finalBuild = "Two teams left. Wheesht has officiated since 1966. Wheesht is, for once, almost speechless. Almost."
+
+# --- Pre-assigned roster (OI group code) ------------------------------------
+# Entering the code "OI" at sign-up reveals this list. Each person already
+# has their team assigned; they just tap their name to claim their identity.
+# IDs are stable so the same person can be recognised across devices in
+# live mode.
+[[roster]]
+id = "oi-01"
+name = "Emily Stokes"
+team = "MEX"
+[[roster]]
+id = "oi-02"
+name = "Melissa Dunbar"
+team = "KOR"
+[[roster]]
+id = "oi-03"
+name = "Alice Zheng"
+team = "RSA"
+[[roster]]
+id = "oi-04"
+name = "Joanne Rozy"
+team = "CZE"
+[[roster]]
+id = "oi-05"
+name = "Jake Matthews"
+team = "CAN"
+[[roster]]
+id = "oi-06"
+name = "Jamie McFarlane 2"
+team = "SUI"
+[[roster]]
+id = "oi-07"
+name = "Mark Sutherland"
+team = "QAT"
+[[roster]]
+id = "oi-08"
+name = "Alex Cole"
+team = "BIH"
+[[roster]]
+id = "oi-09"
+name = "Matthew Mortimer"
+team = "BRA"
+[[roster]]
+id = "oi-10"
+name = "John Anthony"
+team = "MAR"
+[[roster]]
+id = "oi-11"
+name = "Jasmine Morris"
+team = "SCO"
+[[roster]]
+id = "oi-12"
+name = "Liam Fernandez"
+team = "HAI"
+[[roster]]
+id = "oi-13"
+name = "Prachi Mishra"
+team = "USA"
+[[roster]]
+id = "oi-14"
+name = "Lynda Charnock"
+team = "PAR"
+[[roster]]
+id = "oi-15"
+name = "Megan Hasting"
+team = "AUS"
+[[roster]]
+id = "oi-16"
+name = "Cathy Abel"
+team = "TUR"
+[[roster]]
+id = "oi-17"
+name = "Kathleen Williams"
+team = "GER"
+[[roster]]
+id = "oi-18"
+name = "Eleanor Evans"
+team = "ECU"
+[[roster]]
+id = "oi-19"
+name = "David Grunwald"
+team = "CIV"
+[[roster]]
+id = "oi-20"
+name = "Nataoile Ossei-Williams"
+team = "CUW"
+[[roster]]
+id = "oi-21"
+name = "Gail Sauka"
+team = "NED"
+[[roster]]
+id = "oi-22"
+name = "Deo Chen"
+team = "JPN"
+[[roster]]
+id = "oi-23"
+name = "Jennie Lim"
+team = "TUN"
+[[roster]]
+id = "oi-24"
+name = "Adam O'Sullivan"
+team = "SWE"
+[[roster]]
+id = "oi-25"
+name = "Sophie Butler"
+team = "BEL"
+[[roster]]
+id = "oi-26"
+name = "Danielle Sheeran"
+team = "IRN"
+[[roster]]
+id = "oi-27"
+name = "Alizey Husain"
+team = "EGY"
+[[roster]]
+id = "oi-28"
+name = "Dave Winn"
+team = "NZL"
+[[roster]]
+id = "oi-29"
+name = "Barry O'Dwyer"
+team = "ESP"
+[[roster]]
+id = "oi-30"
+name = "Kain Craigs"
+team = "URU"
+[[roster]]
+id = "oi-31"
+name = "Iona McGowan"
+team = "KSA"
+[[roster]]
+id = "oi-32"
+name = "Seema Rani"
+team = "CPV"
+[[roster]]
+id = "oi-33"
+name = "Jenny Phillips"
+team = "FRA"
+[[roster]]
+id = "oi-34"
+name = "Dougie Pender"
+team = "SEN"
+[[roster]]
+id = "oi-35"
+name = "Chris McAllister"
+team = "NOR"
+[[roster]]
+id = "oi-36"
+name = "Trien Do"
+team = "IRQ"
+[[roster]]
+id = "oi-37"
+name = "Michael Lennon"
+team = "ARG"
+[[roster]]
+id = "oi-38"
+name = "Mungo Kilgour"
+team = "AUT"
+[[roster]]
+id = "oi-39"
+name = "Mac Morrison"
+team = "ALG"
+[[roster]]
+id = "oi-40"
+name = "Julian Wan"
+team = "JOR"
+[[roster]]
+id = "oi-41"
+name = "Rymi Liu"
+team = "POR"
+[[roster]]
+id = "oi-42"
+name = "Valerie Thompson"
+team = "COL"
+[[roster]]
+id = "oi-43"
+name = "Nicole Alston"
+team = "UZB"
+[[roster]]
+id = "oi-44"
+name = "Jamie McFarlane"
+team = "COD"
+[[roster]]
+id = "oi-45"
+name = "Ian Crawford"
+team = "ENG"
+[[roster]]
+id = "oi-46"
+name = "Laura Nobel"
+team = "CRO"
+[[roster]]
+id = "oi-47"
+name = "Joanne Davies"
+team = "PAN"
+[[roster]]
+id = "oi-48"
+name = "Lynda Charnock 2"
+team = "GHA"
