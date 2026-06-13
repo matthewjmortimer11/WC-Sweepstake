@@ -34,11 +34,11 @@ VENDOR = Path(__file__).resolve().parent / "vendor"
 PLAIN_JS = ["wc-snapshot.js", "data.js", "store.js"]
 
 # JSX components, load order matters (mascot/ui before screens, app last).
+# Keep this in lockstep with the <script> order in templates/index.html.
 JSX = [
-    ("..", "tweaks-panel.jsx"),
     ("app", "wheesht-mascot.jsx"),
     ("app", "ui.jsx"),
-    ("app", "screens-moments.jsx"),
+    ("..", "tweaks-panel.jsx"),
     ("app", "screens-hub.jsx"),
     ("app", "screens-hub2.jsx"),
     ("app", "screens-onboarding.jsx"),
@@ -46,7 +46,10 @@ JSX = [
     ("app", "screens-predictions.jsx"),
     ("app", "screens-games.jsx"),
     ("app", "screens-admin.jsx"),
+    ("app", "screens-chat.jsx"),
+    ("app", "screens-dev.jsx"),
     ("app", "app.jsx"),
+    ("app", "stage.jsx"),
 ]
 
 

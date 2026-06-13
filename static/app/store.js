@@ -377,6 +377,25 @@
       }).catch(function () {});
     },
 
+    // ===== DEV CONSOLE (hidden cross-league admin) =====
+    // Verify the master key server-side and list every league. Never stores the
+    // key; the server never sends it back.
+    devListLeagues: function (key) {
+      if (!LIVE) {
+        var L = activeLeague() || { code: 'OI', name: 'The Office Sweepstake', seeded: true };
+        return Promise.resolve({ leagues: [Object.assign({ entrants: cache.length }, L)] });
+      }
+      return fetch('/api/dev/leagues', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: key }) })
+        .then(function (r) { return r.json().then(function (j) { if (!r.ok) throw new Error(j.detail || 'Developer access denied'); return j; }); });
+    },
+    // Make any league active (no password — dev only) and pull its state.
+    // Passing null clears the active league. Used to enter and to restore.
+    devEnterLeague: function (L) {
+      if (L && L.code) setActiveLeague({ id: L.id, code: L.code, name: L.name, seeded: !!L.seeded });
+      else lsSet(K.league, null);
+      return Store.refresh().then(function () { rebuild(); emit(); });
+    },
+
     // ===== ADMIN (scoped to the active league) =====
     adminState: function () { return admin; },
     teamsAlive: function () { return WC.TEAM_LIST.filter(function (t) { return t.alive; }).length; },

@@ -227,6 +227,14 @@ def generate_wc_data(tournament: str | None = None) -> dict:
     }
 
 
+def get_dev_key(tournament: str | None = None) -> str:
+    """Master developer key for the hidden cross-league dev console. Server-only
+    — never placed in the client payload. The WC_DEV_KEY env var (read in
+    main.py) takes precedence over this config value."""
+    cfg = load_config(tournament)
+    return str((cfg.get("meta") or {}).get("dev_key", ""))
+
+
 def get_league_seed(tournament: str | None = None) -> dict:
     """Seed values for the pre-assigned league, including the plaintext password
     from config (used once at startup to create/refresh the hashed League row).
