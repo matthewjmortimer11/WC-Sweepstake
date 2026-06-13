@@ -1,0 +1,5 @@
+# Wheesht — World Cup Sweepstake backend (Python 3.11+)
+# Tournament config is read with the stdlib `tomllib`, so no config dependency.
+fastapi>=0.110
+uvicorn[standard]>=0.29
+pydantic>=2.6

@@ -385,11 +385,24 @@ Each phase is independently shippable and leaves the app working.
   `GET /api/state` fetch replacing the embedded snapshot entirely. The snapshot
   is the Phase-1 stand-in for the `MockAdapter`.*
 
-**Phase 2 — Tournament as config**
-- Extract teams/groups/markets/fee/split/special-teams/stage-ladder into
-  `tournaments/world-cup-2026.yaml`; load into the `tournament` tables.
-- Replace hardcoded stage maps, `/6` divisors, `0.6` pot maths, `SCO/ENG`
-  special-casing with config lookups.
+**Phase 2 — Tournament as config — ✅ DONE**
+- All tournament-specific data now lives in `tournaments/world-cup-2026.toml`
+  (TOML, read with the stdlib `tomllib` — no new runtime dependency): teams,
+  groups, prediction markets, fee, charity split, stage ladder + labels,
+  special teams, qualification rules, schedule knobs, venues, and mascot copy.
+- `wc_data.py` is now a thin **config loader + assembler** (the dead demo-people
+  generators were removed). The active tournament is chosen by `WC_TOURNAMENT`
+  (default `world-cup-2026`); a **new tournament is a new `.toml` file, no code
+  change**.
+- Verified behaviour-preserving: the generated payload is byte-identical to the
+  previous output across teams/fixtures/predictions/payouts/fee/lines, plus
+  additive config-derived `meta` fields (`stageLadder`, `stageLabels`,
+  `specialTeams`, `qualification`) that now flow to the client for later phases.
+- Added `requirements.txt`.
+- *Still hardcoded in the client (deferred to the Phase 3/4 work that needs live
+  data): the `/6` progress divisor, the `0.6` pot maths, and the bespoke
+  `SCO/ENG` takeover UX. The config values they should read (`stageLadder`,
+  `specialTeams`, `charitySplit`) are now present in the payload.*
 
 **Phase 3 — Live provider integration**
 - Implement `ApiFootballAdapter` (+ `FootballDataOrgAdapter` as fallback).

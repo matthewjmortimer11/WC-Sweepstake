@@ -1,0 +1,495 @@
+# =============================================================================
+#  Tournament configuration — World Cup 2026
+#
+#  This file is the tournament-specific DATA for the sweepstake. wc_data.py reads
+#  it and builds the app payload; nothing tournament-specific is hardcoded in the
+#  generator any more. A NEW tournament = a new file like this (+ WC_TOURNAMENT
+#  pointing at it), no code changes.
+#
+#  Select at runtime with the WC_TOURNAMENT env var (default: world-cup-2026).
+# =============================================================================
+
+id = "world-cup-2026"
+sweepstake_name = "The Office Sweepstake"   # app title (meta.name)
+season = "World Cup 2026"                    # subtitle (meta.season)
+phase = "pre"                                # pre | live | done
+
+# Ordered stage progression. Drives bracket depth and the per-stage labels below.
+# (Top-level keys must precede the first [table] header in TOML.)
+stage_ladder = ["group", "r32", "r16", "qf", "sf", "final", "winner"]
+
+# Teams that trigger bespoke draw moments (home nations etc.).
+special_teams = ["SCO", "ENG"]
+
+[entry]
+fee = 5              # £ per entry
+charity_split = 0.5  # fraction of every entry that goes to charity
+
+[stage_labels]
+group  = "Group stage"
+r32    = "Round of 32"
+r16    = "Round of 16"
+qf     = "Quarter-final"
+sf     = "Semi-final"
+final  = "Final"
+winner = "Winner"
+
+# How the group stage resolves into the knockout bracket (used by later phases'
+# standings/progression engine; declared here so it travels with the tournament).
+[qualification]
+groups = 12
+group_size = 4
+qualify_per_group = 2
+best_third_qualifiers = 8
+
+[meta]
+stage_label = "Group Stage"   # label for the current phase
+kickoff = "Thu 11 June"
+final_venue = "MetLife Stadium, New Jersey"
+final_date = "Sun 19 July"
+
+# --- Fixture schedule generation -------------------------------------------
+# The group-stage fixtures are generated as a round-robin per group. These are
+# the knobs; the algorithm lives in wc_data.py. (Phase 3 replaces this with the
+# real provider schedule.)
+[schedule]
+start_date = 2026-06-11
+times = ["16:00", "19:00", "22:00"]
+# Round-robin pairings within a group of 4, by matchday (0-indexed team slots).
+round_robin = [
+  [[0, 1], [2, 3]],
+  [[0, 2], [3, 1]],
+  [[0, 3], [1, 2]],
+]
+venues = [
+  "MetLife Stadium, NJ", "SoFi Stadium, LA", "AT&T Stadium, Dallas", "Mercedes-Benz, Atlanta",
+  "Lincoln Financial, Philadelphia", "Gillette Stadium, Boston", "Levi's Stadium, SF Bay",
+  "Hard Rock Stadium, Miami", "NRG Stadium, Houston", "Arrowhead, Kansas City", "Lumen Field, Seattle",
+  "BMO Field, Toronto", "BC Place, Vancouver", "Estadio Azteca, Mexico City",
+  "Estadio Akron, Guadalajara", "Estadio BBVA, Monterrey",
+]
+
+# --- Teams ------------------------------------------------------------------
+# 48 teams across 12 groups A–L. odds are display-only (American format).
+[[teams]]
+name = "Mexico"
+code = "MEX"
+flag = "🇲🇽"
+group = "A"
+color = "#1a7a44"
+odds = "+6000"
+[[teams]]
+name = "South Korea"
+code = "KOR"
+flag = "🇰🇷"
+group = "A"
+color = "#d2143c"
+odds = "+20000"
+[[teams]]
+name = "South Africa"
+code = "RSA"
+flag = "🇿🇦"
+group = "A"
+color = "#0a7b3e"
+odds = "+50000"
+[[teams]]
+name = "Czechia"
+code = "CZE"
+flag = "🇨🇿"
+group = "A"
+color = "#11457e"
+odds = "+30000"
+[[teams]]
+name = "Canada"
+code = "CAN"
+flag = "🇨🇦"
+group = "B"
+color = "#d52b1e"
+odds = "+22500"
+[[teams]]
+name = "Switzerland"
+code = "SUI"
+flag = "🇨🇭"
+group = "B"
+color = "#d52b1e"
+odds = "+15000"
+[[teams]]
+name = "Qatar"
+code = "QAT"
+flag = "🇶🇦"
+group = "B"
+color = "#7a1737"
+odds = "+50000"
+[[teams]]
+name = "Bosnia & Herzegovina"
+code = "BIH"
+flag = "🇧🇦"
+group = "B"
+color = "#0a3b8c"
+odds = "+40000"
+[[teams]]
+name = "Brazil"
+code = "BRA"
+flag = "🇧🇷"
+group = "C"
+color = "#f7c600"
+odds = "+850"
+[[teams]]
+name = "Morocco"
+code = "MAR"
+flag = "🇲🇦"
+group = "C"
+color = "#c1272d"
+odds = "+5000"
+[[teams]]
+name = "Scotland"
+code = "SCO"
+flag = "🏴󠁧󠁢󠁳󠁣󠁴󠁿"
+group = "C"
+color = "#0a3b8c"
+odds = "+30000"
+[[teams]]
+name = "Haiti"
+code = "HAI"
+flag = "🇭🇹"
+group = "C"
+color = "#00209f"
+odds = "+100000"
+[[teams]]
+name = "USA"
+code = "USA"
+flag = "🇺🇸"
+group = "D"
+color = "#0a3161"
+odds = "+6000"
+[[teams]]
+name = "Paraguay"
+code = "PAR"
+flag = "🇵🇾"
+group = "D"
+color = "#d52b1e"
+odds = "+25000"
+[[teams]]
+name = "Australia"
+code = "AUS"
+flag = "🇦🇺"
+group = "D"
+color = "#0a7b3e"
+odds = "+20000"
+[[teams]]
+name = "Türkiye"
+code = "TUR"
+flag = "🇹🇷"
+group = "D"
+color = "#e30a17"
+odds = "+15000"
+[[teams]]
+name = "Germany"
+code = "GER"
+flag = "🇩🇪"
+group = "E"
+color = "#1a1a1a"
+odds = "+1400"
+[[teams]]
+name = "Ecuador"
+code = "ECU"
+flag = "🇪🇨"
+group = "E"
+color = "#ffd100"
+odds = "+12000"
+[[teams]]
+name = "Ivory Coast"
+code = "CIV"
+flag = "🇨🇮"
+group = "E"
+color = "#f77f00"
+odds = "+15000"
+[[teams]]
+name = "Curaçao"
+code = "CUW"
+flag = "🇨🇼"
+group = "E"
+color = "#002b7f"
+odds = "+100000"
+[[teams]]
+name = "Netherlands"
+code = "NED"
+flag = "🇳🇱"
+group = "F"
+color = "#ec6608"
+odds = "+2200"
+[[teams]]
+name = "Japan"
+code = "JPN"
+flag = "🇯🇵"
+group = "F"
+color = "#bc002d"
+odds = "+6600"
+[[teams]]
+name = "Tunisia"
+code = "TUN"
+flag = "🇹🇳"
+group = "F"
+color = "#e70013"
+odds = "+40000"
+[[teams]]
+name = "Sweden"
+code = "SWE"
+flag = "🇸🇪"
+group = "F"
+color = "#005b99"
+odds = "+12000"
+[[teams]]
+name = "Belgium"
+code = "BEL"
+flag = "🇧🇪"
+group = "G"
+color = "#c8102e"
+odds = "+3500"
+[[teams]]
+name = "Iran"
+code = "IRN"
+flag = "🇮🇷"
+group = "G"
+color = "#cf1020"
+odds = "+30000"
+[[teams]]
+name = "Egypt"
+code = "EGY"
+flag = "🇪🇬"
+group = "G"
+color = "#c8102e"
+odds = "+20000"
+[[teams]]
+name = "New Zealand"
+code = "NZL"
+flag = "🇳🇿"
+group = "G"
+color = "#1a1a1a"
+odds = "+50000"
+[[teams]]
+name = "Spain"
+code = "ESP"
+flag = "🇪🇸"
+group = "H"
+color = "#c60b1e"
+odds = "+450"
+[[teams]]
+name = "Uruguay"
+code = "URU"
+flag = "🇺🇾"
+group = "H"
+color = "#5b9ad5"
+odds = "+4000"
+[[teams]]
+name = "Saudi Arabia"
+code = "KSA"
+flag = "🇸🇦"
+group = "H"
+color = "#0a7b3e"
+odds = "+50000"
+[[teams]]
+name = "Cape Verde"
+code = "CPV"
+flag = "🇨🇻"
+group = "H"
+color = "#0a3b8c"
+odds = "+80000"
+[[teams]]
+name = "France"
+code = "FRA"
+flag = "🇫🇷"
+group = "I"
+color = "#0a2472"
+odds = "+500"
+[[teams]]
+name = "Senegal"
+code = "SEN"
+flag = "🇸🇳"
+group = "I"
+color = "#0a7b3e"
+odds = "+6600"
+[[teams]]
+name = "Norway"
+code = "NOR"
+flag = "🇳🇴"
+group = "I"
+color = "#c8102e"
+odds = "+3500"
+[[teams]]
+name = "Iraq"
+code = "IRQ"
+flag = "🇮🇶"
+group = "I"
+color = "#1a1a1a"
+odds = "+100000"
+[[teams]]
+name = "Argentina"
+code = "ARG"
+flag = "🇦🇷"
+group = "J"
+color = "#6cace4"
+odds = "+1000"
+[[teams]]
+name = "Austria"
+code = "AUT"
+flag = "🇦🇹"
+group = "J"
+color = "#c8102e"
+odds = "+12000"
+[[teams]]
+name = "Algeria"
+code = "ALG"
+flag = "🇩🇿"
+group = "J"
+color = "#0a7b3e"
+odds = "+25000"
+[[teams]]
+name = "Jordan"
+code = "JOR"
+flag = "🇯🇴"
+group = "J"
+color = "#1a1a1a"
+odds = "+80000"
+[[teams]]
+name = "Portugal"
+code = "POR"
+flag = "🇵🇹"
+group = "K"
+color = "#c8102e"
+odds = "+900"
+[[teams]]
+name = "Colombia"
+code = "COL"
+flag = "🇨🇴"
+group = "K"
+color = "#ffd100"
+odds = "+4000"
+[[teams]]
+name = "Uzbekistan"
+code = "UZB"
+flag = "🇺🇿"
+group = "K"
+color = "#0a7b3e"
+odds = "+50000"
+[[teams]]
+name = "DR Congo"
+code = "COD"
+flag = "🇨🇩"
+group = "K"
+color = "#3aa0d8"
+odds = "+60000"
+[[teams]]
+name = "England"
+code = "ENG"
+flag = "🏴󠁧󠁢󠁥󠁮󠁧󠁿"
+group = "L"
+color = "#1a1a1a"
+odds = "+650"
+[[teams]]
+name = "Croatia"
+code = "CRO"
+flag = "🇭🇷"
+group = "L"
+color = "#d2143c"
+odds = "+6600"
+[[teams]]
+name = "Panama"
+code = "PAN"
+flag = "🇵🇦"
+group = "L"
+color = "#0a3b8c"
+odds = "+50000"
+[[teams]]
+name = "Ghana"
+code = "GHA"
+flag = "🇬🇭"
+group = "L"
+color = "#0a7b3e"
+odds = "+40000"
+
+# --- Prediction markets -----------------------------------------------------
+# answer is omitted while open; the admin/grader fills it once decided.
+[[markets]]
+key = "winner"
+q = "Tournament Winner"
+kind = "team"
+points = 25
+options = ["ESP", "FRA", "BRA", "ARG", "GER", "POR"]
+[[markets]]
+key = "final"
+q = "The Final Matchup"
+kind = "team2"
+points = 15
+options = ["ESP", "FRA", "BRA", "ARG"]
+[[markets]]
+key = "goldenBoot"
+q = "Golden Boot Winner"
+kind = "player"
+points = 15
+options = [
+  { id = "mbappe", name = "K. Mbappé", team = "FRA" },
+  { id = "yamal", name = "L. Yamal", team = "ESP" },
+  { id = "haaland", name = "E. Haaland", team = "NOR" },
+  { id = "vini", name = "Vinícius Jr", team = "BRA" },
+]
+[[markets]]
+key = "scotland"
+q = "How far do Scotland go?"
+kind = "stage"
+points = 10
+options = ["Group stage", "Round of 32", "Round of 16", "Quarter Final", "Semi Final", "Final", "Winner"]
+[[markets]]
+key = "england"
+q = "How far do England go?"
+kind = "stage"
+points = 10
+options = ["Group stage", "Round of 32", "Round of 16", "Quarter Final", "Semi Final", "Final", "Winner"]
+[[markets]]
+key = "surprise"
+q = "Biggest Surprise Team"
+kind = "team"
+points = 10
+options = ["NOR", "MAR", "SEN", "JPN", "CRO", "COL"]
+[[markets]]
+key = "flop"
+q = "Biggest Disappointment"
+kind = "team"
+points = 10
+options = ["ENG", "BEL", "GER", "USA", "BRA"]
+[[markets]]
+key = "cleanSheets"
+q = "Most Clean Sheets"
+kind = "team"
+points = 10
+options = ["ESP", "BRA", "ARG", "FRA"]
+[[markets]]
+key = "youngPlayer"
+q = "Best Young Player"
+kind = "player"
+points = 10
+options = [
+  { id = "yamal", name = "L. Yamal", team = "ESP" },
+  { id = "yildiz", name = "K. Yıldız", team = "TUR" },
+  { id = "endrick", name = "Endrick", team = "BRA" },
+  { id = "wirtz", name = "F. Wirtz", team = "GER" },
+]
+
+# --- Mascot copy (Wheesht) --------------------------------------------------
+[lines]
+welcome = "Right. Let's get this started. Wheesht is watching."
+drawGood = "Oh aye. That's a tidy wee team. Ye might actually do something wi' that."
+drawMid = "Could be worse. Could be better. Wheesht is reserving judgement."
+drawBad = "…Wheesht is not going to insult ye. The flag's nice though."
+drawYou = "Croatia. Experienced, thrawn, never know when they're beat. Wheesht approves. Quietly."
+upset = "Naebody saw that coming. Wheesht definitely didn't. Wheesht's predictions stand."
+england = "…Wheesht is remaining professional. Next question."
+scotland = "Scotland. The homeland. Drawn with Brazil, aye — but Wheesht believes. Wheesht needs a minute."
+eliminated = "Ye've been eliminated. Wheesht is… sorry. (Wheesht is not sorry. Wheesht saw this coming.)"
+sideBets = "Aye, ye're out. But Wheesht's not done wi' ye yet."
+sideBets2 = "We're the ones watching objectively now. Arguably the better position."
+predOpen = "Predictions are open. Back yerself. Wheesht will remember every single one."
+predLocked = "Predictions are locked. No takebacks. Wheesht has yer answers in writing."
+empty = "Nothing here yet. Wheesht is watching the space."
+error = "Something went wrong. Wheesht is investigating. Wheesht suspects foul play."
+finalBuild = "Two teams left. Wheesht has officiated since 1966. Wheesht is, for once, almost speechless. Almost."
