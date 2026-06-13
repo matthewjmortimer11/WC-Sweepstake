@@ -11,6 +11,10 @@ const Sa = window.Store;
 const { Card: Ca, Btn: Ba, Flag: Fa, Chip: Cha, SectionHead: SHa } = window;
 const { useState: aState2 } = React;
 
+function adminTeam(code) {
+  return WCa.TEAMS[code] || { code: code || 'TBD', name: code || 'To be decided', flag: '🏳️' };
+}
+
 /* ---- match banter ----------------------------------------------------------
    When the organiser saves a full-time score, Wheesht pipes up in the house
    voice: homeland bias for Scotland, dry "remaining professional" digs at
@@ -101,7 +105,7 @@ function TeamToggle(props) {
 
 function ScoreStepper(props) {
   const [a, setA] = aState2(props.a); const [b, setB] = aState2(props.b);
-  const ta = WCa.TEAMS[props.f.a], tb = WCa.TEAMS[props.f.b];
+  const ta = adminTeam(props.f.a), tb = adminTeam(props.f.b);
   function step(box, setter, val, d) { var n = Math.max(0, val + d); setter(n); }
   const num = { width: 34, textAlign: 'center', fontFamily: 'var(--disp)', fontWeight: 800, fontSize: 22 };
   const sbtn = { width: 28, height: 28, borderRadius: 8, border: '2px solid var(--ink)', background: '#fff', fontWeight: 900, fontSize: 16, cursor: 'pointer', lineHeight: 1 };
@@ -126,7 +130,7 @@ function ScoreStepper(props) {
 
 function FixtureAdminRow(props) {
   const f = props.f; const [open, setOpen] = aState2(false);
-  const ta = WCa.TEAMS[f.a], tb = WCa.TEAMS[f.b];
+  const ta = adminTeam(f.a), tb = adminTeam(f.b);
   const st = f.status || 'upcoming';
   return (
     <Ca flat style={{ padding: '11px 13px', marginBottom: 8 }}>

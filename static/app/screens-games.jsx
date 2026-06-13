@@ -10,6 +10,10 @@ const Sg = window.Store;
 const { Card: Cg, Btn: Bg, Flag: Fg, Chip: Chg, WheeshtSays: Saysg, SectionHead: SHg } = window;
 const { useState: gState } = React;
 
+function gameTeam(code) {
+  return WCg.TEAMS[code] || { code: code || 'TBD', name: code || 'To be decided', flag: '🏳️' };
+}
+
 function ownedSet() {
   var set = {};
   (Sg ? Sg.allSync() : WCg.PEOPLE).forEach(function (p) { set[p.team] = (set[p.team] || 0) + 1; });
@@ -20,7 +24,7 @@ function statusOf(f) {
 }
 
 function TeamLine(props) {
-  const t = WCg.TEAMS[props.code]; const owners = props.owners;
+  const t = gameTeam(props.code); const owners = props.owners;
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, flex: 1, minWidth: 0 }}>
       <span style={{ fontSize: 30, lineHeight: 1 }}>{t.flag}</span>
@@ -65,7 +69,7 @@ function FixtureRow(props) {
 
 function NextUp(props) {
   const f = props.f; if (!f) return null;
-  const ta = WCg.TEAMS[f.a], tb = WCg.TEAMS[f.b];
+  const ta = gameTeam(f.a), tb = gameTeam(f.b);
   return (
     <Cg bordered style={{ background: 'var(--ink)', color: '#fff' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -124,7 +128,7 @@ function GamesScreen() {
       </div>
 
       {nextMine
-        ? <NextUp f={nextMine} label={'Your ' + WCg.TEAMS[mineTeam].name + ' play next'} />
+        ? <NextUp f={nextMine} label={'Your ' + gameTeam(mineTeam).name + ' play next'} />
         : <NextUp f={nextOverall} label="First whistle" />}
 
       <div style={{ height: 12 }} />
