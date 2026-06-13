@@ -11,6 +11,64 @@ const Sa = window.Store;
 const { Card: Ca, Btn: Ba, Flag: Fa, Chip: Cha, SectionHead: SHa } = window;
 const { useState: aState2 } = React;
 
+/* ---- match banter ----------------------------------------------------------
+   When the organiser saves a full-time score, Wheesht pipes up in the house
+   voice: homeland bias for Scotland, dry "remaining professional" digs at
+   England, plain dry wit for everyone else. Returns {text, mood} for wcToast. */
+function matchBanter(f, a, b) {
+  const ta = WCa.TEAMS[f.a], tb = WCa.TEAMS[f.b];
+  const na = ta ? ta.name : f.a, nb = tb ? tb.name : f.b;
+  const draw = a === b, aWin = a > b, margin = Math.abs(a - b);
+  const wName = aWin ? na : nb, lName = aWin ? nb : na;
+  const pick = arr => arr[(Math.random() * arr.length) | 0];
+
+  if (f.a === 'SCO' || f.b === 'SCO') {
+    const scoWon = (f.a === 'SCO' && aWin) || (f.b === 'SCO' && !aWin);
+    const other = f.a === 'SCO' ? nb : na;
+    if (draw) return { text: pick([
+      'Scotland hold ' + other + ' to a draw. A point is a point. Wheesht will take it.',
+      'Honours even for Scotland. Wheesht is calling that a moral victory.'
+    ]), mood: 'confident' };
+    if (scoWon) return { text: pick([
+      'SCOTLAND WIN, ' + a + '–' + b + '. Wheesht is not greetin\'. Wheesht has something in its eye.',
+      'Scotland see off ' + other + '. Write it down. Frame it. Wheesht aye believed.',
+      'The homeland delivers. ' + other + ' sent homeward tae think again.'
+    ]), mood: 'scottish' };
+    return { text: pick([
+      'Scotland fall to ' + other + '. Wheesht expected nothing and is somehow still disappointed.',
+      'A gallant Scotland defeat — the most Scottish result there is. Wheesht endures.',
+      'Scotland lose. Wheesht is fine. Wheesht is always fine. (Wheesht is not fine.)'
+    ]), mood: 'crying' };
+  }
+
+  if (f.a === 'ENG' || f.b === 'ENG') {
+    const engWon = (f.a === 'ENG' && aWin) || (f.b === 'ENG' && !aWin);
+    const other = f.a === 'ENG' ? nb : na;
+    if (draw) return { text: 'England draw with ' + other + '. Wheesht is remaining professional. Barely.', mood: 'mischievous' };
+    if (engWon) return { text: pick([
+      'England beat ' + other + '. Wheesht is noting it down. Without comment. For now.',
+      'England win. Wheesht is remaining professional. It is costing Wheesht dearly.'
+    ]), mood: 'mischievous' };
+    return { text: pick([
+      'England lose to ' + other + '. Wheesht is staying neutral. Wheesht is struggling.',
+      other + ' see off England. Wheesht has no comment — and a small, private smile.'
+    ]), mood: 'smug' };
+  }
+
+  if (draw) return { text: pick([
+    na + ' and ' + nb + ' share the points, ' + a + '–' + b + '. Wheesht has seen worse.',
+    'All square: ' + na + ' ' + a + '–' + b + ' ' + nb + '. Result logged.'
+  ]), mood: 'neutral' };
+  if (margin >= 3) return { text: pick([
+    wName + ' take ' + lName + ' apart, ' + a + '–' + b + '. Wheesht almost felt sorry for them. Almost.',
+    'A rout. ' + wName + ' run riot against ' + lName + '. Wheesht is impressed and a wee bit frightened.'
+  ]), mood: 'shocked' };
+  return { text: pick([
+    wName + ' edge ' + lName + ', ' + a + '–' + b + '. Result logged. Wheesht remembers everything.',
+    wName + ' take it. ' + lName + ' will have words in the dressing room. Wheesht logged it.'
+  ]), mood: 'confident' };
+}
+
 function PhaseSeg() {
   const cur = Sa.phase();
   const opts = [['pre', 'Pre-kickoff'], ['live', 'In play'], ['done', 'Finished']];
@@ -95,7 +153,12 @@ function FixtureAdminRow(props) {
         {st === 'done' && <button onClick={() => Sa.clearFixture(f.id)} className="wc-btn wc-btn--sm" style={{ padding: '5px 10px', boxShadow: '0 3px 0 var(--shadow)' }}>Undo</button>}
       </div>
       {open && <ScoreStepper f={f} a={f.score ? f.score[0] : 0} b={f.score ? f.score[1] : 0}
-        onSave={(a, b) => { Sa.setFixtureResult(f.id, a, b); setOpen(false); }} onCancel={() => setOpen(false)} />}
+        onSave={(a, b) => {
+          Sa.setFixtureResult(f.id, a, b);
+          setOpen(false);
+          const bn = matchBanter(f, a, b);
+          if (window.wcToast) window.wcToast(bn.text, bn.mood);
+        }} onCancel={() => setOpen(false)} />}
     </Ca>
   );
 }
@@ -149,7 +212,7 @@ function AdminPanel(props) {
   const byDate = []; const seen = {};
   fixtures.forEach(f => { if (!seen[f.dateISO]) { seen[f.dateISO] = { label: f.dateLabel, items: [] }; byDate.push(seen[f.dateISO]); } seen[f.dateISO].items.push(f); });
 
-  const secs = [['results', 'Results'], ['teams', 'Teams'], ['predict', 'Predictions'], ['people', 'People']];
+  const secs = [['results', 'Results'], ['teams', 'Teams'], ['predict', 'Predictions'], ['people', 'People'], ['chat', 'Chat']];
 
   return (
     <div className="moment" style={{ background: 'var(--bg)' }}>
@@ -157,7 +220,7 @@ function AdminPanel(props) {
         <Wa mood="confident" size={44} />
         <div style={{ flex: 1 }}>
           <div className="dh" style={{ fontSize: 20, color: '#fff', lineHeight: 1 }}>Wheesht's clipboard</div>
-          <div style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--yellow)' }}>Admin · {Sa.teamsAlive()} teams in · {Sa.allSync().length} entrants</div>
+          <div style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--yellow)' }}>{(Sa.activeLeague && Sa.activeLeague()) ? Sa.activeLeague().name : 'Admin'} · {Sa.allSync().length} entrants</div>
         </div>
         <button onClick={props.onClose} style={{ border: 'none', background: 'rgba(255,255,255,.16)', color: '#fff', width: 34, height: 34, borderRadius: 10, fontSize: 18, fontWeight: 900, cursor: 'pointer' }}>×</button>
       </div>
@@ -205,6 +268,8 @@ function AdminPanel(props) {
 
         {sec === 'people' && <PeopleAdmin />}
 
+        {sec === 'chat' && <ChatAdmin />}
+
         <div style={{ marginTop: 22, borderTop: '2px solid var(--line)', paddingTop: 16 }}>
           <button onClick={() => { if (window.confirm('Reset ALL results, eliminations and answers back to pre-kickoff?')) Sa.adminReset(); }}
             style={{ width: '100%', border: '2px solid var(--red)', borderRadius: 11, background: '#fff', color: 'var(--red)', fontFamily: 'var(--disp)', fontWeight: 800, fontSize: 13, padding: '11px', cursor: 'pointer' }}>Reset tournament to pre-kickoff</button>
@@ -249,4 +314,112 @@ function PeopleAdmin() {
   );
 }
 
+/* ---- chat moderation -------------------------------------------------------
+   Live only. Lists recent messages newest-first; the organiser can delete any
+   one (server removes it from data/chat.json). */
+function ChatAdmin() {
+  const [msgs, setMsgs] = aState2([]);
+  const [loading, setLoading] = aState2(true);
+  const isLive = !!window.WC_LIVE;
+
+  function load() {
+    fetch(Sa.api('/chat')).then(r => r.json()).then(d => {
+      setMsgs((d || []).slice().reverse());
+      setLoading(false);
+    }).catch(() => setLoading(false));
+  }
+  React.useEffect(() => { if (isLive) load(); else setLoading(false); }, []);
+
+  function del(id) {
+    if (!window.confirm('Delete this message for everyone? This cannot be undone.')) return;
+    fetch(Sa.api('/chat/' + id), { method: 'DELETE' })
+      .then(() => setMsgs(prev => prev.filter(m => m.id !== id)))
+      .catch(() => {});
+  }
+
+  if (!isLive) {
+    return <Ca flat style={{ textAlign: 'center', padding: '24px 14px' }}>
+      <Wa mood="neutral" size={56} animate />
+      <div className="dh" style={{ fontSize: 16, marginTop: 6 }}>Chat is server-only.</div>
+      <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--ink2)', marginTop: 3 }}>Moderation works once the app is connected to the sweepstake server.</div>
+    </Ca>;
+  }
+
+  return (
+    <>
+      <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--ink2)', marginBottom: 10 }}>Keep the wall civil — delete anything out of order. Removals are instant for everyone.</div>
+      {loading
+        ? <Ca flat style={{ textAlign: 'center', padding: '24px 14px', fontSize: 13, fontWeight: 600, color: 'var(--ink2)' }}>Loading messages…</Ca>
+        : msgs.length === 0
+          ? <Ca flat style={{ textAlign: 'center', padding: '24px 14px' }}>
+              <Wa mood="waiting" size={56} animate />
+              <div className="dh" style={{ fontSize: 16, marginTop: 6 }}>Nothing to moderate.</div>
+              <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--ink2)', marginTop: 3 }}>Messages will appear here as people chat.</div>
+            </Ca>
+          : <Ca flat style={{ padding: '2px 13px' }}>
+              {msgs.map((m, i) => {
+                const d = new Date(m.ts);
+                const timeStr = d.getHours().toString().padStart(2, '0') + ':' + d.getMinutes().toString().padStart(2, '0');
+                return <div key={m.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 0', borderBottom: i < msgs.length - 1 ? '1.5px solid var(--line)' : 'none' }}>
+                  <div style={{ width: 30, height: 30, borderRadius: '50%', background: m.color || '#333', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--disp)', fontWeight: 800, fontSize: 11, flexShrink: 0 }}>{m.initials || '?'}</div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--ink2)' }}>{m.author} · {timeStr}</div>
+                    <div style={{ fontSize: 13.5, fontWeight: 500, lineHeight: 1.4, wordBreak: 'break-word', marginTop: 2 }}>{m.text}</div>
+                  </div>
+                  <button onClick={() => del(m.id)} className="wc-btn wc-btn--sm" style={{ padding: '5px 11px', background: '#fff', color: 'var(--red)', boxShadow: '0 3px 0 var(--shadow)', flexShrink: 0 }}>Delete</button>
+                </div>;
+              })}
+            </Ca>}
+    </>
+  );
+}
+
+/* ---- PIN gate --------------------------------------------------------------
+   Soft gate in front of the clipboard. Not real auth — just stops a casual tap
+   on a shared link from wiping the sweepstake. PIN comes from the tournament
+   config (meta.adminPin); empty config means no gate. Unlock lasts the session. */
+function AdminGate(props) {
+  const PIN = (WCa.meta && WCa.meta.adminPin) || '';
+  const [ok, setOk] = aState2(() => {
+    if (!PIN) return true;
+    try { return sessionStorage.getItem('wheesht_admin_ok') === '1'; } catch (e) { return false; }
+  });
+  const [entry, setEntry] = aState2('');
+  const [bad, setBad] = aState2(false);
+
+  if (ok) return <AdminPanel onClose={props.onClose} />;
+
+  function submit() {
+    if (entry === PIN) {
+      try { sessionStorage.setItem('wheesht_admin_ok', '1'); } catch (e) {}
+      setOk(true);
+    } else { setBad(true); setEntry(''); }
+  }
+
+  return (
+    <div className="moment" style={{ background: 'var(--bg)', alignItems: 'center', justifyContent: 'center', padding: '0 26px' }}>
+      <button onClick={props.onClose} style={{ position: 'absolute', top: 16, right: 16, border: 'none', background: 'var(--ink)', color: '#fff', width: 34, height: 34, borderRadius: 10, fontSize: 18, fontWeight: 900, cursor: 'pointer' }}>×</button>
+      <div className={'rise' + (bad ? ' shake' : '')} style={{ width: '100%', maxWidth: 340, textAlign: 'center' }}>
+        <Wa mood={bad ? 'shocked' : 'mischievous'} size={92} animate />
+        <div className="dh" style={{ fontSize: 24, marginTop: 10 }}>Organiser only.</div>
+        <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--ink2)', marginTop: 6, lineHeight: 1.45 }}>
+          {bad ? 'Wrong code. Wheesht is watching. Try again.' : 'Enter the organiser code. Wheesht doesn’t hand the clipboard to just anyone.'}
+        </div>
+        <input
+          autoFocus
+          type="password"
+          inputMode="numeric"
+          value={entry}
+          onChange={e => { setEntry(e.target.value); setBad(false); }}
+          onKeyDown={e => { if (e.key === 'Enter') submit(); }}
+          placeholder="Code"
+          style={{ width: '100%', border: '2.5px solid var(--ink)', borderRadius: 14, padding: '13px 16px', fontFamily: 'var(--disp)', fontWeight: 800, fontSize: 22, textAlign: 'center', letterSpacing: '.3em', outline: 'none', marginTop: 18, background: '#fff', color: 'var(--ink)' }}
+        />
+        <button onClick={submit} disabled={!entry} className="wc-btn wc-btn--ink wc-btn--block" style={{ marginTop: 14, opacity: entry ? 1 : 0.4 }}>Unlock the clipboard</button>
+      </div>
+    </div>
+  );
+}
+
 window.AdminPanel = AdminPanel;
+window.AdminGate = AdminGate;

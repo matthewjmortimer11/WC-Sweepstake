@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
 <title>Wheesht — World Cup Sweepstake</title>
 <style>
 :root{
@@ -163,6 +163,138 @@ button{font-family:inherit;}
 
 /* tweaks panel host */
 #tweaks-root{position:fixed;inset:0;pointer-events:none;z-index:9999;}
+
+/* ---------- desktop stage (immersive framing) ---------- */
+.stage-bg,.stage-word,.stage-note{display:none;}
+
+@media (min-width:561px){
+  body{background:#15130e;}
+  .stage-bg{display:block;position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden;
+    background:radial-gradient(125% 95% at 50% -12%, #2e2b24 0%, #15130e 72%);}
+  .stage-bg .blob{position:absolute;width:48vmax;height:48vmax;border-radius:50%;
+    filter:blur(85px);opacity:.20;mix-blend-mode:screen;will-change:transform;}
+  .blob--y{background:#F5C800;top:-14%;left:-8%;animation:drift1 23s ease-in-out infinite;}
+  .blob--r{background:#E8272A;bottom:-20%;left:14%;animation:drift2 27s ease-in-out infinite;}
+  .blob--g{background:#1a7a44;top:-10%;right:-6%;animation:drift3 25s ease-in-out infinite;}
+  .blob--b{background:#0a3b8c;bottom:-14%;right:10%;animation:drift1 30s ease-in-out infinite reverse;}
+
+  .stage-word{display:flex;position:fixed;inset:0;z-index:1;pointer-events:none;
+    align-items:center;justify-content:center;}
+  .stage-word b{font-family:var(--disp);font-weight:800;font-size:36vh;line-height:.8;
+    letter-spacing:-.05em;color:#fff;opacity:.04;white-space:nowrap;text-transform:uppercase;}
+
+  .stage-note{display:block;position:fixed;z-index:1;pointer-events:none;opacity:0;
+    animation:noteIn 1.1s .6s ease both;}
+  .stage-note--tl{top:38px;left:42px;}
+  .stage-note--br{bottom:38px;right:44px;text-align:right;}
+  .stage-note .k{font-family:var(--disp);font-weight:800;letter-spacing:.2em;font-size:11px;
+    color:var(--yellow);text-transform:uppercase;}
+  .stage-note .t{font-size:13px;font-weight:600;color:#b8af9e;margin-top:6px;max-width:240px;line-height:1.45;}
+
+  #scaler{position:relative;z-index:2;animation:stageFade 1.1s ease both;}
+  .phone{animation:deviceFloat 7.5s ease-in-out 1.1s infinite;
+    box-shadow:0 2px 4px rgba(0,0,0,.6),
+               0 55px 130px -26px rgba(0,0,0,.82),
+               0 0 0 1px rgba(255,255,255,.05),
+               0 36px 100px -30px rgba(245,200,0,.22),
+               inset 0 0 0 2px #2a2724;}
+
+  @media (max-width:920px){ .stage-note{display:none;} .stage-word b{font-size:28vh;} }
+}
+
+@keyframes drift1{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(6vmax,4vmax) scale(1.12)}}
+@keyframes drift2{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(-5vmax,-4vmax) scale(1.16)}}
+@keyframes drift3{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(-6vmax,5vmax) scale(1.1)}}
+@keyframes stageFade{from{opacity:0}to{opacity:1}}
+@keyframes deviceFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-13px)}}
+@keyframes noteIn{to{opacity:1}}
+@media (prefers-reduced-motion:reduce){
+  .blob,.phone,#scaler,.stage-note{animation:none !important;}
+}
+
+/* ---------- live side panels + overhead-kick flourish ---------- */
+@media (min-width:561px){
+  .stage-panel{position:fixed;z-index:2;pointer-events:none;width:236px;color:#e9e2d2;
+    opacity:0;animation:noteIn 1.1s .7s ease both;top:0;bottom:0;
+    display:flex;flex-direction:column;justify-content:center;}
+  .stage-panel--l{left:46px;}
+  .stage-panel--r{right:46px;align-items:flex-end;}
+  .sp--r{text-align:right;}
+  .sp-kicker{font-family:var(--disp);font-weight:800;letter-spacing:.2em;font-size:11px;color:var(--yellow);text-transform:uppercase;}
+  .sp-title{font-family:var(--disp);font-weight:800;font-size:24px;line-height:1.02;margin-top:6px;color:#fff;letter-spacing:-.02em;}
+  .sp-pot{font-family:var(--disp);font-weight:800;font-size:46px;line-height:1;margin-top:20px;color:var(--yellow);letter-spacing:-.03em;}
+  .sp-pot__l{font-size:12px;font-weight:700;color:#b8af9e;letter-spacing:.04em;text-transform:uppercase;margin-top:2px;}
+  .sp-stats{display:flex;gap:18px;margin-top:22px;}
+  .sp-stat{display:flex;flex-direction:column;}
+  .sp-stat__n{font-family:var(--disp);font-weight:800;font-size:26px;color:#fff;line-height:1;}
+  .sp-stat__l{font-size:10.5px;font-weight:700;color:#b8af9e;text-transform:uppercase;letter-spacing:.05em;margin-top:3px;}
+  .sp-lb{margin-top:16px;display:flex;flex-direction:column;gap:9px;}
+  .sp-row{display:flex;align-items:center;gap:9px;}
+  .sp--r .sp-row{flex-direction:row-reverse;}
+  .sp-rank{font-family:var(--disp);font-weight:800;font-size:14px;color:var(--yellow);width:16px;text-align:center;}
+  .sp-av{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-family:var(--disp);font-weight:800;font-size:12px;flex:0 0 auto;border:2px solid rgba(255,255,255,.15);}
+  .sp-name{font-weight:700;font-size:13px;color:#ece5d6;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:120px;}
+  .sp--r .sp-name{flex:1;text-align:right;}
+  .sp-pts{font-size:12px;font-weight:800;color:#b8af9e;white-space:nowrap;}
+  .sp-empty{font-size:12.5px;font-weight:600;color:#9a917f;}
+  @media (max-width:1120px){ .stage-panel{display:none;} }
+
+  .kick-scene{position:fixed;left:28px;bottom:14px;width:min(420px,30vw);
+    z-index:1;pointer-events:none;opacity:.96;}
+  @media (max-width:1120px){ .kick-scene{left:50%;transform:translateX(-50%);width:min(420px,52vw);opacity:.5;} }
+
+  .stage-toggle{position:fixed;right:24px;bottom:20px;z-index:5;
+    pointer-events:auto;cursor:pointer;border:2px solid rgba(255,255,255,.18);
+    background:rgba(20,18,14,.7);color:#e9e2d2;font-family:var(--body);font-weight:700;
+    font-size:12px;padding:7px 14px;border-radius:999px;transition:border-color .15s,color .15s;}
+  .stage-toggle:hover{border-color:var(--yellow);color:#fff;}
+}
+/* the toggle is desktop-only */
+.stage-toggle{display:none;}
+@media (min-width:561px){ .stage-toggle{display:inline-block;} }
+
+/* kick animation keyframes (gated by .kick-scene visibility) */
+.kick-player{transform-origin:150px 150px;animation:kbPlayer 13s ease-in-out infinite;}
+.kick-leg{transform-origin:150px 150px;animation:kbLeg 13s ease-in-out infinite;}
+.kick-ball{animation:kbBall 13s ease-in infinite;}
+.kick-net{transform-origin:430px 130px;animation:kbNet 13s ease-out infinite;}
+.kick-goal{transform-origin:250px 40px;animation:kbGoal 13s ease-out infinite;}
+.kick-arc{animation:kbArc 13s ease-out infinite;}
+@keyframes kbPlayer{0%{opacity:0;transform:translateY(22px) rotate(-16deg)}4%{opacity:1;transform:translateY(0) rotate(-20deg)}8%{transform:rotate(10deg)}12%{transform:rotate(-4deg)}24%{opacity:1;transform:rotate(-6deg)}30%{opacity:0;transform:translateY(-12px) rotate(-22deg)}100%{opacity:0}}
+@keyframes kbLeg{0%,4%{transform:rotate(-62deg)}8%{transform:rotate(72deg)}12%{transform:rotate(44deg)}24%{transform:rotate(48deg)}30%,100%{transform:rotate(-62deg)}}
+@keyframes kbBall{0%,7%{transform:translate(0,0);opacity:1}11%{transform:translate(150px,-58px)}15%{transform:translate(214px,-22px)}16%{transform:translate(230px,-8px)}18%{transform:translate(230px,-2px)}28%{transform:translate(230px,-2px);opacity:1}31%{opacity:0}100%{opacity:0;transform:translate(0,0)}}
+@keyframes kbNet{0%,15%{transform:scaleX(1)}16%{transform:scaleX(1.05) skewX(-3deg)}19%{transform:scaleX(.99)}22%{transform:scaleX(1)}100%{transform:scaleX(1)}}
+@keyframes kbGoal{0%,15%{opacity:0;transform:scale(.6)}17%{opacity:1;transform:scale(1.12)}20%{transform:scale(1)}28%{opacity:1}32%{opacity:0}100%{opacity:0}}
+@keyframes kbArc{0%,7%{opacity:0}9%{opacity:.5}16%{opacity:.5}26%{opacity:.4}32%{opacity:0}100%{opacity:0}}
+
+/* per-screen entrance (replays on each tab switch via React key remount) */
+.scroll{animation:screenIn .42s cubic-bezier(.2,.8,.25,1) both;}
+@keyframes screenIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+
+/* user motion toggle — kills the showy ambient motion, keeps UI subtle */
+body.motion-off .kick-scene{display:none;}
+body.motion-off .blob{animation:none;}
+body.motion-off .phone{animation:none;}
+
+@media (prefers-reduced-motion:reduce){
+  .kick-player,.kick-leg,.kick-ball,.kick-net,.kick-goal,.kick-arc{animation:none !important;}
+  .kick-scene{display:none;}
+  .scroll{animation:none !important;}
+}
+
+/* ---------- responsive: full-screen on real phones ---------- */
+@media (max-width:560px){
+  body{background:var(--bg);display:block;overflow:hidden;}
+  #scaler{transform:none !important;width:100%;height:100%;}
+  .phone{width:100%;height:100vh;height:100dvh;border-radius:0;padding:0;box-shadow:none;}
+  .screen{border-radius:0;}
+  .notch,.statusbar{display:none;}
+  .scroll{padding-top:env(safe-area-inset-top);}
+  .tabbar{height:calc(84px + env(safe-area-inset-bottom));
+    padding-bottom:env(safe-area-inset-bottom);
+    background:linear-gradient(180deg,rgba(244,238,227,0) 0%,var(--bg) 22%);}
+  .wc-toasts{top:calc(12px + env(safe-area-inset-top));}
+}
 </style>
 <style>@font-face {
   font-family: 'Bricolage Grotesque';
@@ -230,6 +362,18 @@ button{font-family:inherit;}
 </style>
 </head>
 <body>
+<!-- Desktop stage: ambient backdrop + editorial branding (hidden on phones) -->
+<div class="stage-bg" aria-hidden="true">
+  <span class="blob blob--y"></span>
+  <span class="blob blob--r"></span>
+  <span class="blob blob--g"></span>
+  <span class="blob blob--b"></span>
+</div>
+<div class="stage-word" aria-hidden="true"><b>WHEESHT</b></div>
+<div id="stage-left" class="stage-panel stage-panel--l"></div>
+<div id="stage-right" class="stage-panel stage-panel--r"></div>
+<div id="stage-fx" class="kick-scene"></div>
+<button id="stage-toggle" class="stage-toggle" type="button">⚽  Animation on</button>
 <div id="scaler">
   <div class="phone">
     <div class="notch"></div>
@@ -243,8 +387,10 @@ button{font-family:inherit;}
 (function(){
   function fit(){
     var s=document.getElementById('scaler'); if(!s)return;
-    var pad=24; var sc=Math.min((window.innerWidth-pad)/402,(window.innerHeight-pad)/872);
-    sc=Math.min(sc,1.18); s.style.transform='scale('+sc+')';
+    // Phones render full-screen (CSS handles the frame removal) — no scaling.
+    if(window.innerWidth<=560){ s.style.transform='none'; return; }
+    var pad=44; var sc=Math.min((window.innerWidth-pad)/402,(window.innerHeight-pad)/872);
+    sc=Math.min(sc,1.32); s.style.transform='scale('+sc+')';
   }
   window.addEventListener('resize',fit); fit(); setTimeout(fit,200);
 })();
@@ -33546,7 +33692,7 @@ button{font-family:inherit;}
    =========================================================================== */
 (function () {
   if (window.WC_DATA) return; // server already injected real data
-  window.WC_DATA = {"teams":[{"name":"Mexico","code":"MEX","flag":"🇲🇽","group":"A","color":"#1a7a44","odds":"+6000","stage":"group","alive":true,"rounds":0},{"name":"South Korea","code":"KOR","flag":"🇰🇷","group":"A","color":"#d2143c","odds":"+20000","stage":"group","alive":true,"rounds":0},{"name":"South Africa","code":"RSA","flag":"🇿🇦","group":"A","color":"#0a7b3e","odds":"+50000","stage":"group","alive":true,"rounds":0},{"name":"Czechia","code":"CZE","flag":"🇨🇿","group":"A","color":"#11457e","odds":"+30000","stage":"group","alive":true,"rounds":0},{"name":"Canada","code":"CAN","flag":"🇨🇦","group":"B","color":"#d52b1e","odds":"+22500","stage":"group","alive":true,"rounds":0},{"name":"Switzerland","code":"SUI","flag":"🇨🇭","group":"B","color":"#d52b1e","odds":"+15000","stage":"group","alive":true,"rounds":0},{"name":"Qatar","code":"QAT","flag":"🇶🇦","group":"B","color":"#7a1737","odds":"+50000","stage":"group","alive":true,"rounds":0},{"name":"Bosnia & Herzegovina","code":"BIH","flag":"🇧🇦","group":"B","color":"#0a3b8c","odds":"+40000","stage":"group","alive":true,"rounds":0},{"name":"Brazil","code":"BRA","flag":"🇧🇷","group":"C","color":"#f7c600","odds":"+850","stage":"group","alive":true,"rounds":0},{"name":"Morocco","code":"MAR","flag":"🇲🇦","group":"C","color":"#c1272d","odds":"+5000","stage":"group","alive":true,"rounds":0},{"name":"Scotland","code":"SCO","flag":"🏴󠁧󠁢󠁳󠁣󠁴󠁿","group":"C","color":"#0a3b8c","odds":"+30000","stage":"group","alive":true,"rounds":0},{"name":"Haiti","code":"HAI","flag":"🇭🇹","group":"C","color":"#00209f","odds":"+100000","stage":"group","alive":true,"rounds":0},{"name":"USA","code":"USA","flag":"🇺🇸","group":"D","color":"#0a3161","odds":"+6000","stage":"group","alive":true,"rounds":0},{"name":"Paraguay","code":"PAR","flag":"🇵🇾","group":"D","color":"#d52b1e","odds":"+25000","stage":"group","alive":true,"rounds":0},{"name":"Australia","code":"AUS","flag":"🇦🇺","group":"D","color":"#0a7b3e","odds":"+20000","stage":"group","alive":true,"rounds":0},{"name":"Türkiye","code":"TUR","flag":"🇹🇷","group":"D","color":"#e30a17","odds":"+15000","stage":"group","alive":true,"rounds":0},{"name":"Germany","code":"GER","flag":"🇩🇪","group":"E","color":"#1a1a1a","odds":"+1400","stage":"group","alive":true,"rounds":0},{"name":"Ecuador","code":"ECU","flag":"🇪🇨","group":"E","color":"#ffd100","odds":"+12000","stage":"group","alive":true,"rounds":0},{"name":"Ivory Coast","code":"CIV","flag":"🇨🇮","group":"E","color":"#f77f00","odds":"+15000","stage":"group","alive":true,"rounds":0},{"name":"Curaçao","code":"CUW","flag":"🇨🇼","group":"E","color":"#002b7f","odds":"+100000","stage":"group","alive":true,"rounds":0},{"name":"Netherlands","code":"NED","flag":"🇳🇱","group":"F","color":"#ec6608","odds":"+2200","stage":"group","alive":true,"rounds":0},{"name":"Japan","code":"JPN","flag":"🇯🇵","group":"F","color":"#bc002d","odds":"+6600","stage":"group","alive":true,"rounds":0},{"name":"Tunisia","code":"TUN","flag":"🇹🇳","group":"F","color":"#e70013","odds":"+40000","stage":"group","alive":true,"rounds":0},{"name":"Sweden","code":"SWE","flag":"🇸🇪","group":"F","color":"#005b99","odds":"+12000","stage":"group","alive":true,"rounds":0},{"name":"Belgium","code":"BEL","flag":"🇧🇪","group":"G","color":"#c8102e","odds":"+3500","stage":"group","alive":true,"rounds":0},{"name":"Iran","code":"IRN","flag":"🇮🇷","group":"G","color":"#cf1020","odds":"+30000","stage":"group","alive":true,"rounds":0},{"name":"Egypt","code":"EGY","flag":"🇪🇬","group":"G","color":"#c8102e","odds":"+20000","stage":"group","alive":true,"rounds":0},{"name":"New Zealand","code":"NZL","flag":"🇳🇿","group":"G","color":"#1a1a1a","odds":"+50000","stage":"group","alive":true,"rounds":0},{"name":"Spain","code":"ESP","flag":"🇪🇸","group":"H","color":"#c60b1e","odds":"+450","stage":"group","alive":true,"rounds":0},{"name":"Uruguay","code":"URU","flag":"🇺🇾","group":"H","color":"#5b9ad5","odds":"+4000","stage":"group","alive":true,"rounds":0},{"name":"Saudi Arabia","code":"KSA","flag":"🇸🇦","group":"H","color":"#0a7b3e","odds":"+50000","stage":"group","alive":true,"rounds":0},{"name":"Cape Verde","code":"CPV","flag":"🇨🇻","group":"H","color":"#0a3b8c","odds":"+80000","stage":"group","alive":true,"rounds":0},{"name":"France","code":"FRA","flag":"🇫🇷","group":"I","color":"#0a2472","odds":"+500","stage":"group","alive":true,"rounds":0},{"name":"Senegal","code":"SEN","flag":"🇸🇳","group":"I","color":"#0a7b3e","odds":"+6600","stage":"group","alive":true,"rounds":0},{"name":"Norway","code":"NOR","flag":"🇳🇴","group":"I","color":"#c8102e","odds":"+3500","stage":"group","alive":true,"rounds":0},{"name":"Iraq","code":"IRQ","flag":"🇮🇶","group":"I","color":"#1a1a1a","odds":"+100000","stage":"group","alive":true,"rounds":0},{"name":"Argentina","code":"ARG","flag":"🇦🇷","group":"J","color":"#6cace4","odds":"+1000","stage":"group","alive":true,"rounds":0},{"name":"Austria","code":"AUT","flag":"🇦🇹","group":"J","color":"#c8102e","odds":"+12000","stage":"group","alive":true,"rounds":0},{"name":"Algeria","code":"ALG","flag":"🇩🇿","group":"J","color":"#0a7b3e","odds":"+25000","stage":"group","alive":true,"rounds":0},{"name":"Jordan","code":"JOR","flag":"🇯🇴","group":"J","color":"#1a1a1a","odds":"+80000","stage":"group","alive":true,"rounds":0},{"name":"Portugal","code":"POR","flag":"🇵🇹","group":"K","color":"#c8102e","odds":"+900","stage":"group","alive":true,"rounds":0},{"name":"Colombia","code":"COL","flag":"🇨🇴","group":"K","color":"#ffd100","odds":"+4000","stage":"group","alive":true,"rounds":0},{"name":"Uzbekistan","code":"UZB","flag":"🇺🇿","group":"K","color":"#0a7b3e","odds":"+50000","stage":"group","alive":true,"rounds":0},{"name":"DR Congo","code":"COD","flag":"🇨🇩","group":"K","color":"#3aa0d8","odds":"+60000","stage":"group","alive":true,"rounds":0},{"name":"England","code":"ENG","flag":"🏴󠁧󠁢󠁥󠁮󠁧󠁿","group":"L","color":"#1a1a1a","odds":"+650","stage":"group","alive":true,"rounds":0},{"name":"Croatia","code":"CRO","flag":"🇭🇷","group":"L","color":"#d2143c","odds":"+6600","stage":"group","alive":true,"rounds":0},{"name":"Panama","code":"PAN","flag":"🇵🇦","group":"L","color":"#0a3b8c","odds":"+50000","stage":"group","alive":true,"rounds":0},{"name":"Ghana","code":"GHA","flag":"🇬🇭","group":"L","color":"#0a7b3e","odds":"+40000","stage":"group","alive":true,"rounds":0}],"people":[],"r16":[],"fixtures":[{"id":"f0","group":"A","matchday":1,"a":"MEX","b":"KOR","dateISO":"2026-06-11","dateLabel":"Thu 11 Jun","time":"16:00","venue":"MetLife Stadium, NJ","status":"upcoming","score":null},{"id":"f1","group":"A","matchday":1,"a":"RSA","b":"CZE","dateISO":"2026-06-11","dateLabel":"Thu 11 Jun","time":"19:00","venue":"SoFi Stadium, LA","status":"upcoming","score":null},{"id":"f6","group":"B","matchday":1,"a":"CAN","b":"SUI","dateISO":"2026-06-11","dateLabel":"Thu 11 Jun","time":"19:00","venue":"Levi's Stadium, SF Bay","status":"upcoming","score":null},{"id":"f7","group":"B","matchday":1,"a":"QAT","b":"BIH","dateISO":"2026-06-11","dateLabel":"Thu 11 Jun","time":"22:00","venue":"Hard Rock Stadium, Miami","status":"upcoming","score":null},{"id":"f13","group":"C","matchday":1,"a":"SCO","b":"HAI","dateISO":"2026-06-12","dateLabel":"Fri 12 Jun","time":"16:00","venue":"Estadio Azteca, Mexico City","status":"upcoming","score":null},{"id":"f18","group":"D","matchday":1,"a":"USA","b":"PAR","dateISO":"2026-06-12","dateLabel":"Fri 12 Jun","time":"16:00","venue":"AT&T Stadium, Dallas","status":"upcoming","score":null},{"id":"f19","group":"D","matchday":1,"a":"AUS","b":"TUR","dateISO":"2026-06-12","dateLabel":"Fri 12 Jun","time":"19:00","venue":"Mercedes-Benz, Atlanta","status":"upcoming","score":null},{"id":"f12","group":"C","matchday":1,"a":"BRA","b":"MAR","dateISO":"2026-06-12","dateLabel":"Fri 12 Jun","time":"22:00","venue":"BC Place, Vancouver","status":"upcoming","score":null},{"id":"f31","group":"F","matchday":1,"a":"TUN","b":"SWE","dateISO":"2026-06-13","dateLabel":"Sat 13 Jun","time":"16:00","venue":"Estadio BBVA, Monterrey","status":"upcoming","score":null},{"id":"f24","group":"E","matchday":1,"a":"GER","b":"ECU","dateISO":"2026-06-13","dateLabel":"Sat 13 Jun","time":"19:00","venue":"NRG Stadium, Houston","status":"upcoming","score":null},{"id":"f25","group":"E","matchday":1,"a":"CIV","b":"CUW","dateISO":"2026-06-13","dateLabel":"Sat 13 Jun","time":"22:00","venue":"Arrowhead, Kansas City","status":"upcoming","score":null},{"id":"f30","group":"F","matchday":1,"a":"NED","b":"JPN","dateISO":"2026-06-13","dateLabel":"Sat 13 Jun","time":"22:00","venue":"Estadio Akron, Guadalajara","status":"upcoming","score":null},{"id":"f36","group":"G","matchday":1,"a":"BEL","b":"IRN","dateISO":"2026-06-14","dateLabel":"Sun 14 Jun","time":"16:00","venue":"Lincoln Financial, Philadelphia","status":"upcoming","score":null},{"id":"f37","group":"G","matchday":1,"a":"EGY","b":"NZL","dateISO":"2026-06-14","dateLabel":"Sun 14 Jun","time":"19:00","venue":"Gillette Stadium, Boston","status":"upcoming","score":null},{"id":"f42","group":"H","matchday":1,"a":"ESP","b":"URU","dateISO":"2026-06-14","dateLabel":"Sun 14 Jun","time":"19:00","venue":"Lumen Field, Seattle","status":"upcoming","score":null},{"id":"f43","group":"H","matchday":1,"a":"KSA","b":"CPV","dateISO":"2026-06-14","dateLabel":"Sun 14 Jun","time":"22:00","venue":"BMO Field, Toronto","status":"upcoming","score":null},{"id":"f49","group":"I","matchday":1,"a":"NOR","b":"IRQ","dateISO":"2026-06-15","dateLabel":"Mon 15 Jun","time":"16:00","venue":"SoFi Stadium, LA","status":"upcoming","score":null},{"id":"f54","group":"J","matchday":1,"a":"ARG","b":"AUT","dateISO":"2026-06-15","dateLabel":"Mon 15 Jun","time":"16:00","venue":"Levi's Stadium, SF Bay","status":"upcoming","score":null},{"id":"f55","group":"J","matchday":1,"a":"ALG","b":"JOR","dateISO":"2026-06-15","dateLabel":"Mon 15 Jun","time":"19:00","venue":"Hard Rock Stadium, Miami","status":"upcoming","score":null},{"id":"f48","group":"I","matchday":1,"a":"FRA","b":"SEN","dateISO":"2026-06-15","dateLabel":"Mon 15 Jun","time":"22:00","venue":"MetLife Stadium, NJ","status":"upcoming","score":null},{"id":"f67","group":"L","matchday":1,"a":"PAN","b":"GHA","dateISO":"2026-06-16","dateLabel":"Tue 16 Jun","time":"16:00","venue":"Mercedes-Benz, Atlanta","status":"upcoming","score":null},{"id":"f60","group":"K","matchday":1,"a":"POR","b":"COL","dateISO":"2026-06-16","dateLabel":"Tue 16 Jun","time":"19:00","venue":"BC Place, Vancouver","status":"upcoming","score":null},{"id":"f61","group":"K","matchday":1,"a":"UZB","b":"COD","dateISO":"2026-06-16","dateLabel":"Tue 16 Jun","time":"22:00","venue":"Estadio Azteca, Mexico City","status":"upcoming","score":null},{"id":"f66","group":"L","matchday":1,"a":"ENG","b":"CRO","dateISO":"2026-06-16","dateLabel":"Tue 16 Jun","time":"22:00","venue":"AT&T Stadium, Dallas","status":"upcoming","score":null},{"id":"f2","group":"A","matchday":2,"a":"MEX","b":"RSA","dateISO":"2026-06-17","dateLabel":"Wed 17 Jun","time":"16:00","venue":"AT&T Stadium, Dallas","status":"upcoming","score":null},{"id":"f3","group":"A","matchday":2,"a":"CZE","b":"KOR","dateISO":"2026-06-17","dateLabel":"Wed 17 Jun","time":"19:00","venue":"Mercedes-Benz, Atlanta","status":"upcoming","score":null},{"id":"f8","group":"B","matchday":2,"a":"CAN","b":"QAT","dateISO":"2026-06-17","dateLabel":"Wed 17 Jun","time":"19:00","venue":"NRG Stadium, Houston","status":"upcoming","score":null},{"id":"f9","group":"B","matchday":2,"a":"BIH","b":"SUI","dateISO":"2026-06-17","dateLabel":"Wed 17 Jun","time":"22:00","venue":"Arrowhead, Kansas City","status":"upcoming","score":null},{"id":"f15","group":"C","matchday":2,"a":"HAI","b":"MAR","dateISO":"2026-06-18","dateLabel":"Thu 18 Jun","time":"16:00","venue":"Estadio BBVA, Monterrey","status":"upcoming","score":null},{"id":"f20","group":"D","matchday":2,"a":"USA","b":"AUS","dateISO":"2026-06-18","dateLabel":"Thu 18 Jun","time":"16:00","venue":"Lincoln Financial, Philadelphia","status":"upcoming","score":null},{"id":"f21","group":"D","matchday":2,"a":"TUR","b":"PAR","dateISO":"2026-06-18","dateLabel":"Thu 18 Jun","time":"19:00","venue":"Gillette Stadium, Boston","status":"upcoming","score":null},{"id":"f14","group":"C","matchday":2,"a":"BRA","b":"SCO","dateISO":"2026-06-18","dateLabel":"Thu 18 Jun","time":"22:00","venue":"Estadio Akron, Guadalajara","status":"upcoming","score":null},{"id":"f33","group":"F","matchday":2,"a":"SWE","b":"JPN","dateISO":"2026-06-19","dateLabel":"Fri 19 Jun","time":"16:00","venue":"SoFi Stadium, LA","status":"upcoming","score":null},{"id":"f26","group":"E","matchday":2,"a":"GER","b":"CIV","dateISO":"2026-06-19","dateLabel":"Fri 19 Jun","time":"19:00","venue":"Lumen Field, Seattle","status":"upcoming","score":null},{"id":"f27","group":"E","matchday":2,"a":"CUW","b":"ECU","dateISO":"2026-06-19","dateLabel":"Fri 19 Jun","time":"22:00","venue":"BMO Field, Toronto","status":"upcoming","score":null},{"id":"f32","group":"F","matchday":2,"a":"NED","b":"TUN","dateISO":"2026-06-19","dateLabel":"Fri 19 Jun","time":"22:00","venue":"MetLife Stadium, NJ","status":"upcoming","score":null},{"id":"f38","group":"G","matchday":2,"a":"BEL","b":"EGY","dateISO":"2026-06-20","dateLabel":"Sat 20 Jun","time":"16:00","venue":"Levi's Stadium, SF Bay","status":"upcoming","score":null},{"id":"f39","group":"G","matchday":2,"a":"NZL","b":"IRN","dateISO":"2026-06-20","dateLabel":"Sat 20 Jun","time":"19:00","venue":"Hard Rock Stadium, Miami","status":"upcoming","score":null},{"id":"f44","group":"H","matchday":2,"a":"ESP","b":"KSA","dateISO":"2026-06-20","dateLabel":"Sat 20 Jun","time":"19:00","venue":"BC Place, Vancouver","status":"upcoming","score":null},{"id":"f45","group":"H","matchday":2,"a":"CPV","b":"URU","dateISO":"2026-06-20","dateLabel":"Sat 20 Jun","time":"22:00","venue":"Estadio Azteca, Mexico City","status":"upcoming","score":null},{"id":"f51","group":"I","matchday":2,"a":"IRQ","b":"SEN","dateISO":"2026-06-21","dateLabel":"Sun 21 Jun","time":"16:00","venue":"Mercedes-Benz, Atlanta","status":"upcoming","score":null},{"id":"f56","group":"J","matchday":2,"a":"ARG","b":"ALG","dateISO":"2026-06-21","dateLabel":"Sun 21 Jun","time":"16:00","venue":"NRG Stadium, Houston","status":"upcoming","score":null},{"id":"f57","group":"J","matchday":2,"a":"JOR","b":"AUT","dateISO":"2026-06-21","dateLabel":"Sun 21 Jun","time":"19:00","venue":"Arrowhead, Kansas City","status":"upcoming","score":null},{"id":"f50","group":"I","matchday":2,"a":"FRA","b":"NOR","dateISO":"2026-06-21","dateLabel":"Sun 21 Jun","time":"22:00","venue":"AT&T Stadium, Dallas","status":"upcoming","score":null},{"id":"f69","group":"L","matchday":2,"a":"GHA","b":"CRO","dateISO":"2026-06-22","dateLabel":"Mon 22 Jun","time":"16:00","venue":"Gillette Stadium, Boston","status":"upcoming","score":null},{"id":"f62","group":"K","matchday":2,"a":"POR","b":"UZB","dateISO":"2026-06-22","dateLabel":"Mon 22 Jun","time":"19:00","venue":"Estadio Akron, Guadalajara","status":"upcoming","score":null},{"id":"f63","group":"K","matchday":2,"a":"COD","b":"COL","dateISO":"2026-06-22","dateLabel":"Mon 22 Jun","time":"22:00","venue":"Estadio BBVA, Monterrey","status":"upcoming","score":null},{"id":"f68","group":"L","matchday":2,"a":"ENG","b":"PAN","dateISO":"2026-06-22","dateLabel":"Mon 22 Jun","time":"22:00","venue":"Lincoln Financial, Philadelphia","status":"upcoming","score":null},{"id":"f4","group":"A","matchday":3,"a":"MEX","b":"CZE","dateISO":"2026-06-23","dateLabel":"Tue 23 Jun","time":"16:00","venue":"Lincoln Financial, Philadelphia","status":"upcoming","score":null},{"id":"f5","group":"A","matchday":3,"a":"KOR","b":"RSA","dateISO":"2026-06-23","dateLabel":"Tue 23 Jun","time":"19:00","venue":"Gillette Stadium, Boston","status":"upcoming","score":null},{"id":"f10","group":"B","matchday":3,"a":"CAN","b":"BIH","dateISO":"2026-06-23","dateLabel":"Tue 23 Jun","time":"19:00","venue":"Lumen Field, Seattle","status":"upcoming","score":null},{"id":"f11","group":"B","matchday":3,"a":"SUI","b":"QAT","dateISO":"2026-06-23","dateLabel":"Tue 23 Jun","time":"22:00","venue":"BMO Field, Toronto","status":"upcoming","score":null},{"id":"f17","group":"C","matchday":3,"a":"MAR","b":"SCO","dateISO":"2026-06-24","dateLabel":"Wed 24 Jun","time":"16:00","venue":"SoFi Stadium, LA","status":"upcoming","score":null},{"id":"f22","group":"D","matchday":3,"a":"USA","b":"TUR","dateISO":"2026-06-24","dateLabel":"Wed 24 Jun","time":"16:00","venue":"Levi's Stadium, SF Bay","status":"upcoming","score":null},{"id":"f23","group":"D","matchday":3,"a":"PAR","b":"AUS","dateISO":"2026-06-24","dateLabel":"Wed 24 Jun","time":"19:00","venue":"Hard Rock Stadium, Miami","status":"upcoming","score":null},{"id":"f16","group":"C","matchday":3,"a":"BRA","b":"HAI","dateISO":"2026-06-24","dateLabel":"Wed 24 Jun","time":"22:00","venue":"MetLife Stadium, NJ","status":"upcoming","score":null},{"id":"f35","group":"F","matchday":3,"a":"JPN","b":"TUN","dateISO":"2026-06-25","dateLabel":"Thu 25 Jun","time":"16:00","venue":"Mercedes-Benz, Atlanta","status":"upcoming","score":null},{"id":"f28","group":"E","matchday":3,"a":"GER","b":"CUW","dateISO":"2026-06-25","dateLabel":"Thu 25 Jun","time":"19:00","venue":"BC Place, Vancouver","status":"upcoming","score":null},{"id":"f29","group":"E","matchday":3,"a":"ECU","b":"CIV","dateISO":"2026-06-25","dateLabel":"Thu 25 Jun","time":"22:00","venue":"Estadio Azteca, Mexico City","status":"upcoming","score":null},{"id":"f34","group":"F","matchday":3,"a":"NED","b":"SWE","dateISO":"2026-06-25","dateLabel":"Thu 25 Jun","time":"22:00","venue":"AT&T Stadium, Dallas","status":"upcoming","score":null},{"id":"f40","group":"G","matchday":3,"a":"BEL","b":"NZL","dateISO":"2026-06-26","dateLabel":"Fri 26 Jun","time":"16:00","venue":"NRG Stadium, Houston","status":"upcoming","score":null},{"id":"f41","group":"G","matchday":3,"a":"IRN","b":"EGY","dateISO":"2026-06-26","dateLabel":"Fri 26 Jun","time":"19:00","venue":"Arrowhead, Kansas City","status":"upcoming","score":null},{"id":"f46","group":"H","matchday":3,"a":"ESP","b":"CPV","dateISO":"2026-06-26","dateLabel":"Fri 26 Jun","time":"19:00","venue":"Estadio Akron, Guadalajara","status":"upcoming","score":null},{"id":"f47","group":"H","matchday":3,"a":"URU","b":"KSA","dateISO":"2026-06-26","dateLabel":"Fri 26 Jun","time":"22:00","venue":"Estadio BBVA, Monterrey","status":"upcoming","score":null},{"id":"f53","group":"I","matchday":3,"a":"SEN","b":"NOR","dateISO":"2026-06-27","dateLabel":"Sat 27 Jun","time":"16:00","venue":"Gillette Stadium, Boston","status":"upcoming","score":null},{"id":"f58","group":"J","matchday":3,"a":"ARG","b":"JOR","dateISO":"2026-06-27","dateLabel":"Sat 27 Jun","time":"16:00","venue":"Lumen Field, Seattle","status":"upcoming","score":null},{"id":"f59","group":"J","matchday":3,"a":"AUT","b":"ALG","dateISO":"2026-06-27","dateLabel":"Sat 27 Jun","time":"19:00","venue":"BMO Field, Toronto","status":"upcoming","score":null},{"id":"f52","group":"I","matchday":3,"a":"FRA","b":"IRQ","dateISO":"2026-06-27","dateLabel":"Sat 27 Jun","time":"22:00","venue":"Lincoln Financial, Philadelphia","status":"upcoming","score":null},{"id":"f71","group":"L","matchday":3,"a":"CRO","b":"PAN","dateISO":"2026-06-28","dateLabel":"Sun 28 Jun","time":"16:00","venue":"Hard Rock Stadium, Miami","status":"upcoming","score":null},{"id":"f64","group":"K","matchday":3,"a":"POR","b":"COD","dateISO":"2026-06-28","dateLabel":"Sun 28 Jun","time":"19:00","venue":"MetLife Stadium, NJ","status":"upcoming","score":null},{"id":"f65","group":"K","matchday":3,"a":"COL","b":"UZB","dateISO":"2026-06-28","dateLabel":"Sun 28 Jun","time":"22:00","venue":"SoFi Stadium, LA","status":"upcoming","score":null},{"id":"f70","group":"L","matchday":3,"a":"ENG","b":"GHA","dateISO":"2026-06-28","dateLabel":"Sun 28 Jun","time":"22:00","venue":"Levi's Stadium, SF Bay","status":"upcoming","score":null}],"predictions":[{"key":"winner","q":"Tournament Winner","kind":"team","points":25,"answer":null,"options":["ESP","FRA","BRA","ARG","GER","POR"]},{"key":"final","q":"The Final Matchup","kind":"team2","points":15,"answer":null,"options":["ESP","FRA","BRA","ARG"]},{"key":"goldenBoot","q":"Golden Boot Winner","kind":"player","points":15,"answer":null,"options":[{"id":"mbappe","name":"K. Mbappé","team":"FRA"},{"id":"yamal","name":"L. Yamal","team":"ESP"},{"id":"haaland","name":"E. Haaland","team":"NOR"},{"id":"vini","name":"Vinícius Jr","team":"BRA"}]},{"key":"scotland","q":"How far do Scotland go?","kind":"stage","points":10,"answer":null,"options":["Group stage","Round of 32","Round of 16","Quarter Final","Semi Final","Final","Winner"]},{"key":"england","q":"How far do England go?","kind":"stage","points":10,"answer":null,"options":["Group stage","Round of 32","Round of 16","Quarter Final","Semi Final","Final","Winner"]},{"key":"surprise","q":"Biggest Surprise Team","kind":"team","points":10,"answer":null,"options":["NOR","MAR","SEN","JPN","CRO","COL"]},{"key":"flop","q":"Biggest Disappointment","kind":"team","points":10,"answer":null,"options":["ENG","BEL","GER","USA","BRA"]},{"key":"cleanSheets","q":"Most Clean Sheets","kind":"team","points":10,"answer":null,"options":["ESP","BRA","ARG","FRA"]},{"key":"youngPlayer","q":"Best Young Player","kind":"player","points":10,"answer":null,"options":[{"id":"yamal","name":"L. Yamal","team":"ESP"},{"id":"yildiz","name":"K. Yıldız","team":"TUR"},{"id":"endrick","name":"Endrick","team":"BRA"},{"id":"wirtz","name":"F. Wirtz","team":"GER"}]}],"fee":5,"pot":0,"charitySplit":0.5,"payouts":[{"place":"Winner","pct":0.5,"label":"holds the champion — takes the whole pot"},{"place":"Charity","pct":0.5,"label":"half of every entry"}],"lines":{"welcome":"Right. Let's get this started. Wheesht is watching.","drawGood":"Oh aye. That's a tidy wee team. Ye might actually do something wi' that.","drawMid":"Could be worse. Could be better. Wheesht is reserving judgement.","drawBad":"…Wheesht is not going to insult ye. The flag's nice though.","drawYou":"Croatia. Experienced, thrawn, never know when they're beat. Wheesht approves. Quietly.","upset":"Naebody saw that coming. Wheesht definitely didn't. Wheesht's predictions stand.","england":"…Wheesht is remaining professional. Next question.","scotland":"Scotland. The homeland. Drawn with Brazil, aye — but Wheesht believes. Wheesht needs a minute.","eliminated":"Ye've been eliminated. Wheesht is… sorry. (Wheesht is not sorry. Wheesht saw this coming.)","sideBets":"Aye, ye're out. But Wheesht's not done wi' ye yet.","sideBets2":"We're the ones watching objectively now. Arguably the better position.","predOpen":"Predictions are open. Back yerself. Wheesht will remember every single one.","predLocked":"Predictions are locked. No takebacks. Wheesht has yer answers in writing.","empty":"Nothing here yet. Wheesht is watching the space.","error":"Something went wrong. Wheesht is investigating. Wheesht suspects foul play.","finalBuild":"Two teams left. Wheesht has officiated since 1966. Wheesht is, for once, almost speechless. Almost."},"meta":{"name":"The Office Sweepstake","season":"World Cup 2026","stageLabel":"Group Stage","phase":"pre","maxTeams":48,"groupSize":0,"stillIn":0,"out":0,"teamsLeft":48,"kickoff":"Thu 11 June","finalVenue":"MetLife Stadium, New Jersey","finalDate":"Sun 19 July","predictionsLocked":false,"stageLadder":["group","r32","r16","qf","sf","final","winner"],"stageLabels":{"group":"Group stage","r32":"Round of 32","r16":"Round of 16","qf":"Quarter-final","sf":"Semi-final","final":"Final","winner":"Winner"},"specialTeams":["SCO","ENG"],"qualification":{"groups":12,"group_size":4,"qualify_per_group":2,"best_third_qualifiers":8}}};
+  window.WC_DATA = {"teams":[{"name":"Mexico","code":"MEX","flag":"🇲🇽","group":"A","color":"#1a7a44","odds":"+6000","stage":"group","alive":true,"rounds":0},{"name":"South Korea","code":"KOR","flag":"🇰🇷","group":"A","color":"#d2143c","odds":"+20000","stage":"group","alive":true,"rounds":0},{"name":"South Africa","code":"RSA","flag":"🇿🇦","group":"A","color":"#0a7b3e","odds":"+50000","stage":"group","alive":true,"rounds":0},{"name":"Czechia","code":"CZE","flag":"🇨🇿","group":"A","color":"#11457e","odds":"+30000","stage":"group","alive":true,"rounds":0},{"name":"Canada","code":"CAN","flag":"🇨🇦","group":"B","color":"#d52b1e","odds":"+22500","stage":"group","alive":true,"rounds":0},{"name":"Switzerland","code":"SUI","flag":"🇨🇭","group":"B","color":"#d52b1e","odds":"+15000","stage":"group","alive":true,"rounds":0},{"name":"Qatar","code":"QAT","flag":"🇶🇦","group":"B","color":"#7a1737","odds":"+50000","stage":"group","alive":true,"rounds":0},{"name":"Bosnia & Herzegovina","code":"BIH","flag":"🇧🇦","group":"B","color":"#0a3b8c","odds":"+40000","stage":"group","alive":true,"rounds":0},{"name":"Brazil","code":"BRA","flag":"🇧🇷","group":"C","color":"#f7c600","odds":"+850","stage":"group","alive":true,"rounds":0},{"name":"Morocco","code":"MAR","flag":"🇲🇦","group":"C","color":"#c1272d","odds":"+5000","stage":"group","alive":true,"rounds":0},{"name":"Scotland","code":"SCO","flag":"🏴󠁧󠁢󠁳󠁣󠁴󠁿","group":"C","color":"#0a3b8c","odds":"+30000","stage":"group","alive":true,"rounds":0},{"name":"Haiti","code":"HAI","flag":"🇭🇹","group":"C","color":"#00209f","odds":"+100000","stage":"group","alive":true,"rounds":0},{"name":"USA","code":"USA","flag":"🇺🇸","group":"D","color":"#0a3161","odds":"+6000","stage":"group","alive":true,"rounds":0},{"name":"Paraguay","code":"PAR","flag":"🇵🇾","group":"D","color":"#d52b1e","odds":"+25000","stage":"group","alive":true,"rounds":0},{"name":"Australia","code":"AUS","flag":"🇦🇺","group":"D","color":"#0a7b3e","odds":"+20000","stage":"group","alive":true,"rounds":0},{"name":"Türkiye","code":"TUR","flag":"🇹🇷","group":"D","color":"#e30a17","odds":"+15000","stage":"group","alive":true,"rounds":0},{"name":"Germany","code":"GER","flag":"🇩🇪","group":"E","color":"#1a1a1a","odds":"+1400","stage":"group","alive":true,"rounds":0},{"name":"Ecuador","code":"ECU","flag":"🇪🇨","group":"E","color":"#ffd100","odds":"+12000","stage":"group","alive":true,"rounds":0},{"name":"Ivory Coast","code":"CIV","flag":"🇨🇮","group":"E","color":"#f77f00","odds":"+15000","stage":"group","alive":true,"rounds":0},{"name":"Curaçao","code":"CUW","flag":"🇨🇼","group":"E","color":"#002b7f","odds":"+100000","stage":"group","alive":true,"rounds":0},{"name":"Netherlands","code":"NED","flag":"🇳🇱","group":"F","color":"#ec6608","odds":"+2200","stage":"group","alive":true,"rounds":0},{"name":"Japan","code":"JPN","flag":"🇯🇵","group":"F","color":"#bc002d","odds":"+6600","stage":"group","alive":true,"rounds":0},{"name":"Tunisia","code":"TUN","flag":"🇹🇳","group":"F","color":"#e70013","odds":"+40000","stage":"group","alive":true,"rounds":0},{"name":"Sweden","code":"SWE","flag":"🇸🇪","group":"F","color":"#005b99","odds":"+12000","stage":"group","alive":true,"rounds":0},{"name":"Belgium","code":"BEL","flag":"🇧🇪","group":"G","color":"#c8102e","odds":"+3500","stage":"group","alive":true,"rounds":0},{"name":"Iran","code":"IRN","flag":"🇮🇷","group":"G","color":"#cf1020","odds":"+30000","stage":"group","alive":true,"rounds":0},{"name":"Egypt","code":"EGY","flag":"🇪🇬","group":"G","color":"#c8102e","odds":"+20000","stage":"group","alive":true,"rounds":0},{"name":"New Zealand","code":"NZL","flag":"🇳🇿","group":"G","color":"#1a1a1a","odds":"+50000","stage":"group","alive":true,"rounds":0},{"name":"Spain","code":"ESP","flag":"🇪🇸","group":"H","color":"#c60b1e","odds":"+450","stage":"group","alive":true,"rounds":0},{"name":"Uruguay","code":"URU","flag":"🇺🇾","group":"H","color":"#5b9ad5","odds":"+4000","stage":"group","alive":true,"rounds":0},{"name":"Saudi Arabia","code":"KSA","flag":"🇸🇦","group":"H","color":"#0a7b3e","odds":"+50000","stage":"group","alive":true,"rounds":0},{"name":"Cape Verde","code":"CPV","flag":"🇨🇻","group":"H","color":"#0a3b8c","odds":"+80000","stage":"group","alive":true,"rounds":0},{"name":"France","code":"FRA","flag":"🇫🇷","group":"I","color":"#0a2472","odds":"+500","stage":"group","alive":true,"rounds":0},{"name":"Senegal","code":"SEN","flag":"🇸🇳","group":"I","color":"#0a7b3e","odds":"+6600","stage":"group","alive":true,"rounds":0},{"name":"Norway","code":"NOR","flag":"🇳🇴","group":"I","color":"#c8102e","odds":"+3500","stage":"group","alive":true,"rounds":0},{"name":"Iraq","code":"IRQ","flag":"🇮🇶","group":"I","color":"#1a1a1a","odds":"+100000","stage":"group","alive":true,"rounds":0},{"name":"Argentina","code":"ARG","flag":"🇦🇷","group":"J","color":"#6cace4","odds":"+1000","stage":"group","alive":true,"rounds":0},{"name":"Austria","code":"AUT","flag":"🇦🇹","group":"J","color":"#c8102e","odds":"+12000","stage":"group","alive":true,"rounds":0},{"name":"Algeria","code":"ALG","flag":"🇩🇿","group":"J","color":"#0a7b3e","odds":"+25000","stage":"group","alive":true,"rounds":0},{"name":"Jordan","code":"JOR","flag":"🇯🇴","group":"J","color":"#1a1a1a","odds":"+80000","stage":"group","alive":true,"rounds":0},{"name":"Portugal","code":"POR","flag":"🇵🇹","group":"K","color":"#c8102e","odds":"+900","stage":"group","alive":true,"rounds":0},{"name":"Colombia","code":"COL","flag":"🇨🇴","group":"K","color":"#ffd100","odds":"+4000","stage":"group","alive":true,"rounds":0},{"name":"Uzbekistan","code":"UZB","flag":"🇺🇿","group":"K","color":"#0a7b3e","odds":"+50000","stage":"group","alive":true,"rounds":0},{"name":"DR Congo","code":"COD","flag":"🇨🇩","group":"K","color":"#3aa0d8","odds":"+60000","stage":"group","alive":true,"rounds":0},{"name":"England","code":"ENG","flag":"🏴󠁧󠁢󠁥󠁮󠁧󠁿","group":"L","color":"#1a1a1a","odds":"+650","stage":"group","alive":true,"rounds":0},{"name":"Croatia","code":"CRO","flag":"🇭🇷","group":"L","color":"#d2143c","odds":"+6600","stage":"group","alive":true,"rounds":0},{"name":"Panama","code":"PAN","flag":"🇵🇦","group":"L","color":"#0a3b8c","odds":"+50000","stage":"group","alive":true,"rounds":0},{"name":"Ghana","code":"GHA","flag":"🇬🇭","group":"L","color":"#0a7b3e","odds":"+40000","stage":"group","alive":true,"rounds":0}],"people":[{"id":"oi-01","name":"Emily Stokes","initials":"ES","team":"MEX","color":"#E8272A","department":"","location":"Edinburgh","city":"Edinburgh","ltMember":false,"leadership":false,"gender":"—","stage":"group","alive":true,"isYou":false,"isDemo":false,"isOI":true,"leagueCode":"OI","picks":{},"predScore":0,"joinedAt":0},{"id":"oi-02","name":"Melissa Dunbar","initials":"MD","team":"KOR","color":"#1a7a44","department":"","location":"Edinburgh","city":"Edinburgh","ltMember":false,"leadership":false,"gender":"—","stage":"group","alive":true,"isYou":false,"isDemo":false,"isOI":true,"leagueCode":"OI","picks":{},"predScore":0,"joinedAt":0},{"id":"oi-03","name":"Alice Zheng","initials":"AZ","team":"RSA","color":"#0a3b8c","department":"","location":"Edinburgh","city":"Edinburgh","ltMember":false,"leadership":false,"gender":"—","stage":"group","alive":true,"isYou":false,"isDemo":false,"isOI":true,"leagueCode":"OI","picks":{},"predScore":0,"joinedAt":0},{"id":"oi-04","name":"Joanne Rozy","initials":"JR","team":"CZE","color":"#7A3FB0","department":"","location":"Edinburgh","city":"Edinburgh","ltMember":false,"leadership":false,"gender":"—","stage":"group","alive":true,"isYou":false,"isDemo":false,"isOI":true,"leagueCode":"OI","picks":{},"predScore":0,"joinedAt":0},{"id":"oi-05","name":"Jake Matthews","initials":"JM","team":"CAN","color":"#E07A1A","department":"","location":"Edinburgh","city":"Edinburgh","ltMember":false,"leadership":false,"gender":"—","stage":"group","alive":true,"isYou":false,"isDemo":false,"isOI":true,"leagueCode":"OI","picks":{},"predScore":0,"joinedAt":0},{"id":"oi-06","name":"Jamie McFarlane 2","initials":"JM","team":"SUI","color":"#0d8a8a","department":"","location":"Edinburgh","city":"Edinburgh","ltMember":false,"leadership":false,"gender":"—","stage":"group","alive":true,"isYou":false,"isDemo":false,"isOI":true,"leagueCode":"OI","picks":{},"predScore":0,"joinedAt":0},{"id":"oi-07","name":"Mark Sutherland","initials":"MS","team":"QAT","color":"#C0246B","department":"","location":"Edinburgh","city":"Edinburgh","ltMember":false,"leadership":false,"gender":"—","stage":"group","alive":true,"isYou":false,"isDemo":false,"isOI":true,"leagueCode":"OI","picks":{},"predScore":0,"joinedAt":0},{"id":"oi-08","name":"Alex Cole","initials":"AC","team":"BIH","color":"#3a6ea5","department":"","location":"Edinburgh","city":"Edinburgh","ltMember":false,"leadership":false,"gender":"—","stage":"group","alive":true,"isYou":false,"isDemo":false,"isOI":true,"leagueCode":"OI","picks":{},"predScore":0,"joinedAt":0},{"id":"oi-10","name":"John Anthony","initials":"JA","team":"MAR","color":"#E8272A","department":"","location":"Edinburgh","city":"Edinburgh","ltMember":false,"leadership":false,"gender":"—","stage":"group","alive":true,"isYou":false,"isDemo":false,"isOI":true,"leagueCode":"OI","picks":{},"predScore":0,"joinedAt":0},{"id":"oi-11","name":"Jasmine Morris","initials":"JM","team":"SCO","color":"#1a7a44","department":"","location":"Edinburgh","city":"Edinburgh","ltMember":false,"leadership":false,"gender":"—","stage":"group","alive":true,"isYou":false,"isDemo":false,"isOI":true,"leagueCode":"OI","picks":{},"predScore":0,"joinedAt":0},{"id":"oi-12","name":"Liam Fernandez","initials":"LF","team":"HAI","color":"#0a3b8c","department":"","location":"Edinburgh","city":"Edinburgh","ltMember":false,"leadership":false,"gender":"—","stage":"group","alive":true,"isYou":false,"isDemo":false,"isOI":true,"leagueCode":"OI","picks":{},"predScore":0,"joinedAt":0},{"id":"oi-13","name":"Prachi Mishra","initials":"PM","team":"USA","color":"#7A3FB0","department":"","location":"Edinburgh","city":"Edinburgh","ltMember":false,"leadership":false,"gender":"—","stage":"group","alive":true,"isYou":false,"isDemo":false,"isOI":true,"leagueCode":"OI","picks":{},"predScore":0,"joinedAt":0},{"id":"oi-14","name":"Lynda Charnock","initials":"LC","team":"PAR","color":"#E07A1A","department":"","location":"Edinburgh","city":"Edinburgh","ltMember":false,"leadership":false,"gender":"—","stage":"group","alive":true,"isYou":false,"isDemo":false,"isOI":true,"leagueCode":"OI","picks":{},"predScore":0,"joinedAt":0},{"id":"oi-15","name":"Megan Hasting","initials":"MH","team":"AUS","color":"#0d8a8a","department":"","location":"Edinburgh","city":"Edinburgh","ltMember":false,"leadership":false,"gender":"—","stage":"group","alive":true,"isYou":false,"isDemo":false,"isOI":true,"leagueCode":"OI","picks":{},"predScore":0,"joinedAt":0},{"id":"oi-16","name":"Cathy Abel","initials":"CA","team":"TUR","color":"#C0246B","department":"","location":"Edinburgh","city":"Edinburgh","ltMember":false,"leadership":false,"gender":"—","stage":"group","alive":true,"isYou":false,"isDemo":false,"isOI":true,"leagueCode":"OI","picks":{},"predScore":0,"joinedAt":0},{"id":"oi-17","name":"Kathleen Williams","initials":"KW","team":"GER","color":"#3a6ea5","department":"","location":"Edinburgh","city":"Edinburgh","ltMember":false,"leadership":false,"gender":"—","stage":"group","alive":true,"isYou":false,"isDemo":false,"isOI":true,"leagueCode":"OI","picks":{},"predScore":0,"joinedAt":0},{"id":"oi-18","name":"Eleanor Evans","initials":"EE","team":"ECU","color":"#E8272A","department":"","location":"Edinburgh","city":"Edinburgh","ltMember":false,"leadership":false,"gender":"—","stage":"group","alive":true,"isYou":false,"isDemo":false,"isOI":true,"leagueCode":"OI","picks":{},"predScore":0,"joinedAt":0},{"id":"oi-19","name":"David Grunwald","initials":"DG","team":"CIV","color":"#1a7a44","department":"","location":"Edinburgh","city":"Edinburgh","ltMember":false,"leadership":false,"gender":"—","stage":"group","alive":true,"isYou":false,"isDemo":false,"isOI":true,"leagueCode":"OI","picks":{},"predScore":0,"joinedAt":0},{"id":"oi-20","name":"Nataoile Ossei-Williams","initials":"NO","team":"CUW","color":"#0a3b8c","department":"","location":"Edinburgh","city":"Edinburgh","ltMember":false,"leadership":false,"gender":"—","stage":"group","alive":true,"isYou":false,"isDemo":false,"isOI":true,"leagueCode":"OI","picks":{},"predScore":0,"joinedAt":0},{"id":"oi-21","name":"Gail Sauka","initials":"GS","team":"NED","color":"#7A3FB0","department":"","location":"Edinburgh","city":"Edinburgh","ltMember":false,"leadership":false,"gender":"—","stage":"group","alive":true,"isYou":false,"isDemo":false,"isOI":true,"leagueCode":"OI","picks":{},"predScore":0,"joinedAt":0},{"id":"oi-22","name":"Deo Chen","initials":"DC","team":"JPN","color":"#E07A1A","department":"","location":"Edinburgh","city":"Edinburgh","ltMember":false,"leadership":false,"gender":"—","stage":"group","alive":true,"isYou":false,"isDemo":false,"isOI":true,"leagueCode":"OI","picks":{},"predScore":0,"joinedAt":0},{"id":"oi-23","name":"Jennie Lim","initials":"JL","team":"TUN","color":"#0d8a8a","department":"","location":"Edinburgh","city":"Edinburgh","ltMember":false,"leadership":false,"gender":"—","stage":"group","alive":true,"isYou":false,"isDemo":false,"isOI":true,"leagueCode":"OI","picks":{},"predScore":0,"joinedAt":0},{"id":"oi-24","name":"Adam O'Sullivan","initials":"AO","team":"SWE","color":"#C0246B","department":"","location":"Edinburgh","city":"Edinburgh","ltMember":false,"leadership":false,"gender":"—","stage":"group","alive":true,"isYou":false,"isDemo":false,"isOI":true,"leagueCode":"OI","picks":{},"predScore":0,"joinedAt":0},{"id":"oi-25","name":"Sophie Butler","initials":"SB","team":"BEL","color":"#3a6ea5","department":"","location":"Edinburgh","city":"Edinburgh","ltMember":false,"leadership":false,"gender":"—","stage":"group","alive":true,"isYou":false,"isDemo":false,"isOI":true,"leagueCode":"OI","picks":{},"predScore":0,"joinedAt":0},{"id":"oi-26","name":"Danielle Sheeran","initials":"DS","team":"IRN","color":"#E8272A","department":"","location":"Edinburgh","city":"Edinburgh","ltMember":false,"leadership":false,"gender":"—","stage":"group","alive":true,"isYou":false,"isDemo":false,"isOI":true,"leagueCode":"OI","picks":{},"predScore":0,"joinedAt":0},{"id":"oi-27","name":"Alizey Husain","initials":"AH","team":"EGY","color":"#1a7a44","department":"","location":"Edinburgh","city":"Edinburgh","ltMember":false,"leadership":false,"gender":"—","stage":"group","alive":true,"isYou":false,"isDemo":false,"isOI":true,"leagueCode":"OI","picks":{},"predScore":0,"joinedAt":0},{"id":"oi-28","name":"Dave Winn","initials":"DW","team":"NZL","color":"#0a3b8c","department":"","location":"Edinburgh","city":"Edinburgh","ltMember":false,"leadership":false,"gender":"—","stage":"group","alive":true,"isYou":false,"isDemo":false,"isOI":true,"leagueCode":"OI","picks":{},"predScore":0,"joinedAt":0},{"id":"oi-29","name":"Barry O'Dwyer","initials":"BO","team":"ESP","color":"#7A3FB0","department":"","location":"Edinburgh","city":"Edinburgh","ltMember":false,"leadership":false,"gender":"—","stage":"group","alive":true,"isYou":false,"isDemo":false,"isOI":true,"leagueCode":"OI","picks":{},"predScore":0,"joinedAt":0},{"id":"oi-30","name":"Kain Craigs","initials":"KC","team":"URU","color":"#E07A1A","department":"","location":"Edinburgh","city":"Edinburgh","ltMember":false,"leadership":false,"gender":"—","stage":"group","alive":true,"isYou":false,"isDemo":false,"isOI":true,"leagueCode":"OI","picks":{},"predScore":0,"joinedAt":0},{"id":"oi-31","name":"Iona McGowan","initials":"IM","team":"KSA","color":"#0d8a8a","department":"","location":"Edinburgh","city":"Edinburgh","ltMember":false,"leadership":false,"gender":"—","stage":"group","alive":true,"isYou":false,"isDemo":false,"isOI":true,"leagueCode":"OI","picks":{},"predScore":0,"joinedAt":0},{"id":"oi-32","name":"Seema Rani","initials":"SR","team":"CPV","color":"#C0246B","department":"","location":"Edinburgh","city":"Edinburgh","ltMember":false,"leadership":false,"gender":"—","stage":"group","alive":true,"isYou":false,"isDemo":false,"isOI":true,"leagueCode":"OI","picks":{},"predScore":0,"joinedAt":0},{"id":"oi-33","name":"Jenny Phillips","initials":"JP","team":"FRA","color":"#3a6ea5","department":"","location":"Edinburgh","city":"Edinburgh","ltMember":false,"leadership":false,"gender":"—","stage":"group","alive":true,"isYou":false,"isDemo":false,"isOI":true,"leagueCode":"OI","picks":{},"predScore":0,"joinedAt":0},{"id":"oi-34","name":"Dougie Pender","initials":"DP","team":"SEN","color":"#E8272A","department":"","location":"Edinburgh","city":"Edinburgh","ltMember":false,"leadership":false,"gender":"—","stage":"group","alive":true,"isYou":false,"isDemo":false,"isOI":true,"leagueCode":"OI","picks":{},"predScore":0,"joinedAt":0},{"id":"oi-35","name":"Chris McAllister","initials":"CM","team":"NOR","color":"#1a7a44","department":"","location":"Edinburgh","city":"Edinburgh","ltMember":false,"leadership":false,"gender":"—","stage":"group","alive":true,"isYou":false,"isDemo":false,"isOI":true,"leagueCode":"OI","picks":{},"predScore":0,"joinedAt":0},{"id":"oi-36","name":"Trien Do","initials":"TD","team":"IRQ","color":"#0a3b8c","department":"","location":"Edinburgh","city":"Edinburgh","ltMember":false,"leadership":false,"gender":"—","stage":"group","alive":true,"isYou":false,"isDemo":false,"isOI":true,"leagueCode":"OI","picks":{},"predScore":0,"joinedAt":0},{"id":"oi-37","name":"Michael Lennon","initials":"ML","team":"ARG","color":"#7A3FB0","department":"","location":"Edinburgh","city":"Edinburgh","ltMember":false,"leadership":false,"gender":"—","stage":"group","alive":true,"isYou":false,"isDemo":false,"isOI":true,"leagueCode":"OI","picks":{},"predScore":0,"joinedAt":0},{"id":"oi-38","name":"Mungo Kilgour","initials":"MK","team":"AUT","color":"#E07A1A","department":"","location":"Edinburgh","city":"Edinburgh","ltMember":false,"leadership":false,"gender":"—","stage":"group","alive":true,"isYou":false,"isDemo":false,"isOI":true,"leagueCode":"OI","picks":{},"predScore":0,"joinedAt":0},{"id":"oi-39","name":"Mac Morrison","initials":"MM","team":"ALG","color":"#0d8a8a","department":"","location":"Edinburgh","city":"Edinburgh","ltMember":false,"leadership":false,"gender":"—","stage":"group","alive":true,"isYou":false,"isDemo":false,"isOI":true,"leagueCode":"OI","picks":{},"predScore":0,"joinedAt":0},{"id":"oi-40","name":"Julian Wan","initials":"JW","team":"JOR","color":"#C0246B","department":"","location":"Edinburgh","city":"Edinburgh","ltMember":false,"leadership":false,"gender":"—","stage":"group","alive":true,"isYou":false,"isDemo":false,"isOI":true,"leagueCode":"OI","picks":{},"predScore":0,"joinedAt":0},{"id":"oi-41","name":"Rymi Liu","initials":"RL","team":"POR","color":"#3a6ea5","department":"","location":"Edinburgh","city":"Edinburgh","ltMember":false,"leadership":false,"gender":"—","stage":"group","alive":true,"isYou":false,"isDemo":false,"isOI":true,"leagueCode":"OI","picks":{},"predScore":0,"joinedAt":0},{"id":"oi-42","name":"Valerie Thompson","initials":"VT","team":"COL","color":"#E8272A","department":"","location":"Edinburgh","city":"Edinburgh","ltMember":false,"leadership":false,"gender":"—","stage":"group","alive":true,"isYou":false,"isDemo":false,"isOI":true,"leagueCode":"OI","picks":{},"predScore":0,"joinedAt":0},{"id":"oi-43","name":"Nicole Alston","initials":"NA","team":"UZB","color":"#1a7a44","department":"","location":"Edinburgh","city":"Edinburgh","ltMember":false,"leadership":false,"gender":"—","stage":"group","alive":true,"isYou":false,"isDemo":false,"isOI":true,"leagueCode":"OI","picks":{},"predScore":0,"joinedAt":0},{"id":"oi-44","name":"Jamie McFarlane","initials":"JM","team":"COD","color":"#0a3b8c","department":"","location":"Edinburgh","city":"Edinburgh","ltMember":false,"leadership":false,"gender":"—","stage":"group","alive":true,"isYou":false,"isDemo":false,"isOI":true,"leagueCode":"OI","picks":{},"predScore":0,"joinedAt":0},{"id":"oi-45","name":"Ian Crawford","initials":"IC","team":"ENG","color":"#7A3FB0","department":"","location":"Edinburgh","city":"Edinburgh","ltMember":false,"leadership":false,"gender":"—","stage":"group","alive":true,"isYou":false,"isDemo":false,"isOI":true,"leagueCode":"OI","picks":{},"predScore":0,"joinedAt":0},{"id":"oi-46","name":"Laura Nobel","initials":"LN","team":"CRO","color":"#E07A1A","department":"","location":"Edinburgh","city":"Edinburgh","ltMember":false,"leadership":false,"gender":"—","stage":"group","alive":true,"isYou":false,"isDemo":false,"isOI":true,"leagueCode":"OI","picks":{},"predScore":0,"joinedAt":0},{"id":"oi-47","name":"Joanne Davies","initials":"JD","team":"PAN","color":"#0d8a8a","department":"","location":"Edinburgh","city":"Edinburgh","ltMember":false,"leadership":false,"gender":"—","stage":"group","alive":true,"isYou":false,"isDemo":false,"isOI":true,"leagueCode":"OI","picks":{},"predScore":0,"joinedAt":0},{"id":"oi-48","name":"Lynda Charnock 2","initials":"LC","team":"GHA","color":"#C0246B","department":"","location":"Edinburgh","city":"Edinburgh","ltMember":false,"leadership":false,"gender":"—","stage":"group","alive":true,"isYou":false,"isDemo":false,"isOI":true,"leagueCode":"OI","picks":{},"predScore":0,"joinedAt":0}],"r16":[],"fixtures":[{"id":"f0","group":"A","matchday":1,"stage":"group","a":"MEX","b":"KOR","dateISO":"2026-06-11","dateLabel":"Thu 11 Jun","time":"16:00","venue":"MetLife Stadium, NJ","status":"upcoming","score":null,"winner":null},{"id":"f1","group":"A","matchday":1,"stage":"group","a":"RSA","b":"CZE","dateISO":"2026-06-11","dateLabel":"Thu 11 Jun","time":"19:00","venue":"SoFi Stadium, LA","status":"upcoming","score":null,"winner":null},{"id":"f6","group":"B","matchday":1,"stage":"group","a":"CAN","b":"SUI","dateISO":"2026-06-11","dateLabel":"Thu 11 Jun","time":"19:00","venue":"Levi's Stadium, SF Bay","status":"upcoming","score":null,"winner":null},{"id":"f7","group":"B","matchday":1,"stage":"group","a":"QAT","b":"BIH","dateISO":"2026-06-11","dateLabel":"Thu 11 Jun","time":"22:00","venue":"Hard Rock Stadium, Miami","status":"upcoming","score":null,"winner":null},{"id":"f13","group":"C","matchday":1,"stage":"group","a":"SCO","b":"HAI","dateISO":"2026-06-12","dateLabel":"Fri 12 Jun","time":"16:00","venue":"Estadio Azteca, Mexico City","status":"upcoming","score":null,"winner":null},{"id":"f18","group":"D","matchday":1,"stage":"group","a":"USA","b":"PAR","dateISO":"2026-06-12","dateLabel":"Fri 12 Jun","time":"16:00","venue":"AT&T Stadium, Dallas","status":"upcoming","score":null,"winner":null},{"id":"f19","group":"D","matchday":1,"stage":"group","a":"AUS","b":"TUR","dateISO":"2026-06-12","dateLabel":"Fri 12 Jun","time":"19:00","venue":"Mercedes-Benz, Atlanta","status":"upcoming","score":null,"winner":null},{"id":"f12","group":"C","matchday":1,"stage":"group","a":"BRA","b":"MAR","dateISO":"2026-06-12","dateLabel":"Fri 12 Jun","time":"22:00","venue":"BC Place, Vancouver","status":"upcoming","score":null,"winner":null},{"id":"f31","group":"F","matchday":1,"stage":"group","a":"TUN","b":"SWE","dateISO":"2026-06-13","dateLabel":"Sat 13 Jun","time":"16:00","venue":"Estadio BBVA, Monterrey","status":"upcoming","score":null,"winner":null},{"id":"f24","group":"E","matchday":1,"stage":"group","a":"GER","b":"ECU","dateISO":"2026-06-13","dateLabel":"Sat 13 Jun","time":"19:00","venue":"NRG Stadium, Houston","status":"upcoming","score":null,"winner":null},{"id":"f25","group":"E","matchday":1,"stage":"group","a":"CIV","b":"CUW","dateISO":"2026-06-13","dateLabel":"Sat 13 Jun","time":"22:00","venue":"Arrowhead, Kansas City","status":"upcoming","score":null,"winner":null},{"id":"f30","group":"F","matchday":1,"stage":"group","a":"NED","b":"JPN","dateISO":"2026-06-13","dateLabel":"Sat 13 Jun","time":"22:00","venue":"Estadio Akron, Guadalajara","status":"upcoming","score":null,"winner":null},{"id":"f36","group":"G","matchday":1,"stage":"group","a":"BEL","b":"IRN","dateISO":"2026-06-14","dateLabel":"Sun 14 Jun","time":"16:00","venue":"Lincoln Financial, Philadelphia","status":"upcoming","score":null,"winner":null},{"id":"f37","group":"G","matchday":1,"stage":"group","a":"EGY","b":"NZL","dateISO":"2026-06-14","dateLabel":"Sun 14 Jun","time":"19:00","venue":"Gillette Stadium, Boston","status":"upcoming","score":null,"winner":null},{"id":"f42","group":"H","matchday":1,"stage":"group","a":"ESP","b":"URU","dateISO":"2026-06-14","dateLabel":"Sun 14 Jun","time":"19:00","venue":"Lumen Field, Seattle","status":"upcoming","score":null,"winner":null},{"id":"f43","group":"H","matchday":1,"stage":"group","a":"KSA","b":"CPV","dateISO":"2026-06-14","dateLabel":"Sun 14 Jun","time":"22:00","venue":"BMO Field, Toronto","status":"upcoming","score":null,"winner":null},{"id":"f49","group":"I","matchday":1,"stage":"group","a":"NOR","b":"IRQ","dateISO":"2026-06-15","dateLabel":"Mon 15 Jun","time":"16:00","venue":"SoFi Stadium, LA","status":"upcoming","score":null,"winner":null},{"id":"f54","group":"J","matchday":1,"stage":"group","a":"ARG","b":"AUT","dateISO":"2026-06-15","dateLabel":"Mon 15 Jun","time":"16:00","venue":"Levi's Stadium, SF Bay","status":"upcoming","score":null,"winner":null},{"id":"f55","group":"J","matchday":1,"stage":"group","a":"ALG","b":"JOR","dateISO":"2026-06-15","dateLabel":"Mon 15 Jun","time":"19:00","venue":"Hard Rock Stadium, Miami","status":"upcoming","score":null,"winner":null},{"id":"f48","group":"I","matchday":1,"stage":"group","a":"FRA","b":"SEN","dateISO":"2026-06-15","dateLabel":"Mon 15 Jun","time":"22:00","venue":"MetLife Stadium, NJ","status":"upcoming","score":null,"winner":null},{"id":"f67","group":"L","matchday":1,"stage":"group","a":"PAN","b":"GHA","dateISO":"2026-06-16","dateLabel":"Tue 16 Jun","time":"16:00","venue":"Mercedes-Benz, Atlanta","status":"upcoming","score":null,"winner":null},{"id":"f60","group":"K","matchday":1,"stage":"group","a":"POR","b":"COL","dateISO":"2026-06-16","dateLabel":"Tue 16 Jun","time":"19:00","venue":"BC Place, Vancouver","status":"upcoming","score":null,"winner":null},{"id":"f61","group":"K","matchday":1,"stage":"group","a":"UZB","b":"COD","dateISO":"2026-06-16","dateLabel":"Tue 16 Jun","time":"22:00","venue":"Estadio Azteca, Mexico City","status":"upcoming","score":null,"winner":null},{"id":"f66","group":"L","matchday":1,"stage":"group","a":"ENG","b":"CRO","dateISO":"2026-06-16","dateLabel":"Tue 16 Jun","time":"22:00","venue":"AT&T Stadium, Dallas","status":"upcoming","score":null,"winner":null},{"id":"f2","group":"A","matchday":2,"stage":"group","a":"MEX","b":"RSA","dateISO":"2026-06-17","dateLabel":"Wed 17 Jun","time":"16:00","venue":"AT&T Stadium, Dallas","status":"upcoming","score":null,"winner":null},{"id":"f3","group":"A","matchday":2,"stage":"group","a":"CZE","b":"KOR","dateISO":"2026-06-17","dateLabel":"Wed 17 Jun","time":"19:00","venue":"Mercedes-Benz, Atlanta","status":"upcoming","score":null,"winner":null},{"id":"f8","group":"B","matchday":2,"stage":"group","a":"CAN","b":"QAT","dateISO":"2026-06-17","dateLabel":"Wed 17 Jun","time":"19:00","venue":"NRG Stadium, Houston","status":"upcoming","score":null,"winner":null},{"id":"f9","group":"B","matchday":2,"stage":"group","a":"BIH","b":"SUI","dateISO":"2026-06-17","dateLabel":"Wed 17 Jun","time":"22:00","venue":"Arrowhead, Kansas City","status":"upcoming","score":null,"winner":null},{"id":"f15","group":"C","matchday":2,"stage":"group","a":"HAI","b":"MAR","dateISO":"2026-06-18","dateLabel":"Thu 18 Jun","time":"16:00","venue":"Estadio BBVA, Monterrey","status":"upcoming","score":null,"winner":null},{"id":"f20","group":"D","matchday":2,"stage":"group","a":"USA","b":"AUS","dateISO":"2026-06-18","dateLabel":"Thu 18 Jun","time":"16:00","venue":"Lincoln Financial, Philadelphia","status":"upcoming","score":null,"winner":null},{"id":"f21","group":"D","matchday":2,"stage":"group","a":"TUR","b":"PAR","dateISO":"2026-06-18","dateLabel":"Thu 18 Jun","time":"19:00","venue":"Gillette Stadium, Boston","status":"upcoming","score":null,"winner":null},{"id":"f14","group":"C","matchday":2,"stage":"group","a":"BRA","b":"SCO","dateISO":"2026-06-18","dateLabel":"Thu 18 Jun","time":"22:00","venue":"Estadio Akron, Guadalajara","status":"upcoming","score":null,"winner":null},{"id":"f33","group":"F","matchday":2,"stage":"group","a":"SWE","b":"JPN","dateISO":"2026-06-19","dateLabel":"Fri 19 Jun","time":"16:00","venue":"SoFi Stadium, LA","status":"upcoming","score":null,"winner":null},{"id":"f26","group":"E","matchday":2,"stage":"group","a":"GER","b":"CIV","dateISO":"2026-06-19","dateLabel":"Fri 19 Jun","time":"19:00","venue":"Lumen Field, Seattle","status":"upcoming","score":null,"winner":null},{"id":"f27","group":"E","matchday":2,"stage":"group","a":"CUW","b":"ECU","dateISO":"2026-06-19","dateLabel":"Fri 19 Jun","time":"22:00","venue":"BMO Field, Toronto","status":"upcoming","score":null,"winner":null},{"id":"f32","group":"F","matchday":2,"stage":"group","a":"NED","b":"TUN","dateISO":"2026-06-19","dateLabel":"Fri 19 Jun","time":"22:00","venue":"MetLife Stadium, NJ","status":"upcoming","score":null,"winner":null},{"id":"f38","group":"G","matchday":2,"stage":"group","a":"BEL","b":"EGY","dateISO":"2026-06-20","dateLabel":"Sat 20 Jun","time":"16:00","venue":"Levi's Stadium, SF Bay","status":"upcoming","score":null,"winner":null},{"id":"f39","group":"G","matchday":2,"stage":"group","a":"NZL","b":"IRN","dateISO":"2026-06-20","dateLabel":"Sat 20 Jun","time":"19:00","venue":"Hard Rock Stadium, Miami","status":"upcoming","score":null,"winner":null},{"id":"f44","group":"H","matchday":2,"stage":"group","a":"ESP","b":"KSA","dateISO":"2026-06-20","dateLabel":"Sat 20 Jun","time":"19:00","venue":"BC Place, Vancouver","status":"upcoming","score":null,"winner":null},{"id":"f45","group":"H","matchday":2,"stage":"group","a":"CPV","b":"URU","dateISO":"2026-06-20","dateLabel":"Sat 20 Jun","time":"22:00","venue":"Estadio Azteca, Mexico City","status":"upcoming","score":null,"winner":null},{"id":"f51","group":"I","matchday":2,"stage":"group","a":"IRQ","b":"SEN","dateISO":"2026-06-21","dateLabel":"Sun 21 Jun","time":"16:00","venue":"Mercedes-Benz, Atlanta","status":"upcoming","score":null,"winner":null},{"id":"f56","group":"J","matchday":2,"stage":"group","a":"ARG","b":"ALG","dateISO":"2026-06-21","dateLabel":"Sun 21 Jun","time":"16:00","venue":"NRG Stadium, Houston","status":"upcoming","score":null,"winner":null},{"id":"f57","group":"J","matchday":2,"stage":"group","a":"JOR","b":"AUT","dateISO":"2026-06-21","dateLabel":"Sun 21 Jun","time":"19:00","venue":"Arrowhead, Kansas City","status":"upcoming","score":null,"winner":null},{"id":"f50","group":"I","matchday":2,"stage":"group","a":"FRA","b":"NOR","dateISO":"2026-06-21","dateLabel":"Sun 21 Jun","time":"22:00","venue":"AT&T Stadium, Dallas","status":"upcoming","score":null,"winner":null},{"id":"f69","group":"L","matchday":2,"stage":"group","a":"GHA","b":"CRO","dateISO":"2026-06-22","dateLabel":"Mon 22 Jun","time":"16:00","venue":"Gillette Stadium, Boston","status":"upcoming","score":null,"winner":null},{"id":"f62","group":"K","matchday":2,"stage":"group","a":"POR","b":"UZB","dateISO":"2026-06-22","dateLabel":"Mon 22 Jun","time":"19:00","venue":"Estadio Akron, Guadalajara","status":"upcoming","score":null,"winner":null},{"id":"f63","group":"K","matchday":2,"stage":"group","a":"COD","b":"COL","dateISO":"2026-06-22","dateLabel":"Mon 22 Jun","time":"22:00","venue":"Estadio BBVA, Monterrey","status":"upcoming","score":null,"winner":null},{"id":"f68","group":"L","matchday":2,"stage":"group","a":"ENG","b":"PAN","dateISO":"2026-06-22","dateLabel":"Mon 22 Jun","time":"22:00","venue":"Lincoln Financial, Philadelphia","status":"upcoming","score":null,"winner":null},{"id":"f4","group":"A","matchday":3,"stage":"group","a":"MEX","b":"CZE","dateISO":"2026-06-23","dateLabel":"Tue 23 Jun","time":"16:00","venue":"Lincoln Financial, Philadelphia","status":"upcoming","score":null,"winner":null},{"id":"f5","group":"A","matchday":3,"stage":"group","a":"KOR","b":"RSA","dateISO":"2026-06-23","dateLabel":"Tue 23 Jun","time":"19:00","venue":"Gillette Stadium, Boston","status":"upcoming","score":null,"winner":null},{"id":"f10","group":"B","matchday":3,"stage":"group","a":"CAN","b":"BIH","dateISO":"2026-06-23","dateLabel":"Tue 23 Jun","time":"19:00","venue":"Lumen Field, Seattle","status":"upcoming","score":null,"winner":null},{"id":"f11","group":"B","matchday":3,"stage":"group","a":"SUI","b":"QAT","dateISO":"2026-06-23","dateLabel":"Tue 23 Jun","time":"22:00","venue":"BMO Field, Toronto","status":"upcoming","score":null,"winner":null},{"id":"f17","group":"C","matchday":3,"stage":"group","a":"MAR","b":"SCO","dateISO":"2026-06-24","dateLabel":"Wed 24 Jun","time":"16:00","venue":"SoFi Stadium, LA","status":"upcoming","score":null,"winner":null},{"id":"f22","group":"D","matchday":3,"stage":"group","a":"USA","b":"TUR","dateISO":"2026-06-24","dateLabel":"Wed 24 Jun","time":"16:00","venue":"Levi's Stadium, SF Bay","status":"upcoming","score":null,"winner":null},{"id":"f23","group":"D","matchday":3,"stage":"group","a":"PAR","b":"AUS","dateISO":"2026-06-24","dateLabel":"Wed 24 Jun","time":"19:00","venue":"Hard Rock Stadium, Miami","status":"upcoming","score":null,"winner":null},{"id":"f16","group":"C","matchday":3,"stage":"group","a":"BRA","b":"HAI","dateISO":"2026-06-24","dateLabel":"Wed 24 Jun","time":"22:00","venue":"MetLife Stadium, NJ","status":"upcoming","score":null,"winner":null},{"id":"f35","group":"F","matchday":3,"stage":"group","a":"JPN","b":"TUN","dateISO":"2026-06-25","dateLabel":"Thu 25 Jun","time":"16:00","venue":"Mercedes-Benz, Atlanta","status":"upcoming","score":null,"winner":null},{"id":"f28","group":"E","matchday":3,"stage":"group","a":"GER","b":"CUW","dateISO":"2026-06-25","dateLabel":"Thu 25 Jun","time":"19:00","venue":"BC Place, Vancouver","status":"upcoming","score":null,"winner":null},{"id":"f29","group":"E","matchday":3,"stage":"group","a":"ECU","b":"CIV","dateISO":"2026-06-25","dateLabel":"Thu 25 Jun","time":"22:00","venue":"Estadio Azteca, Mexico City","status":"upcoming","score":null,"winner":null},{"id":"f34","group":"F","matchday":3,"stage":"group","a":"NED","b":"SWE","dateISO":"2026-06-25","dateLabel":"Thu 25 Jun","time":"22:00","venue":"AT&T Stadium, Dallas","status":"upcoming","score":null,"winner":null},{"id":"f40","group":"G","matchday":3,"stage":"group","a":"BEL","b":"NZL","dateISO":"2026-06-26","dateLabel":"Fri 26 Jun","time":"16:00","venue":"NRG Stadium, Houston","status":"upcoming","score":null,"winner":null},{"id":"f41","group":"G","matchday":3,"stage":"group","a":"IRN","b":"EGY","dateISO":"2026-06-26","dateLabel":"Fri 26 Jun","time":"19:00","venue":"Arrowhead, Kansas City","status":"upcoming","score":null,"winner":null},{"id":"f46","group":"H","matchday":3,"stage":"group","a":"ESP","b":"CPV","dateISO":"2026-06-26","dateLabel":"Fri 26 Jun","time":"19:00","venue":"Estadio Akron, Guadalajara","status":"upcoming","score":null,"winner":null},{"id":"f47","group":"H","matchday":3,"stage":"group","a":"URU","b":"KSA","dateISO":"2026-06-26","dateLabel":"Fri 26 Jun","time":"22:00","venue":"Estadio BBVA, Monterrey","status":"upcoming","score":null,"winner":null},{"id":"f53","group":"I","matchday":3,"stage":"group","a":"SEN","b":"NOR","dateISO":"2026-06-27","dateLabel":"Sat 27 Jun","time":"16:00","venue":"Gillette Stadium, Boston","status":"upcoming","score":null,"winner":null},{"id":"f58","group":"J","matchday":3,"stage":"group","a":"ARG","b":"JOR","dateISO":"2026-06-27","dateLabel":"Sat 27 Jun","time":"16:00","venue":"Lumen Field, Seattle","status":"upcoming","score":null,"winner":null},{"id":"f59","group":"J","matchday":3,"stage":"group","a":"AUT","b":"ALG","dateISO":"2026-06-27","dateLabel":"Sat 27 Jun","time":"19:00","venue":"BMO Field, Toronto","status":"upcoming","score":null,"winner":null},{"id":"f52","group":"I","matchday":3,"stage":"group","a":"FRA","b":"IRQ","dateISO":"2026-06-27","dateLabel":"Sat 27 Jun","time":"22:00","venue":"Lincoln Financial, Philadelphia","status":"upcoming","score":null,"winner":null},{"id":"f71","group":"L","matchday":3,"stage":"group","a":"CRO","b":"PAN","dateISO":"2026-06-28","dateLabel":"Sun 28 Jun","time":"16:00","venue":"Hard Rock Stadium, Miami","status":"upcoming","score":null,"winner":null},{"id":"f64","group":"K","matchday":3,"stage":"group","a":"POR","b":"COD","dateISO":"2026-06-28","dateLabel":"Sun 28 Jun","time":"19:00","venue":"MetLife Stadium, NJ","status":"upcoming","score":null,"winner":null},{"id":"f65","group":"K","matchday":3,"stage":"group","a":"COL","b":"UZB","dateISO":"2026-06-28","dateLabel":"Sun 28 Jun","time":"22:00","venue":"SoFi Stadium, LA","status":"upcoming","score":null,"winner":null},{"id":"f70","group":"L","matchday":3,"stage":"group","a":"ENG","b":"GHA","dateISO":"2026-06-28","dateLabel":"Sun 28 Jun","time":"22:00","venue":"Levi's Stadium, SF Bay","status":"upcoming","score":null,"winner":null}],"predictions":[{"key":"winner","q":"Tournament Winner","kind":"team","points":25,"answer":null,"options":["ESP","FRA","BRA","ARG","GER","POR"]},{"key":"final","q":"The Final Matchup","kind":"team2","points":15,"answer":null,"options":["ESP","FRA","BRA","ARG"]},{"key":"goldenBoot","q":"Golden Boot Winner","kind":"player","points":15,"answer":null,"options":[{"id":"mbappe","name":"K. Mbappé","team":"FRA"},{"id":"yamal","name":"L. Yamal","team":"ESP"},{"id":"haaland","name":"E. Haaland","team":"NOR"},{"id":"vini","name":"Vinícius Jr","team":"BRA"}]},{"key":"scotland","q":"How far do Scotland go?","kind":"stage","points":10,"answer":null,"options":["Group stage","Round of 32","Round of 16","Quarter Final","Semi Final","Final","Winner"]},{"key":"england","q":"How far do England go?","kind":"stage","points":10,"answer":null,"options":["Group stage","Round of 32","Round of 16","Quarter Final","Semi Final","Final","Winner"]},{"key":"surprise","q":"Biggest Surprise Team","kind":"team","points":10,"answer":null,"options":["NOR","MAR","SEN","JPN","CRO","COL"]},{"key":"flop","q":"Biggest Disappointment","kind":"team","points":10,"answer":null,"options":["ENG","BEL","GER","USA","BRA"]},{"key":"cleanSheets","q":"Most Clean Sheets","kind":"team","points":10,"answer":null,"options":["ESP","BRA","ARG","FRA"]},{"key":"youngPlayer","q":"Best Young Player","kind":"player","points":10,"answer":null,"options":[{"id":"yamal","name":"L. Yamal","team":"ESP"},{"id":"yildiz","name":"K. Yıldız","team":"TUR"},{"id":"endrick","name":"Endrick","team":"BRA"},{"id":"wirtz","name":"F. Wirtz","team":"GER"}]}],"fee":5,"pot":235,"charitySplit":0.5,"payouts":[{"place":"Winner","pct":0.5,"label":"holds the champion — takes the whole pot"},{"place":"Charity","pct":0.5,"label":"half of every entry"}],"lines":{"welcome":"Right. Let's get this started. Wheesht is watching.","drawGood":"Oh aye. That's a tidy wee team. Ye might actually do something wi' that.","drawMid":"Could be worse. Could be better. Wheesht is reserving judgement.","drawBad":"…Wheesht is not going to insult ye. The flag's nice though.","drawYou":"Croatia. Experienced, thrawn, never know when they're beat. Wheesht approves. Quietly.","upset":"Naebody saw that coming. Wheesht definitely didn't. Wheesht's predictions stand.","england":"…Wheesht is remaining professional. Next question.","scotland":"Scotland. The homeland. Drawn with Brazil, aye — but Wheesht believes. Wheesht needs a minute.","eliminated":"Ye've been eliminated. Wheesht is… sorry. (Wheesht is not sorry. Wheesht saw this coming.)","sideBets":"Aye, ye're out. But Wheesht's not done wi' ye yet.","sideBets2":"We're the ones watching objectively now. Arguably the better position.","predOpen":"Predictions are open. Back yerself. Wheesht will remember every single one.","predLocked":"Predictions are locked. No takebacks. Wheesht has yer answers in writing.","empty":"Nothing here yet. Wheesht is watching the space.","error":"Something went wrong. Wheesht is investigating. Wheesht suspects foul play.","finalBuild":"Two teams left. Wheesht has officiated since 1966. Wheesht is, for once, almost speechless. Almost."},"league":{"code":"OI","name":"The Office Sweepstake","seeded":true},"meta":{"id":"world-cup-2026","competitionCode":"WC","name":"The Office Sweepstake","season":"World Cup 2026","stageLabel":"Group Stage","phase":"pre","maxTeams":48,"groupSize":47,"stillIn":47,"out":0,"teamsLeft":48,"kickoff":"Thu 11 June","finalVenue":"MetLife Stadium, New Jersey","finalDate":"Sun 19 July","adminPin":"1966","predictionsLocked":false,"stageLadder":["group","r32","r16","qf","sf","final","winner"],"stageLabels":{"group":"Group stage","r32":"Round of 32","r16":"Round of 16","qf":"Quarter-final","sf":"Semi-final","final":"Final","winner":"Winner"},"specialTeams":["SCO","ENG"],"qualification":{"groups":12,"group_size":4,"qualify_per_group":2,"best_third_qualifiers":8}}};
 })();
 
 </script>
@@ -33554,98 +33700,112 @@ button{font-family:inherit;}
 <script>
 /* ===========================================================================
    DATA LAYER — builds window.WC from server-injected window.WC_DATA.
-   The Python backend (main.py) generates WC_DATA and injects it as a
-   <script> tag before this file loads.
+   The Python backend (main.py) injects WC_DATA before this file loads.
+
+   build() mutates the SAME window.WC object in place so modules that captured
+   `const X = window.WC` at load keep a live reference. window.__rebuildWC re-runs
+   it after Store.refresh() swaps in fresh league state (teams, fixtures, people,
+   predictions, meta) — without that, a live refresh updated nothing.
    =========================================================================== */
 (function () {
-  var d = window.WC_DATA;
-  if (!d) { console.error('WC_DATA not injected by server'); return; }
+  function build() {
+    var d = window.WC_DATA;
+    if (!d) { console.error('WC_DATA not injected by server'); return; }
 
-  // Build lookup maps
-  var TEAMS = {};
-  var TEAM_LIST = d.teams.map(function (t) {
-    TEAMS[t.code] = t;
-    return t;
-  });
+    var TEAMS = {};
+    var TEAM_LIST = (d.teams || []).map(function (t) {
+      TEAMS[t.code] = t;
+      return t;
+    });
 
-  var PEOPLE = d.people;
-  var YOU = PEOPLE[0]; // YOU is always index 0
+    var PEOPLE = d.people || [];
+    var YOU = PEOPLE[0]; // YOU is always index 0 (when present)
 
-  function ownersOf(code) {
-    return PEOPLE.filter(function (p) { return p.team === code; });
+    function ownersOf(code) {
+      return PEOPLE.filter(function (p) { return p.team === code; });
+    }
+    function rate(list) {
+      if (!list.length) return 0;
+      return Math.round(100 * list.filter(function (p) { return p.alive; }).length / list.length);
+    }
+
+    var SEGMENTS = [
+      {
+        key: 'city', label: 'London vs Edinburgh',
+        a: { name: 'London', list: PEOPLE.filter(function (p) { return p.city === 'London'; }) },
+        b: { name: 'Edinburgh', list: PEOPLE.filter(function (p) { return p.city === 'Edinburgh'; }) },
+      },
+      {
+        key: 'gender', label: 'Girls vs Boys',
+        a: { name: 'Girls', list: PEOPLE.filter(function (p) { return p.gender === 'F'; }) },
+        b: { name: 'Boys', list: PEOPLE.filter(function (p) { return p.gender === 'M'; }) },
+      },
+      {
+        key: 'rank', label: 'Leadership vs Everyone',
+        a: { name: 'Leadership', list: PEOPLE.filter(function (p) { return p.leadership; }) },
+        b: { name: 'Everyone else', list: PEOPLE.filter(function (p) { return !p.leadership && !p.isYou; }) },
+      },
+    ];
+
+    var GROUPS = 'ABCDEFGHIJKL'.split('').map(function (g) {
+      return { id: g, teams: TEAM_LIST.filter(function (t) { return t.group === g; }) };
+    });
+
+    // Mutate the existing object (don't reassign) so captured refs stay valid.
+    var WC = window.WC || {};
+    WC.TEAMS = TEAMS;
+    WC.TEAM_LIST = TEAM_LIST;
+    WC.GROUPS = GROUPS;
+    WC.R16 = d.r16;
+    WC.FIXTURES = d.fixtures || [];
+    WC.PEOPLE = PEOPLE;
+    WC.YOU = YOU;
+    WC.ownersOf = ownersOf;
+    WC.SEGMENTS = SEGMENTS;
+    WC.rate = rate;
+    WC.FEE = d.fee;
+    WC.POT = d.pot;
+    WC.PAYOUTS = d.payouts;
+    WC.LINES = d.lines;
+    WC.predictions = d.predictions || [];
+    WC.PREDICTIONS = d.predictions || [];
+    WC.meta = d.meta;
+    WC.league = d.league || null;
+    window.WC = WC;
   }
 
-  function rate(list) {
-    if (!list.length) return 0;
-    return Math.round(100 * list.filter(function (p) { return p.alive; }).length / list.length);
-  }
-
-  var SEGMENTS = [
-    {
-      key: 'city', label: 'London vs Edinburgh',
-      a: { name: 'London', list: PEOPLE.filter(function (p) { return p.city === 'London'; }) },
-      b: { name: 'Edinburgh', list: PEOPLE.filter(function (p) { return p.city === 'Edinburgh'; }) },
-    },
-    {
-      key: 'gender', label: 'Girls vs Boys',
-      a: { name: 'Girls', list: PEOPLE.filter(function (p) { return p.gender === 'F'; }) },
-      b: { name: 'Boys', list: PEOPLE.filter(function (p) { return p.gender === 'M'; }) },
-    },
-    {
-      key: 'rank', label: 'Leadership vs Everyone',
-      a: { name: 'Leadership', list: PEOPLE.filter(function (p) { return p.leadership; }) },
-      b: { name: 'Everyone else', list: PEOPLE.filter(function (p) { return !p.leadership && !p.isYou; }) },
-    },
-  ];
-
-  var GROUPS = 'ABCDEFGHIJKL'.split('').map(function (g) {
-    return { id: g, teams: TEAM_LIST.filter(function (t) { return t.group === g; }) };
-  });
-
-  window.WC = {
-    TEAMS: TEAMS,
-    TEAM_LIST: TEAM_LIST,
-    GROUPS: GROUPS,
-    R16: d.r16,
-    FIXTURES: d.fixtures || [],
-    PEOPLE: PEOPLE,
-    YOU: YOU,
-    ownersOf: ownersOf,
-    SEGMENTS: SEGMENTS,
-    rate: rate,
-    FEE: d.fee,
-    POT: d.pot,
-    PAYOUTS: d.payouts,
-    LINES: d.lines,
-    predictions: d.predictions || [],
-    PREDICTIONS: d.predictions || [],
-    meta: d.meta,
-  };
+  build();
+  window.__rebuildWC = build;
 })();
 
 </script>
 
 <script>
 /* ===========================================================================
-   STORE — participant identity, accounts & persistence.
-   No passwords, no sessions. Each participant gets a unique id, persisted
-   on the device. Multiple people can sign up on one device (account picker),
-   and "Find My Entry" recovers an account by name.
+   STORE — leagues, participant identity, accounts & persistence.
+
+   A LEAGUE is the unit of isolation: entrants, chat, results and prediction
+   answers all belong to one league. World Cup fixtures are global. No accounts
+   have passwords; the league has one. Each participant gets a unique id,
+   persisted on the device, and carries its leagueCode so the device can hold
+   entries in several leagues without mixing them.
 
    Source of truth:
-     • LIVE  (window.WC_LIVE, server present) → /api/participants endpoints
-     • MOCK  (static / no backend)            → localStorage
+     • LIVE (window.WC_LIVE) → /api/leagues/{code}/… endpoints (Postgres)
+     • MOCK (static / no backend) → localStorage, single implicit league
 
-   Components read the synchronous cache (Store.allSync / getSync) and
-   subscribe for re-renders. Call Store.refresh() on mount for live sync.
+   Components read the synchronous cache (Store.allSync / getSync), scoped to the
+   ACTIVE league, and subscribe for re-renders.
    =========================================================================== */
 (function () {
   var WC = window.WC;
   var LIVE = !!window.WC_LIVE;
-  var K = { mine: 'wheesht_mine_v2', device: 'wheesht_device_v2', active: 'wheesht_active_v2', admin: 'wheesht_admin_v1', removed: 'wheesht_removed_v1' };
+  var K = {
+    mine: 'wheesht_mine_v2', device: 'wheesht_device_v2', active: 'wheesht_active_v2',
+    admin: 'wheesht_admin_v1', removed: 'wheesht_removed_v1',
+    league: 'wheesht_league_v1', leagues: 'wheesht_leagues_v1',
+  };
 
-  // Charity split — half of every £5 buy-in goes to charity; the rest is the
-  // prize pot for the single winner (whoever holds the champion).
   var CHARITY_SPLIT = 0.5;
 
   function lsGet(k, d) { try { var v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch (e) { return d; } }
@@ -33654,65 +33814,101 @@ button{font-family:inherit;}
   function initials(n) { var c = (n || '').trim().replace(/Wee |Big /g, ''); var p = c.split(/\s+/); var i = p[0] ? p[0][0] : '?'; if (p[1] && /[a-z]/i.test(p[1][0])) i += p[1][0]; return (i || '?').toUpperCase(); }
   var COLORS = ['#E8272A', '#1a7a44', '#0a3b8c', '#7A3FB0', '#E07A1A', '#0d8a8a', '#C0246B', '#3a6ea5'];
 
-  // ---- admin overrides (results / eliminations / prediction answers) ------
-  // Persisted locally; in LIVE mode also pushed to the backend so every device
-  // picks them up via refresh(). Applied onto window.WC in place so all
-  // components that hold WC references see the update.
-  var admin = lsGet(K.admin, { teams: {}, fixtures: {}, predictions: {}, meta: {} });
-  // Snapshot pristine values BEFORE any override is applied, so clearing an
-  // override reverts cleanly instead of leaving a stale in-place mutation.
+  // ---- active league ------------------------------------------------------
+  function activeLeague() { return lsGet(K.league, null); }
+  function leagueCode() { var L = activeLeague(); return L ? L.code : null; }
+  function knownLeagues() { return lsGet(K.leagues, {}); }
+  function rememberLeague(L) {
+    if (!L || !L.code) return;
+    var all = knownLeagues(); all[L.code] = L; lsSet(K.leagues, all);
+  }
+  function setActiveLeague(L) { lsSet(K.league, L); rememberLeague(L); }
+  // Build a league-scoped API path. In MOCK mode there is no server, so callers
+  // guard on LIVE before fetching.
+  function api(path) { var c = leagueCode(); return '/api/leagues/' + encodeURIComponent(c || '') + path; }
+
+  // ---- admin overrides ----------------------------------------------------
+  // In LIVE mode the SERVER resolves overrides into the league state, so the
+  // client never applies them locally — it just hydrates the raw blob from the
+  // refresh payload to build the next edit. In MOCK mode applyAdmin() mutates WC
+  // in place (the static preview's only path).
+  var admin = LIVE ? { teams: {}, fixtures: {}, predictions: {}, meta: {} }
+                   : lsGet(K.admin, { teams: {}, fixtures: {}, predictions: {}, meta: {} });
+
   var BASE = {
     teams: {}, preds: {},
-    meta: { phase: WC.meta.phase, stageLabel: WC.meta.stageLabel }
+    meta: { phase: WC.meta.phase, stageLabel: WC.meta.stageLabel },
   };
   WC.TEAM_LIST.forEach(function (t) { BASE.teams[t.code] = { alive: t.alive, stage: t.stage, rounds: t.rounds }; });
   (WC.PREDICTIONS || []).forEach(function (m) { BASE.preds[m.key] = m.answer; });
+
   function applyAdmin() {
-    // teams — reset to baseline, then apply eliminations
     WC.TEAM_LIST.forEach(function (t) {
       var b = BASE.teams[t.code]; if (b) { t.alive = b.alive; t.stage = b.stage; t.rounds = b.rounds; }
       var o = admin.teams && admin.teams[t.code];
       if (o) { t.alive = o.alive; t.stage = o.stage; if (o.rounds != null) t.rounds = o.rounds; }
     });
-    // fixtures (results)
+    // FIX: only patch fixtures that have an explicit override; never reset the
+    // others back to upcoming/null (that wiped the provider/server baseline).
     (WC.FIXTURES || []).forEach(function (f) {
       var o = admin.fixtures && admin.fixtures[f.id];
-      if (o) { f.score = o.score; f.status = o.status; } else { f.score = null; f.status = 'upcoming'; }
+      if (o) {
+        if (o.score !== undefined) f.score = o.score;
+        if (o.status !== undefined) f.status = o.status;
+        if (o.winner !== undefined) f.winner = o.winner;
+      }
     });
-    // prediction answers — reset to baseline, then apply
     (WC.PREDICTIONS || []).forEach(function (m) {
       m.answer = BASE.preds[m.key];
       if (admin.predictions && admin.predictions.hasOwnProperty(m.key)) m.answer = admin.predictions[m.key];
     });
-    // meta phase — reset to baseline, then apply
     WC.meta.phase = (admin.meta && admin.meta.phase) || BASE.meta.phase;
     WC.meta.stageLabel = WC.meta.phase === 'pre' ? 'Group Stage'
       : WC.meta.phase === 'done' ? 'Tournament over' : 'In play';
     WC.meta.teamsLeft = WC.TEAM_LIST.filter(function (t) { return t.alive; }).length;
   }
-  function persistAdmin() {
-    lsSet(K.admin, admin);
-    if (LIVE) { try { fetch('/api/admin', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(admin) }); } catch (e) {} }
-  }
-  applyAdmin();
 
-  // ---- cache (demo field + this-device participants) ----------------------
-  var mine = lsGet(K.mine, []);       // full participant objects created here
+  function persistAdmin() {
+    if (LIVE) {
+      var c = leagueCode(); if (!c) return;
+      try { fetch(api('/admin'), { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(admin) }); } catch (e) {}
+    } else {
+      lsSet(K.admin, admin);
+    }
+  }
+  // After any admin edit: LIVE → push + re-pull resolved state; MOCK → apply locally.
+  function commitAdmin() {
+    if (LIVE) { persistAdmin(); Store.refresh(); }
+    else { applyAdmin(); persistAdmin(); rebuild(); emit(); }
+  }
+
+  if (!LIVE) applyAdmin();
+
+  // ---- cache (active-league participants) ---------------------------------
+  var mine = lsGet(K.mine, []);
   var cache = [];
   function liveStatus(p) {
-    // A person's alive/stage always reflects their team's CURRENT status, not a
-    // snapshot taken at sign-up — so the app tracks live as results come in.
     var t = WC.TEAMS[p.team];
     if (!t) return p;
     if (p.alive === t.alive && p.stage === t.stage) return p;
     return Object.assign({}, p, { alive: t.alive, stage: t.stage });
   }
   function rebuild() {
+    var code = leagueCode();
     var seen = {};
     var removed = lsGet(K.removed, []);
     cache = [];
-    mine.forEach(function (p) { if (!seen[p.id] && removed.indexOf(p.id) < 0) { seen[p.id] = 1; cache.push(liveStatus(p)); } });
-    (WC.PEOPLE || []).forEach(function (p) { if (!seen[p.id] && removed.indexOf(p.id) < 0) { seen[p.id] = 1; cache.push(liveStatus(p)); } });
+    // device-created entries: only those for the active league (or untagged)
+    mine.forEach(function (p) {
+      if (seen[p.id] || removed.indexOf(p.id) >= 0) return;
+      if (code && p.leagueCode && p.leagueCode !== code) return;
+      seen[p.id] = 1; cache.push(liveStatus(p));
+    });
+    // server/seed people are already league-scoped by the backend
+    (WC.PEOPLE || []).forEach(function (p) {
+      if (seen[p.id] || removed.indexOf(p.id) >= 0) return;
+      seen[p.id] = 1; cache.push(liveStatus(p));
+    });
   }
   rebuild();
 
@@ -33720,9 +33916,7 @@ button{font-family:inherit;}
   var subs = [];
   function emit() { subs.forEach(function (f) { try { f(); } catch (e) {} }); }
 
-  // ---- draw ---------------------------------------------------------------
-  // Each entrant gets a UNIQUE country until all are taken (maxTeams, ~48);
-  // after that, countries can be shared. Returns a team code.
+  // ---- draw (unique within the active league until all teams taken) -------
   function drawTeam(force) {
     if (force && WC.TEAMS[force]) return force;
     var maxTeams = (WC.meta && WC.meta.maxTeams) || WC.TEAM_LIST.length;
@@ -33731,11 +33925,9 @@ button{font-family:inherit;}
     var distinct = Object.keys(taken).length;
     var pool;
     if (distinct < maxTeams) {
-      // uniqueness phase — only hand out countries nobody holds yet
       pool = WC.TEAM_LIST.filter(function (t) { return !taken[t.code]; }).map(function (t) { return t.code; });
       if (!pool.length) pool = WC.TEAM_LIST.map(function (t) { return t.code; });
     } else {
-      // sharing phase — everything's taken, double-ups allowed (fewest-held first)
       var min = Infinity;
       WC.TEAM_LIST.forEach(function (t) { var n = taken[t.code] || 0; if (n < min) min = n; });
       pool = WC.TEAM_LIST.filter(function (t) { return (taken[t.code] || 0) === min; }).map(function (t) { return t.code; });
@@ -33749,7 +33941,7 @@ button{font-family:inherit;}
     if (p.picks) {
       var s = 0;
       (WC.PREDICTIONS || []).forEach(function (m) {
-        if (m.answer == null) return;            // unresolved
+        if (m.answer == null) return;
         var pick = p.picks[m.key];
         if (pick == null) return;
         if (m.kind === 'team2') { if (Array.isArray(pick) && Array.isArray(m.answer) && pick.slice().sort().join() === m.answer.slice().sort().join()) s += m.points; }
@@ -33760,7 +33952,6 @@ button{font-family:inherit;}
     return p.predScore || 0;
   }
 
-  // ---- ranking helpers ----------------------------------------------------
   function withScores(list) {
     return list.map(function (p) { return Object.assign({}, p, { predScore: predScoreOf(p) }); });
   }
@@ -33776,10 +33967,61 @@ button{font-family:inherit;}
 
     subscribe: function (fn) { subs.push(fn); return function () { subs = subs.filter(function (f) { return f !== fn; }); }; },
 
-    // device accounts
+    // ===== LEAGUES =====
+    activeLeague: activeLeague,
+    leagueCode: leagueCode,
+    api: api,
+    knownLeagues: function () { return knownLeagues(); },
+    // Create a league on the backend, then make it active.
+    createLeague: function (name, code, password) {
+      var body = { name: name, code: code, password: password };
+      if (!LIVE) {
+        var L = { id: 'mock-' + code, code: (code || '').toUpperCase(), name: name || 'Sweepstake', seeded: false };
+        setActiveLeague(L); rebuild(); emit();
+        return Promise.resolve({ league: L });
+      }
+      return fetch('/api/leagues', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+        .then(function (r) { return r.json().then(function (j) { if (!r.ok) throw new Error(j.detail || 'Could not create league'); return j; }); })
+        .then(function (j) { setActiveLeague(j.league); rebuild(); emit(); return j; });
+    },
+    // Validate code+password; on success make the league active. Resolves with
+    // the league (incl. seeded flag so onboarding picks roster vs draw).
+    joinLeague: function (code, password) {
+      if (!LIVE) {
+        var def = (WC.league || { code: 'OI', name: 'The Office Sweepstake', seeded: true });
+        if ((code || '').toUpperCase() !== def.code) return Promise.reject(new Error('No league with that code'));
+        setActiveLeague(def); rebuild(); emit();
+        return Promise.resolve({ league: def });
+      }
+      return fetch('/api/leagues/join', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: code, password: password }) })
+        .then(function (r) { return r.json().then(function (j) { if (!r.ok) throw new Error(j.detail || 'Could not join'); return j; }); })
+        .then(function (j) { setActiveLeague(j.league); return Store.refresh().then(function () { return j; }); });
+    },
+    // Jump back into the league a device account belongs to, then activate it.
+    resumeAccount: function (id) {
+      var acc = null;
+      mine.forEach(function (p) { if (p.id === id) acc = p; });
+      var leagues = knownLeagues();
+      var L = acc && acc.leagueCode ? leagues[acc.leagueCode] : null;
+      if (L) setActiveLeague(L);
+      lsSet(K.active, id);
+      rebuild(); emit();
+      return Store.refresh();
+    },
+
+    // device accounts (active league only)
     deviceIds: function () { return lsGet(K.device, []); },
     deviceAccounts: function () {
-      return this.deviceIds().map(function (id) { return Store.getSync(id); }).filter(Boolean);
+      var code = leagueCode();
+      return this.deviceIds().map(function (id) { return Store.getSync(id); })
+        .filter(function (p) { return p && (!code || !p.leagueCode || p.leagueCode === code); });
+    },
+    // ALL device accounts across every league (for the resume gate).
+    allDeviceAccounts: function () {
+      return this.deviceIds().map(function (id) {
+        var found = null; mine.forEach(function (p) { if (p.id === id) found = p; });
+        return found;
+      }).filter(Boolean);
     },
     activeId: function () { return lsGet(K.active, null); },
     active: function () { var id = this.activeId(); return id ? this.getSync(id) : null; },
@@ -33791,41 +34033,34 @@ button{font-family:inherit;}
       emit();
     },
 
-    // remove a participant entirely (organiser action). Works for anyone:
-    // device-created entries are deleted outright; server/demo entries are
-    // tombstoned so they stay gone after a rebuild.
     removeParticipant: function (id) {
       mine = mine.filter(function (p) { return p.id !== id; });
       lsSet(K.mine, mine);
       var rem = lsGet(K.removed, []); if (rem.indexOf(id) < 0) { rem.push(id); lsSet(K.removed, rem); }
       var d = this.deviceIds().filter(function (x) { return x !== id; }); lsSet(K.device, d);
       if (this.activeId() === id) lsSet(K.active, d[0] || null);
-      if (LIVE) { try { fetch('/api/participants/' + id, { method: 'DELETE' }); } catch (e) {} }
+      if (LIVE && leagueCode()) { try { fetch(api('/participants/' + id), { method: 'DELETE' }); } catch (e) {} }
       rebuild(); emit();
     },
 
-    // reads (sync from cache)
+    // reads (sync, active-league scoped)
     allSync: function () { return cache.slice(); },
     getSync: function (id) { for (var i = 0; i < cache.length; i++) if (cache[i].id === id) return cache[i]; return null; },
     rankedByPred: rankedByPred,
     predScoreOf: predScoreOf,
     maxPredPoints: function () { return (WC.PREDICTIONS || []).reduce(function (a, m) { return a + m.points; }, 0); },
 
-    // money — gross take grows with every entrant; half to charity, the rest is
-  // the single prize pot (winner takes all).
     gross: function () { return cache.length * (WC.FEE || 0); },
     charity: function () { return cache.length * (WC.FEE || 0) * CHARITY_SPLIT; },
     pot: function () { return cache.length * (WC.FEE || 0) * (1 - CHARITY_SPLIT); },
     charitySplit: function () { return CHARITY_SPLIT; },
 
-    // search (Find My Entry)
     search: function (q) {
       q = (q || '').trim().toLowerCase();
       if (!q) return [];
       return cache.filter(function (p) { return (p.name || '').toLowerCase().indexOf(q) >= 0; }).slice(0, 12);
     },
 
-    // create (onboarding) → assigns id + team, persists, makes active
     create: function (profile, opts) {
       opts = opts || {};
       var team = drawTeam(opts.forceTeam);
@@ -33837,12 +34072,13 @@ button{font-family:inherit;}
         city: profile.location || 'London', ltMember: !!profile.ltMember, leadership: !!profile.ltMember,
         gender: '—', team: team, color: COLORS[(Math.random() * COLORS.length) | 0],
         stage: t.stage, alive: t.alive, isYou: false, isDemo: false,
+        leagueCode: leagueCode(), isOrganiser: !!opts.organiser,
         picks: {}, predScore: 0, joinedAt: Date.now()
       };
       mine = mine.concat([p]); lsSet(K.mine, mine); rebuild();
       var d = this.deviceIds(); if (d.indexOf(p.id) < 0) d.push(p.id); lsSet(K.device, d);
       lsSet(K.active, p.id);
-      if (LIVE) { try { fetch('/api/participants', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(p) }); } catch (e) {} }
+      if (LIVE && leagueCode()) { try { fetch(api('/participants'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(p) }); } catch (e) {} }
       emit();
       return p;
     },
@@ -33853,7 +34089,7 @@ button{font-family:inherit;}
       mine[idx] = Object.assign({}, mine[idx], patch);
       if (patch.name) mine[idx].initials = initials(patch.name);
       lsSet(K.mine, mine); rebuild();
-      if (LIVE) { try { fetch('/api/participants/' + id, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(mine[idx]) }); } catch (e) {} }
+      if (LIVE && leagueCode()) { try { fetch(api('/participants/' + id), { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(mine[idx]) }); } catch (e) {} }
       emit();
       return mine[idx];
     },
@@ -33861,57 +34097,82 @@ button{font-family:inherit;}
     setPick: function (id, key, value) {
       var p = this.getSync(id); if (!p) return;
       var picks = Object.assign({}, p.picks || {}); picks[key] = value;
-      return this.update(id, { picks: picks });
+      // keep a local copy if this is a device-held entry
+      var inMine = mine.some(function (m) { return m.id === id; });
+      if (inMine) { this.update(id, { picks: picks }); }
+      else if (LIVE && leagueCode()) {
+        // seeded roster entry not yet in `mine` — persist the pick directly
+        try { fetch(api('/participants/' + id + '/picks'), { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: key, value: value }) }); } catch (e) {}
+        emit();
+      }
+      return picks;
     },
 
-    // live refresh (no-op in mock)
+    claimOI: function (id) {
+      var d = this.deviceIds();
+      if (d.indexOf(id) < 0) { d.push(id); lsSet(K.device, d); }
+      lsSet(K.active, id);
+      var alreadyMine = mine.some(function (p) { return p.id === id; });
+      if (!alreadyMine) {
+        var person = this.getSync(id);
+        if (person) { person = Object.assign({}, person, { leagueCode: leagueCode() }); mine = mine.concat([person]); lsSet(K.mine, mine); }
+      }
+      emit();
+    },
+
     refresh: function () {
       if (!LIVE) return Promise.resolve();
-      return fetch('/api/state').then(function (r) { return r.json(); }).then(function (d) {
-        if (d && d.people) { window.WC_DATA = d; if (window.__rebuildWC) window.__rebuildWC(); rebuild(); emit(); }
+      var c = leagueCode();
+      if (!c) return Promise.resolve();
+      return fetch('/api/leagues/' + encodeURIComponent(c) + '/state').then(function (r) { return r.json(); }).then(function (d) {
+        if (d && d.people) {
+          window.WC_DATA = d;
+          if (d.adminOverrides) admin = d.adminOverrides;
+          if (window.__rebuildWC) window.__rebuildWC();
+          rebuild(); emit();
+        }
       }).catch(function () {});
     },
 
-    // ===== ADMIN =====
+    // ===== ADMIN (scoped to the active league) =====
     adminState: function () { return admin; },
     teamsAlive: function () { return WC.TEAM_LIST.filter(function (t) { return t.alive; }).length; },
     phase: function () { return WC.meta.phase; },
     setPhase: function (phase) {
       admin.meta = admin.meta || {}; admin.meta.phase = phase;
-      applyAdmin(); persistAdmin(); rebuild(); emit();
+      commitAdmin();
     },
     setTeamOut: function (code, out) {
       admin.teams = admin.teams || {};
       if (out) admin.teams[code] = { alive: false, stage: 'out-group', rounds: 1 };
       else admin.teams[code] = { alive: true, stage: (WC.meta.phase === 'pre' ? 'group' : 'r16'), rounds: (WC.meta.phase === 'pre' ? 0 : 3) };
-      // first elimination auto-advances the tournament into play
       if (out && WC.meta.phase === 'pre') { admin.meta = admin.meta || {}; admin.meta.phase = 'live'; }
-      applyAdmin(); persistAdmin(); rebuild(); emit();
+      commitAdmin();
     },
     setFixtureResult: function (id, a, b) {
       admin.fixtures = admin.fixtures || {};
       admin.fixtures[id] = { score: [a, b], status: 'done' };
       if (WC.meta.phase === 'pre') { admin.meta = admin.meta || {}; admin.meta.phase = 'live'; }
-      applyAdmin(); persistAdmin(); emit();
+      commitAdmin();
     },
     setFixtureLive: function (id, on) {
       admin.fixtures = admin.fixtures || {};
       if (on) { admin.fixtures[id] = { score: (admin.fixtures[id] && admin.fixtures[id].score) || [0, 0], status: 'live' }; }
       else { delete admin.fixtures[id]; }
-      applyAdmin(); persistAdmin(); emit();
+      commitAdmin();
     },
     clearFixture: function (id) {
       if (admin.fixtures) delete admin.fixtures[id];
-      applyAdmin(); persistAdmin(); emit();
+      commitAdmin();
     },
     setPredictionAnswer: function (key, answer) {
       admin.predictions = admin.predictions || {};
       if (answer == null) delete admin.predictions[key]; else admin.predictions[key] = answer;
-      applyAdmin(); persistAdmin(); emit();
+      commitAdmin();
     },
     adminReset: function () {
       admin = { teams: {}, fixtures: {}, predictions: {}, meta: {} };
-      applyAdmin(); persistAdmin(); rebuild(); emit();
+      commitAdmin();
     }
   };
 
@@ -38317,9 +38578,11 @@ function Seg(p) {
   }, o.label)));
 }
 
-/* =================== ACCOUNT GATE =================== */
+/* =================== ACCOUNT / LEAGUE GATE =================== */
 function AccountGate(props) {
-  const accounts = So.deviceAccounts();
+  // All device accounts across every league, so people can hop back in.
+  const accounts = So.allDeviceAccounts ? So.allDeviceAccounts() : [];
+  const leagues = So.knownLeagues ? So.knownLeagues() : {};
   return /*#__PURE__*/React.createElement("div", {
     className: "moment"
   }, /*#__PURE__*/React.createElement("div", {
@@ -38377,12 +38640,12 @@ function AccountGate(props) {
       color: 'var(--yellow)',
       fontWeight: 800
     }
-  }, "Wheesht here."), " Officially impartial. Constitutionally Scottish. Who am I talking to?"))), accounts.length > 0 && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+  }, "Wheesht here."), " Officially impartial. Constitutionally Scottish. Join a league or start yer own."))), accounts.length > 0 && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     className: "wc-sec",
     style: {
       margin: '26px 4px 11px'
     }
-  }, /*#__PURE__*/React.createElement("h3", null, "On this device"), /*#__PURE__*/React.createElement("span", null, accounts.length, " ", accounts.length === 1 ? 'entry' : 'entries')), /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement("h3", null, "Jump back in"), /*#__PURE__*/React.createElement("span", null, accounts.length, " on this device")), /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
       flexDirection: 'column',
@@ -38390,9 +38653,10 @@ function AccountGate(props) {
     }
   }, accounts.map(p => {
     const t = WCo.TEAMS[p.team];
+    const lg = p.leagueCode && leagues[p.leagueCode];
     return /*#__PURE__*/React.createElement("button", {
       key: p.id,
-      onClick: () => props.onPick(p.id),
+      onClick: () => props.onResume(p.id),
       style: {
         display: 'flex',
         alignItems: 'center',
@@ -38424,7 +38688,7 @@ function AccountGate(props) {
         fontWeight: 700,
         color: 'var(--ink2)'
       }
-    }, p.location, p.department ? ' · ' + p.department : '', p.ltMember ? ' · LT' : '')), t && /*#__PURE__*/React.createElement(Fo, {
+    }, lg ? lg.name : p.leagueCode || 'Sweepstake', t ? ' · ' + t.name : '')), t && /*#__PURE__*/React.createElement(Fo, {
       team: t,
       size: 26
     }), /*#__PURE__*/React.createElement("span", {
@@ -38434,8 +38698,12 @@ function AccountGate(props) {
       }
     }, "\u2192"));
   }))), /*#__PURE__*/React.createElement("div", {
+    className: "wc-sec",
     style: {
-      marginTop: 22,
+      margin: '26px 4px 11px'
+    }
+  }, /*#__PURE__*/React.createElement("h3", null, accounts.length ? 'Another league' : 'Get started')), /*#__PURE__*/React.createElement("div", {
+    style: {
       display: 'flex',
       flexDirection: 'column',
       gap: 10
@@ -38443,10 +38711,129 @@ function AccountGate(props) {
   }, /*#__PURE__*/React.createElement(Bo, {
     variant: "ink",
     block: true,
-    onClick: props.onNew
-  }, accounts.length ? 'Add someone new' : 'Join the sweepstake', " \u2192"), /*#__PURE__*/React.createElement("button", {
-    onClick: props.onFind,
+    onClick: props.onJoin
+  }, "Join a league \u2192"), /*#__PURE__*/React.createElement(Bo, {
+    variant: "primary",
+    block: true,
+    onClick: props.onCreate
+  }, "Create a new league \u2192"))));
+}
+
+/* =================== JOIN A LEAGUE =================== */
+function JoinLeague(props) {
+  const [code, setCode] = oState('');
+  const [pw, setPw] = oState('');
+  const [err, setErr] = oState('');
+  const [busy, setBusy] = oState(false);
+  const ok = code.trim().length >= 2 && pw.length > 0;
+  function submit() {
+    if (!ok || busy) return;
+    setBusy(true);
+    setErr('');
+    So.joinLeague(code.trim(), pw).then(function (res) {
+      setBusy(false);
+      props.onJoined(res.league);
+    }).catch(function (e) {
+      setBusy(false);
+      setErr(e && e.message || 'Could not join that league.');
+    });
+  }
+  return /*#__PURE__*/React.createElement("div", {
+    className: "moment"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "mscroll",
     style: {
+      padding: '30px 22px 28px'
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: props.onBack,
+    style: {
+      background: 'none',
+      border: 'none',
+      cursor: 'pointer',
+      fontSize: 14,
+      fontWeight: 800,
+      color: 'var(--ink2)',
+      padding: 0,
+      marginBottom: 14
+    }
+  }, "\u2190 Back"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: 12,
+      alignItems: 'center'
+    }
+  }, /*#__PURE__*/React.createElement(Wo, {
+    mood: "mischievous",
+    size: 72,
+    animate: true
+  }), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    className: "dh",
+    style: {
+      fontSize: 24,
+      lineHeight: 1
+    }
+  }, "Join a league"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 13,
+      fontWeight: 600,
+      color: 'var(--ink2)',
+      marginTop: 4
+    }
+  }, "Pop in the league code and password the organiser gave ye."))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 20
+    }
+  }, /*#__PURE__*/React.createElement(Lab, null, "League code"), /*#__PURE__*/React.createElement("input", {
+    autoFocus: true,
+    style: {
+      ...inp,
+      textTransform: 'uppercase',
+      letterSpacing: '.14em',
+      fontSize: 22,
+      textAlign: 'center'
+    },
+    value: code,
+    onChange: e => {
+      setCode(e.target.value);
+      setErr('');
+    },
+    placeholder: "e.g. OFFICE26",
+    maxLength: 12
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 14
+    }
+  }, /*#__PURE__*/React.createElement(Lab, null, "Password"), /*#__PURE__*/React.createElement("input", {
+    type: "password",
+    style: inp,
+    value: pw,
+    onChange: e => {
+      setPw(e.target.value);
+      setErr('');
+    },
+    onKeyDown: e => e.key === 'Enter' && submit(),
+    placeholder: "League password"
+  })), err && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 10,
+      fontSize: 13,
+      fontWeight: 700,
+      color: 'var(--red)'
+    }
+  }, err), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 18
+    }
+  }, /*#__PURE__*/React.createElement(Bo, {
+    variant: "ink",
+    block: true,
+    onClick: submit
+  }, busy ? 'Checking…' : 'Join league →')), /*#__PURE__*/React.createElement("button", {
+    onClick: props.onCreate,
+    style: {
+      width: '100%',
+      marginTop: 12,
       background: 'none',
       border: 'none',
       cursor: 'pointer',
@@ -38456,7 +38843,135 @@ function AccountGate(props) {
       textDecoration: 'underline',
       padding: '4px 0'
     }
-  }, "Already entered elsewhere? Find my entry"))));
+  }, "No league yet? Create one")));
+}
+
+/* =================== CREATE A LEAGUE =================== */
+function CreateLeague(props) {
+  const [name, setName] = oState('');
+  const [code, setCode] = oState('');
+  const [pw, setPw] = oState('');
+  const [err, setErr] = oState('');
+  const [busy, setBusy] = oState(false);
+  const cleanCode = code.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+  const ok = name.trim().length > 0 && cleanCode.length >= 2 && pw.length >= 4;
+  function submit() {
+    if (!ok || busy) return;
+    setBusy(true);
+    setErr('');
+    So.createLeague(name.trim(), cleanCode, pw).then(function (res) {
+      setBusy(false);
+      props.onCreated(res.league);
+    }).catch(function (e) {
+      setBusy(false);
+      setErr(e && e.message || 'Could not create that league.');
+    });
+  }
+  return /*#__PURE__*/React.createElement("div", {
+    className: "moment"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "mscroll",
+    style: {
+      padding: '30px 22px 28px'
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: props.onBack,
+    style: {
+      background: 'none',
+      border: 'none',
+      cursor: 'pointer',
+      fontSize: 14,
+      fontWeight: 800,
+      color: 'var(--ink2)',
+      padding: 0,
+      marginBottom: 14
+    }
+  }, "\u2190 Back"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: 12,
+      alignItems: 'center'
+    }
+  }, /*#__PURE__*/React.createElement(Wo, {
+    mood: "confident",
+    size: 72,
+    animate: true
+  }), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    className: "dh",
+    style: {
+      fontSize: 24,
+      lineHeight: 1
+    }
+  }, "Create a league"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 13,
+      fontWeight: 600,
+      color: 'var(--ink2)',
+      marginTop: 4
+    }
+  }, "Ye'll be the organiser. Share the code + password with yer crew."))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 20,
+      display: 'flex',
+      flexDirection: 'column',
+      gap: 14
+    }
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement(Lab, null, "League name"), /*#__PURE__*/React.createElement("input", {
+    autoFocus: true,
+    style: inp,
+    value: name,
+    onChange: e => {
+      setName(e.target.value);
+      setErr('');
+    },
+    placeholder: "e.g. The Pub Quiz Crew",
+    maxLength: 60
+  })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement(Lab, null, "League code"), /*#__PURE__*/React.createElement("input", {
+    style: {
+      ...inp,
+      textTransform: 'uppercase',
+      letterSpacing: '.12em'
+    },
+    value: code,
+    onChange: e => {
+      setCode(e.target.value);
+      setErr('');
+    },
+    placeholder: "e.g. PUBCREW",
+    maxLength: 12
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11.5,
+      fontWeight: 600,
+      color: 'var(--ink2)',
+      marginTop: 4
+    }
+  }, "2\u201312 letters or numbers. People type this to join.")), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement(Lab, null, "Password"), /*#__PURE__*/React.createElement("input", {
+    type: "password",
+    style: inp,
+    value: pw,
+    onChange: e => {
+      setPw(e.target.value);
+      setErr('');
+    },
+    onKeyDown: e => e.key === 'Enter' && submit(),
+    placeholder: "At least 4 characters"
+  }))), err && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 10,
+      fontSize: 13,
+      fontWeight: 700,
+      color: 'var(--red)'
+    }
+  }, err), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 18
+    }
+  }, /*#__PURE__*/React.createElement(Bo, {
+    variant: "ink",
+    block: true,
+    onClick: () => ok && submit()
+  }, busy ? 'Creating…' : 'Create & continue →'))));
 }
 
 /* =================== FIND MY ENTRY =================== */
@@ -39150,12 +39665,128 @@ function ScotlandTakeover(props) {
     onClick: props.onDone
   }, "Tha sin sgoinneil \u2014 into my dashboard \u2192"))));
 }
+
+/* =================== ROSTER PICKER (seeded leagues) =================== */
+function OIRosterPicker(props) {
+  const all = So.allSync().filter(function (p) {
+    return p.isOI;
+  });
+  const myIds = new Set(So.deviceIds());
+  const league = So.activeLeague ? So.activeLeague() : null;
+  return /*#__PURE__*/React.createElement("div", {
+    className: "moment"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "mscroll",
+    style: {
+      padding: '24px 22px 28px'
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: props.onBack,
+    style: {
+      background: 'none',
+      border: 'none',
+      cursor: 'pointer',
+      fontSize: 14,
+      fontWeight: 800,
+      color: 'var(--ink2)',
+      padding: 0,
+      marginBottom: 12
+    }
+  }, "\u2190 Back"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: 12,
+      alignItems: 'center',
+      marginBottom: 16
+    }
+  }, /*#__PURE__*/React.createElement(Wo, {
+    mood: "confident",
+    size: 64,
+    animate: true
+  }), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    className: "dh",
+    style: {
+      fontSize: 24,
+      lineHeight: 1
+    }
+  }, "Who are ye?"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 13,
+      fontWeight: 600,
+      color: 'var(--ink2)',
+      marginTop: 4
+    }
+  }, league ? league.name + ' — y' : 'Y', "our team's already been drawn. Find yer name and tap it."))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      flexDirection: 'column',
+      gap: 8
+    }
+  }, all.map(function (p) {
+    const t = WCo.TEAMS[p.team];
+    const mine = myIds.has(p.id);
+    return /*#__PURE__*/React.createElement("button", {
+      key: p.id,
+      onClick: function () {
+        if (!mine) props.onClaim(p.id);
+      },
+      style: {
+        display: 'flex',
+        alignItems: 'center',
+        gap: 12,
+        background: mine ? 'var(--yellow)' : '#fff',
+        border: '2.5px solid var(--ink)',
+        borderRadius: 16,
+        padding: '11px 13px',
+        cursor: mine ? 'default' : 'pointer',
+        textAlign: 'left',
+        boxShadow: '0 4px 0 var(--ink)'
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 30,
+        lineHeight: 1,
+        flexShrink: 0
+      }
+    }, t ? t.flag : '🏳️'), /*#__PURE__*/React.createElement("div", {
+      style: {
+        flex: 1,
+        minWidth: 0
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "dh",
+      style: {
+        fontSize: 17
+      }
+    }, p.name), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 12,
+        fontWeight: 700,
+        color: 'var(--ink2)'
+      }
+    }, t ? t.name : p.team, " \xB7 Group ", t ? t.group : '?')), mine ? /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 12,
+        fontWeight: 800,
+        color: 'var(--ink2)'
+      }
+    }, "on device") : /*#__PURE__*/React.createElement("span", {
+      className: "dh",
+      style: {
+        fontSize: 18
+      }
+    }, "\u2192"));
+  }))));
+}
 Object.assign(window, {
   AccountGate,
+  JoinLeague,
+  CreateLeague,
   FindMyEntry,
   OnboardingForm,
   DrawMoment,
-  ScotlandTakeover
+  ScotlandTakeover,
+  OIRosterPicker
 });
 </script>
 
@@ -40620,6 +41251,67 @@ const {
 const {
   useState: aState2
 } = React;
+
+/* ---- match banter ----------------------------------------------------------
+   When the organiser saves a full-time score, Wheesht pipes up in the house
+   voice: homeland bias for Scotland, dry "remaining professional" digs at
+   England, plain dry wit for everyone else. Returns {text, mood} for wcToast. */
+function matchBanter(f, a, b) {
+  const ta = WCa.TEAMS[f.a],
+    tb = WCa.TEAMS[f.b];
+  const na = ta ? ta.name : f.a,
+    nb = tb ? tb.name : f.b;
+  const draw = a === b,
+    aWin = a > b,
+    margin = Math.abs(a - b);
+  const wName = aWin ? na : nb,
+    lName = aWin ? nb : na;
+  const pick = arr => arr[Math.random() * arr.length | 0];
+  if (f.a === 'SCO' || f.b === 'SCO') {
+    const scoWon = f.a === 'SCO' && aWin || f.b === 'SCO' && !aWin;
+    const other = f.a === 'SCO' ? nb : na;
+    if (draw) return {
+      text: pick(['Scotland hold ' + other + ' to a draw. A point is a point. Wheesht will take it.', 'Honours even for Scotland. Wheesht is calling that a moral victory.']),
+      mood: 'confident'
+    };
+    if (scoWon) return {
+      text: pick(['SCOTLAND WIN, ' + a + '–' + b + '. Wheesht is not greetin\'. Wheesht has something in its eye.', 'Scotland see off ' + other + '. Write it down. Frame it. Wheesht aye believed.', 'The homeland delivers. ' + other + ' sent homeward tae think again.']),
+      mood: 'scottish'
+    };
+    return {
+      text: pick(['Scotland fall to ' + other + '. Wheesht expected nothing and is somehow still disappointed.', 'A gallant Scotland defeat — the most Scottish result there is. Wheesht endures.', 'Scotland lose. Wheesht is fine. Wheesht is always fine. (Wheesht is not fine.)']),
+      mood: 'crying'
+    };
+  }
+  if (f.a === 'ENG' || f.b === 'ENG') {
+    const engWon = f.a === 'ENG' && aWin || f.b === 'ENG' && !aWin;
+    const other = f.a === 'ENG' ? nb : na;
+    if (draw) return {
+      text: 'England draw with ' + other + '. Wheesht is remaining professional. Barely.',
+      mood: 'mischievous'
+    };
+    if (engWon) return {
+      text: pick(['England beat ' + other + '. Wheesht is noting it down. Without comment. For now.', 'England win. Wheesht is remaining professional. It is costing Wheesht dearly.']),
+      mood: 'mischievous'
+    };
+    return {
+      text: pick(['England lose to ' + other + '. Wheesht is staying neutral. Wheesht is struggling.', other + ' see off England. Wheesht has no comment — and a small, private smile.']),
+      mood: 'smug'
+    };
+  }
+  if (draw) return {
+    text: pick([na + ' and ' + nb + ' share the points, ' + a + '–' + b + '. Wheesht has seen worse.', 'All square: ' + na + ' ' + a + '–' + b + ' ' + nb + '. Result logged.']),
+    mood: 'neutral'
+  };
+  if (margin >= 3) return {
+    text: pick([wName + ' take ' + lName + ' apart, ' + a + '–' + b + '. Wheesht almost felt sorry for them. Almost.', 'A rout. ' + wName + ' run riot against ' + lName + '. Wheesht is impressed and a wee bit frightened.']),
+    mood: 'shocked'
+  };
+  return {
+    text: pick([wName + ' edge ' + lName + ', ' + a + '–' + b + '. Result logged. Wheesht remembers everything.', wName + ' take it. ' + lName + ' will have words in the dressing room. Wheesht logged it.']),
+    mood: 'confident'
+  };
+}
 function PhaseSeg() {
   const cur = Sa.phase();
   const opts = [['pre', 'Pre-kickoff'], ['live', 'In play'], ['done', 'Finished']];
@@ -40875,6 +41567,8 @@ function FixtureAdminRow(props) {
     onSave: (a, b) => {
       Sa.setFixtureResult(f.id, a, b);
       setOpen(false);
+      const bn = matchBanter(f, a, b);
+      if (window.wcToast) window.wcToast(bn.text, bn.mood);
     },
     onCancel: () => setOpen(false)
   }));
@@ -40970,7 +41664,7 @@ function AdminPanel(props) {
     }
     seen[f.dateISO].items.push(f);
   });
-  const secs = [['results', 'Results'], ['teams', 'Teams'], ['predict', 'Predictions'], ['people', 'People']];
+  const secs = [['results', 'Results'], ['teams', 'Teams'], ['predict', 'Predictions'], ['people', 'People'], ['chat', 'Chat']];
   return /*#__PURE__*/React.createElement("div", {
     className: "moment",
     style: {
@@ -41008,7 +41702,7 @@ function AdminPanel(props) {
       fontWeight: 700,
       color: 'var(--yellow)'
     }
-  }, "Admin \xB7 ", Sa.teamsAlive(), " teams in \xB7 ", Sa.allSync().length, " entrants")), /*#__PURE__*/React.createElement("button", {
+  }, Sa.activeLeague && Sa.activeLeague() ? Sa.activeLeague().name : 'Admin', " \xB7 ", Sa.allSync().length, " entrants")), /*#__PURE__*/React.createElement("button", {
     onClick: props.onClose,
     style: {
       border: 'none',
@@ -41109,7 +41803,7 @@ function AdminPanel(props) {
   }, "Set the answer once it's known \u2014 every entrant's score and the league re-grade instantly."), (WCa.predictions || Sa.PREDICTIONS).map(m => /*#__PURE__*/React.createElement(PredAdmin, {
     key: m.key,
     m: m
-  }))), sec === 'people' && /*#__PURE__*/React.createElement(PeopleAdmin, null), /*#__PURE__*/React.createElement("div", {
+  }))), sec === 'people' && /*#__PURE__*/React.createElement(PeopleAdmin, null), sec === 'chat' && /*#__PURE__*/React.createElement(ChatAdmin, null), /*#__PURE__*/React.createElement("div", {
     style: {
       marginTop: 22,
       borderTop: '2px solid var(--line)',
@@ -41236,7 +41930,278 @@ function PeopleAdmin() {
     }, "Remove"));
   })));
 }
+
+/* ---- chat moderation -------------------------------------------------------
+   Live only. Lists recent messages newest-first; the organiser can delete any
+   one (server removes it from data/chat.json). */
+function ChatAdmin() {
+  const [msgs, setMsgs] = aState2([]);
+  const [loading, setLoading] = aState2(true);
+  const isLive = !!window.WC_LIVE;
+  function load() {
+    fetch(Sa.api('/chat')).then(r => r.json()).then(d => {
+      setMsgs((d || []).slice().reverse());
+      setLoading(false);
+    }).catch(() => setLoading(false));
+  }
+  React.useEffect(() => {
+    if (isLive) load();else setLoading(false);
+  }, []);
+  function del(id) {
+    if (!window.confirm('Delete this message for everyone? This cannot be undone.')) return;
+    fetch(Sa.api('/chat/' + id), {
+      method: 'DELETE'
+    }).then(() => setMsgs(prev => prev.filter(m => m.id !== id))).catch(() => {});
+  }
+  if (!isLive) {
+    return /*#__PURE__*/React.createElement(Ca, {
+      flat: true,
+      style: {
+        textAlign: 'center',
+        padding: '24px 14px'
+      }
+    }, /*#__PURE__*/React.createElement(Wa, {
+      mood: "neutral",
+      size: 56,
+      animate: true
+    }), /*#__PURE__*/React.createElement("div", {
+      className: "dh",
+      style: {
+        fontSize: 16,
+        marginTop: 6
+      }
+    }, "Chat is server-only."), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 12.5,
+        fontWeight: 600,
+        color: 'var(--ink2)',
+        marginTop: 3
+      }
+    }, "Moderation works once the app is connected to the sweepstake server."));
+  }
+  return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12.5,
+      fontWeight: 600,
+      color: 'var(--ink2)',
+      marginBottom: 10
+    }
+  }, "Keep the wall civil \u2014 delete anything out of order. Removals are instant for everyone."), loading ? /*#__PURE__*/React.createElement(Ca, {
+    flat: true,
+    style: {
+      textAlign: 'center',
+      padding: '24px 14px',
+      fontSize: 13,
+      fontWeight: 600,
+      color: 'var(--ink2)'
+    }
+  }, "Loading messages\u2026") : msgs.length === 0 ? /*#__PURE__*/React.createElement(Ca, {
+    flat: true,
+    style: {
+      textAlign: 'center',
+      padding: '24px 14px'
+    }
+  }, /*#__PURE__*/React.createElement(Wa, {
+    mood: "waiting",
+    size: 56,
+    animate: true
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "dh",
+    style: {
+      fontSize: 16,
+      marginTop: 6
+    }
+  }, "Nothing to moderate."), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12.5,
+      fontWeight: 600,
+      color: 'var(--ink2)',
+      marginTop: 3
+    }
+  }, "Messages will appear here as people chat.")) : /*#__PURE__*/React.createElement(Ca, {
+    flat: true,
+    style: {
+      padding: '2px 13px'
+    }
+  }, msgs.map((m, i) => {
+    const d = new Date(m.ts);
+    const timeStr = d.getHours().toString().padStart(2, '0') + ':' + d.getMinutes().toString().padStart(2, '0');
+    return /*#__PURE__*/React.createElement("div", {
+      key: m.id,
+      style: {
+        display: 'flex',
+        alignItems: 'flex-start',
+        gap: 10,
+        padding: '10px 0',
+        borderBottom: i < msgs.length - 1 ? '1.5px solid var(--line)' : 'none'
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        width: 30,
+        height: 30,
+        borderRadius: '50%',
+        background: m.color || '#333',
+        color: '#fff',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        fontFamily: 'var(--disp)',
+        fontWeight: 800,
+        fontSize: 11,
+        flexShrink: 0
+      }
+    }, m.initials || '?'), /*#__PURE__*/React.createElement("div", {
+      style: {
+        flex: 1,
+        minWidth: 0
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 11,
+        fontWeight: 800,
+        color: 'var(--ink2)'
+      }
+    }, m.author, " \xB7 ", timeStr), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 13.5,
+        fontWeight: 500,
+        lineHeight: 1.4,
+        wordBreak: 'break-word',
+        marginTop: 2
+      }
+    }, m.text)), /*#__PURE__*/React.createElement("button", {
+      onClick: () => del(m.id),
+      className: "wc-btn wc-btn--sm",
+      style: {
+        padding: '5px 11px',
+        background: '#fff',
+        color: 'var(--red)',
+        boxShadow: '0 3px 0 var(--shadow)',
+        flexShrink: 0
+      }
+    }, "Delete"));
+  })));
+}
+
+/* ---- PIN gate --------------------------------------------------------------
+   Soft gate in front of the clipboard. Not real auth — just stops a casual tap
+   on a shared link from wiping the sweepstake. PIN comes from the tournament
+   config (meta.adminPin); empty config means no gate. Unlock lasts the session. */
+function AdminGate(props) {
+  const PIN = WCa.meta && WCa.meta.adminPin || '';
+  const [ok, setOk] = aState2(() => {
+    if (!PIN) return true;
+    try {
+      return sessionStorage.getItem('wheesht_admin_ok') === '1';
+    } catch (e) {
+      return false;
+    }
+  });
+  const [entry, setEntry] = aState2('');
+  const [bad, setBad] = aState2(false);
+  if (ok) return /*#__PURE__*/React.createElement(AdminPanel, {
+    onClose: props.onClose
+  });
+  function submit() {
+    if (entry === PIN) {
+      try {
+        sessionStorage.setItem('wheesht_admin_ok', '1');
+      } catch (e) {}
+      setOk(true);
+    } else {
+      setBad(true);
+      setEntry('');
+    }
+  }
+  return /*#__PURE__*/React.createElement("div", {
+    className: "moment",
+    style: {
+      background: 'var(--bg)',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: '0 26px'
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: props.onClose,
+    style: {
+      position: 'absolute',
+      top: 16,
+      right: 16,
+      border: 'none',
+      background: 'var(--ink)',
+      color: '#fff',
+      width: 34,
+      height: 34,
+      borderRadius: 10,
+      fontSize: 18,
+      fontWeight: 900,
+      cursor: 'pointer'
+    }
+  }, "\xD7"), /*#__PURE__*/React.createElement("div", {
+    className: 'rise' + (bad ? ' shake' : ''),
+    style: {
+      width: '100%',
+      maxWidth: 340,
+      textAlign: 'center'
+    }
+  }, /*#__PURE__*/React.createElement(Wa, {
+    mood: bad ? 'shocked' : 'mischievous',
+    size: 92,
+    animate: true
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "dh",
+    style: {
+      fontSize: 24,
+      marginTop: 10
+    }
+  }, "Organiser only."), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 13.5,
+      fontWeight: 600,
+      color: 'var(--ink2)',
+      marginTop: 6,
+      lineHeight: 1.45
+    }
+  }, bad ? 'Wrong code. Wheesht is watching. Try again.' : 'Enter the organiser code. Wheesht doesn’t hand the clipboard to just anyone.'), /*#__PURE__*/React.createElement("input", {
+    autoFocus: true,
+    type: "password",
+    inputMode: "numeric",
+    value: entry,
+    onChange: e => {
+      setEntry(e.target.value);
+      setBad(false);
+    },
+    onKeyDown: e => {
+      if (e.key === 'Enter') submit();
+    },
+    placeholder: "Code",
+    style: {
+      width: '100%',
+      border: '2.5px solid var(--ink)',
+      borderRadius: 14,
+      padding: '13px 16px',
+      fontFamily: 'var(--disp)',
+      fontWeight: 800,
+      fontSize: 22,
+      textAlign: 'center',
+      letterSpacing: '.3em',
+      outline: 'none',
+      marginTop: 18,
+      background: '#fff',
+      color: 'var(--ink)'
+    }
+  }), /*#__PURE__*/React.createElement("button", {
+    onClick: submit,
+    disabled: !entry,
+    className: "wc-btn wc-btn--ink wc-btn--block",
+    style: {
+      marginTop: 14,
+      opacity: entry ? 1 : 0.4
+    }
+  }, "Unlock the clipboard")));
+}
 window.AdminPanel = AdminPanel;
+window.AdminGate = AdminGate;
 </script>
 
 <script>
@@ -41321,6 +42286,13 @@ function Icon(props) {
     viewBox: "0 0 24 24"
   }, /*#__PURE__*/React.createElement("path", _extends({
     d: "M12 3.5l2.4 4.9 5.4.8-3.9 3.8.9 5.4-4.8-2.5-4.8 2.5.9-5.4L4.2 9.2l5.4-.8z"
+  }, common)));
+  if (props.name === 'chat') return /*#__PURE__*/React.createElement("svg", {
+    width: "26",
+    height: "26",
+    viewBox: "0 0 24 24"
+  }, /*#__PURE__*/React.createElement("path", _extends({
+    d: "M4 4h16a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H8l-4 4V6a2 2 0 0 1 2-2z"
   }, common)));
   return /*#__PURE__*/React.createElement("svg", {
     width: "26",
@@ -41411,7 +42383,7 @@ function AppBar(props) {
       flex: 1,
       minWidth: 0
     }
-  }, /*#__PURE__*/React.createElement("h1", null, A_WC.meta.name), /*#__PURE__*/React.createElement("p", null, A_WC.meta.season, " \xB7 ", A_WC.meta.stageLabel)), /*#__PURE__*/React.createElement("button", {
+  }, /*#__PURE__*/React.createElement("h1", null, A_WC.league && A_WC.league.name || A_WC.meta.name), /*#__PURE__*/React.createElement("p", null, A_WC.meta.season, " \xB7 ", A_WC.meta.stageLabel)), /*#__PURE__*/React.createElement("button", {
     onClick: props.onMoments,
     className: "wc-btn wc-btn--sm",
     style: {
@@ -41435,9 +42407,9 @@ function AppBar(props) {
   })));
 }
 function TabBar(props) {
-  const tabs = [['me', 'You'], ['games', 'Games'], ['players', 'Players'], ['predictions', 'Predict'], ['summary', 'Verdict']];
+  const tabs = [['me', 'You'], ['games', 'Games'], ['players', 'Players'], ['predictions', 'Predict'], ['chat', 'Chat'], ['summary', 'Verdict']];
   return /*#__PURE__*/React.createElement("div", {
-    className: "tabbar tabbar--5"
+    className: "tabbar tabbar--6"
   }, tabs.map(([k, lab]) => /*#__PURE__*/React.createElement("button", {
     key: k,
     className: props.tab === k ? 'on' : '',
@@ -41604,6 +42576,13 @@ function AccountSheet(props) {
       boxShadow: '0 4px 0 var(--shadow)'
     }
   }, "Find my entry")), /*#__PURE__*/React.createElement("button", {
+    onClick: props.onSwitch,
+    className: "wc-btn wc-btn--sm wc-btn--block",
+    style: {
+      marginTop: 9,
+      boxShadow: '0 4px 0 var(--shadow)'
+    }
+  }, "Join / switch league \u2192"), /*#__PURE__*/React.createElement("button", {
     onClick: props.onAdmin,
     style: {
       width: '100%',
@@ -41750,6 +42729,7 @@ function App() {
   const [menu, setMenu] = aState(false);
   const [account, setAccount] = aState(false);
   const [admin, setAdmin] = aState(false);
+  const [organiser, setOrganiser] = aState(false); // true while creating a league
   const [, tick] = aState(0);
   const [t, setTweak] = window.useTweaks(TW_DEFAULTS);
 
@@ -41786,32 +42766,73 @@ function App() {
   }, [flow, me && me.id]); // eslint-disable-line
 
   function onboardSubmit(profile) {
-    const p = A_S.create(profile);
+    const p = A_S.create(profile, {
+      organiser: organiser
+    });
+    setOrganiser(false);
+    A_S.refresh && A_S.refresh();
     setDraw({
       participant: p
     });
     setFlow('app');
   }
-  function pickAccount(id) {
-    A_S.setActive(id);
+  function resumeAccount(id) {
+    Promise.resolve(A_S.resumeAccount ? A_S.resumeAccount(id) : A_S.setActive(id)).then(() => {
+      setFlow('app');
+      setTab('me');
+    });
+  }
+  function claimOI(id) {
+    A_S.claimOI(id);
+    A_S.refresh && A_S.refresh();
+    const p = A_S.getSync(id);
+    const t = p && A_WC.TEAMS[p.team];
     setFlow('app');
-    setTab('me');
+    setTimeout(() => window.wcToast && window.wcToast('Welcome, ' + (p ? p.name : '') + '! Yer team is ' + (t && t.flag || '') + ' ' + (t ? t.name : '') + '.', 'confident'), 400);
   }
 
   // -------- onboarding / identity flow --------
   if (flow === 'gate') return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(window.AccountGate, {
-    onPick: pickAccount,
-    onNew: () => setFlow('form'),
-    onFind: () => setFlow('find')
+    onResume: resumeAccount,
+    onJoin: () => {
+      setOrganiser(false);
+      setFlow('join');
+    },
+    onCreate: () => {
+      setOrganiser(true);
+      setFlow('create');
+    }
+  }), /*#__PURE__*/React.createElement(window.ToastLayer, null), /*#__PURE__*/React.createElement(window.ConfettiLayer, null));
+  if (flow === 'join') return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(window.JoinLeague, {
+    onBack: () => setFlow('gate'),
+    onCreate: () => {
+      setOrganiser(true);
+      setFlow('create');
+    },
+    onJoined: league => {
+      setOrganiser(false);
+      setFlow(league && league.seeded ? 'oi-roster' : 'find');
+    }
+  }), /*#__PURE__*/React.createElement(window.ToastLayer, null), /*#__PURE__*/React.createElement(window.ConfettiLayer, null));
+  if (flow === 'create') return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(window.CreateLeague, {
+    onBack: () => setFlow('gate'),
+    onCreated: () => {
+      setOrganiser(true);
+      setFlow('form');
+    }
   }), /*#__PURE__*/React.createElement(window.ToastLayer, null), /*#__PURE__*/React.createElement(window.ConfettiLayer, null));
   if (flow === 'find') return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(window.FindMyEntry, {
     onBack: () => setFlow('gate'),
-    onPicked: pickAccount,
+    onPicked: claimOI,
     onNew: () => setFlow('form')
   }), /*#__PURE__*/React.createElement(window.ToastLayer, null), /*#__PURE__*/React.createElement(window.ConfettiLayer, null));
   if (flow === 'form') return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(window.OnboardingForm, {
     onBack: () => setFlow(me ? 'app' : 'gate'),
     onSubmit: onboardSubmit
+  }), /*#__PURE__*/React.createElement(window.ToastLayer, null), /*#__PURE__*/React.createElement(window.ConfettiLayer, null));
+  if (flow === 'oi-roster') return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(window.OIRosterPicker, {
+    onBack: () => setFlow('join'),
+    onClaim: claimOI
   }), /*#__PURE__*/React.createElement(window.ToastLayer, null), /*#__PURE__*/React.createElement(window.ConfettiLayer, null));
 
   // -------- main app --------
@@ -41823,6 +42844,7 @@ function App() {
     games: /*#__PURE__*/React.createElement(window.GamesScreen, null),
     players: /*#__PURE__*/React.createElement(window.TrackerScreen, null),
     predictions: /*#__PURE__*/React.createElement(window.PredictionsScreen, null),
+    chat: /*#__PURE__*/React.createElement(window.ChatScreen, null),
     summary: /*#__PURE__*/React.createElement(window.SummaryScreen, null)
   };
   return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(StatusBar, null), /*#__PURE__*/React.createElement("div", {
@@ -41861,6 +42883,10 @@ function App() {
       setAccount(false);
       setFlow('find');
     },
+    onSwitch: () => {
+      setAccount(false);
+      setFlow('gate');
+    },
     onAdmin: () => {
       setAccount(false);
       setAdmin(true);
@@ -41882,7 +42908,7 @@ function App() {
     onDone: () => setOverlay(null)
   }), overlay === 'final' && /*#__PURE__*/React.createElement(window.FinalMoment, {
     onDone: () => setOverlay(null)
-  }), admin && /*#__PURE__*/React.createElement(window.AdminPanel, {
+  }), admin && /*#__PURE__*/React.createElement(window.AdminGate, {
     onClose: () => setAdmin(false)
   }), /*#__PURE__*/React.createElement(window.ToastLayer, null), /*#__PURE__*/React.createElement(window.ConfettiLayer, null), /*#__PURE__*/React.createElement(window.TweaksPanel, {
     title: "Tweaks"

@@ -35,7 +35,7 @@ function AppBar(props){
   return <div className="appbar">
     <div className="mk"><A_W mood="confident" size={42}/></div>
     <div style={{flex:1,minWidth:0}}>
-      <h1>{A_WC.meta.name}</h1>
+      <h1>{(A_WC.league&&A_WC.league.name)||A_WC.meta.name}</h1>
       <p>{A_WC.meta.season} · {A_WC.meta.stageLabel}</p>
     </div>
     <button onClick={props.onMoments} className="wc-btn wc-btn--sm" style={{padding:'8px 11px',boxShadow:'0 4px 0 var(--shadow)'}}>Moments</button>
@@ -88,6 +88,7 @@ function AccountSheet(props){
         <button onClick={props.onAdd} className="wc-btn wc-btn--sm" style={{flex:1,boxShadow:'0 4px 0 var(--shadow)'}}>+ Add someone</button>
         <button onClick={props.onFind} className="wc-btn wc-btn--sm" style={{flex:1,boxShadow:'0 4px 0 var(--shadow)'}}>Find my entry</button>
       </div>
+      <button onClick={props.onSwitch} className="wc-btn wc-btn--sm wc-btn--block" style={{marginTop:9,boxShadow:'0 4px 0 var(--shadow)'}}>Join / switch league →</button>
       <button onClick={props.onAdmin} style={{width:'100%',marginTop:11,border:'none',background:'none',cursor:'pointer',fontSize:12.5,fontWeight:800,color:'var(--ink2)',padding:'6px 0',display:'flex',alignItems:'center',justifyContent:'center',gap:6}}>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><circle cx="12" cy="12" r="3.2"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1"/></svg>
         Organiser tools
@@ -142,6 +143,7 @@ function App(){
   const [menu,setMenu]=aState(false);
   const [account,setAccount]=aState(false);
   const [admin,setAdmin]=aState(false);
+  const [organiser,setOrganiser]=aState(false); // true while creating a league
   const [,tick]=aState(0);
   const [t,setTweak]=window.useTweaks(TW_DEFAULTS);
 
@@ -169,13 +171,18 @@ function App(){
   },[flow,me&&me.id]); // eslint-disable-line
 
   function onboardSubmit(profile){
-    const p=A_S.create(profile);
+    const p=A_S.create(profile,{organiser:organiser});
+    setOrganiser(false);
+    A_S.refresh&&A_S.refresh();
     setDraw({participant:p}); setFlow('app');
   }
-  function pickAccount(id){ A_S.setActive(id); setFlow('app'); setTab('me'); }
+  function resumeAccount(id){
+    Promise.resolve(A_S.resumeAccount?A_S.resumeAccount(id):A_S.setActive(id)).then(()=>{ setFlow('app'); setTab('me'); });
+  }
 
   function claimOI(id){
     A_S.claimOI(id);
+    A_S.refresh&&A_S.refresh();
     const p=A_S.getSync(id);
     const t=p&&A_WC.TEAMS[p.team];
     setFlow('app');
@@ -184,23 +191,28 @@ function App(){
 
   // -------- onboarding / identity flow --------
   if(flow==='gate') return <React.Fragment>
-    <window.AccountGate onPick={pickAccount} onNew={()=>setFlow('form')} onFind={()=>setFlow('find')} onCode={()=>setFlow('oi-code')}/>
+    <window.AccountGate onResume={resumeAccount} onJoin={()=>{setOrganiser(false);setFlow('join');}} onCreate={()=>{setOrganiser(true);setFlow('create');}}/>
+    <window.ToastLayer/><window.ConfettiLayer/>
+  </React.Fragment>;
+  if(flow==='join') return <React.Fragment>
+    <window.JoinLeague onBack={()=>setFlow('gate')} onCreate={()=>{setOrganiser(true);setFlow('create');}}
+      onJoined={(league)=>{ setOrganiser(false); setFlow(league&&league.seeded?'oi-roster':'find'); }}/>
+    <window.ToastLayer/><window.ConfettiLayer/>
+  </React.Fragment>;
+  if(flow==='create') return <React.Fragment>
+    <window.CreateLeague onBack={()=>setFlow('gate')} onCreated={()=>{ setOrganiser(true); setFlow('form'); }}/>
     <window.ToastLayer/><window.ConfettiLayer/>
   </React.Fragment>;
   if(flow==='find') return <React.Fragment>
-    <window.FindMyEntry onBack={()=>setFlow('gate')} onPicked={pickAccount} onNew={()=>setFlow('form')}/>
+    <window.FindMyEntry onBack={()=>setFlow('gate')} onPicked={claimOI} onNew={()=>setFlow('form')}/>
     <window.ToastLayer/><window.ConfettiLayer/>
   </React.Fragment>;
   if(flow==='form') return <React.Fragment>
     <window.OnboardingForm onBack={()=>setFlow(me?'app':'gate')} onSubmit={onboardSubmit}/>
     <window.ToastLayer/><window.ConfettiLayer/>
   </React.Fragment>;
-  if(flow==='oi-code') return <React.Fragment>
-    <window.OICodeEntry onBack={()=>setFlow('gate')} onMatch={()=>setFlow('oi-roster')} onNew={()=>setFlow('form')}/>
-    <window.ToastLayer/><window.ConfettiLayer/>
-  </React.Fragment>;
   if(flow==='oi-roster') return <React.Fragment>
-    <window.OIRosterPicker onBack={()=>setFlow('oi-code')} onClaim={claimOI}/>
+    <window.OIRosterPicker onBack={()=>setFlow('join')} onClaim={claimOI}/>
     <window.ToastLayer/><window.ConfettiLayer/>
   </React.Fragment>;
 
@@ -233,13 +245,14 @@ function App(){
     {account && <AccountSheet onClose={()=>setAccount(false)}
       onAdd={()=>{setAccount(false);setFlow('form');}}
       onFind={()=>{setAccount(false);setFlow('find');}}
+      onSwitch={()=>{setAccount(false);setFlow('gate');}}
       onAdmin={()=>{setAccount(false);setAdmin(true);}}/>}
 
     {draw && <window.DrawMoment participant={draw.participant} forceTeam={draw.forceTeam}
       onDone={()=>{ const wasReplay=draw.replay; setDraw(null); if(!wasReplay){ setTab('me'); setTimeout(()=>window.wcConfetti&&window.wcConfetti({y:.4}),200);} }}/>}
     {overlay==='result' && <window.ResultMoment onDone={()=>setOverlay(null)}/>}
     {overlay==='final' && <window.FinalMoment onDone={()=>setOverlay(null)}/>}
-    {admin && <window.AdminPanel onClose={()=>setAdmin(false)}/>}
+    {admin && <window.AdminGate onClose={()=>setAdmin(false)}/>}
 
     <window.ToastLayer/>
     <window.ConfettiLayer/>

@@ -1,12 +1,10 @@
 /* ===========================================================================
-   DESKTOP STAGE — live side panels + the McTominay overhead-kick flourish.
+   DESKTOP STAGE — live side panels beside the device.
 
    Runs only on wide screens (the phone view ignores all of this). It:
      • mounts two live React panels beside the device (pot/standings + the
        prediction league leaderboard),
-     • injects an SVG bicycle-kick animation that replays as a periodic
-       flourish (a nod to McTominay v Denmark),
-     • wires a persisted on/off toggle for the motion.
+     • wires a persisted on/off toggle for the ambient backdrop motion.
    =========================================================================== */
 (function () {
   if (typeof window === 'undefined') return;
@@ -26,45 +24,6 @@
   function motionOn() { try { return localStorage.getItem(MK) !== 'off'; } catch (e) { return true; } }
   function applyMotion() { document.body.classList.toggle('motion-off', !motionOn()); }
   applyMotion();
-
-  /* ---- the overhead-kick scene (SVG injected once) ---------------------- */
-  var KICK_SVG =
-    '<svg viewBox="0 0 500 260" width="100%" height="100%" aria-hidden="true">' +
-      '<defs>' +
-        '<linearGradient id="kpitch" x1="0" y1="0" x2="0" y2="1">' +
-          '<stop offset="0" stop-color="#1a7a44" stop-opacity="0"/>' +
-          '<stop offset="1" stop-color="#1a7a44" stop-opacity=".30"/>' +
-        '</linearGradient>' +
-      '</defs>' +
-      // pitch glow
-      '<ellipse cx="250" cy="248" rx="240" ry="26" fill="url(#kpitch)"/>' +
-      // goal frame + net (right side)
-      '<g class="kick-net" stroke="#fff" stroke-opacity=".85" fill="none" stroke-width="3" stroke-linecap="round">' +
-        '<path d="M388 70 H474 V196 H388" stroke-width="5"/>' +
-        '<g stroke-width="1.4" stroke-opacity=".45">' +
-          '<path d="M404 72 V194 M422 72 V194 M440 72 V194 M458 72 V194"/>' +
-          '<path d="M390 92 H474 M390 116 H474 M390 140 H474 M390 164 H474"/>' +
-        '</g>' +
-      '</g>' +
-      // motion arc of the ball
-      '<path class="kick-arc" d="M196 138 Q330 60 430 120" stroke="#F5C800" stroke-opacity=".5" stroke-width="3" fill="none" stroke-dasharray="3 9" stroke-linecap="round"/>' +
-      // player — bold navy scissor-kick silhouette
-      '<g class="kick-player" stroke="#0a2a5e" stroke-width="11" stroke-linecap="round" fill="none">' +
-        '<circle cx="108" cy="150" r="12" fill="#0a2a5e" stroke="none"/>' +    // head
-        '<path d="M120 150 H150"/>' +                                          // torso
-        '<path d="M126 150 L118 172"/>' +                                      // balancing arm
-        '<path class="kick-support" d="M150 150 L160 172 L150 188"/>' +        // support leg
-        '<g class="kick-leg"><path d="M150 150 L182 150 L200 136"/></g>' +     // striking leg
-      '</g>' +
-      // the ball
-      '<g class="kick-ball"><circle cx="200" cy="134" r="9" fill="#fff" stroke="#1A1A1A" stroke-width="2.5"/>' +
-        '<path d="M200 127 l5 4 -2 6 -6 0 -2 -6 z" fill="#1A1A1A"/></g>' +
-      // GOAL flash
-      '<text class="kick-goal" x="250" y="44" text-anchor="middle" font-family="Bricolage Grotesque,sans-serif" font-weight="800" font-size="34" fill="#F5C800" letter-spacing="1">GOAAL!</text>' +
-    '</svg>';
-
-  var fx = document.getElementById('stage-fx');
-  if (fx) fx.innerHTML = KICK_SVG;
 
   /* ---- toggle button ---------------------------------------------------- */
   var btn = document.getElementById('stage-toggle');

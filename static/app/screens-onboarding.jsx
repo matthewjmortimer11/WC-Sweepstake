@@ -28,9 +28,11 @@ function Seg(p) {
   </div>;
 }
 
-/* =================== ACCOUNT GATE =================== */
+/* =================== ACCOUNT / LEAGUE GATE =================== */
 function AccountGate(props) {
-  const accounts = So.deviceAccounts();
+  // All device accounts across every league, so people can hop back in.
+  const accounts = So.allDeviceAccounts ? So.allDeviceAccounts() : [];
+  const leagues = So.knownLeagues ? So.knownLeagues() : {};
   return (
     <div className="moment">
       <div className="mscroll" style={{ padding: '34px 22px 28px' }}>
@@ -39,20 +41,21 @@ function AccountGate(props) {
           <div className="dh" style={{ fontSize: 30, marginTop: 8, lineHeight: 1 }}>{WCo.meta.name}</div>
           <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink2)', marginTop: 6 }}>{WCo.meta.season} · {WCo.meta.stageLabel}</div>
           <div style={{ display: 'inline-flex', marginTop: 14, background: 'var(--ink)', color: '#fff', borderRadius: '16px 16px 16px 5px', padding: '11px 15px', maxWidth: 320, textAlign: 'left' }}>
-            <div style={{ fontSize: 14, fontWeight: 600, lineHeight: 1.35 }}><span style={{ color: 'var(--yellow)', fontWeight: 800 }}>Wheesht here.</span> Officially impartial. Constitutionally Scottish. Who am I talking to?</div>
+            <div style={{ fontSize: 14, fontWeight: 600, lineHeight: 1.35 }}><span style={{ color: 'var(--yellow)', fontWeight: 800 }}>Wheesht here.</span> Officially impartial. Constitutionally Scottish. Join a league or start yer own.</div>
           </div>
         </div>
 
         {accounts.length > 0 && <>
-          <div className="wc-sec" style={{ margin: '26px 4px 11px' }}><h3>On this device</h3><span>{accounts.length} {accounts.length === 1 ? 'entry' : 'entries'}</span></div>
+          <div className="wc-sec" style={{ margin: '26px 4px 11px' }}><h3>Jump back in</h3><span>{accounts.length} on this device</span></div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
             {accounts.map(p => {
               const t = WCo.TEAMS[p.team];
-              return <button key={p.id} onClick={() => props.onPick(p.id)} style={{ display: 'flex', alignItems: 'center', gap: 12, background: '#fff', border: '2.5px solid var(--ink)', borderRadius: 16, padding: '11px 13px', cursor: 'pointer', textAlign: 'left', boxShadow: '0 4px 0 var(--ink)' }}>
+              const lg = p.leagueCode && leagues[p.leagueCode];
+              return <button key={p.id} onClick={() => props.onResume(p.id)} style={{ display: 'flex', alignItems: 'center', gap: 12, background: '#fff', border: '2.5px solid var(--ink)', borderRadius: 16, padding: '11px 13px', cursor: 'pointer', textAlign: 'left', boxShadow: '0 4px 0 var(--ink)' }}>
                 <Ao person={p} size={44} />
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div className="dh" style={{ fontSize: 17 }}>{p.name}</div>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--ink2)' }}>{p.location}{p.department ? ' · ' + p.department : ''}{p.ltMember ? ' · LT' : ''}</div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--ink2)' }}>{lg ? lg.name : (p.leagueCode || 'Sweepstake')}{t ? ' · ' + t.name : ''}</div>
                 </div>
                 {t && <Fo team={t} size={26} />}
                 <span className="dh" style={{ fontSize: 20 }}>→</span>
@@ -61,10 +64,130 @@ function AccountGate(props) {
           </div>
         </>}
 
-        <div style={{ marginTop: 22, display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <Bo variant="ink" block onClick={props.onNew}>{accounts.length ? 'Add someone new' : 'Join the sweepstake'} →</Bo>
-          <button onClick={props.onFind} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 13.5, fontWeight: 800, color: 'var(--ink2)', textDecoration: 'underline', padding: '4px 0' }}>Already entered elsewhere? Find my entry</button>
-          <button onClick={props.onCode} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 13.5, fontWeight: 800, color: 'var(--ink2)', textDecoration: 'underline', padding: '4px 0' }}>Got a group code? Enter it here</button>
+        <div className="wc-sec" style={{ margin: '26px 4px 11px' }}><h3>{accounts.length ? 'Another league' : 'Get started'}</h3></div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <Bo variant="ink" block onClick={props.onJoin}>Join a league →</Bo>
+          <Bo variant="primary" block onClick={props.onCreate}>Create a new league →</Bo>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* =================== JOIN A LEAGUE =================== */
+function JoinLeague(props) {
+  const [code, setCode] = oState('');
+  const [pw, setPw] = oState('');
+  const [err, setErr] = oState('');
+  const [busy, setBusy] = oState(false);
+  const ok = code.trim().length >= 2 && pw.length > 0;
+
+  function submit() {
+    if (!ok || busy) return;
+    setBusy(true); setErr('');
+    So.joinLeague(code.trim(), pw).then(function (res) {
+      setBusy(false);
+      props.onJoined(res.league);
+    }).catch(function (e) {
+      setBusy(false);
+      setErr((e && e.message) || 'Could not join that league.');
+    });
+  }
+
+  return (
+    <div className="moment">
+      <div className="mscroll" style={{ padding: '30px 22px 28px' }}>
+        <button onClick={props.onBack} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, fontWeight: 800, color: 'var(--ink2)', padding: 0, marginBottom: 14 }}>← Back</button>
+        <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+          <Wo mood="mischievous" size={72} animate />
+          <div>
+            <div className="dh" style={{ fontSize: 24, lineHeight: 1 }}>Join a league</div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink2)', marginTop: 4 }}>Pop in the league code and password the organiser gave ye.</div>
+          </div>
+        </div>
+        <div style={{ marginTop: 20 }}>
+          <Lab>League code</Lab>
+          <input
+            autoFocus
+            style={{ ...inp, textTransform: 'uppercase', letterSpacing: '.14em', fontSize: 22, textAlign: 'center' }}
+            value={code}
+            onChange={e => { setCode(e.target.value); setErr(''); }}
+            placeholder="e.g. OFFICE26"
+            maxLength={12}
+          />
+        </div>
+        <div style={{ marginTop: 14 }}>
+          <Lab>Password</Lab>
+          <input
+            type="password"
+            style={inp}
+            value={pw}
+            onChange={e => { setPw(e.target.value); setErr(''); }}
+            onKeyDown={e => e.key === 'Enter' && submit()}
+            placeholder="League password"
+          />
+        </div>
+        {err && <div style={{ marginTop: 10, fontSize: 13, fontWeight: 700, color: 'var(--red)' }}>{err}</div>}
+        <div style={{ marginTop: 18 }}>
+          <Bo variant="ink" block onClick={submit}>{busy ? 'Checking…' : 'Join league →'}</Bo>
+        </div>
+        <button onClick={props.onCreate} style={{ width: '100%', marginTop: 12, background: 'none', border: 'none', cursor: 'pointer', fontSize: 13.5, fontWeight: 800, color: 'var(--ink2)', textDecoration: 'underline', padding: '4px 0' }}>No league yet? Create one</button>
+      </div>
+    </div>
+  );
+}
+
+/* =================== CREATE A LEAGUE =================== */
+function CreateLeague(props) {
+  const [name, setName] = oState('');
+  const [code, setCode] = oState('');
+  const [pw, setPw] = oState('');
+  const [err, setErr] = oState('');
+  const [busy, setBusy] = oState(false);
+  const cleanCode = code.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+  const ok = name.trim().length > 0 && cleanCode.length >= 2 && pw.length >= 4;
+
+  function submit() {
+    if (!ok || busy) return;
+    setBusy(true); setErr('');
+    So.createLeague(name.trim(), cleanCode, pw).then(function (res) {
+      setBusy(false);
+      props.onCreated(res.league);
+    }).catch(function (e) {
+      setBusy(false);
+      setErr((e && e.message) || 'Could not create that league.');
+    });
+  }
+
+  return (
+    <div className="moment">
+      <div className="mscroll" style={{ padding: '30px 22px 28px' }}>
+        <button onClick={props.onBack} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, fontWeight: 800, color: 'var(--ink2)', padding: 0, marginBottom: 14 }}>← Back</button>
+        <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+          <Wo mood="confident" size={72} animate />
+          <div>
+            <div className="dh" style={{ fontSize: 24, lineHeight: 1 }}>Create a league</div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink2)', marginTop: 4 }}>Ye'll be the organiser. Share the code + password with yer crew.</div>
+          </div>
+        </div>
+        <div style={{ marginTop: 20, display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div>
+            <Lab>League name</Lab>
+            <input autoFocus style={inp} value={name} onChange={e => { setName(e.target.value); setErr(''); }} placeholder="e.g. The Pub Quiz Crew" maxLength={60} />
+          </div>
+          <div>
+            <Lab>League code</Lab>
+            <input style={{ ...inp, textTransform: 'uppercase', letterSpacing: '.12em' }} value={code} onChange={e => { setCode(e.target.value); setErr(''); }} placeholder="e.g. PUBCREW" maxLength={12} />
+            <div style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--ink2)', marginTop: 4 }}>2–12 letters or numbers. People type this to join.</div>
+          </div>
+          <div>
+            <Lab>Password</Lab>
+            <input type="password" style={inp} value={pw} onChange={e => { setPw(e.target.value); setErr(''); }} onKeyDown={e => e.key === 'Enter' && submit()} placeholder="At least 4 characters" />
+          </div>
+        </div>
+        {err && <div style={{ marginTop: 10, fontSize: 13, fontWeight: 700, color: 'var(--red)' }}>{err}</div>}
+        <div style={{ marginTop: 18 }}>
+          <Bo variant="ink" block onClick={() => ok && submit()}>{busy ? 'Creating…' : 'Create & continue →'}</Bo>
         </div>
       </div>
     </div>
@@ -296,58 +419,11 @@ function ScotlandTakeover(props) {
   );
 }
 
-/* =================== OI CODE ENTRY =================== */
-function OICodeEntry(props) {
-  const [code, setCode] = oState('');
-  const [err, setErr] = oState(false);
-
-  function submit() {
-    if (code.trim().toUpperCase() === 'OI') {
-      props.onMatch();
-    } else {
-      setErr(true);
-    }
-  }
-
-  return (
-    <div className="moment">
-      <div className="mscroll" style={{ padding: '30px 22px 28px' }}>
-        <button onClick={props.onBack} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, fontWeight: 800, color: 'var(--ink2)', padding: 0, marginBottom: 14 }}>← Back</button>
-        <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-          <Wo mood="mischievous" size={72} animate />
-          <div>
-            <div className="dh" style={{ fontSize: 24, lineHeight: 1 }}>Group code</div>
-            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink2)', marginTop: 4 }}>Enter the code for your sweepstake group to see your pre-assigned team.</div>
-          </div>
-        </div>
-        <div style={{ marginTop: 20 }}>
-          <Lab>Your code</Lab>
-          <input
-            autoFocus
-            style={{ ...inp, textTransform: 'uppercase', letterSpacing: '.14em', fontSize: 24, textAlign: 'center' }}
-            value={code}
-            onChange={e => { setCode(e.target.value); setErr(false); }}
-            onKeyDown={e => e.key === 'Enter' && submit()}
-            placeholder="e.g. OI"
-            maxLength={8}
-          />
-        </div>
-        {err && <div style={{ marginTop: 10, fontSize: 13, fontWeight: 700, color: 'var(--red)' }}>
-          That code disnae ring a bell. Try again, or{' '}
-          <button onClick={props.onNew} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--red)', fontWeight: 700, fontSize: 13, padding: 0, textDecoration: 'underline' }}>sign up normally</button>.
-        </div>}
-        <div style={{ marginTop: 18 }}>
-          <Bo variant="ink" block onClick={submit}>Find my group →</Bo>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* =================== OI ROSTER PICKER =================== */
+/* =================== ROSTER PICKER (seeded leagues) =================== */
 function OIRosterPicker(props) {
   const all = So.allSync().filter(function(p) { return p.isOI; });
   const myIds = new Set(So.deviceIds());
+  const league = So.activeLeague ? So.activeLeague() : null;
 
   return (
     <div className="moment">
@@ -357,7 +433,7 @@ function OIRosterPicker(props) {
           <Wo mood="confident" size={64} animate />
           <div>
             <div className="dh" style={{ fontSize: 24, lineHeight: 1 }}>Who are ye?</div>
-            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink2)', marginTop: 4 }}>Your team's already been drawn. Find yer name and tap it — Wheesht'll do the rest.</div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink2)', marginTop: 4 }}>{league ? league.name + ' — y' : 'Y'}our team's already been drawn. Find yer name and tap it.</div>
           </div>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -395,4 +471,4 @@ function OIRosterPicker(props) {
   );
 }
 
-Object.assign(window, { AccountGate, FindMyEntry, OnboardingForm, DrawMoment, ScotlandTakeover, OICodeEntry, OIRosterPicker });
+Object.assign(window, { AccountGate, JoinLeague, CreateLeague, FindMyEntry, OnboardingForm, DrawMoment, ScotlandTakeover, OIRosterPicker });
