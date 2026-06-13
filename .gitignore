@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Runtime data (participant store is generated at runtime)
+data/
+
+# Build vendor deps (large third-party; see scripts/vendor/README.md)
+scripts/vendor/react.development.js
+scripts/vendor/react-dom.development.js
+scripts/vendor/babel.min.js
+scripts/vendor/fonts_inline.css
+
+# Design export checked in by the prototype tool — not source
+World Cup Sweepstake.zip
+
+# Debug page
+static/diag.html

@@ -252,17 +252,8 @@ button{font-family:inherit;}
 
 
 
-
-<script>
-window.__errors = [];
-window.onerror = function(msg, src, line, col, err) {
-  window.__errors.push((err ? err.toString() : msg) + ' (' + (src||'').split('/').pop() + ':' + line + ')');
-  var r = document.getElementById('root');
-  if (r) r.innerHTML = '<div style="padding:20px;font:13px/1.5 monospace;color:#c00;background:#fff;border-radius:12px;margin:16px">' +
-    '<b>JS Error — report to dev:</b><br>' + window.__errors.map(function(e){return e.replace(/</g,'&lt;');}).join('<br>') + '</div>';
-  return false;
-};
-</script>
+<!-- Single source of truth: generated from wc_data.py by scripts/build_snapshot.py.
+     No-op when the server injects window.WC_DATA above (live mode). -->
 
 <script>
 /**
@@ -33540,184 +33531,22 @@ window.onerror = function(msg, src, line, col, err) {
 </script>
 
 <script>
-(function(){
-  function fit(){
-    var s=document.getElementById('scaler'); if(!s)return;
-    var pad=24;
-    var sc=Math.min((window.innerWidth-pad)/402,(window.innerHeight-pad)/872);
-    sc=Math.min(sc,1.18); s.style.transform='scale('+sc+')';
-  }
-  window.addEventListener('resize',fit); fit(); setTimeout(fit,200);
-})();
+(function(){function fit(){var s=document.getElementById('scaler');if(!s)return;var pad=24;var sc=Math.min((window.innerWidth-pad)/402,(window.innerHeight-pad)/872);sc=Math.min(sc,1.18);s.style.transform='scale('+sc+')';}window.addEventListener('resize',fit);fit();setTimeout(fit,200);})();
 </script>
 
 <script>
 /* ===========================================================================
-   MOCK DATA — self-contained fallback so the app runs with no backend.
-   In production main.py injects window.WC_DATA before this file; the `||`
-   keeps the real data. With no server (static preview / "mock mode") this
-   seed boots the app instead. Shape matches wc_data.generate_wc_data().
+   GENERATED FILE — DO NOT EDIT BY HAND.
+   Source of truth: wc_data.py (generate_wc_data()).
+   Regenerate:      python scripts/build_snapshot.py
+
+   Front-end data fallback. When a server injects window.WC_DATA (live mode),
+   this file is a no-op; with no server (static preview / standalone offline)
+   it seeds the same data the server would. One source, no drift.
    =========================================================================== */
 (function () {
   if (window.WC_DATA) return; // server already injected real data
-
-  var TEAMS_RAW = [
-    ['Mexico','MEX','🇲🇽','A','#1a7a44','+6000','r16'],['South Korea','KOR','🇰🇷','A','#d2143c','+20000','out-r32'],
-    ['South Africa','RSA','🇿🇦','A','#0a7b3e','+50000','out-group'],['Czechia','CZE','🇨🇿','A','#11457e','+30000','out-group'],
-    ['Canada','CAN','🇨🇦','B','#d52b1e','+22500','out-group'],['Switzerland','SUI','🇨🇭','B','#d52b1e','+15000','out-r32'],
-    ['Qatar','QAT','🇶🇦','B','#7a1737','+50000','out-group'],['Bosnia & Herz.','BIH','🇧🇦','B','#0a3b8c','+40000','out-group'],
-    ['Brazil','BRA','🇧🇷','C','#f7c600','+850','r16'],['Morocco','MAR','🇲🇦','C','#c1272d','+5000','out-r16'],
-    ['Scotland','SCO','🏴󠁧󠁢󠁳󠁣󠁴󠁿','C','#0a3b8c','+30000','out-r32'],['Haiti','HAI','🇭🇹','C','#00209f','+100000','out-group'],
-    ['USA','USA','🇺🇸','D','#0a3161','+6000','out-r32'],['Paraguay','PAR','🇵🇾','D','#d52b1e','+25000','out-r32'],
-    ['Australia','AUS','🇦🇺','D','#0a7b3e','+20000','out-r32'],['Türkiye','TUR','🇹🇷','D','#e30a17','+15000','out-group'],
-    ['Germany','GER','🇩🇪','E','#1a1a1a','+1400','r16'],['Ecuador','ECU','🇪🇨','E','#ffd100','+12000','out-r32'],
-    ['Ivory Coast','CIV','🇨🇮','E','#f77f00','+15000','out-r32'],['Curaçao','CUW','🇨🇼','E','#002b7f','+100000','out-group'],
-    ['Netherlands','NED','🇳🇱','F','#ec6608','+2200','r16'],['Japan','JPN','🇯🇵','F','#bc002d','+6600','r16'],
-    ['Tunisia','TUN','🇹🇳','F','#e70013','+40000','out-group'],['Sweden','SWE','🇸🇪','F','#005b99','+12000','out-r32'],
-    ['Belgium','BEL','🇧🇪','G','#c8102e','+3500','out-r32'],['Iran','IRN','🇮🇷','G','#cf1020','+30000','out-r32'],
-    ['Egypt','EGY','🇪🇬','G','#c8102e','+20000','out-r32'],['New Zealand','NZL','🇳🇿','G','#1a1a1a','+50000','out-group'],
-    ['Spain','ESP','🇪🇸','H','#c60b1e','+450','qf'],['Uruguay','URU','🇺🇾','H','#5b9ad5','+4000','r16'],
-    ['Saudi Arabia','KSA','🇸🇦','H','#0a7b3e','+50000','out-r32'],['Cape Verde','CPV','🇨🇻','H','#0a3b8c','+80000','out-group'],
-    ['France','FRA','🇫🇷','I','#0a2472','+500','r16'],['Senegal','SEN','🇸🇳','I','#0a7b3e','+6600','r16'],
-    ['Norway','NOR','🇳🇴','I','#c8102e','+3500','qf'],['Iraq','IRQ','🇮🇶','I','#1a1a1a','+100000','out-group'],
-    ['Argentina','ARG','🇦🇷','J','#6cace4','+1000','r16'],['Austria','AUT','🇦🇹','J','#c8102e','+12000','out-r32'],
-    ['Algeria','ALG','🇩🇿','J','#0a7b3e','+25000','out-group'],['Jordan','JOR','🇯🇴','J','#1a1a1a','+80000','out-group'],
-    ['Portugal','POR','🇵🇹','K','#c8102e','+900','r16'],['Colombia','COL','🇨🇴','K','#ffd100','+4000','r16'],
-    ['Uzbekistan','UZB','🇺🇿','K','#0a7b3e','+50000','out-r32'],['DR Congo','COD','🇨🇩','K','#3aa0d8','+60000','out-group'],
-    ['England','ENG','🏴󠁧󠁢󠁥󠁮󠁧󠁿','L','#1a1a1a','+650','out-r16'],['Croatia','CRO','🇭🇷','L','#d2143c','+6600','r16'],
-    ['Panama','PAN','🇵🇦','L','#0a3b8c','+50000','out-r32'],['Ghana','GHA','🇬🇭','L','#0a7b3e','+40000','out-group']
-  ];
-  var STAGE_ROUNDS = { 'out-group':1, 'out-r32':2, 'out-r16':3, 'r16':3, 'qf':4 };
-
-  var teams = [], byCode = {};
-  TEAMS_RAW.forEach(function (r) {
-    // Pre-tournament: not a ball kicked yet — everyone's still in.
-    var t = { name:r[0], code:r[1], flag:r[2], group:r[3], color:r[4], odds:r[5],
-      stage:'group', alive:true, rounds:0 };
-    teams.push(t); byCode[r[1]] = t;
-  });
-
-  // seeded PRNG
-  function mulberry32(a){ return function(){ a|=0; a=a+0x6D2B79F5|0; var t=Math.imul(a^a>>>15,1|a); t=t+Math.imul(t^t>>>7,61|t)^t; return ((t^t>>>14)>>>0)/4294967296; }; }
-  var rng = mulberry32(20260611);
-  function pick(arr){ return arr[(rng()*arr.length)|0]; }
-
-  var FIRST=['Davie','Sarah','Mo','Priya','Callum','Aisha','Greg','Niamh','Tom','Iqra','Stuart','Bex','Liam','Hannah','Fraser','Jade','Connor','Ruth','Ali','Nina','Jonny','Eilidh','Rab','Chloe','Sam','Leah','Kev','Maya','Doug','Farah','Andy','Grace','Roisin','Pete','Suki','Hamish','Tara','Marcus','Lena','Orla','Jacob','Mei','Finlay','Zara','Owen','Carla','Dean','Anya','Gus','Polly','Reece','Imo','Nathan','Saoirse','Bobby','Yusuf','Lottie','Kai','Murray','Dani','Theo','Effie','Joe','Nadia','Will','Archie','Bea'];
-  var LAST=['M.','T.','K.','R.','P.','B.','C.','S.','D.','G.','H.','N.','J.','W.','Mc.','F.'];
-  var FEMALE={Sarah:1,Priya:1,Aisha:1,Niamh:1,Iqra:1,Bex:1,Hannah:1,Jade:1,Ruth:1,Nina:1,Eilidh:1,Chloe:1,Leah:1,Maya:1,Farah:1,Grace:1,Roisin:1,Suki:1,Tara:1,Lena:1,Orla:1,Mei:1,Zara:1,Carla:1,Anya:1,Polly:1,Imo:1,Saoirse:1,Lottie:1,Dani:1,Effie:1,Nadia:1,Bea:1};
-  var DEPTS=['Engineering','Product','Design','Sales','Marketing','Finance','Legal','People','Operations','Data','Support','Delivery'];
-  var COLORS=['#E8272A','#1a7a44','#0a3b8c','#7A3FB0','#E07A1A','#0d8a8a','#C0246B','#3a6ea5'];
-
-  function initials(n){ var c=n.replace(/Wee |Big /g,''); var p=c.split(' '); var i=p[0]?p[0][0]:'?'; if(p[1]&&/[a-z]/i.test(p[1][0])) i+=p[1][0]; return i.toUpperCase(); }
-
-  // BLANK SLATE — no participants. Real sign-ups populate the field; the pot
-  // and contestant count grow from zero with every entry.
-  var people = [];
-
-  // No knockout fixtures yet — the group stage hasn't started.
-  var r16 = [];
-
-  // -------- upcoming games tracker: full group-stage fixture list ----------
-  // Generated from the 12 groups (each team plays the other three). Dates are
-  // spread across the group-stage window so the tracker has a real schedule to
-  // count down to. Status flips to 'live'/'done' as results are recorded.
-  var GROUPS_ORDER = ['A','B','C','D','E','F','G','H','I','J','K','L'];
-  var VENUES = ['MetLife Stadium, NJ','SoFi Stadium, LA','AT&T Stadium, Dallas','Mercedes-Benz, Atlanta','Lincoln Financial, Philadelphia',
-    'Gillette Stadium, Boston','Levi\'s Stadium, SF Bay','Hard Rock Stadium, Miami','NRG Stadium, Houston','Arrowhead, Kansas City',
-    'Lumen Field, Seattle','BMO Field, Toronto','BC Place, Vancouver','Estadio Azteca, Mexico City','Estadio Akron, Guadalajara','Estadio BBVA, Monterrey'];
-  var DOW = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-  var MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  function dLabel(d){ return DOW[d.getDay()]+' '+d.getDate()+' '+MON[d.getMonth()]; }
-  // round-robin pairings within a group of 4 (indexes), by matchday
-  var RR = [[[0,1],[2,3]],[[0,2],[3,1]],[[0,3],[1,2]]];
-  var START = new Date(2026,5,11);   // Thu 11 Jun 2026
-  var TIMES = ['16:00','19:00','22:00'];
-  var fixtures = [], vi = 0, fid = 0;
-  GROUPS_ORDER.forEach(function(g, gi){
-    var gteams = teams.filter(function(t){ return t.group===g; });
-    if (gteams.length < 4) return;
-    for (var md=0; md<3; md++){
-      var dayOffset = md*6 + Math.floor(gi/2);   // MD1 d0-5, MD2 d6-11, MD3 d12-17
-      var date = new Date(START); date.setDate(START.getDate()+dayOffset);
-      RR[md].forEach(function(pair, pidx){
-        var a = gteams[pair[0]], b = gteams[pair[1]];
-        fixtures.push({
-          id:'f'+(fid++), group:g, matchday:md+1,
-          a:a.code, b:b.code,
-          dateISO: date.toISOString().slice(0,10),
-          dateLabel: dLabel(date),
-          time: TIMES[(gi + pidx) % 3],
-          venue: VENUES[vi++ % VENUES.length],
-          status:'upcoming', score:null
-        });
-      });
-    }
-  });
-  fixtures.sort(function(x,y){ return x.dateISO===y.dateISO ? (x.time<y.time?-1:1) : (x.dateISO<y.dateISO?-1:1); });
-
-  // -------- predictions catalogue --------
-  // Pre-tournament: every market is open (answer:null). Results get filled in
-  // as the tournament unfolds; Store grades each pick against the answer.
-  var PREDICTIONS = [
-    { key:'winner', q:'Tournament Winner', kind:'team', points:25, answer:null,
-      options:['ESP','FRA','BRA','ARG','GER','POR'] },
-    { key:'final', q:'The Final Matchup', kind:'team2', points:15, answer:null,
-      options:['ESP','FRA','BRA','ARG'] },
-    { key:'goldenBoot', q:'Golden Boot Winner', kind:'player', points:15, answer:null,
-      options:[{id:'mbappe',name:'K. Mbappé',team:'FRA'},{id:'yamal',name:'L. Yamal',team:'ESP'},{id:'haaland',name:'E. Haaland',team:'NOR'},{id:'vini',name:'Vinícius Jr',team:'BRA'}] },
-    { key:'scotland', q:'How far do Scotland go?', kind:'stage', points:10, answer:null,
-      options:['Group stage','Round of 32','Round of 16','Quarter Final','Semi Final','Final','Winner'] },
-    { key:'england', q:'How far do England go?', kind:'stage', points:10, answer:null,
-      options:['Group stage','Round of 32','Round of 16','Quarter Final','Semi Final','Final','Winner'] },
-    { key:'surprise', q:'Biggest Surprise Team', kind:'team', points:10, answer:null,
-      options:['NOR','MAR','SEN','JPN','CRO','COL'] },
-    { key:'flop', q:'Biggest Disappointment', kind:'team', points:10, answer:null,
-      options:['ENG','BEL','GER','USA','BRA'] },
-    { key:'cleanSheets', q:'Most Clean Sheets', kind:'team', points:10, answer:null,
-      options:['ESP','BRA','ARG','FRA'] },
-    { key:'youngPlayer', q:'Best Young Player', kind:'player', points:10, answer:null,
-      options:[{id:'yamal',name:'L. Yamal',team:'ESP'},{id:'yildiz',name:'K. Yıldız',team:'TUR'},{id:'endrick',name:'Endrick',team:'BRA'},{id:'wirtz',name:'F. Wirtz',team:'GER'}] }
-  ];
-
-  var lines = {
-    welcome:"Right. Let's get this started. Wheesht is watching.",
-    drawGood:"Oh aye. That's a tidy wee team. Ye might actually do something wi' that.",
-    drawMid:"Could be worse. Could be better. Wheesht is reserving judgement.",
-    drawBad:"…Wheesht is not going to insult ye. The flag's nice though.",
-    england:"…Interesting. Wheesht is remaining professional. We'll see.",
-    scotland:"SCOTLAND. The homeland. In a group with Brazil, mind — but Wheesht believes. Wheesht needs a minute. Then a parade.",
-    eliminated:"Ye've been eliminated. Wheesht is… sorry. (Wheesht is not sorry. Wheesht saw this coming.)",
-    predOpen:"Predictions are open. Back yerself. Wheesht will remember every single one.",
-    predLocked:"Predictions are locked. No takebacks. Wheesht has yer answers in writing.",
-    empty:"Nothing here yet. Wheesht is watching the space.",
-    error:"Something went wrong. Wheesht is investigating. Wheesht suspects foul play."
-  };
-
-  var fee = 5, pot = 0;               // pot starts empty, grows per sign-up
-  var still=0, out=0, tl=teams.length;
-
-  window.WC_DATA = {
-    teams: teams,
-    people: people,
-    r16: r16,
-    fixtures: fixtures,
-    predictions: PREDICTIONS,
-    fee: fee, pot: pot,
-    payouts: [
-      {place:'Winner', pct:0.55, label:'holds the champion'},
-      {place:'Runner-up', pct:0.20, label:'holds the losing finalist'},
-      {place:'Prediction champ', pct:0.13, label:'best prediction score'},
-      {place:'Wooden spoon', pct:0.12, label:'first team eliminated'}
-    ],
-    lines: lines,
-    meta: {
-      name:'The Office Sweepstake', season:'World Cup 2026', stageLabel:'Group Stage',
-      phase:'pre', maxTeams: teams.length,
-      groupSize: people.length, stillIn: still, out: out, teamsLeft: tl,
-      kickoff:'Thu 11 June', finalVenue:'MetLife Stadium, New Jersey', finalDate:'Sun 19 July',
-      predictionsLocked: false
-    }
-  };
+  window.WC_DATA = {"teams":[{"name":"Mexico","code":"MEX","flag":"🇲🇽","group":"A","color":"#1a7a44","odds":"+6000","stage":"group","alive":true,"rounds":0},{"name":"South Korea","code":"KOR","flag":"🇰🇷","group":"A","color":"#d2143c","odds":"+20000","stage":"group","alive":true,"rounds":0},{"name":"South Africa","code":"RSA","flag":"🇿🇦","group":"A","color":"#0a7b3e","odds":"+50000","stage":"group","alive":true,"rounds":0},{"name":"Czechia","code":"CZE","flag":"🇨🇿","group":"A","color":"#11457e","odds":"+30000","stage":"group","alive":true,"rounds":0},{"name":"Canada","code":"CAN","flag":"🇨🇦","group":"B","color":"#d52b1e","odds":"+22500","stage":"group","alive":true,"rounds":0},{"name":"Switzerland","code":"SUI","flag":"🇨🇭","group":"B","color":"#d52b1e","odds":"+15000","stage":"group","alive":true,"rounds":0},{"name":"Qatar","code":"QAT","flag":"🇶🇦","group":"B","color":"#7a1737","odds":"+50000","stage":"group","alive":true,"rounds":0},{"name":"Bosnia & Herzegovina","code":"BIH","flag":"🇧🇦","group":"B","color":"#0a3b8c","odds":"+40000","stage":"group","alive":true,"rounds":0},{"name":"Brazil","code":"BRA","flag":"🇧🇷","group":"C","color":"#f7c600","odds":"+850","stage":"group","alive":true,"rounds":0},{"name":"Morocco","code":"MAR","flag":"🇲🇦","group":"C","color":"#c1272d","odds":"+5000","stage":"group","alive":true,"rounds":0},{"name":"Scotland","code":"SCO","flag":"🏴󠁧󠁢󠁳󠁣󠁴󠁿","group":"C","color":"#0a3b8c","odds":"+30000","stage":"group","alive":true,"rounds":0},{"name":"Haiti","code":"HAI","flag":"🇭🇹","group":"C","color":"#00209f","odds":"+100000","stage":"group","alive":true,"rounds":0},{"name":"USA","code":"USA","flag":"🇺🇸","group":"D","color":"#0a3161","odds":"+6000","stage":"group","alive":true,"rounds":0},{"name":"Paraguay","code":"PAR","flag":"🇵🇾","group":"D","color":"#d52b1e","odds":"+25000","stage":"group","alive":true,"rounds":0},{"name":"Australia","code":"AUS","flag":"🇦🇺","group":"D","color":"#0a7b3e","odds":"+20000","stage":"group","alive":true,"rounds":0},{"name":"Türkiye","code":"TUR","flag":"🇹🇷","group":"D","color":"#e30a17","odds":"+15000","stage":"group","alive":true,"rounds":0},{"name":"Germany","code":"GER","flag":"🇩🇪","group":"E","color":"#1a1a1a","odds":"+1400","stage":"group","alive":true,"rounds":0},{"name":"Ecuador","code":"ECU","flag":"🇪🇨","group":"E","color":"#ffd100","odds":"+12000","stage":"group","alive":true,"rounds":0},{"name":"Ivory Coast","code":"CIV","flag":"🇨🇮","group":"E","color":"#f77f00","odds":"+15000","stage":"group","alive":true,"rounds":0},{"name":"Curaçao","code":"CUW","flag":"🇨🇼","group":"E","color":"#002b7f","odds":"+100000","stage":"group","alive":true,"rounds":0},{"name":"Netherlands","code":"NED","flag":"🇳🇱","group":"F","color":"#ec6608","odds":"+2200","stage":"group","alive":true,"rounds":0},{"name":"Japan","code":"JPN","flag":"🇯🇵","group":"F","color":"#bc002d","odds":"+6600","stage":"group","alive":true,"rounds":0},{"name":"Tunisia","code":"TUN","flag":"🇹🇳","group":"F","color":"#e70013","odds":"+40000","stage":"group","alive":true,"rounds":0},{"name":"Sweden","code":"SWE","flag":"🇸🇪","group":"F","color":"#005b99","odds":"+12000","stage":"group","alive":true,"rounds":0},{"name":"Belgium","code":"BEL","flag":"🇧🇪","group":"G","color":"#c8102e","odds":"+3500","stage":"group","alive":true,"rounds":0},{"name":"Iran","code":"IRN","flag":"🇮🇷","group":"G","color":"#cf1020","odds":"+30000","stage":"group","alive":true,"rounds":0},{"name":"Egypt","code":"EGY","flag":"🇪🇬","group":"G","color":"#c8102e","odds":"+20000","stage":"group","alive":true,"rounds":0},{"name":"New Zealand","code":"NZL","flag":"🇳🇿","group":"G","color":"#1a1a1a","odds":"+50000","stage":"group","alive":true,"rounds":0},{"name":"Spain","code":"ESP","flag":"🇪🇸","group":"H","color":"#c60b1e","odds":"+450","stage":"group","alive":true,"rounds":0},{"name":"Uruguay","code":"URU","flag":"🇺🇾","group":"H","color":"#5b9ad5","odds":"+4000","stage":"group","alive":true,"rounds":0},{"name":"Saudi Arabia","code":"KSA","flag":"🇸🇦","group":"H","color":"#0a7b3e","odds":"+50000","stage":"group","alive":true,"rounds":0},{"name":"Cape Verde","code":"CPV","flag":"🇨🇻","group":"H","color":"#0a3b8c","odds":"+80000","stage":"group","alive":true,"rounds":0},{"name":"France","code":"FRA","flag":"🇫🇷","group":"I","color":"#0a2472","odds":"+500","stage":"group","alive":true,"rounds":0},{"name":"Senegal","code":"SEN","flag":"🇸🇳","group":"I","color":"#0a7b3e","odds":"+6600","stage":"group","alive":true,"rounds":0},{"name":"Norway","code":"NOR","flag":"🇳🇴","group":"I","color":"#c8102e","odds":"+3500","stage":"group","alive":true,"rounds":0},{"name":"Iraq","code":"IRQ","flag":"🇮🇶","group":"I","color":"#1a1a1a","odds":"+100000","stage":"group","alive":true,"rounds":0},{"name":"Argentina","code":"ARG","flag":"🇦🇷","group":"J","color":"#6cace4","odds":"+1000","stage":"group","alive":true,"rounds":0},{"name":"Austria","code":"AUT","flag":"🇦🇹","group":"J","color":"#c8102e","odds":"+12000","stage":"group","alive":true,"rounds":0},{"name":"Algeria","code":"ALG","flag":"🇩🇿","group":"J","color":"#0a7b3e","odds":"+25000","stage":"group","alive":true,"rounds":0},{"name":"Jordan","code":"JOR","flag":"🇯🇴","group":"J","color":"#1a1a1a","odds":"+80000","stage":"group","alive":true,"rounds":0},{"name":"Portugal","code":"POR","flag":"🇵🇹","group":"K","color":"#c8102e","odds":"+900","stage":"group","alive":true,"rounds":0},{"name":"Colombia","code":"COL","flag":"🇨🇴","group":"K","color":"#ffd100","odds":"+4000","stage":"group","alive":true,"rounds":0},{"name":"Uzbekistan","code":"UZB","flag":"🇺🇿","group":"K","color":"#0a7b3e","odds":"+50000","stage":"group","alive":true,"rounds":0},{"name":"DR Congo","code":"COD","flag":"🇨🇩","group":"K","color":"#3aa0d8","odds":"+60000","stage":"group","alive":true,"rounds":0},{"name":"England","code":"ENG","flag":"🏴󠁧󠁢󠁥󠁮󠁧󠁿","group":"L","color":"#1a1a1a","odds":"+650","stage":"group","alive":true,"rounds":0},{"name":"Croatia","code":"CRO","flag":"🇭🇷","group":"L","color":"#d2143c","odds":"+6600","stage":"group","alive":true,"rounds":0},{"name":"Panama","code":"PAN","flag":"🇵🇦","group":"L","color":"#0a3b8c","odds":"+50000","stage":"group","alive":true,"rounds":0},{"name":"Ghana","code":"GHA","flag":"🇬🇭","group":"L","color":"#0a7b3e","odds":"+40000","stage":"group","alive":true,"rounds":0}],"people":[],"r16":[],"fixtures":[{"id":"f0","group":"A","matchday":1,"a":"MEX","b":"KOR","dateISO":"2026-06-11","dateLabel":"Thu 11 Jun","time":"16:00","venue":"MetLife Stadium, NJ","status":"upcoming","score":null},{"id":"f1","group":"A","matchday":1,"a":"RSA","b":"CZE","dateISO":"2026-06-11","dateLabel":"Thu 11 Jun","time":"19:00","venue":"SoFi Stadium, LA","status":"upcoming","score":null},{"id":"f6","group":"B","matchday":1,"a":"CAN","b":"SUI","dateISO":"2026-06-11","dateLabel":"Thu 11 Jun","time":"19:00","venue":"Levi's Stadium, SF Bay","status":"upcoming","score":null},{"id":"f7","group":"B","matchday":1,"a":"QAT","b":"BIH","dateISO":"2026-06-11","dateLabel":"Thu 11 Jun","time":"22:00","venue":"Hard Rock Stadium, Miami","status":"upcoming","score":null},{"id":"f13","group":"C","matchday":1,"a":"SCO","b":"HAI","dateISO":"2026-06-12","dateLabel":"Fri 12 Jun","time":"16:00","venue":"Estadio Azteca, Mexico City","status":"upcoming","score":null},{"id":"f18","group":"D","matchday":1,"a":"USA","b":"PAR","dateISO":"2026-06-12","dateLabel":"Fri 12 Jun","time":"16:00","venue":"AT&T Stadium, Dallas","status":"upcoming","score":null},{"id":"f19","group":"D","matchday":1,"a":"AUS","b":"TUR","dateISO":"2026-06-12","dateLabel":"Fri 12 Jun","time":"19:00","venue":"Mercedes-Benz, Atlanta","status":"upcoming","score":null},{"id":"f12","group":"C","matchday":1,"a":"BRA","b":"MAR","dateISO":"2026-06-12","dateLabel":"Fri 12 Jun","time":"22:00","venue":"BC Place, Vancouver","status":"upcoming","score":null},{"id":"f31","group":"F","matchday":1,"a":"TUN","b":"SWE","dateISO":"2026-06-13","dateLabel":"Sat 13 Jun","time":"16:00","venue":"Estadio BBVA, Monterrey","status":"upcoming","score":null},{"id":"f24","group":"E","matchday":1,"a":"GER","b":"ECU","dateISO":"2026-06-13","dateLabel":"Sat 13 Jun","time":"19:00","venue":"NRG Stadium, Houston","status":"upcoming","score":null},{"id":"f25","group":"E","matchday":1,"a":"CIV","b":"CUW","dateISO":"2026-06-13","dateLabel":"Sat 13 Jun","time":"22:00","venue":"Arrowhead, Kansas City","status":"upcoming","score":null},{"id":"f30","group":"F","matchday":1,"a":"NED","b":"JPN","dateISO":"2026-06-13","dateLabel":"Sat 13 Jun","time":"22:00","venue":"Estadio Akron, Guadalajara","status":"upcoming","score":null},{"id":"f36","group":"G","matchday":1,"a":"BEL","b":"IRN","dateISO":"2026-06-14","dateLabel":"Sun 14 Jun","time":"16:00","venue":"Lincoln Financial, Philadelphia","status":"upcoming","score":null},{"id":"f37","group":"G","matchday":1,"a":"EGY","b":"NZL","dateISO":"2026-06-14","dateLabel":"Sun 14 Jun","time":"19:00","venue":"Gillette Stadium, Boston","status":"upcoming","score":null},{"id":"f42","group":"H","matchday":1,"a":"ESP","b":"URU","dateISO":"2026-06-14","dateLabel":"Sun 14 Jun","time":"19:00","venue":"Lumen Field, Seattle","status":"upcoming","score":null},{"id":"f43","group":"H","matchday":1,"a":"KSA","b":"CPV","dateISO":"2026-06-14","dateLabel":"Sun 14 Jun","time":"22:00","venue":"BMO Field, Toronto","status":"upcoming","score":null},{"id":"f49","group":"I","matchday":1,"a":"NOR","b":"IRQ","dateISO":"2026-06-15","dateLabel":"Mon 15 Jun","time":"16:00","venue":"SoFi Stadium, LA","status":"upcoming","score":null},{"id":"f54","group":"J","matchday":1,"a":"ARG","b":"AUT","dateISO":"2026-06-15","dateLabel":"Mon 15 Jun","time":"16:00","venue":"Levi's Stadium, SF Bay","status":"upcoming","score":null},{"id":"f55","group":"J","matchday":1,"a":"ALG","b":"JOR","dateISO":"2026-06-15","dateLabel":"Mon 15 Jun","time":"19:00","venue":"Hard Rock Stadium, Miami","status":"upcoming","score":null},{"id":"f48","group":"I","matchday":1,"a":"FRA","b":"SEN","dateISO":"2026-06-15","dateLabel":"Mon 15 Jun","time":"22:00","venue":"MetLife Stadium, NJ","status":"upcoming","score":null},{"id":"f67","group":"L","matchday":1,"a":"PAN","b":"GHA","dateISO":"2026-06-16","dateLabel":"Tue 16 Jun","time":"16:00","venue":"Mercedes-Benz, Atlanta","status":"upcoming","score":null},{"id":"f60","group":"K","matchday":1,"a":"POR","b":"COL","dateISO":"2026-06-16","dateLabel":"Tue 16 Jun","time":"19:00","venue":"BC Place, Vancouver","status":"upcoming","score":null},{"id":"f61","group":"K","matchday":1,"a":"UZB","b":"COD","dateISO":"2026-06-16","dateLabel":"Tue 16 Jun","time":"22:00","venue":"Estadio Azteca, Mexico City","status":"upcoming","score":null},{"id":"f66","group":"L","matchday":1,"a":"ENG","b":"CRO","dateISO":"2026-06-16","dateLabel":"Tue 16 Jun","time":"22:00","venue":"AT&T Stadium, Dallas","status":"upcoming","score":null},{"id":"f2","group":"A","matchday":2,"a":"MEX","b":"RSA","dateISO":"2026-06-17","dateLabel":"Wed 17 Jun","time":"16:00","venue":"AT&T Stadium, Dallas","status":"upcoming","score":null},{"id":"f3","group":"A","matchday":2,"a":"CZE","b":"KOR","dateISO":"2026-06-17","dateLabel":"Wed 17 Jun","time":"19:00","venue":"Mercedes-Benz, Atlanta","status":"upcoming","score":null},{"id":"f8","group":"B","matchday":2,"a":"CAN","b":"QAT","dateISO":"2026-06-17","dateLabel":"Wed 17 Jun","time":"19:00","venue":"NRG Stadium, Houston","status":"upcoming","score":null},{"id":"f9","group":"B","matchday":2,"a":"BIH","b":"SUI","dateISO":"2026-06-17","dateLabel":"Wed 17 Jun","time":"22:00","venue":"Arrowhead, Kansas City","status":"upcoming","score":null},{"id":"f15","group":"C","matchday":2,"a":"HAI","b":"MAR","dateISO":"2026-06-18","dateLabel":"Thu 18 Jun","time":"16:00","venue":"Estadio BBVA, Monterrey","status":"upcoming","score":null},{"id":"f20","group":"D","matchday":2,"a":"USA","b":"AUS","dateISO":"2026-06-18","dateLabel":"Thu 18 Jun","time":"16:00","venue":"Lincoln Financial, Philadelphia","status":"upcoming","score":null},{"id":"f21","group":"D","matchday":2,"a":"TUR","b":"PAR","dateISO":"2026-06-18","dateLabel":"Thu 18 Jun","time":"19:00","venue":"Gillette Stadium, Boston","status":"upcoming","score":null},{"id":"f14","group":"C","matchday":2,"a":"BRA","b":"SCO","dateISO":"2026-06-18","dateLabel":"Thu 18 Jun","time":"22:00","venue":"Estadio Akron, Guadalajara","status":"upcoming","score":null},{"id":"f33","group":"F","matchday":2,"a":"SWE","b":"JPN","dateISO":"2026-06-19","dateLabel":"Fri 19 Jun","time":"16:00","venue":"SoFi Stadium, LA","status":"upcoming","score":null},{"id":"f26","group":"E","matchday":2,"a":"GER","b":"CIV","dateISO":"2026-06-19","dateLabel":"Fri 19 Jun","time":"19:00","venue":"Lumen Field, Seattle","status":"upcoming","score":null},{"id":"f27","group":"E","matchday":2,"a":"CUW","b":"ECU","dateISO":"2026-06-19","dateLabel":"Fri 19 Jun","time":"22:00","venue":"BMO Field, Toronto","status":"upcoming","score":null},{"id":"f32","group":"F","matchday":2,"a":"NED","b":"TUN","dateISO":"2026-06-19","dateLabel":"Fri 19 Jun","time":"22:00","venue":"MetLife Stadium, NJ","status":"upcoming","score":null},{"id":"f38","group":"G","matchday":2,"a":"BEL","b":"EGY","dateISO":"2026-06-20","dateLabel":"Sat 20 Jun","time":"16:00","venue":"Levi's Stadium, SF Bay","status":"upcoming","score":null},{"id":"f39","group":"G","matchday":2,"a":"NZL","b":"IRN","dateISO":"2026-06-20","dateLabel":"Sat 20 Jun","time":"19:00","venue":"Hard Rock Stadium, Miami","status":"upcoming","score":null},{"id":"f44","group":"H","matchday":2,"a":"ESP","b":"KSA","dateISO":"2026-06-20","dateLabel":"Sat 20 Jun","time":"19:00","venue":"BC Place, Vancouver","status":"upcoming","score":null},{"id":"f45","group":"H","matchday":2,"a":"CPV","b":"URU","dateISO":"2026-06-20","dateLabel":"Sat 20 Jun","time":"22:00","venue":"Estadio Azteca, Mexico City","status":"upcoming","score":null},{"id":"f51","group":"I","matchday":2,"a":"IRQ","b":"SEN","dateISO":"2026-06-21","dateLabel":"Sun 21 Jun","time":"16:00","venue":"Mercedes-Benz, Atlanta","status":"upcoming","score":null},{"id":"f56","group":"J","matchday":2,"a":"ARG","b":"ALG","dateISO":"2026-06-21","dateLabel":"Sun 21 Jun","time":"16:00","venue":"NRG Stadium, Houston","status":"upcoming","score":null},{"id":"f57","group":"J","matchday":2,"a":"JOR","b":"AUT","dateISO":"2026-06-21","dateLabel":"Sun 21 Jun","time":"19:00","venue":"Arrowhead, Kansas City","status":"upcoming","score":null},{"id":"f50","group":"I","matchday":2,"a":"FRA","b":"NOR","dateISO":"2026-06-21","dateLabel":"Sun 21 Jun","time":"22:00","venue":"AT&T Stadium, Dallas","status":"upcoming","score":null},{"id":"f69","group":"L","matchday":2,"a":"GHA","b":"CRO","dateISO":"2026-06-22","dateLabel":"Mon 22 Jun","time":"16:00","venue":"Gillette Stadium, Boston","status":"upcoming","score":null},{"id":"f62","group":"K","matchday":2,"a":"POR","b":"UZB","dateISO":"2026-06-22","dateLabel":"Mon 22 Jun","time":"19:00","venue":"Estadio Akron, Guadalajara","status":"upcoming","score":null},{"id":"f63","group":"K","matchday":2,"a":"COD","b":"COL","dateISO":"2026-06-22","dateLabel":"Mon 22 Jun","time":"22:00","venue":"Estadio BBVA, Monterrey","status":"upcoming","score":null},{"id":"f68","group":"L","matchday":2,"a":"ENG","b":"PAN","dateISO":"2026-06-22","dateLabel":"Mon 22 Jun","time":"22:00","venue":"Lincoln Financial, Philadelphia","status":"upcoming","score":null},{"id":"f4","group":"A","matchday":3,"a":"MEX","b":"CZE","dateISO":"2026-06-23","dateLabel":"Tue 23 Jun","time":"16:00","venue":"Lincoln Financial, Philadelphia","status":"upcoming","score":null},{"id":"f5","group":"A","matchday":3,"a":"KOR","b":"RSA","dateISO":"2026-06-23","dateLabel":"Tue 23 Jun","time":"19:00","venue":"Gillette Stadium, Boston","status":"upcoming","score":null},{"id":"f10","group":"B","matchday":3,"a":"CAN","b":"BIH","dateISO":"2026-06-23","dateLabel":"Tue 23 Jun","time":"19:00","venue":"Lumen Field, Seattle","status":"upcoming","score":null},{"id":"f11","group":"B","matchday":3,"a":"SUI","b":"QAT","dateISO":"2026-06-23","dateLabel":"Tue 23 Jun","time":"22:00","venue":"BMO Field, Toronto","status":"upcoming","score":null},{"id":"f17","group":"C","matchday":3,"a":"MAR","b":"SCO","dateISO":"2026-06-24","dateLabel":"Wed 24 Jun","time":"16:00","venue":"SoFi Stadium, LA","status":"upcoming","score":null},{"id":"f22","group":"D","matchday":3,"a":"USA","b":"TUR","dateISO":"2026-06-24","dateLabel":"Wed 24 Jun","time":"16:00","venue":"Levi's Stadium, SF Bay","status":"upcoming","score":null},{"id":"f23","group":"D","matchday":3,"a":"PAR","b":"AUS","dateISO":"2026-06-24","dateLabel":"Wed 24 Jun","time":"19:00","venue":"Hard Rock Stadium, Miami","status":"upcoming","score":null},{"id":"f16","group":"C","matchday":3,"a":"BRA","b":"HAI","dateISO":"2026-06-24","dateLabel":"Wed 24 Jun","time":"22:00","venue":"MetLife Stadium, NJ","status":"upcoming","score":null},{"id":"f35","group":"F","matchday":3,"a":"JPN","b":"TUN","dateISO":"2026-06-25","dateLabel":"Thu 25 Jun","time":"16:00","venue":"Mercedes-Benz, Atlanta","status":"upcoming","score":null},{"id":"f28","group":"E","matchday":3,"a":"GER","b":"CUW","dateISO":"2026-06-25","dateLabel":"Thu 25 Jun","time":"19:00","venue":"BC Place, Vancouver","status":"upcoming","score":null},{"id":"f29","group":"E","matchday":3,"a":"ECU","b":"CIV","dateISO":"2026-06-25","dateLabel":"Thu 25 Jun","time":"22:00","venue":"Estadio Azteca, Mexico City","status":"upcoming","score":null},{"id":"f34","group":"F","matchday":3,"a":"NED","b":"SWE","dateISO":"2026-06-25","dateLabel":"Thu 25 Jun","time":"22:00","venue":"AT&T Stadium, Dallas","status":"upcoming","score":null},{"id":"f40","group":"G","matchday":3,"a":"BEL","b":"NZL","dateISO":"2026-06-26","dateLabel":"Fri 26 Jun","time":"16:00","venue":"NRG Stadium, Houston","status":"upcoming","score":null},{"id":"f41","group":"G","matchday":3,"a":"IRN","b":"EGY","dateISO":"2026-06-26","dateLabel":"Fri 26 Jun","time":"19:00","venue":"Arrowhead, Kansas City","status":"upcoming","score":null},{"id":"f46","group":"H","matchday":3,"a":"ESP","b":"CPV","dateISO":"2026-06-26","dateLabel":"Fri 26 Jun","time":"19:00","venue":"Estadio Akron, Guadalajara","status":"upcoming","score":null},{"id":"f47","group":"H","matchday":3,"a":"URU","b":"KSA","dateISO":"2026-06-26","dateLabel":"Fri 26 Jun","time":"22:00","venue":"Estadio BBVA, Monterrey","status":"upcoming","score":null},{"id":"f53","group":"I","matchday":3,"a":"SEN","b":"NOR","dateISO":"2026-06-27","dateLabel":"Sat 27 Jun","time":"16:00","venue":"Gillette Stadium, Boston","status":"upcoming","score":null},{"id":"f58","group":"J","matchday":3,"a":"ARG","b":"JOR","dateISO":"2026-06-27","dateLabel":"Sat 27 Jun","time":"16:00","venue":"Lumen Field, Seattle","status":"upcoming","score":null},{"id":"f59","group":"J","matchday":3,"a":"AUT","b":"ALG","dateISO":"2026-06-27","dateLabel":"Sat 27 Jun","time":"19:00","venue":"BMO Field, Toronto","status":"upcoming","score":null},{"id":"f52","group":"I","matchday":3,"a":"FRA","b":"IRQ","dateISO":"2026-06-27","dateLabel":"Sat 27 Jun","time":"22:00","venue":"Lincoln Financial, Philadelphia","status":"upcoming","score":null},{"id":"f71","group":"L","matchday":3,"a":"CRO","b":"PAN","dateISO":"2026-06-28","dateLabel":"Sun 28 Jun","time":"16:00","venue":"Hard Rock Stadium, Miami","status":"upcoming","score":null},{"id":"f64","group":"K","matchday":3,"a":"POR","b":"COD","dateISO":"2026-06-28","dateLabel":"Sun 28 Jun","time":"19:00","venue":"MetLife Stadium, NJ","status":"upcoming","score":null},{"id":"f65","group":"K","matchday":3,"a":"COL","b":"UZB","dateISO":"2026-06-28","dateLabel":"Sun 28 Jun","time":"22:00","venue":"SoFi Stadium, LA","status":"upcoming","score":null},{"id":"f70","group":"L","matchday":3,"a":"ENG","b":"GHA","dateISO":"2026-06-28","dateLabel":"Sun 28 Jun","time":"22:00","venue":"Levi's Stadium, SF Bay","status":"upcoming","score":null}],"predictions":[{"key":"winner","q":"Tournament Winner","kind":"team","points":25,"answer":null,"options":["ESP","FRA","BRA","ARG","GER","POR"]},{"key":"final","q":"The Final Matchup","kind":"team2","points":15,"answer":null,"options":["ESP","FRA","BRA","ARG"]},{"key":"goldenBoot","q":"Golden Boot Winner","kind":"player","points":15,"answer":null,"options":[{"id":"mbappe","name":"K. Mbappé","team":"FRA"},{"id":"yamal","name":"L. Yamal","team":"ESP"},{"id":"haaland","name":"E. Haaland","team":"NOR"},{"id":"vini","name":"Vinícius Jr","team":"BRA"}]},{"key":"scotland","q":"How far do Scotland go?","kind":"stage","points":10,"answer":null,"options":["Group stage","Round of 32","Round of 16","Quarter Final","Semi Final","Final","Winner"]},{"key":"england","q":"How far do England go?","kind":"stage","points":10,"answer":null,"options":["Group stage","Round of 32","Round of 16","Quarter Final","Semi Final","Final","Winner"]},{"key":"surprise","q":"Biggest Surprise Team","kind":"team","points":10,"answer":null,"options":["NOR","MAR","SEN","JPN","CRO","COL"]},{"key":"flop","q":"Biggest Disappointment","kind":"team","points":10,"answer":null,"options":["ENG","BEL","GER","USA","BRA"]},{"key":"cleanSheets","q":"Most Clean Sheets","kind":"team","points":10,"answer":null,"options":["ESP","BRA","ARG","FRA"]},{"key":"youngPlayer","q":"Best Young Player","kind":"player","points":10,"answer":null,"options":[{"id":"yamal","name":"L. Yamal","team":"ESP"},{"id":"yildiz","name":"K. Yıldız","team":"TUR"},{"id":"endrick","name":"Endrick","team":"BRA"},{"id":"wirtz","name":"F. Wirtz","team":"GER"}]}],"fee":5,"pot":0,"charitySplit":0.5,"payouts":[{"place":"Winner","pct":0.5,"label":"holds the champion — takes the whole pot"},{"place":"Charity","pct":0.5,"label":"half of every entry"}],"lines":{"welcome":"Right. Let's get this started. Wheesht is watching.","drawGood":"Oh aye. That's a tidy wee team. Ye might actually do something wi' that.","drawMid":"Could be worse. Could be better. Wheesht is reserving judgement.","drawBad":"…Wheesht is not going to insult ye. The flag's nice though.","drawYou":"Croatia. Experienced, thrawn, never know when they're beat. Wheesht approves. Quietly.","upset":"Naebody saw that coming. Wheesht definitely didn't. Wheesht's predictions stand.","england":"…Wheesht is remaining professional. Next question.","scotland":"Scotland. The homeland. Drawn with Brazil, aye — but Wheesht believes. Wheesht needs a minute.","eliminated":"Ye've been eliminated. Wheesht is… sorry. (Wheesht is not sorry. Wheesht saw this coming.)","sideBets":"Aye, ye're out. But Wheesht's not done wi' ye yet.","sideBets2":"We're the ones watching objectively now. Arguably the better position.","predOpen":"Predictions are open. Back yerself. Wheesht will remember every single one.","predLocked":"Predictions are locked. No takebacks. Wheesht has yer answers in writing.","empty":"Nothing here yet. Wheesht is watching the space.","error":"Something went wrong. Wheesht is investigating. Wheesht suspects foul play.","finalBuild":"Two teams left. Wheesht has officiated since 1966. Wheesht is, for once, almost speechless. Almost."},"meta":{"name":"The Office Sweepstake","season":"World Cup 2026","stageLabel":"Group Stage","phase":"pre","maxTeams":48,"groupSize":0,"stillIn":0,"out":0,"teamsLeft":48,"kickoff":"Thu 11 June","finalVenue":"MetLife Stadium, New Jersey","finalDate":"Sun 19 July","predictionsLocked":false}};
 })();
 
 </script>
@@ -34092,7 +33921,6 @@ window.onerror = function(msg, src, line, col, err) {
 </script>
 
 <script>
-try {
 // @ds-adherence-ignore -- omelette starter scaffold (raw elements/hex/px by design)
 
 /* BEGIN USAGE */
@@ -34755,11 +34583,9 @@ Object.assign(window, {
   TweakColor,
   TweakButton
 });
-} catch(e) { window.__errors = window.__errors||[]; window.__errors.push("tweaks-panel.js: "+e.message); console.error("tweaks-panel.js",e); }
 </script>
 
 <script>
-try {
 /* ===========================================================================
    WHEESHT — REFEREE WHISTLE MASCOT (side profile)
    The silhouette reads as a real ref whistle seen side-on: round resonating
@@ -35565,11 +35391,9 @@ try {
   window.WheeshtMascot = WheeshtMascot;
   window.Wheesht = WheeshtMascot;
 })();
-} catch(e) { window.__errors = window.__errors||[]; window.__errors.push("wheesht-mascot.js: "+e.message); console.error("wheesht-mascot.js",e); }
 </script>
 
 <script>
-try {
 /* ===========================================================================
    UI KIT — sticker-album / match-programme components.
    Exported to window. Relies on CSS vars + classes defined in index.html.
@@ -35905,11 +35729,9 @@ Object.assign(window, {
   ToastLayer: ToastLayer,
   ConfettiLayer: ConfettiLayer
 });
-} catch(e) { window.__errors = window.__errors||[]; window.__errors.push("ui.js: "+e.message); console.error("ui.js",e); }
 </script>
 
 <script>
-try {
 /* ===========================================================================
    MOMENT SCREENS — full-screen takeovers
    Entry & Setup · The Draw · Result & Commentary · The Final
@@ -36809,11 +36631,9 @@ Object.assign(window, {
   ResultMoment,
   FinalMoment
 });
-} catch(e) { window.__errors = window.__errors||[]; window.__errors.push("screens-moments.js: "+e.message); console.error("screens-moments.js",e); }
 </script>
 
 <script>
-try {
 /* ===========================================================================
    HUB SCREENS — Dashboard · Tracker · Side Bets · Weekly Summary
    =========================================================================== */
@@ -37718,11 +37538,9 @@ function TrackerScreen() {
 }
 window.DashboardScreen = DashboardScreen;
 window.TrackerScreen = TrackerScreen;
-} catch(e) { window.__errors = window.__errors||[]; window.__errors.push("screens-hub.js: "+e.message); console.error("screens-hub.js",e); }
 </script>
 
 <script>
-try {
 /* ===========================================================================
    HUB SCREENS pt.2 — Side Bets (the eliminated experience) · Weekly Summary
    =========================================================================== */
@@ -38427,11 +38245,9 @@ function SummaryScreen(props) {
 }
 window.SideBetsScreen = SideBetsScreen;
 window.SummaryScreen = SummaryScreen;
-} catch(e) { window.__errors = window.__errors||[]; window.__errors.push("screens-hub2.js: "+e.message); console.error("screens-hub2.js",e); }
 </script>
 
 <script>
-try {
 /* ===========================================================================
    ONBOARDING & IDENTITY SCREENS
    Account gate (pick / add / recover) · onboarding form · the draw ·
@@ -39341,11 +39157,9 @@ Object.assign(window, {
   DrawMoment,
   ScotlandTakeover
 });
-} catch(e) { window.__errors = window.__errors||[]; window.__errors.push("screens-onboarding.js: "+e.message); console.error("screens-onboarding.js",e); }
 </script>
 
 <script>
-try {
 /* ===========================================================================
    PERSONAL DASHBOARD — "Me" screen.
    Profile · assigned team & progress · predictions · results & winnings ·
@@ -40094,11 +39908,9 @@ function MeScreen(props) {
   }));
 }
 window.MeScreen = MeScreen;
-} catch(e) { window.__errors = window.__errors||[]; window.__errors.push("screens-dashboard.js: "+e.message); console.error("screens-dashboard.js",e); }
 </script>
 
 <script>
-try {
 /* ===========================================================================
    PREDICTIONS — tournament prediction markets, scoring & leaderboard.
    Replaces the old "side bets". Open markets are pickable; resolved markets
@@ -40419,11 +40231,9 @@ function PredictionsScreen(props) {
   }, "Every point's logged. Wheesht remembers. Especially the bad calls."));
 }
 window.PredictionsScreen = PredictionsScreen;
-} catch(e) { window.__errors = window.__errors||[]; window.__errors.push("screens-predictions.js: "+e.message); console.error("screens-predictions.js",e); }
 </script>
 
 <script>
-try {
 /* ===========================================================================
    GAMES — upcoming fixtures tracker.
    The full group-stage schedule with date grouping, status, and filters
@@ -40787,11 +40597,9 @@ function GamesScreen() {
   })))));
 }
 window.GamesScreen = GamesScreen;
-} catch(e) { window.__errors = window.__errors||[]; window.__errors.push("screens-games.js: "+e.message); console.error("screens-games.js",e); }
 </script>
 
 <script>
-try {
 /* ===========================================================================
    ADMIN — Wheesht's clipboard. Run the sweepstake through the tournament:
    set the phase, mark teams out (owners flip to eliminated automatically),
@@ -41429,11 +41237,9 @@ function PeopleAdmin() {
   })));
 }
 window.AdminPanel = AdminPanel;
-} catch(e) { window.__errors = window.__errors||[]; window.__errors.push("screens-admin.js: "+e.message); console.error("screens-admin.js",e); }
 </script>
 
 <script>
-try {
 function _extends() { return _extends = Object.assign ? Object.assign.bind() : function (n) { for (var e = 1; e < arguments.length; e++) { var t = arguments[e]; for (var r in t) ({}).hasOwnProperty.call(t, r) && (n[r] = t[r]); } return n; }, _extends.apply(null, arguments); }
 /* ===========================================================================
    APP SHELL — identity gate · onboarding flow · tab nav · account switcher ·
@@ -42160,7 +41966,6 @@ function App() {
   }, "Sign out of this device"))));
 }
 ReactDOM.createRoot(document.getElementById('root')).render(/*#__PURE__*/React.createElement(App, null));
-} catch(e) { window.__errors = window.__errors||[]; window.__errors.push("app.js: "+e.message); console.error("app.js",e); }
 </script>
 </body>
 </html>

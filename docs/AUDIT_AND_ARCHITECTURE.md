@@ -371,11 +371,19 @@ Each phase is independently shippable and leaves the app working.
 - Introduce a DB layer (start with SQLite via SQLModel/SQLAlchemy; Postgres-ready).
 - Define canonical Pydantic models + the `ProviderAdapter` Protocol.
 
-**Phase 1 — Single source of truth (kill the duplication)**
-- Move all tournament data behind the backend; delete `static/app/mock-data.js`.
-- Replace it with `MockAdapter` (records the current prototype data as a snapshot
-  so offline/standalone demos still work) and a real `GET /api/state`.
-- Frontend: `data.js`/`store.js` fetch from the API; no embedded catalogue.
+**Phase 1 — Single source of truth (kill the duplication) — ✅ DONE**
+- `wc_data.py` is now the **one** definition of the tournament scenario.
+- `static/app/wc-snapshot.js` is **generated** from it by
+  `scripts/build_snapshot.py` (no-op in server mode where `main.py` injects
+  `window.WC_DATA`; seeds the same data in the no-server/offline path).
+- Deleted the hand-maintained `static/app/mock-data.js` (which had already
+  drifted — it still carried the old 4-way payout split vs. the canonical
+  winner-takes-all + charity model).
+- `preview.html`, `templates/index.html`, and both standalone builds
+  (`scripts/build_standalone.py`) now derive from that one source — no drift.
+- *Deferred to later phases (need the provider): a DB-backed store and the
+  `GET /api/state` fetch replacing the embedded snapshot entirely. The snapshot
+  is the Phase-1 stand-in for the `MockAdapter`.*
 
 **Phase 2 — Tournament as config**
 - Extract teams/groups/markets/fee/split/special-teams/stage-ladder into

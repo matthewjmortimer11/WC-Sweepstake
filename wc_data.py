@@ -153,7 +153,9 @@ def generate_wc_data() -> dict:
     r16: list = []
 
     # Upcoming games tracker — full group-stage fixture list, generated from the
-    # 12 groups (each team plays the other three). Mirrors static/app/mock-data.js.
+    # 12 groups (each team plays the other three). This module is the single
+    # source of truth; the client snapshot (static/app/wc-snapshot.js) is
+    # generated from it by scripts/build_snapshot.py.
     import datetime as _dt
     VENUES = [
         'MetLife Stadium, NJ', 'SoFi Stadium, LA', 'AT&T Stadium, Dallas', 'Mercedes-Benz, Atlanta',
@@ -195,7 +197,7 @@ def generate_wc_data() -> dict:
     pot = len(people) * fee
 
     # Tournament prediction markets. answer=None → still open; once a result is
-    # set, Store grades each pick against it. Mirrors static/app/mock-data.js.
+    # set, Store grades each pick against it.
     predictions = [
         {'key': 'winner', 'q': 'Tournament Winner', 'kind': 'team', 'points': 25,
          'answer': None, 'options': ['ESP', 'FRA', 'BRA', 'ARG', 'GER', 'POR']},

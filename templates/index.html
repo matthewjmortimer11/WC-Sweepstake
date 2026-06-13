@@ -195,7 +195,9 @@ button{font-family:inherit;}
 
 <!-- WC_DATA_INJECTION -->
 
-<script src="app/mock-data.js"></script>
+<!-- Single source of truth: generated from wc_data.py by scripts/build_snapshot.py.
+     No-op when the server injects window.WC_DATA above (live mode). -->
+<script src="app/wc-snapshot.js"></script>
 <script src="app/data.js"></script>
 <script src="app/store.js"></script>
 <script type="text/babel" src="app/wheesht-mascot.jsx"></script>
