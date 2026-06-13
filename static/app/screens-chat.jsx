@@ -95,7 +95,7 @@ function ChatScreen() {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 168px)' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100dvh - 146px - env(safe-area-inset-top, 0px))' }}>
 
       {/* message list */}
       <div ref={listRef} style={{ flex: 1, overflowY: 'auto', padding: '14px 14px 6px' }}>
