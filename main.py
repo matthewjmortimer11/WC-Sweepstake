@@ -32,6 +32,7 @@ from fastapi.responses import FileResponse, HTMLResponse
 from pydantic import BaseModel
 from sqlalchemy import func, select
 
+import standings
 import sync
 from db import AsyncSessionLocal, engine
 from models import AdminOverride, Base, ChatMessage, League, Participant
@@ -171,28 +172,25 @@ def _base_fixtures() -> List[Dict[str, Any]]:
 
 
 def _resolve(league_people: List[Dict[str, Any]], admin: Dict[str, Any]):
-    """Apply a league's admin overrides on top of the GLOBAL baseline. Crucially,
-    fixtures that have no explicit override keep their provider/baseline values —
-    overrides never reset other fixtures to upcoming/null."""
+    """Resolve a league's full state from the GLOBAL baseline + its own overrides.
+
+    Composition (per league):
+      1. fixtures = baseline with this league's explicit result overrides patched
+         in; fixtures with no override keep their provider/baseline values (they
+         are never reset to upcoming/null).
+      2. teams = the rules engine recomputed from THIS league's results, then the
+         organiser's manual eliminations/restores applied on top (manual wins).
+      3. people = each entrant mirrors the status of the team they hold.
+      4. predictions = auto-graded from this league's results, then the
+         organiser's manual answers applied on top (manual wins).
+    """
     admin_teams = admin.get("teams") or {}
     admin_fixtures = admin.get("fixtures") or {}
     admin_preds = admin.get("predictions") or {}
     phase = (admin.get("meta") or {}).get("phase") or _wc_data["meta"]["phase"]
+    ladder = _wc_data["meta"]["stageLadder"]
 
-    # teams = baseline + manual eliminations/restores
-    teams = []
-    for t in _wc_data["teams"]:
-        t = dict(t)
-        o = admin_teams.get(t["code"])
-        if o:
-            t["alive"] = o.get("alive", t["alive"])
-            t["stage"] = o.get("stage", t["stage"])
-            if o.get("rounds") is not None:
-                t["rounds"] = o["rounds"]
-        teams.append(t)
-    team_map = {t["code"]: t for t in teams}
-
-    # fixtures = baseline, with explicit overrides patched in (others untouched)
+    # 1. fixtures = baseline + explicit overrides (others untouched)
     fixtures = []
     for f in _base_fixtures():
         o = admin_fixtures.get(f["id"])
@@ -206,23 +204,24 @@ def _resolve(league_people: List[Dict[str, Any]], admin: Dict[str, Any]):
                 f["winner"] = o["winner"]
         fixtures.append(f)
 
-    # people inherit their team's (possibly overridden) status
-    people = []
-    for p in league_people:
-        p = dict(p)
-        t = team_map.get(p.get("team"))
-        if t:
-            p["alive"] = t["alive"]
-            p["stage"] = t["stage"]
-        people.append(p)
+    # 2. rules engine from this league's results, then manual team overrides
+    teams = standings.compute_team_status(_wc_data["teams"], fixtures, ladder)
+    for t in teams:
+        o = admin_teams.get(t["code"])
+        if o:
+            t["alive"] = o.get("alive", t["alive"])
+            t["stage"] = o.get("stage", t["stage"])
+            if o.get("rounds") is not None:
+                t["rounds"] = o["rounds"]
 
-    # prediction answers applied where the organiser has set them
-    predictions = []
-    for m in _wc_data["predictions"]:
-        m = dict(m)
+    # 3. people inherit their team's status
+    people = standings.apply_to_people(league_people, teams)
+
+    # 4. auto-grade predictions, then apply manual answers on top
+    predictions = standings.grade_predictions(_wc_data["predictions"], teams, fixtures, ladder)
+    for m in predictions:
         if m["key"] in admin_preds:
             m["answer"] = admin_preds[m["key"]]
-        predictions.append(m)
 
     return teams, fixtures, people, predictions, phase
 

@@ -88,12 +88,13 @@ def _build_fixtures(cfg: dict, teams: list[dict]) -> list[dict]:
                 a, b = gteams[ia], gteams[ib]
                 fixtures.append({
                     "id": f"f{fid}", "group": g, "matchday": md + 1,
+                    "stage": "group",
                     "a": a["code"], "b": b["code"],
                     "dateISO": date.isoformat(),
                     "dateLabel": f"{_DOW[date.weekday()]} {date.day} {_MON[date.month - 1]}",
                     "time": times[(gi + pidx) % len(times)],
                     "venue": venues[vi % len(venues)],
-                    "status": "upcoming", "score": None,
+                    "status": "upcoming", "score": None, "winner": None,
                 })
                 vi += 1
                 fid += 1
