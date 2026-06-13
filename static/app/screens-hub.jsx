@@ -269,12 +269,13 @@ function StageFunnel(){
 function PersonRow(props){
   const p=props.person; const t=WC.TEAMS[p.team]; const you=props.you;
   const pts = window.Store ? window.Store.predScoreOf(p) : (p.predScore||0);
+  const includeDept = window.Store && window.Store.includeDepartment ? window.Store.includeDepartment() : true;
   return (
     <div style={{display:'flex',alignItems:'center',gap:9,padding:'9px 4px',borderBottom:'1.5px solid var(--line)',opacity:p.alive?1:.62}}>
       <Avatar person={Object.assign({},p,{isYou:false})} size={34} dim={!p.alive}/>
       <div style={{flex:1,minWidth:0}}>
         <div style={{fontWeight:800,fontSize:14,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{p.name}{you&&' (you)'}</div>
-        <div style={{fontSize:11,fontWeight:600,color:'var(--ink2)',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{(p.location||p.city)}{p.department?' · '+p.department:''}{p.ltMember?' · LT':''}</div>
+        <div style={{fontSize:11,fontWeight:600,color:'var(--ink2)',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{(p.location||p.city)}{includeDept && p.department?' · '+p.department:''}{p.ltMember?' · LT':''}</div>
       </div>
       <div style={{display:'flex',alignItems:'center',gap:5}}>
         <Flag team={t} size={20}/>
@@ -298,6 +299,7 @@ function TrackerScreen(){
   const pre = WC.meta.phase === 'pre';
   const P = window.Store ? window.Store.allSync() : WC.PEOPLE;
   const youId = window.Store ? window.Store.activeId() : null;
+  const includeDept = window.Store && window.Store.includeDepartment ? window.Store.includeDepartment() : true;
   const depts = Array.from(new Set(P.map(p=>p.department).filter(Boolean))).sort();
   const filters=[['all','Everyone'],['in','Still in'],['out','Out'],['London','London'],['Edinburgh','Edinburgh'],['lt','LT members']];
   let list=P.slice();
@@ -305,7 +307,7 @@ function TrackerScreen(){
   else if(filter==='out') list=list.filter(p=>!p.alive);
   else if(filter==='London'||filter==='Edinburgh') list=list.filter(p=>(p.location||p.city)===filter);
   else if(filter==='lt') list=list.filter(p=>p.ltMember||p.leadership);
-  if(dept) list=list.filter(p=>p.department===dept);
+  if(includeDept && dept) list=list.filter(p=>p.department===dept);
   list.sort((a,b)=>{ if(a.id===youId)return -1; if(b.id===youId)return 1; return WC.TEAMS[b.team].rounds-WC.TEAMS[a.team].rounds; });
   const stillIn = P.filter(p=>p.alive).length;
   const filtersShown = pre ? filters.filter(f=>f[0]!=='out') : filters;
@@ -331,13 +333,13 @@ function TrackerScreen(){
           <button key={k} onClick={()=>setFilter(k)} className={'wc-chip'+(filter===k?' wc-chip--yellow':'')} style={{whiteSpace:'nowrap',cursor:'pointer',flex:'0 0 auto'}}>{lab}</button>
         ))}
       </div>
-      <div style={{display:'flex',gap:8,alignItems:'center',marginBottom:6}}>
+      {includeDept && <div style={{display:'flex',gap:8,alignItems:'center',marginBottom:6}}>
         <span style={{fontSize:12,fontWeight:800,color:'var(--ink2)'}}>Dept</span>
         <select value={dept} onChange={e=>setDept(e.target.value)} style={{flex:1,border:'2px solid var(--line)',borderRadius:10,padding:'7px 10px',fontFamily:'var(--body)',fontWeight:700,fontSize:13,background:'#fff',color:'var(--ink)'}}>
           <option value="">All departments</option>
           {depts.map(d=><option key={d} value={d}>{d}</option>)}
         </select>
-      </div>
+      </div>}
       <Card flat style={{padding:'4px 14px'}}>
         {list.map(p=><PersonRow key={p.id} person={p} you={p.id===youId} pre={pre}/>)}
       </Card>

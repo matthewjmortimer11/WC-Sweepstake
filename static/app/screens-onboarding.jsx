@@ -198,6 +198,7 @@ function CreateLeague(props) {
 function FindMyEntry(props) {
   const [q, setQ] = oState('');
   const results = q.trim() ? So.search(q) : [];
+  const includeDept = So.includeDepartment ? So.includeDepartment() : true;
   return (
     <div className="moment">
       <div className="mscroll" style={{ padding: '30px 22px 28px' }}>
@@ -227,7 +228,7 @@ function FindMyEntry(props) {
               <Ao person={p} size={38} />
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontWeight: 800, fontSize: 14.5 }}>{p.name}</div>
-                <div style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--ink2)' }}>{p.location}{p.department ? ' · ' + p.department : ''}</div>
+                <div style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--ink2)' }}>{p.location}{includeDept && p.department ? ' · ' + p.department : ''}</div>
               </div>
               {t && <Fo team={t} size={22} />}
               <span className="dh" style={{ fontSize: 16, color: 'var(--red)' }}>This is me →</span>
@@ -245,7 +246,12 @@ function OnboardingForm(props) {
   const [dept, setDept] = oState('');
   const [loc, setLoc] = oState('Edinburgh');
   const [lt, setLt] = oState(false);
+  const includeDept = So.includeDepartment ? So.includeDepartment() : true;
   const ok = name.trim().length > 0;
+  const split = So.charitySplit ? So.charitySplit() : 0.5;
+  const fee = WCo.FEE || 0;
+  const charityPerEntry = fee * split;
+  const winnerAfterEntry = (window.Store ? window.Store.pot() : WCo.POT * (1 - split)) + fee * (1 - split);
   return (
     <div className="moment">
       <div className="mscroll" style={{ padding: '28px 22px 30px' }}>
@@ -261,11 +267,11 @@ function OnboardingForm(props) {
             <Lab>Full name</Lab>
             <input autoFocus style={inp} value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Davie McAllister" />
           </div>
-          <div>
+          {includeDept && <div>
             <Lab opt>Team / department</Lab>
             <input style={inp} value={dept} onChange={e => setDept(e.target.value)} placeholder="e.g. Engineering" list="wh-depts" />
             <datalist id="wh-depts">{DEPTS.map(d => <option key={d} value={d} />)}</datalist>
-          </div>
+          </div>}
           <div>
             <Lab>Work location</Lab>
             <Seg value={loc} onChange={setLoc} options={[{ value: 'Edinburgh', label: 'Edinburgh' }, { value: 'London', label: 'London' }]} />
@@ -278,12 +284,12 @@ function OnboardingForm(props) {
 
         <Co bordered style={{ marginTop: 20, background: 'var(--yellow)' }}>
           <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: '.05em', textTransform: 'uppercase' }}>Your buy-in</div>
-          <div className="dh" style={{ fontSize: 28, margin: '2px 0 4px' }}>You're putting in £{WCo.FEE}.</div>
-          <div style={{ fontSize: 14, fontWeight: 600 }}><b>£{(WCo.FEE / 2).toFixed(2).replace(/\.00$/, '')} goes to charity</b>, the other half into a winner-takes-all pot — <b>{('£' + (((window.Store ? window.Store.pot() : WCo.POT * 0.5) + WCo.FEE * 0.5)).toLocaleString('en-GB'))}</b> once you're in, and growing with every sign-up.</div>
+          <div className="dh" style={{ fontSize: 28, margin: '2px 0 4px' }}>You're putting in £{fee}.</div>
+          <div style={{ fontSize: 14, fontWeight: 600 }}><b>£{charityPerEntry.toFixed(2).replace(/\.00$/, '')} goes to charity</b>, the rest into a winner-takes-all fund — <b>{'£' + Math.round(winnerAfterEntry).toLocaleString('en-GB')}</b> once you're in, and growing with every sign-up.</div>
         </Co>
 
         <div style={{ marginTop: 18 }}>
-          <Bo variant="ink" block onClick={() => ok && props.onSubmit({ name: name.trim(), department: dept.trim(), location: loc, ltMember: lt })}>
+          <Bo variant="ink" block onClick={() => ok && props.onSubmit({ name: name.trim(), department: includeDept ? dept.trim() : '', location: loc, ltMember: lt })}>
             {ok ? 'To the draw →' : 'Pop yer name in first'}
           </Bo>
         </div>

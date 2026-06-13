@@ -32,6 +32,7 @@ function overallRank(me) {
 
 function ProfileHeader(props) {
   const me = props.me; const t = WCd.TEAMS[me.team];
+  const includeDept = Sd.includeDepartment ? Sd.includeDepartment() : true;
   return (
     <Cd bordered className="pop">
       <div style={{ display: 'flex', alignItems: 'center', gap: 13 }}>
@@ -40,7 +41,7 @@ function ProfileHeader(props) {
           <div className="dh" style={{ fontSize: 24, lineHeight: 1 }}>{me.name}</div>
           <div style={{ display: 'flex', gap: 6, marginTop: 7, flexWrap: 'wrap' }}>
             <Chd>{me.location}</Chd>
-            {me.department && <Chd>{me.department}</Chd>}
+            {includeDept && me.department && <Chd>{me.department}</Chd>}
             {me.ltMember && <Chd tone="yellow">LT</Chd>}
           </div>
         </div>
@@ -56,6 +57,7 @@ function EditProfile(props) {
   const [dept, setDept] = dState(me.department || '');
   const [loc, setLoc] = dState(me.location || 'London');
   const [lt, setLt] = dState(!!me.ltMember);
+  const includeDept = Sd.includeDepartment ? Sd.includeDepartment() : true;
   const fld = { width: '100%', border: '2.5px solid var(--ink)', borderRadius: 12, padding: '11px 13px', fontFamily: 'var(--body)', fontWeight: 600, fontSize: 15, marginTop: 6, outline: 'none' };
   function seg(val, set, opts) {
     return <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>{opts.map(o =>
@@ -69,12 +71,12 @@ function EditProfile(props) {
         <div className="dh" style={{ fontSize: 22, marginBottom: 14 }}>Edit your details</div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 13 }}>
           <div><label style={{ fontWeight: 800, fontSize: 13, fontFamily: 'var(--disp)' }}>Full name</label><input style={fld} value={name} onChange={e => setName(e.target.value)} /></div>
-          <div><label style={{ fontWeight: 800, fontSize: 13, fontFamily: 'var(--disp)' }}>Team / department</label><input style={fld} value={dept} onChange={e => setDept(e.target.value)} placeholder="optional" /></div>
+          {includeDept && <div><label style={{ fontWeight: 800, fontSize: 13, fontFamily: 'var(--disp)' }}>Team / department</label><input style={fld} value={dept} onChange={e => setDept(e.target.value)} placeholder="optional" /></div>}
           <div><label style={{ fontWeight: 800, fontSize: 13, fontFamily: 'var(--disp)' }}>Work location</label>{seg(loc, setLoc, [{ value: 'Edinburgh', label: 'Edinburgh' }, { value: 'London', label: 'London' }])}</div>
           <div><label style={{ fontWeight: 800, fontSize: 13, fontFamily: 'var(--disp)' }}>Leadership Team?</label>{seg(lt, setLt, [{ value: false, label: 'No' }, { value: true, label: 'Yes' }])}</div>
         </div>
         <div style={{ marginTop: 18 }}>
-          <Bd variant="ink" block onClick={() => { Sd.update(me.id, { name: name.trim() || me.name, department: dept.trim(), location: loc, city: loc, ltMember: lt, leadership: lt }); props.onClose(); }}>Save</Bd>
+          <Bd variant="ink" block onClick={() => { Sd.update(me.id, { name: name.trim() || me.name, department: includeDept ? dept.trim() : me.department, location: loc, city: loc, ltMember: lt, leadership: lt }); props.onClose(); }}>Save</Bd>
         </div>
       </div>
     </div>

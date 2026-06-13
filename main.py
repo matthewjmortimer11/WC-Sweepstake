@@ -228,7 +228,15 @@ def _resolve(league_people: List[Dict[str, Any]], admin: Dict[str, Any]):
 
 def _league_state(league: League, league_people: List[Dict[str, Any]], admin: Dict[str, Any]) -> Dict[str, Any]:
     teams, fixtures, people, predictions, phase = _resolve(league_people, admin)
+    admin_meta = admin.get("meta") or {}
+    fee = _wc_data["fee"]
+    try:
+        if admin_meta.get("entryFee") is not None:
+            fee = max(0, float(admin_meta.get("entryFee")))
+    except (TypeError, ValueError):
+        fee = _wc_data["fee"]
     data = dict(_wc_data)
+    data["fee"] = fee
     data["teams"] = teams
     data["fixtures"] = fixtures
     data["people"] = people
@@ -247,8 +255,9 @@ def _league_state(league: League, league_people: List[Dict[str, Any]], admin: Di
     meta["stillIn"] = sum(1 for p in people if p.get("alive"))
     meta["out"] = sum(1 for p in people if not p.get("alive"))
     meta["teamsLeft"] = sum(1 for t in teams if t.get("alive"))
+    meta["includeDepartment"] = bool(admin_meta.get("includeDepartment", True))
     data["meta"] = meta
-    data["pot"] = len(people) * data["fee"]
+    data["pot"] = len(people) * fee
     return data
 
 

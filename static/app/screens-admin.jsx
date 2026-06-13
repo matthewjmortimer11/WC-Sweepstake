@@ -202,6 +202,77 @@ function PredAdmin(props) {
    );
 }
 
+function moneyAdmin(n) {
+   return '£' + (Math.round(Number(n || 0) * 100) / 100).toLocaleString('en-GB', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+}
+
+function SettingsAdmin() {
+   const [, bump] = aState2(0);
+   React.useEffect(() => Sa.subscribe(() => bump(x => x + 1)), []);
+   const feeNow = Sa.entryFee ? Sa.entryFee() : WCa.FEE;
+   const [fee, setFee] = aState2(String(feeNow || 0));
+   React.useEffect(() => setFee(String(feeNow || 0)), [feeNow]);
+   const entrants = Sa.allSync().length;
+   const split = Sa.charitySplit ? Sa.charitySplit() : 0.5;
+   const n = Number(fee);
+   const feeNum = isFinite(n) && n >= 0 ? n : feeNow;
+   const gross = entrants * feeNum;
+   const charity = gross * split;
+   const winner = gross * (1 - split);
+   const includeDept = Sa.includeDepartment ? Sa.includeDepartment() : true;
+   const fld = { width: '100%', border: '2.5px solid var(--ink)', borderRadius: 12, padding: '11px 13px', fontFamily: 'var(--disp)', fontWeight: 800, fontSize: 22, outline: 'none', background: '#fff' };
+   function saveFee() {
+     const val = Number(fee);
+     if (!isFinite(val) || val < 0) { setFee(String(feeNow || 0)); return; }
+     Sa.setEntryFee(val);
+   }
+   function toggleRow(onClick, on, title, text) {
+     return <button onClick={onClick} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 11, textAlign: 'left', border: '2px solid var(--line)', borderRadius: 13, background: '#fff', padding: '11px 12px', cursor: 'pointer' }}>
+       <span style={{ width: 42, height: 24, borderRadius: 999, background: on ? 'var(--green)' : 'var(--line)', border: '2px solid var(--ink)', position: 'relative', flex: '0 0 auto' }}>
+         <span style={{ position: 'absolute', top: 2, left: on ? 20 : 2, width: 16, height: 16, borderRadius: '50%', background: '#fff', border: '2px solid var(--ink)' }} />
+       </span>
+       <span style={{ flex: 1, minWidth: 0 }}>
+         <span className="dh" style={{ display: 'block', fontSize: 15 }}>{title}</span>
+         <span style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--ink2)', marginTop: 2, lineHeight: 1.3 }}>{text}</span>
+       </span>
+     </button>;
+   }
+   return (
+     <>
+       <Ca bordered style={{ background: 'var(--yellow)', marginBottom: 12 }}>
+         <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.06em', textTransform: 'uppercase' }}>Entry fee</div>
+         <div style={{ display: 'flex', gap: 9, alignItems: 'center', marginTop: 7 }}>
+           <span className="dh" style={{ fontSize: 24 }}>£</span>
+           <input type="number" min="0" step="0.5" value={fee} onChange={e => setFee(e.target.value)} onBlur={saveFee} style={fld} />
+           <button onClick={saveFee} className="wc-btn wc-btn--sm wc-btn--ink" style={{ flex: '0 0 auto' }}>Save</button>
+         </div>
+         <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--ink2)', marginTop: 9 }}>{entrants} entrants at {moneyAdmin(feeNum)} each.</div>
+       </Ca>
+
+       <Ca flat style={{ padding: '12px 13px', marginBottom: 12 }}>
+         {[
+           ['Total collected', gross, 'var(--ink)'],
+           ['Winner fund', winner, 'var(--green)'],
+           ['Charity fund', charity, 'var(--red)'],
+         ].map((r, i) => (
+           <div key={r[0]} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: i ? '8px 0 0' : '0', borderTop: i ? '1.5px solid var(--line)' : 'none', marginTop: i ? 8 : 0 }}>
+             <span style={{ flex: 1, fontSize: 13, fontWeight: 800, color: 'var(--ink2)' }}>{r[0]}</span>
+             <span className="dh" style={{ fontSize: 19, color: r[2] }}>{moneyAdmin(r[1])}</span>
+           </div>
+         ))}
+       </Ca>
+
+       <SHa>Signup fields</SHa>
+       {toggleRow(
+         () => Sa.setIncludeDepartment(!includeDept),
+         includeDept,
+         'Team / department field',
+         includeDept ? 'Shown on signup, profile editing and the directory.' : 'Hidden from signup, profile editing and directory filters.'
+       )}
+     </>
+   );
+}
+
 function AdminPanel(props) {
    const [, bump] = aState2(0);
    React.useEffect(() => Sa.subscribe(() => bump(x => x + 1)), []);
@@ -216,7 +287,7 @@ function AdminPanel(props) {
    const byDate = []; const seen = {};
    fixtures.forEach(f => { if (!seen[f.dateISO]) { seen[f.dateISO] = { label: f.dateLabel, items: [] }; byDate.push(seen[f.dateISO]); } seen[f.dateISO].items.push(f); });
 
-   const secs = [['results', 'Results'], ['teams', 'Teams'], ['predict', 'Predictions'], ['people', 'People'], ['chat', 'Chat']];
+   const secs = [['results', 'Results'], ['teams', 'Teams'], ['predict', 'Predictions'], ['people', 'People'], ['chat', 'Chat'], ['settings', 'Settings']];
 
    return (
      <div className="moment" style={{ background: 'var(--bg)' }}>
@@ -233,9 +304,9 @@ function AdminPanel(props) {
          <SHa>Tournament phase</SHa>
          <PhaseSeg />
 
-         <div style={{ display: 'flex', gap: 7, margin: '20px 0 14px' }}>
+         <div style={{ display: 'flex', gap: 7, margin: '20px 0 14px', flexWrap: 'wrap' }}>
            {secs.map(([k, lab]) => (
-             <button key={k} onClick={() => setSec(k)} className={'wc-chip' + (sec === k ? ' wc-chip--yellow' : '')} style={{ flex: 1, cursor: 'pointer', textAlign: 'center' }}>{lab}</button>
+             <button key={k} onClick={() => setSec(k)} className={'wc-chip' + (sec === k ? ' wc-chip--yellow' : '')} style={{ flex: '1 0 30%', cursor: 'pointer', textAlign: 'center', justifyContent: 'center' }}>{lab}</button>
            ))}
          </div>
 
@@ -274,6 +345,8 @@ function AdminPanel(props) {
 
          {sec === 'chat' && <ChatAdmin />}
 
+         {sec === 'settings' && <SettingsAdmin />}
+
          <div style={{ marginTop: 22, borderTop: '2px solid var(--line)', paddingTop: 16 }}>
            <button onClick={() => { if (window.confirm('Reset ALL results, eliminations and answers back to pre-kickoff?')) Sa.adminReset(); }}
              style={{ width: '100%', border: '2px solid var(--red)', borderRadius: 11, background: '#fff', color: 'var(--red)', fontFamily: 'var(--disp)', fontWeight: 800, fontSize: 13, padding: '10px', cursor: 'pointer' }}>Reset everything</button>
@@ -285,6 +358,7 @@ function AdminPanel(props) {
 
 function PeopleAdmin() {
    const [q, setQ] = aState2('');
+   const includeDept = Sa.includeDepartment ? Sa.includeDepartment() : true;
    const all = Sa.allSync().slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''));
    const list = q.trim() ? all.filter(p => (p.name || '').toLowerCase().indexOf(q.toLowerCase()) >= 0) : all;
    const fld = { width: '100%', border: '2.5px solid var(--ink)', borderRadius: 12, padding: '10px 13px', fontFamily: 'var(--body)', fontWeight: 600, fontSize: 15, outline: 'none', marginBottom: 12 };
@@ -308,7 +382,7 @@ function PeopleAdmin() {
                  {t && <Fa team={t} size={22} />}
                  <div style={{ flex: 1, minWidth: 0 }}>
                    <div style={{ fontWeight: 800, fontSize: 14, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name}</div>
-                   <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--ink2)' }}>{(p.location || p.city || '')}{p.department ? ' · ' + p.department : ''}{t ? ' · ' + t.name : ''}</div>
+                   <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--ink2)' }}>{(p.location || p.city || '')}{includeDept && p.department ? ' · ' + p.department : ''}{t ? ' · ' + t.name : ''}</div>
                  </div>
                  <button onClick={() => remove(p)} className="wc-btn wc-btn--sm" style={{ padding: '6px 12px', background: '#fff', color: 'var(--red)', boxShadow: '0 3px 0 var(--shadow)' }}>Remove</button>
                </div>;

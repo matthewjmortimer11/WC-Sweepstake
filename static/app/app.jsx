@@ -62,6 +62,7 @@ function TabBar(props){
 function AccountSheet(props){
   const accounts = A_S.deviceAccounts();
   const activeId = A_S.activeId();
+  const includeDept = A_S.includeDepartment ? A_S.includeDepartment() : true;
   return <div style={{position:'absolute',inset:0,zIndex:70,display:'flex',flexDirection:'column',justifyContent:'flex-end'}}>
     <div onClick={props.onClose} style={{position:'absolute',inset:0,background:'rgba(26,26,26,.45)'}}/>
     <div className="rise" style={{position:'relative',background:'var(--bg)',borderRadius:'26px 26px 0 0',padding:'18px 18px 26px',boxShadow:'0 -20px 50px rgba(0,0,0,.3)'}}>
@@ -76,7 +77,7 @@ function AccountSheet(props){
               <window.Avatar person={Object.assign({},p,{isYou:false})} size={40}/>
               <div style={{flex:1,minWidth:0}}>
                 <div className="dh" style={{fontSize:16}}>{p.name}{on&&' ·'} {on&&<span style={{fontSize:11,color:'var(--ink2)'}}>active</span>}</div>
-                <div style={{fontSize:11.5,fontWeight:700,color:'var(--ink2)'}}>{p.location}{p.department?' · '+p.department:''}</div>
+                <div style={{fontSize:11.5,fontWeight:700,color:'var(--ink2)'}}>{p.location}{includeDept && p.department?' · '+p.department:''}</div>
               </div>
               {t&&<window.Flag team={t} size={24}/>}
             </button>

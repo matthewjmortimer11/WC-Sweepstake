@@ -54,7 +54,8 @@
 
   var BASE = {
     teams: {}, preds: {},
-    meta: { phase: WC.meta.phase, stageLabel: WC.meta.stageLabel },
+    fee: WC.FEE || 0,
+    meta: { phase: WC.meta.phase, stageLabel: WC.meta.stageLabel, includeDepartment: WC.meta.includeDepartment !== false },
   };
   WC.TEAM_LIST.forEach(function (t) { BASE.teams[t.code] = { alive: t.alive, stage: t.stage, rounds: t.rounds }; });
   (WC.PREDICTIONS || []).forEach(function (m) { BASE.preds[m.key] = m.answer; });
@@ -83,6 +84,15 @@
     WC.meta.stageLabel = WC.meta.phase === 'pre' ? 'Group Stage'
       : WC.meta.phase === 'done' ? 'Tournament over' : 'In play';
     WC.meta.teamsLeft = WC.TEAM_LIST.filter(function (t) { return t.alive; }).length;
+    WC.meta.includeDepartment = !admin.meta || admin.meta.includeDepartment !== false;
+    var fee = admin.meta && admin.meta.entryFee != null ? Number(admin.meta.entryFee) : BASE.fee;
+    WC.FEE = isFinite(fee) && fee >= 0 ? fee : BASE.fee;
+    WC.POT = (WC.PEOPLE || []).length * WC.FEE;
+  }
+
+  function charitySplitValue() {
+    var v = WC.charitySplit != null ? WC.charitySplit : WC.CHARITY_SPLIT;
+    return v == null ? CHARITY_SPLIT : Number(v);
   }
 
   function persistAdmin(nextAdmin) {
@@ -284,9 +294,9 @@
     maxPredPoints: function () { return (WC.PREDICTIONS || []).reduce(function (a, m) { return a + m.points; }, 0); },
 
     gross: function () { return cache.length * (WC.FEE || 0); },
-    charity: function () { return cache.length * (WC.FEE || 0) * CHARITY_SPLIT; },
-    pot: function () { return cache.length * (WC.FEE || 0) * (1 - CHARITY_SPLIT); },
-    charitySplit: function () { return CHARITY_SPLIT; },
+    charity: function () { return cache.length * (WC.FEE || 0) * charitySplitValue(); },
+    pot: function () { return cache.length * (WC.FEE || 0) * (1 - charitySplitValue()); },
+    charitySplit: charitySplitValue,
 
     search: function (q) {
       q = (q || '').trim().toLowerCase();
@@ -371,8 +381,20 @@
     adminState: function () { return admin; },
     teamsAlive: function () { return WC.TEAM_LIST.filter(function (t) { return t.alive; }).length; },
     phase: function () { return WC.meta.phase; },
+    entryFee: function () { return WC.FEE || 0; },
+    includeDepartment: function () { return !WC.meta || WC.meta.includeDepartment !== false; },
     setPhase: function (phase) {
       admin.meta = admin.meta || {}; admin.meta.phase = phase;
+      commitAdmin();
+    },
+    setEntryFee: function (fee) {
+      var n = Math.max(0, Math.round(Number(fee) * 100) / 100);
+      if (!isFinite(n)) return;
+      admin.meta = admin.meta || {}; admin.meta.entryFee = n;
+      commitAdmin();
+    },
+    setIncludeDepartment: function (on) {
+      admin.meta = admin.meta || {}; admin.meta.includeDepartment = !!on;
       commitAdmin();
     },
     setTeamOut: function (code, out) {
@@ -404,7 +426,8 @@
       commitAdmin();
     },
     adminReset: function () {
-      admin = { teams: {}, fixtures: {}, predictions: {}, meta: {} };
+      var keep = admin.meta || {};
+      admin = { teams: {}, fixtures: {}, predictions: {}, meta: { entryFee: keep.entryFee, includeDepartment: keep.includeDepartment } };
       commitAdmin();
     }
   };
