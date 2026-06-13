@@ -20,18 +20,20 @@ function stageName(t) {
   return 'Out · Group stage';
 }
 
+function dashTeam(code) { return WCd.TEAMS[code] || { code: code || '?', name: code || 'TBD', flag: '🏳️', rounds: 0, stage: 'group', odds: '0' }; }
+
 function overallRank(me) {
   const rows = Sd.allSync().slice().sort((a, b) => {
-    const ta = WCd.TEAMS[a.team], tb = WCd.TEAMS[b.team];
+    const ta = dashTeam(a.team), tb = dashTeam(b.team);
     if (tb.rounds !== ta.rounds) return tb.rounds - ta.rounds;
-    return parseInt(ta.odds.slice(1)) - parseInt(tb.odds.slice(1));
+    return parseInt(String(ta.odds).slice(1) || '0') - parseInt(String(tb.odds).slice(1) || '0');
   });
   const i = rows.findIndex(p => p.id === me.id);
   return { rank: i < 0 ? rows.length : i + 1, total: rows.length };
 }
 
 function ProfileHeader(props) {
-  const me = props.me; const t = WCd.TEAMS[me.team];
+  const me = props.me; const t = dashTeam(me.team);
   const includeDept = Sd.includeDepartment ? Sd.includeDepartment() : true;
   return (
     <Cd bordered className="pop">
@@ -84,7 +86,7 @@ function EditProfile(props) {
 }
 
 function TeamCard(props) {
-  const me = props.me; const t = WCd.TEAMS[me.team];
+  const me = props.me; const t = dashTeam(me.team);
   const nextTie = (WCd.R16 || []).find(x => (x.a === me.team || x.b === me.team) && !x.done);
   const opp = nextTie ? WCd.TEAMS[nextTie.a === me.team ? nextTie.b : nextTie.a] : null;
   const pre = PRE();
@@ -161,7 +163,7 @@ function PredCard(props) {
 }
 
 function WinningsCard(props) {
-  const me = props.me; const t = WCd.TEAMS[me.team];
+  const me = props.me; const t = dashTeam(me.team);
   const pot = Sd.pot ? Sd.pot() : (WCd.POT * 0.5);
   const charity = Sd.charity ? Sd.charity() : (WCd.POT * 0.5);
   const ov = overallRank(me);
@@ -194,7 +196,7 @@ function WinningsCard(props) {
 }
 
 function ActivityFeed(props) {
-  const me = props.me; const t = WCd.TEAMS[me.team];
+  const me = props.me; const t = dashTeam(me.team);
   const pre = PRE();
   const items = [];
   if (pre) {
@@ -230,7 +232,7 @@ function MeScreen(props) {
   const me = Sd.active();
   const [edit, setEdit] = dState(false);
   if (!me) return null;
-  const t = WCd.TEAMS[me.team];
+  const t = dashTeam(me.team);
   const pre = PRE();
   const greetMood = pre ? 'happy' : (t.alive ? 'happy' : 'crying');
   return (

@@ -187,7 +187,7 @@
         if (m.answer == null) return;
         var pick = p.picks[m.key];
         if (pick == null) return;
-        if (m.kind === 'team2') { if (Array.isArray(pick) && Array.isArray(m.answer) && pick.slice().sort().join() === m.answer.slice().sort().join()) s += m.points; }
+        if (m.kind === 'team2') { if (Array.isArray(pick) && Array.isArray(m.answer) && pick.length === m.answer.length && pick.slice().sort().join() === m.answer.slice().sort().join()) s += m.points; }
         else if (pick === m.answer) s += m.points;
       });
       return s;
