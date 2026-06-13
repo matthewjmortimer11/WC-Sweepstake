@@ -147,15 +147,15 @@ function PreVerdict(){
       <div className="appbar" style={{padding:'2px 0 12px'}}>
         <div>
           <div className="dh" style={{fontSize:26}}>The Verdict</div>
-          <div style={{fontSize:13,fontWeight:600,color:'var(--ink2)'}}>Wheesht’s running commentary — once there’s something to comment on.</div>
+          <div style={{fontSize:13,fontWeight:600,color:'var(--ink2)'}}>Wheesht’s running commentary now the football has started.</div>
         </div>
       </div>
-      <Says2 mood="confident" label="pre-match" animate>Not a ball kicked yet. Wheesht is loosening the whistle, ironing the tartan, and watching every one of ye. Get yer predictions in.</Says2>
-      <SH2>Countdown</SH2>
+      <Says2 mood="broadcast" label="live" animate>The first whistle has gone. No hiding now: the sweepstake is live, the notes are being taken, and Wheesht is watching every one of ye.</Says2>
+      <SH2>Tournament status</SH2>
       <Card2 bordered style={{background:'var(--ink)',color:'#fff',textAlign:'center',padding:'22px 16px'}}>
-        <div style={{fontSize:11,fontWeight:800,letterSpacing:'.1em',color:'var(--yellow)',textTransform:'uppercase'}}>First whistle</div>
-        <div className="dh" style={{fontSize:34,margin:'4px 0 2px',color:'#fff'}}>{WC2.meta.kickoff || 'Soon'}</div>
-        <div style={{fontSize:13,fontWeight:600,opacity:.8}}>Group stage kicks off · {WC2.meta.season}</div>
+        <div style={{fontSize:11,fontWeight:800,letterSpacing:'.1em',color:'var(--yellow)',textTransform:'uppercase'}}>First whistle gone</div>
+        <div className="dh" style={{fontSize:34,margin:'4px 0 2px',color:'#fff'}}>Tournament live</div>
+        <div style={{fontSize:13,fontWeight:600,opacity:.8}}>Group stage underway · {WC2.meta.season}</div>
       </Card2>
       <SH2>Where it stands</SH2>
       <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:9}}>
@@ -166,9 +166,9 @@ function PreVerdict(){
           </Card2>
         ))}
       </div>
-      <SH2>Wheesht’s pre-match notes</SH2>
+      <SH2>Wheesht’s notes</SH2>
       {[
-        {m:'mischievous',t:'Predictions close at kick-off',d:'Every market’s open. After the first whistle, no takebacks. Wheesht has a long memory.'},
+        {m:'mischievous',t:'Predictions are closed',d:'The first whistle has gone. No takebacks now. Wheesht has a long memory.'},
         {m:'scottish',t:'The homeland watch',d:'Scotland are in the draw. Wheesht is, as ever, completely impartial about this.'},
         {m:'confident',t:'The pot grows with every sign-up',d:'Drag a colleague in. More entrants, bigger pot, more folk for Wheesht to judge.'},
       ].map((n,i)=>(

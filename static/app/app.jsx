@@ -1,6 +1,6 @@
 /* ===========================================================================
    APP SHELL — identity gate · onboarding flow · tab nav · account switcher ·
-   moment replays · admin tweaks.
+   admin tweaks.
    =========================================================================== */
 const A_WC = window.WC;
 const A_W = window.Wheesht;
@@ -38,7 +38,6 @@ function AppBar(props){
       <h1>{(A_WC.league&&A_WC.league.name)||A_WC.meta.name}</h1>
       <p>{A_WC.meta.season} · {A_WC.meta.stageLabel}</p>
     </div>
-    <button onClick={props.onMoments} className="wc-btn wc-btn--sm" style={{padding:'8px 11px',boxShadow:'0 4px 0 var(--shadow)'}}>Moments</button>
     {me && <button onClick={props.onAccount} style={{border:'none',background:'none',cursor:'pointer',padding:0,marginLeft:2}}>
       <window.Avatar person={Object.assign({},me,{isYou:false})} size={40}/>
     </button>}
@@ -98,35 +97,6 @@ function AccountSheet(props){
   </div>;
 }
 
-/* ---- moments / replays ---- */
-function MomentMenu(props){
-  const me = props.me; const myTeam = me ? A_WC.TEAMS[me.team] : null;
-  const items=[
-    ['draw','See your draw again', myTeam?('You drew '+myTeam.name):'Your team reveal','confident'],
-    ['scotland','Replay: You drew Scotland','The full tartan meltdown','scottish'],
-    ['england','Replay: You drew England','Wheesht stays professional. Barely.','mischievous'],
-    ['result','Tonight’s result','Norway 2–1 England','shocked'],
-    ['final','The final','Spain vs France · the ceremony','celebrating'],
-  ];
-  return <div style={{position:'absolute',inset:0,zIndex:70,display:'flex',flexDirection:'column',justifyContent:'flex-end'}}>
-    <div onClick={props.onClose} style={{position:'absolute',inset:0,background:'rgba(26,26,26,.45)'}}/>
-    <div className="rise" style={{position:'relative',background:'var(--bg)',borderRadius:'26px 26px 0 0',padding:'18px 18px 28px',boxShadow:'0 -20px 50px rgba(0,0,0,.3)'}}>
-      <div style={{width:44,height:5,borderRadius:3,background:'var(--line)',margin:'0 auto 14px'}}/>
-      <div className="dh" style={{fontSize:22,marginBottom:4}}>Relive a moment</div>
-      <div style={{fontSize:13,fontWeight:600,color:'var(--ink2)',marginBottom:12}}>Every big beat of the sweepstake. Wheesht included, obviously.</div>
-      <div style={{display:'flex',flexDirection:'column',gap:9}}>
-        {items.map(it=>(
-          <button key={it[0]} onClick={()=>props.onPick(it[0])} style={{display:'flex',alignItems:'center',gap:12,background:'#fff',border:'2.5px solid var(--ink)',borderRadius:16,padding:'9px 13px',cursor:'pointer',textAlign:'left',boxShadow:'0 4px 0 var(--ink)'}}>
-            <A_W mood={it[3]} size={46}/>
-            <div style={{flex:1,minWidth:0}}><div className="dh" style={{fontSize:16}}>{it[1]}</div><div style={{fontSize:12,fontWeight:600,color:'var(--ink2)'}}>{it[2]}</div></div>
-            <span className="dh" style={{fontSize:20}}>→</span>
-          </button>
-        ))}
-      </div>
-    </div>
-  </div>;
-}
-
 const TW_DEFAULTS = /*EDITMODE-BEGIN*/{
   "celebration": 8,
   "accent": "#E8272A",
@@ -140,8 +110,6 @@ function App(){
   const [tab,setTab]=aState('me');
   const [flow,setFlow]=aState(me?'app':'gate'); // gate | find | form | app
   const [draw,setDraw]=aState(null);            // {forceTeam, replay}
-  const [overlay,setOverlay]=aState(null);       // 'result' | 'final'
-  const [menu,setMenu]=aState(false);
   const [account,setAccount]=aState(false);
   const [admin,setAdmin]=aState(false);
   const [organiser,setOrganiser]=aState(false); // true while creating a league
@@ -230,18 +198,10 @@ function App(){
   return <React.Fragment>
     <StatusBar/>
     <div className="scroll" key={tab+(me?me.id:'')}>
-      <AppBar me={me} onMoments={()=>setMenu(true)} onAccount={()=>setAccount(true)}/>
+      <AppBar me={me} onAccount={()=>setAccount(true)}/>
       {screens[tab]}
     </div>
     <TabBar tab={tab} setTab={setTab}/>
-
-    {menu && <MomentMenu me={me} onClose={()=>setMenu(false)} onPick={(m)=>{
-      setMenu(false);
-      if(m==='draw') setDraw({forceTeam:me.team,replay:true});
-      else if(m==='scotland') setDraw({forceTeam:'SCO',replay:true});
-      else if(m==='england') setDraw({forceTeam:'ENG',replay:true});
-      else setOverlay(m);
-    }}/>}
 
     {account && <AccountSheet onClose={()=>setAccount(false)}
       onAdd={()=>{setAccount(false);setFlow('form');}}
@@ -251,8 +211,6 @@ function App(){
 
     {draw && <window.DrawMoment participant={draw.participant} forceTeam={draw.forceTeam}
       onDone={()=>{ const wasReplay=draw.replay; setDraw(null); if(!wasReplay){ setTab('me'); setTimeout(()=>window.wcConfetti&&window.wcConfetti({y:.4}),200);} }}/>}
-    {overlay==='result' && <window.ResultMoment onDone={()=>setOverlay(null)}/>}
-    {overlay==='final' && <window.FinalMoment onDone={()=>setOverlay(null)}/>}
     {admin && <window.AdminGate onClose={()=>setAdmin(false)}/>}
 
     <window.ToastLayer/>

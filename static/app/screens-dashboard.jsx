@@ -203,7 +203,7 @@ function ActivityFeed(props) {
     items.push({ m: 'confident', t: 'You drew ' + t.name + ' ' + t.flag, d: 'Group ' + t.group + '. Locked in. May the football gods be kind.', when: 'just now' });
     if (submitted < totalMkts) items.push({ m: 'mischievous', t: 'Predictions are open', d: (totalMkts - submitted) + ' still to call before kick-off. Get them in.', when: 'now' });
     else items.push({ m: 'happy', t: 'All predictions in', d: 'Every market called. Wheesht has them in writing.', when: 'now' });
-    items.push({ m: 'broadcast', t: 'Tournament kicks off', d: (WCd.meta.kickoff || 'Soon') + ' — first whistle of the group stage.', when: 'upcoming' });
+    items.push({ m: 'broadcast', t: 'Tournament is underway', d: 'The first whistle has gone. Wheesht is taking notes.', when: 'live' });
     items.push({ m: 'neutral', t: 'You entered the sweepstake', d: 'Buy-in confirmed. £' + WCd.FEE + ' in the pot. Welcome aboard.', when: 'on joining' });
   } else {
     if (!t.alive) items.push({ m: 'crying', t: t.name + ' knocked out', d: stageName(t) + ' — your run ends here. The side game awaits.', when: '2h ago' });

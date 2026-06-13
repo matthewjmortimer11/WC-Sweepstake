@@ -15,6 +15,7 @@ function ChatScreen() {
   const [err, setErr] = cState(false);
   const listRef = cRef(null);
   const isLive = !!window.WC_LIVE;
+  const leagueCode = Sch.leagueCode && Sch.leagueCode();
 
   function scrollBottom() {
     setTimeout(function() {
@@ -23,35 +24,50 @@ function ChatScreen() {
   }
 
   function load() {
-    if (!Sch.leagueCode || !Sch.leagueCode()) return;
-    fetch(Sch.api('/chat')).then(function(r) { return r.json(); }).then(function(data) {
-      setMsgs(data);
+    if (!leagueCode) {
+      setMsgs([]);
+      setErr(false);
+      return;
+    }
+    fetch(Sch.api('/chat')).then(function(r) {
+      return r.json().then(function(data) {
+        if (!r.ok) throw new Error((data && data.detail) || 'Chat failed');
+        return data;
+      });
+    }).then(function(data) {
+      setMsgs(Array.isArray(data) ? data : []);
       setErr(false);
     }).catch(function() { setErr(true); });
   }
 
   cEffect(function() {
-    if (!isLive) return;
+    if (!isLive || !leagueCode) return;
     load();
     scrollBottom();
     var iv = setInterval(load, 15000);
     return function() { clearInterval(iv); };
-  }, []);
+  }, [isLive, leagueCode]);
 
   cEffect(function() { scrollBottom(); }, [msgs.length]);
 
   function send() {
-    if (!text.trim() || !me || busy) return;
+    if (!text.trim() || !me || busy || !leagueCode) return;
     setBusy(true);
     fetch(Sch.api('/chat'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ author_id: me.id, text: text.trim() }),
-    }).then(function(r) { return r.json(); }).then(function(msg) {
-      setMsgs(function(prev) { return prev.concat([msg]); });
+    }).then(function(r) {
+      return r.json().then(function(msg) {
+        if (!r.ok) throw new Error((msg && msg.detail) || 'Message failed');
+        return msg;
+      });
+    }).then(function(msg) {
+      if (msg && msg.id) setMsgs(function(prev) { return prev.concat([msg]); });
       setText('');
       setBusy(false);
-    }).catch(function() { setBusy(false); });
+      setErr(false);
+    }).catch(function() { setBusy(false); setErr(true); });
   }
 
   if (!isLive) {
@@ -66,6 +82,18 @@ function ChatScreen() {
     );
   }
 
+  if (!leagueCode) {
+    return (
+      <div style={{ padding: '48px 22px', textAlign: 'center' }}>
+        <Wch mood="neutral" size={88} animate />
+        <div className="dh" style={{ fontSize: 22, marginTop: 12 }}>Group chat</div>
+        <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--ink2)', marginTop: 8, lineHeight: 1.5 }}>
+          Join or create a league to use chat.
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 168px)' }}>
 
@@ -73,14 +101,14 @@ function ChatScreen() {
       <div ref={listRef} style={{ flex: 1, overflowY: 'auto', padding: '14px 14px 6px' }}>
         {msgs.length === 0 && !err && (
           <div style={{ textAlign: 'center', padding: '44px 0', color: 'var(--ink2)', fontSize: 13.5, fontWeight: 600 }}>
-            <Wch mood="waiting" size={64} animate />
+            <Wch mood="neutral" size={64} animate />
             <div style={{ marginTop: 8 }}>Nothing yet. Wheesht is listening.</div>
           </div>
         )}
         {err && (
-          <div style={{ textAlign: 'center', padding: '32px 0', color: 'var(--ink2)', fontSize: 13 }}>
+          <button onClick={load} style={{ width: '100%', border: 'none', background: 'none', cursor: 'pointer', textAlign: 'center', padding: '32px 0', color: 'var(--ink2)', fontFamily: 'var(--body)', fontSize: 13, fontWeight: 700 }}>
             Couldn't load messages — tap to retry.
-          </div>
+          </button>
         )}
         {msgs.map(function(msg) {
           var isMe = me && msg.author_id === me.id;
