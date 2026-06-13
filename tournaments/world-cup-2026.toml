@@ -26,6 +26,17 @@ special_teams = ["SCO", "ENG"]
 fee = 5              # £ per entry
 charity_split = 0.5  # fraction of every entry that goes to charity
 
+# The pre-seeded sweepstake league. Entering this code + password at sign-up
+# reveals the [[roster]] below (the existing office sweepstake). Other people
+# create their OWN league instead — see the league model in main.py. The League
+# row is seeded into Postgres on startup from these values (password is hashed,
+# never stored or sent in plaintext).
+[league]
+code = "OI"
+name = "The Office Sweepstake"
+password = "Unsweepstake"
+seeded = true
+
 [stage_labels]
 group  = "Group stage"
 r32    = "Round of 32"
@@ -536,10 +547,6 @@ team = "QAT"
 id = "oi-08"
 name = "Alex Cole"
 team = "BIH"
-[[roster]]
-id = "oi-09"
-name = "Matthew Mortimer"
-team = "BRA"
 [[roster]]
 id = "oi-10"
 name = "John Anthony"

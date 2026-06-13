@@ -23,7 +23,8 @@ function ChatScreen() {
   }
 
   function load() {
-    fetch('/api/chat').then(function(r) { return r.json(); }).then(function(data) {
+    if (!Sch.leagueCode || !Sch.leagueCode()) return;
+    fetch(Sch.api('/chat')).then(function(r) { return r.json(); }).then(function(data) {
       setMsgs(data);
       setErr(false);
     }).catch(function() { setErr(true); });
@@ -42,7 +43,7 @@ function ChatScreen() {
   function send() {
     if (!text.trim() || !me || busy) return;
     setBusy(true);
-    fetch('/api/chat', {
+    fetch(Sch.api('/chat'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ author_id: me.id, text: text.trim() }),

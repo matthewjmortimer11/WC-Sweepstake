@@ -220,7 +220,7 @@ function AdminPanel(props) {
         <Wa mood="confident" size={44} />
         <div style={{ flex: 1 }}>
           <div className="dh" style={{ fontSize: 20, color: '#fff', lineHeight: 1 }}>Wheesht's clipboard</div>
-          <div style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--yellow)' }}>Admin · {Sa.teamsAlive()} teams in · {Sa.allSync().length} entrants</div>
+          <div style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--yellow)' }}>{(Sa.activeLeague && Sa.activeLeague()) ? Sa.activeLeague().name : 'Admin'} · {Sa.allSync().length} entrants</div>
         </div>
         <button onClick={props.onClose} style={{ border: 'none', background: 'rgba(255,255,255,.16)', color: '#fff', width: 34, height: 34, borderRadius: 10, fontSize: 18, fontWeight: 900, cursor: 'pointer' }}>×</button>
       </div>
@@ -323,7 +323,7 @@ function ChatAdmin() {
   const isLive = !!window.WC_LIVE;
 
   function load() {
-    fetch('/api/chat').then(r => r.json()).then(d => {
+    fetch(Sa.api('/chat')).then(r => r.json()).then(d => {
       setMsgs((d || []).slice().reverse());
       setLoading(false);
     }).catch(() => setLoading(false));
@@ -332,7 +332,7 @@ function ChatAdmin() {
 
   function del(id) {
     if (!window.confirm('Delete this message for everyone? This cannot be undone.')) return;
-    fetch('/api/chat/' + id, { method: 'DELETE' })
+    fetch(Sa.api('/chat/' + id), { method: 'DELETE' })
       .then(() => setMsgs(prev => prev.filter(m => m.id !== id)))
       .catch(() => {});
   }

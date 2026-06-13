@@ -104,6 +104,7 @@ def _build_fixtures(cfg: dict, teams: list[dict]) -> list[dict]:
 def _build_people(cfg: dict, teams: list[dict]) -> list[dict]:
     """Build the pre-seeded participant list from the [[roster]] config section."""
     roster = cfg.get("roster", [])
+    league_code = (cfg.get("league") or {}).get("code", "OI")
     team_map = {t["code"]: t for t in teams}
     people = []
     for i, entry in enumerate(roster):
@@ -127,6 +128,7 @@ def _build_people(cfg: dict, teams: list[dict]) -> list[dict]:
             "isYou": False,
             "isDemo": False,
             "isOI": True,
+            "leagueCode": league_code,
             "picks": {},
             "predScore": 0,
             "joinedAt": 0,
@@ -167,6 +169,15 @@ def generate_wc_data(tournament: str | None = None) -> dict:
     ]
 
     lines = dict(cfg["lines"])
+
+    # Public descriptor for the pre-seeded league (password intentionally omitted
+    # — it is hashed into Postgres on startup and never travels to the client).
+    league_cfg = cfg.get("league") or {}
+    league = {
+        "code": league_cfg.get("code", "OI"),
+        "name": league_cfg.get("name", cfg["sweepstake_name"]),
+        "seeded": bool(league_cfg.get("seeded", True)),
+    }
 
     still_in = sum(1 for p in people if p["alive"])
     out_count = sum(1 for p in people if not p["alive"])
@@ -209,5 +220,20 @@ def generate_wc_data(tournament: str | None = None) -> dict:
         "charitySplit": charity_split,
         "payouts": payouts,
         "lines": lines,
+        "league": league,
         "meta": meta,
+    }
+
+
+def get_league_seed(tournament: str | None = None) -> dict:
+    """Seed values for the pre-assigned league, including the plaintext password
+    from config (used once at startup to create/refresh the hashed League row).
+    Never expose this to the client."""
+    cfg = load_config(tournament)
+    league_cfg = cfg.get("league") or {}
+    return {
+        "code": league_cfg.get("code", "OI"),
+        "name": league_cfg.get("name", cfg["sweepstake_name"]),
+        "password": league_cfg.get("password", ""),
+        "seeded": bool(league_cfg.get("seeded", True)),
     }
