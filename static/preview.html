@@ -21,6 +21,7 @@ body{
   font-family:var(--body); color:var(--ink); background:#201f1c;
   background:radial-gradient(120% 90% at 50% 0%, #2b2925 0%, #1a1916 80%);
   display:flex; align-items:center; justify-content:center; overflow:hidden;
+  -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale; text-rendering:optimizeLegibility;
 }
 button{font-family:inherit;}
 .dh{font-family:var(--disp); font-weight:800; letter-spacing:-.02em; line-height:.98;}
@@ -48,12 +49,19 @@ button{font-family:inherit;}
 .notch{position:absolute;top:11px;left:50%;transform:translateX(-50%);width:108px;height:30px;background:#0e0d0c;border-radius:18px;z-index:40;}
 
 /* ---------- scroll body ---------- */
-.scroll{flex:1 1 auto; overflow-y:auto; overflow-x:hidden; position:relative; -webkit-overflow-scrolling:touch;}
+.scroll{flex:1 1 auto; overflow-y:auto; overflow-x:hidden; position:relative; -webkit-overflow-scrolling:touch;
+  overscroll-behavior-y:contain;}
 .scroll::-webkit-scrollbar{width:0;height:0;}
-.pad{padding:6px 18px 120px;}
+.pad{padding:6px 18px 124px;}
 
 /* ---------- top app bar ---------- */
-.appbar{display:flex;align-items:center;gap:11px;padding:4px 18px 12px;}
+/* Sticky + frosted so content scrolls cleanly beneath it (native feel). */
+.appbar{display:flex;align-items:center;gap:11px;padding:10px 18px 12px;position:sticky;top:0;z-index:20;
+  background:rgba(244,238,227,.82);-webkit-backdrop-filter:saturate(1.4) blur(14px);backdrop-filter:saturate(1.4) blur(14px);
+  -webkit-user-select:none;user-select:none;}
+.appbar::after{content:'';position:absolute;left:0;right:0;bottom:0;height:1px;
+  background:linear-gradient(90deg,transparent,var(--line) 18%,var(--line) 82%,transparent);opacity:0;transition:opacity .25s;}
+.appbar.is-stuck::after{opacity:1;}
 .appbar .mk{width:46px;height:46px;border-radius:50%;background:var(--yellow);border:2.5px solid var(--ink);
   display:flex;align-items:center;justify-content:center;overflow:hidden;flex:0 0 auto;box-shadow:0 3px 0 var(--ink);}
 .appbar h1{font-family:var(--disp);font-weight:800;font-size:18px;margin:0;line-height:1;letter-spacing:-.02em;}
@@ -61,7 +69,7 @@ button{font-family:inherit;}
 
 /* ---------- cards ---------- */
 .wc-card{background:var(--surface);border-radius:var(--r);padding:16px;
-  box-shadow:0 3px 0 var(--shadow), 0 14px 30px -18px rgba(26,26,26,.5);position:relative;}
+  box-shadow:0 3px 0 var(--shadow), 0 18px 36px -22px rgba(26,26,26,.42), inset 0 1px 0 rgba(255,255,255,.55);position:relative;}
 .wc-card--bd{border:2.5px solid var(--ink);box-shadow:0 5px 0 var(--ink);}
 .wc-card--flat{box-shadow:none;border:2px solid var(--line);}
 
@@ -121,13 +129,24 @@ button{font-family:inherit;}
 
 /* ---------- tab bar ---------- */
 .tabbar{position:absolute;left:0;right:0;bottom:0;height:84px;display:flex;align-items:flex-start;
-  padding:10px 12px 0;gap:2px;background:linear-gradient(180deg,rgba(244,238,227,0) 0%,var(--bg) 26%);z-index:25;}
+  padding:10px 12px 0;gap:2px;background:linear-gradient(180deg,rgba(244,238,227,0) 0%,var(--bg) 26%);z-index:25;
+  -webkit-user-select:none;user-select:none;}
 .tabbar button{flex:1;border:none;background:none;cursor:pointer;display:flex;flex-direction:column;
-  align-items:center;gap:3px;padding:6px 0;color:var(--ink2);font-weight:700;font-size:10.5px;font-family:var(--body);}
-.tabbar button.on{color:var(--ink);}
-.tabbar .ic{width:26px;height:26px;display:flex;align-items:center;justify-content:center;}
-.tabbar button.on .ic svg{transform:scale(1.06);}
-.tabdot{width:5px;height:5px;border-radius:50%;background:var(--red);margin-top:1px;}
+  align-items:center;gap:3px;padding:6px 0;color:var(--ink2);font-weight:700;font-size:10.5px;font-family:var(--body);
+  transition:color .2s ease;}
+.tabbar button.on{color:var(--ink);font-weight:800;}
+.tabbar .ic{width:26px;height:26px;display:flex;align-items:center;justify-content:center;position:relative;z-index:1;
+  transition:transform .26s cubic-bezier(.2,1.3,.4,1);}
+/* soft capsule that pops in behind the active icon — no layout shift */
+.tabbar .ic::before{content:'';position:absolute;inset:-6px -13px;border-radius:999px;z-index:-1;
+  background:var(--yellow);box-shadow:inset 0 0 0 1.5px rgba(26,26,26,.10);
+  transform:scale(.6);opacity:0;transition:transform .26s cubic-bezier(.2,1.3,.4,1),opacity .2s ease;}
+.tabbar button.on .ic::before{transform:scale(1);opacity:1;}
+.tabbar button.on .ic{transform:translateY(-1px);}
+.tabbar button.on .ic svg{transform:scale(1.04);}
+.tabbar button:active .ic{transform:scale(.9);}
+.tabdot{width:5px;height:5px;border-radius:50%;background:var(--red);margin-top:1px;
+  box-shadow:0 0 0 2px var(--bg);}
 .tabbar--5 button{font-size:10px;}
 .tabbar--5 .ic{width:24px;height:24px;}
 .tabbar--5 .ic svg{width:23px;height:23px;}
@@ -285,6 +304,24 @@ body.motion-off .phone{animation:none;}
   .scroll{animation:none !important;}
 }
 
+/* ---------- polish: tactile feedback, focus, inputs ---------- */
+/* Springy press for any tappable row/card that opts in. */
+.tap{transition:transform .12s cubic-bezier(.2,.8,.2,1);cursor:pointer;}
+.tap:active{transform:scale(.98);}
+.wc-chip{transition:transform .1s ease;}
+.wc-chip:active{transform:scale(.94);}
+/* Accessible, on-brand focus ring for keyboard users (mouse/touch stay clean). */
+input,textarea,select{transition:border-color .15s ease,box-shadow .15s ease;}
+input:focus-visible,textarea:focus-visible,select:focus-visible{
+  border-color:var(--ink)!important;box-shadow:0 0 0 3px rgba(245,200,0,.45);outline:none;}
+button:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(245,200,0,.55);border-radius:12px;}
+/* Avatar button in the app bar gets a gentle press. */
+.appbar button{transition:transform .12s ease;}
+.appbar button:active{transform:scale(.92);}
+@media (prefers-reduced-motion:reduce){
+  .tabbar .ic,.tabbar .ic::before,.tabbar button{transition:none!important;}
+}
+
 /* ---------- responsive: full-screen on real phones ---------- */
 @media (max-width:560px){
   body{background:var(--bg);display:block;overflow:hidden;}
@@ -343,21 +380,21 @@ body.motion-off .phone{animation:none;}
 
 <!-- Single source of truth: generated from wc_data.py by scripts/build_snapshot.py.
      No-op when the server injects window.WC_DATA above (live mode). -->
-<script src="app/wc-snapshot.js?v=20260613-hardening"></script>
-<script src="app/data.js?v=20260613-hardening"></script>
-<script src="app/store.js?v=20260613-hardening"></script>
-<script type="text/babel" src="app/wheesht-mascot.jsx?v=20260613-hardening"></script>
-<script type="text/babel" src="app/ui.jsx?v=20260613-hardening"></script>
-<script type="text/babel" src="tweaks-panel.jsx?v=20260613-hardening"></script>
-<script type="text/babel" src="app/screens-hub.jsx?v=20260613-hardening"></script>
-<script type="text/babel" src="app/screens-hub2.jsx?v=20260613-hardening"></script>
-<script type="text/babel" src="app/screens-onboarding.jsx?v=20260613-hardening"></script>
-<script type="text/babel" src="app/screens-dashboard.jsx?v=20260613-hardening"></script>
-<script type="text/babel" src="app/screens-predictions.jsx?v=20260613-hardening"></script>
-<script type="text/babel" src="app/screens-games.jsx?v=20260613-hardening"></script>
-<script type="text/babel" src="app/screens-admin.jsx?v=20260613-hardening"></script>
-<script type="text/babel" src="app/screens-chat.jsx?v=20260613-hardening"></script>
-<script type="text/babel" src="app/app.jsx?v=20260613-hardening"></script>
-<script type="text/babel" src="app/stage.jsx?v=20260613-hardening"></script>
+<script src="app/wc-snapshot.js?v=20260613-ui-polish"></script>
+<script src="app/data.js?v=20260613-ui-polish"></script>
+<script src="app/store.js?v=20260613-ui-polish"></script>
+<script type="text/babel" src="app/wheesht-mascot.jsx?v=20260613-ui-polish"></script>
+<script type="text/babel" src="app/ui.jsx?v=20260613-ui-polish"></script>
+<script type="text/babel" src="tweaks-panel.jsx?v=20260613-ui-polish"></script>
+<script type="text/babel" src="app/screens-hub.jsx?v=20260613-ui-polish"></script>
+<script type="text/babel" src="app/screens-hub2.jsx?v=20260613-ui-polish"></script>
+<script type="text/babel" src="app/screens-onboarding.jsx?v=20260613-ui-polish"></script>
+<script type="text/babel" src="app/screens-dashboard.jsx?v=20260613-ui-polish"></script>
+<script type="text/babel" src="app/screens-predictions.jsx?v=20260613-ui-polish"></script>
+<script type="text/babel" src="app/screens-games.jsx?v=20260613-ui-polish"></script>
+<script type="text/babel" src="app/screens-admin.jsx?v=20260613-ui-polish"></script>
+<script type="text/babel" src="app/screens-chat.jsx?v=20260613-ui-polish"></script>
+<script type="text/babel" src="app/app.jsx?v=20260613-ui-polish"></script>
+<script type="text/babel" src="app/stage.jsx?v=20260613-ui-polish"></script>
 </body>
 </html>

@@ -32,7 +32,16 @@ function StatusBar(){
 
 function AppBar(props){
   const me = props.me;
-  return <div className="appbar">
+  const ref = React.useRef(null);
+  React.useEffect(()=>{
+    const bar = ref.current; if(!bar) return;
+    const sc = bar.closest('.scroll'); if(!sc) return;
+    const onScroll = ()=>{ bar.classList.toggle('is-stuck', sc.scrollTop>4); };
+    onScroll();
+    sc.addEventListener('scroll', onScroll, {passive:true});
+    return ()=> sc.removeEventListener('scroll', onScroll);
+  },[]);
+  return <div className="appbar" ref={ref}>
     <div className="mk"><A_W mood="confident" size={42}/></div>
     <div style={{flex:1,minWidth:0}}>
       <h1>{(A_WC.league&&A_WC.league.name)||A_WC.meta.name}</h1>
