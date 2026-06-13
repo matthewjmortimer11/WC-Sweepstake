@@ -13,6 +13,7 @@ import json
 import logging
 import os
 import threading
+import uuid
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Optional, Any, Dict, List
@@ -40,7 +41,9 @@ _HTML_TEMPLATE = Path("templates/index.html").read_text(encoding="utf-8")
 _DATA_DIR = Path("data")
 _PARTICIPANTS_FILE = _DATA_DIR / "participants.json"
 _ADMIN_FILE = _DATA_DIR / "admin.json"
+_CHAT_FILE = _DATA_DIR / "chat.json"
 _lock = threading.Lock()
+_MAX_CHAT = 200
 
 
 def _load_participants() -> List[Dict[str, Any]]:
@@ -66,6 +69,23 @@ def _load_admin() -> Dict[str, Any]:
         except (json.JSONDecodeError, OSError):
             pass
     return {"teams": {}, "fixtures": {}, "predictions": {}, "meta": {}}
+
+
+def _load_chat() -> List[Dict[str, Any]]:
+    if _CHAT_FILE.exists():
+        try:
+            return json.loads(_CHAT_FILE.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            return []
+    return []
+
+
+def _save_chat(messages: List[Dict[str, Any]]) -> None:
+    _DATA_DIR.mkdir(exist_ok=True)
+    _CHAT_FILE.write_text(
+        json.dumps(messages[-_MAX_CHAT:], ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
 
 
 def _save_admin(data: Dict[str, Any]) -> None:
@@ -277,6 +297,47 @@ async def put_admin(payload: AdminPayload):
     """Persist admin overrides (score corrections etc.) to data/admin.json."""
     _save_admin(payload.model_dump())
     return {"ok": True}
+
+
+class ChatPayload(BaseModel):
+    author_id: str
+    text: str
+
+
+@app.get("/api/chat")
+async def get_chat():
+    """Return the last 100 chat messages."""
+    return _load_chat()[-100:]
+
+
+@app.post("/api/chat")
+async def post_chat(payload: ChatPayload):
+    """Append a message from the given participant."""
+    text = payload.text.strip()[:280]
+    if not text:
+        raise HTTPException(status_code=400, detail="empty message")
+
+    people = _merged_people()
+    person = next((p for p in people if p.get("id") == payload.author_id), None)
+    if not person:
+        raise HTTPException(status_code=400, detail="unknown participant")
+
+    import time as _time
+    msg = {
+        "id": uuid.uuid4().hex[:10],
+        "author_id": payload.author_id,
+        "author": person["name"],
+        "initials": person.get("initials", "?"),
+        "color": person.get("color", "#333"),
+        "team": person.get("team", ""),
+        "text": text,
+        "ts": int(_time.time() * 1000),
+    }
+    with _lock:
+        messages = _load_chat()
+        messages.append(msg)
+        _save_chat(messages)
+    return msg
 
 
 # ── Static file serving ───────────────────────────────────────────────────────

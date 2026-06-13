@@ -15,6 +15,7 @@ function Icon(props){
   if(props.name==='me') return <svg width="26" height="26" viewBox="0 0 24 24"><circle cx="12" cy="8.5" r="3.6" {...common}/><path d="M5 19.5c0-3.6 3.1-5.5 7-5.5s7 1.9 7 5.5" {...common}/></svg>;
   if(props.name==='players') return <svg width="26" height="26" viewBox="0 0 24 24"><circle cx="8.5" cy="9" r="2.8" {...common}/><circle cx="16" cy="9.5" r="2.3" {...common}/><path d="M3.5 18c0-2.8 2.2-4.3 5-4.3s5 1.5 5 4.3M14 17.6c0-2 .9-3.4 3.4-3.4 2 0 3.1 1.2 3.1 3" {...common}/></svg>;
   if(props.name==='predictions') return <svg width="26" height="26" viewBox="0 0 24 24"><path d="M12 3.5l2.4 4.9 5.4.8-3.9 3.8.9 5.4-4.8-2.5-4.8 2.5.9-5.4L4.2 9.2l5.4-.8z" {...common}/></svg>;
+  if(props.name==='chat') return <svg width="26" height="26" viewBox="0 0 24 24"><path d="M4 4h16a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H8l-4 4V6a2 2 0 0 1 2-2z" {...common}/></svg>;
   return <svg width="26" height="26" viewBox="0 0 24 24"><rect x="5" y="3.5" width="14" height="17" rx="2.5" {...common}/><line x1="8.5" y1="8" x2="15.5" y2="8" {...common}/><line x1="8.5" y1="12" x2="15.5" y2="12" {...common}/><line x1="8.5" y1="16" x2="13" y2="16" {...common}/></svg>;
 }
 
@@ -45,8 +46,8 @@ function AppBar(props){
 }
 
 function TabBar(props){
-  const tabs=[['me','You'],['games','Games'],['players','Players'],['predictions','Predict'],['summary','Verdict']];
-  return <div className="tabbar tabbar--5">
+  const tabs=[['me','You'],['games','Games'],['players','Players'],['predictions','Predict'],['chat','Chat'],['summary','Verdict']];
+  return <div className="tabbar tabbar--6">
     {tabs.map(([k,lab])=>(
       <button key={k} className={props.tab===k?'on':''} onClick={()=>props.setTab(k)}>
         <span className="ic"><Icon name={k}/></span>
@@ -209,6 +210,7 @@ function App(){
     games:<window.GamesScreen/>,
     players:<window.TrackerScreen/>,
     predictions:<window.PredictionsScreen/>,
+    chat:<window.ChatScreen/>,
     summary:<window.SummaryScreen/>,
   };
 
