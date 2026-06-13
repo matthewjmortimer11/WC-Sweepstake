@@ -204,11 +204,11 @@ function AdminPanel(props) {
    const [sec, setSec] = aState2('results');
    const [mdFilter, setMdFilter] = aState2(0);
    const owned = {};
-   Sa.allSync().forEach(p => { owned[p.team] = (owned[p.team] || 0) + 1; });
+   const allPeople = Sa.allSync() || [];
+   allPeople.forEach(p => { owned[p.team] = (owned[p.team] || 0) + 1; });
 
    const groups = 'ABCDEFGHIJKL'.split('');
    const fixtures = (WCa.FIXTURES || []).filter(f => mdFilter === 0 || f.matchday === mdFilter);
-   // group fixtures by date
    const byDate = []; const seen = {};
    fixtures.forEach(f => { if (!seen[f.dateISO]) { seen[f.dateISO] = { label: f.dateLabel, items: [] }; byDate.push(seen[f.dateISO]); } seen[f.dateISO].items.push(f); });
 
@@ -220,9 +220,9 @@ function AdminPanel(props) {
          <Wa mood="confident" size={44} />
          <div style={{ flex: 1 }}>
            <div className="dh" style={{ fontSize: 20, color: '#fff', lineHeight: 1 }}>Wheesht's clipboard</div>
-           <div style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--yellow)' }}>{(Sa.activeLeague && Sa.activeLeague()) ? Sa.activeLeague().name : 'Admin'} · {Sa.allSync().length} entrants</div>
+           <div style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--yellow)' }}>{(Sa.activeLeague && Sa.activeLeague()) ? Sa.activeLeague().name : 'Admin'} · {allPeople.length} entrants</div>
          </div>
-         <button onClick={props.onClose} style={{ border: 'none', background: 'rgba(255,255,255,.16)', color: '#fff', width: 34, height: 34, borderRadius: 10, fontSize: 18, fontWeight: 900, cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
+         <button onClick={props.onClose} style={{ border: 'none', background: 'rgba(255,255,255,.16)', color: '#fff', width: 34, height: 34, borderRadius: 10, fontSize: 18, fontWeight: 900, cursor: 'pointer', padding: 0 }}>✕</button>
        </div>
 
        <div className="mscroll" style={{ padding: '16px 18px 30px' }}>
