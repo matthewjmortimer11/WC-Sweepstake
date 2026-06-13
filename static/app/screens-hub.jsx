@@ -243,9 +243,9 @@ function StageFunnel(){
   const P = window.Store ? window.Store.allSync() : WC.PEOPLE;
   const stages = [
     {label:'Entered', n:P.length, sub:'the draw'},
-    {label:'Past groups', n:P.filter(p=>WC.TEAMS[p.team].rounds>=2).length, sub:'Top 2 + best 3rds'},
-    {label:'Past R32', n:P.filter(p=>WC.TEAMS[p.team].rounds>=3).length, sub:'Last 16'},
-    {label:'Into QFs', n:P.filter(p=>WC.TEAMS[p.team].rounds>=4).length, sub:'Last 8'},
+    {label:'Past groups', n:P.filter(p=>(WC.TEAMS[p.team]||{rounds:0}).rounds>=2).length, sub:'Top 2 + best 3rds'},
+    {label:'Past R32', n:P.filter(p=>(WC.TEAMS[p.team]||{rounds:0}).rounds>=3).length, sub:'Last 16'},
+    {label:'Into QFs', n:P.filter(p=>(WC.TEAMS[p.team]||{rounds:0}).rounds>=4).length, sub:'Last 8'},
   ];
   const max=P.length;
   return (
@@ -267,7 +267,7 @@ function StageFunnel(){
 }
 
 function PersonRow(props){
-  const p=props.person; const t=WC.TEAMS[p.team]; const you=props.you;
+  const p=props.person; const t=WC.TEAMS[p.team]||{code:p.team||'?',flag:'🏳️',rounds:0,stage:'group'}; const you=props.you;
   const pts = window.Store ? window.Store.predScoreOf(p) : (p.predScore||0);
   const includeDept = window.Store && window.Store.includeDepartment ? window.Store.includeDepartment() : true;
   return (
@@ -300,6 +300,7 @@ function TrackerScreen(){
   const P = window.Store ? window.Store.allSync() : WC.PEOPLE;
   const youId = window.Store ? window.Store.activeId() : null;
   const includeDept = window.Store && window.Store.includeDepartment ? window.Store.includeDepartment() : true;
+  React.useEffect(function(){ if(!includeDept) setDept(''); }, [includeDept]);
   const depts = Array.from(new Set(P.map(p=>p.department).filter(Boolean))).sort();
   const filters=[['all','Everyone'],['in','Still in'],['out','Out'],['London','London'],['Edinburgh','Edinburgh'],['lt','LT members']];
   let list=P.slice();
@@ -308,7 +309,7 @@ function TrackerScreen(){
   else if(filter==='London'||filter==='Edinburgh') list=list.filter(p=>(p.location||p.city)===filter);
   else if(filter==='lt') list=list.filter(p=>p.ltMember||p.leadership);
   if(includeDept && dept) list=list.filter(p=>p.department===dept);
-  list.sort((a,b)=>{ if(a.id===youId)return -1; if(b.id===youId)return 1; return WC.TEAMS[b.team].rounds-WC.TEAMS[a.team].rounds; });
+  list.sort((a,b)=>{ if(a.id===youId)return -1; if(b.id===youId)return 1; return (WC.TEAMS[b.team]||{rounds:0}).rounds-(WC.TEAMS[a.team]||{rounds:0}).rounds; });
   const stillIn = P.filter(p=>p.alive).length;
   const filtersShown = pre ? filters.filter(f=>f[0]!=='out') : filters;
   return (

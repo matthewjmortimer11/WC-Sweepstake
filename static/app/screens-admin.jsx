@@ -225,6 +225,7 @@ function SettingsAdmin() {
      const val = Number(fee);
      if (!isFinite(val) || val < 0) { setFee(String(feeNow || 0)); return; }
      Sa.setEntryFee(val);
+     if (window.wcToast) window.wcToast('Entry fee set to £' + val.toLocaleString('en-GB'), 'confident');
    }
    function toggleRow(onClick, on, title, text) {
      return <button onClick={onClick} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 11, textAlign: 'left', border: '2px solid var(--line)', borderRadius: 13, background: '#fff', padding: '11px 12px', cursor: 'pointer' }}>
