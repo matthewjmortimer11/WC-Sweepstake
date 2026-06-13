@@ -174,6 +174,8 @@ def generate_wc_data(tournament: str | None = None) -> dict:
     m = cfg["meta"]
 
     meta = {
+        "id": cfg["id"],
+        "competitionCode": cfg.get("competition_code", "WC"),
         "name": cfg["sweepstake_name"],
         "season": cfg["season"],
         "stageLabel": m["stage_label"],
