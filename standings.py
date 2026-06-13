@@ -156,6 +156,86 @@ def compute_team_status(
     return out
 
 
+def _clean_sheets(code: str, fixtures: List[Dict[str, Any]]) -> int:
+    """Count finished matches where `code` kept a clean sheet (conceded 0)."""
+    n = 0
+    for f in fixtures:
+        if f.get("status") != "done":
+            continue
+        score = f.get("score")
+        if not score or None in score:
+            continue
+        if f.get("a") == code and score[1] == 0:
+            n += 1
+        elif f.get("b") == code and score[0] == 0:
+            n += 1
+    return n
+
+
+def grade_predictions(
+    predictions: List[Dict[str, Any]],
+    teams: List[Dict[str, Any]],
+    fixtures: List[Dict[str, Any]],
+    stage_ladder: List[str],
+) -> List[Dict[str, Any]]:
+    """Fill in `answer` for the markets we can settle directly from results.
+
+    Auto-graded (everything else is left for the admin panel — it needs
+    player-level data or human judgement):
+
+      winner      → the champion, once the final is decided.
+      final       → the two teams in the final fixture, once it exists.
+      scotland /  → that nation's furthest stage, once they're out (or champion).
+        england
+      cleanSheets → option team with most clean sheets, once the tournament ends.
+
+    An answer that is already set (e.g. an admin/config value) is never
+    overwritten.
+    """
+    ladder_index = {s: i for i, s in enumerate(stage_ladder)}
+    by_code = {t["code"]: t for t in teams}
+    champion = next((t["code"] for t in teams if t.get("stage") == "winner"), None)
+    final_fx = next((f for f in fixtures if f.get("stage") == "final"), None)
+
+    special_stage_keys = {"scotland": "SCO", "england": "ENG"}
+
+    out: List[Dict[str, Any]] = []
+    for m in predictions:
+        nm = dict(m)
+        if nm.get("answer") is not None:
+            out.append(nm)
+            continue
+
+        key = m.get("key")
+        ans: Any = None
+
+        if key == "winner":
+            ans = champion
+        elif key == "final" and final_fx:
+            ans = [final_fx.get("a"), final_fx.get("b")]
+        elif key in special_stage_keys:
+            t = by_code.get(special_stage_keys[key])
+            # Only settle once they can't progress further.
+            if t and (not t.get("alive") or t.get("stage") == "winner"):
+                idx = ladder_index.get(t.get("stage"))
+                opts = m.get("options") or []
+                # The stage-market options are positionally aligned with the
+                # stage ladder (group → winner).
+                if idx is not None and idx < len(opts):
+                    ans = opts[idx]
+        elif key == "cleanSheets" and champion is not None:
+            best, best_n = None, -1
+            for code in (m.get("options") or []):
+                n = _clean_sheets(code, fixtures)
+                if n > best_n:
+                    best_n, best = n, code
+            ans = best
+
+        nm["answer"] = ans
+        out.append(nm)
+    return out
+
+
 def apply_to_people(
     people: List[Dict[str, Any]],
     teams: List[Dict[str, Any]],

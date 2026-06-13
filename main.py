@@ -139,6 +139,12 @@ def _state() -> Dict[str, Any]:
     people = standings.apply_to_people(people, teams)
     data["people"] = people
 
+    # Auto-grade the prediction markets we can settle from results; the rest
+    # stay open for the admin panel.
+    data["predictions"] = standings.grade_predictions(
+        _wc_data["predictions"], teams, fixtures, stage_ladder
+    )
+
     meta = dict(data["meta"])
     meta["groupSize"] = len(people)
     meta["stillIn"] = sum(1 for p in people if p.get("alive"))
