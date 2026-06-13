@@ -63,6 +63,11 @@ final_date = "Sun 19 July"
 # tournament reset). Not real auth — just stops casual taps on a shared link
 # from wiping the sweepstake. Change this before sharing.
 admin_pin = "1966"
+# Master developer key — unlocks the hidden cross-league dev console (the secret
+# gesture: tap the mascot in the top bar seven times). Lets you administer ANY
+# league. Unlike admin_pin it is verified server-side and is NEVER sent to the
+# browser. Override in production with the WC_DEV_KEY environment variable.
+dev_key = "wheesht-boss-2026"
 
 # --- Fixture schedule generation -------------------------------------------
 # The group-stage fixtures are generated as a round-robin per group. These are

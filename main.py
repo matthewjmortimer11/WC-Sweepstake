@@ -37,7 +37,7 @@ import standings
 import sync
 from db import AsyncSessionLocal, engine
 from models import AdminOverride, Base, ChatMessage, League, Participant
-from wc_data import _initials, generate_wc_data, get_league_seed
+from wc_data import _initials, generate_wc_data, get_dev_key, get_league_seed
 
 log = logging.getLogger(__name__)
 
@@ -47,6 +47,11 @@ _ROSTER: List[Dict[str, Any]] = _wc_data["people"]  # seeded league base roster
 _CONFIG_LEAGUE_CODE: str = _wc_data["league"]["code"]
 
 _HTML_TEMPLATE = Path("templates/index.html").read_text(encoding="utf-8")
+
+# Master developer key for the hidden cross-league dev console. Env var wins;
+# otherwise the tournament config's meta.dev_key. Verified server-side only and
+# never shipped to the browser. Empty → the dev console is disabled (403).
+_DEV_KEY: str = os.environ.get("WC_DEV_KEY") or get_dev_key()
 
 # Legacy JSON store (pre-league). Read-only now, used once for migration.
 _DATA_DIR = Path("data")
@@ -726,6 +731,40 @@ async def delete_chat(code: str, message_id: str):
         await session.delete(row)
         await session.commit()
         return {"ok": True}
+
+
+# ── Dev console (hidden cross-league admin) ───────────────────────────────────
+# A master-keyed endpoint that lists every league so a developer can drop into
+# any of them. The key is checked here (constant-time) and never leaves the
+# server. Per-league admin/results endpoints are reused once a league is chosen.
+
+class DevAuth(BaseModel):
+    key: str
+
+
+def _dev_key_ok(key: str) -> bool:
+    if not _DEV_KEY:
+        return False
+    return hmac.compare_digest(key or "", _DEV_KEY)
+
+
+@app.post("/api/dev/leagues")
+async def dev_list_leagues(payload: DevAuth):
+    if not _dev_key_ok(payload.key):
+        # Same shape whether the key is wrong or the feature is off — no probing.
+        raise HTTPException(status_code=403, detail="Developer access denied")
+    async with AsyncSessionLocal() as session:
+        res = await session.execute(select(League).order_by(League.created_at.desc()))
+        leagues = list(res.scalars().all())
+        out: List[Dict[str, Any]] = []
+        for lg in leagues:
+            rows = await _participant_rows(session, lg)
+            entrants = len(_league_people(lg, rows))
+            item = _league_public(lg)
+            item["entrants"] = entrants
+            item["createdAt"] = lg.created_at.isoformat() if lg.created_at else None
+            out.append(item)
+    return {"leagues": out}
 
 
 # ── Static file serving ───────────────────────────────────────────────────────

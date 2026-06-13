@@ -33,6 +33,7 @@ function StatusBar(){
 function AppBar(props){
   const me = props.me;
   const ref = React.useRef(null);
+  const taps = React.useRef({n:0,t:0});
   React.useEffect(()=>{
     const bar = ref.current; if(!bar) return;
     const sc = bar.closest('.scroll'); if(!sc) return;
@@ -41,8 +42,15 @@ function AppBar(props){
     sc.addEventListener('scroll', onScroll, {passive:true});
     return ()=> sc.removeEventListener('scroll', onScroll);
   },[]);
+  // Secret gesture: tap the mascot 7 times within ~2.5s to open the dev console.
+  function secretTap(){
+    const now = Date.now();
+    taps.current.n = (now - taps.current.t < 2500) ? taps.current.n + 1 : 1;
+    taps.current.t = now;
+    if(taps.current.n >= 7){ taps.current.n = 0; props.onDev && props.onDev(); }
+  }
   return <div className="appbar" ref={ref}>
-    <div className="mk"><A_W mood="confident" size={42}/></div>
+    <div className="mk" onClick={secretTap} style={{cursor:'default'}}><A_W mood="confident" size={42}/></div>
     <div style={{flex:1,minWidth:0}}>
       <h1>{(A_WC.league&&A_WC.league.name)||A_WC.meta.name}</h1>
       <p>{A_WC.meta.season} · {A_WC.meta.stageLabel}</p>
@@ -121,6 +129,8 @@ function App(){
   const [draw,setDraw]=aState(null);            // {forceTeam, replay}
   const [account,setAccount]=aState(false);
   const [admin,setAdmin]=aState(false);
+  const [dev,setDev]=aState(false);             // hidden dev console overlay
+  const devReturn=React.useRef(undefined);      // league to restore after dev admin
   const [organiser,setOrganiser]=aState(false); // true while creating a league
   const [,tick]=aState(0);
   const [t,setTweak]=window.useTweaks(TW_DEFAULTS);
@@ -156,6 +166,23 @@ function App(){
   }
   function resumeAccount(id){
     Promise.resolve(A_S.resumeAccount?A_S.resumeAccount(id):A_S.setActive(id)).then(()=>{ setFlow('app'); setTab('me'); });
+  }
+
+  // Dev console picked a league to administer: remember where we were, switch
+  // into it (no password), unlock the clipboard, open admin.
+  function devAdmin(league){
+    devReturn.current = A_S.activeLeague() || null;
+    try{ sessionStorage.setItem('wheesht_admin_ok','1'); }catch(e){}
+    Promise.resolve(A_S.devEnterLeague(league)).then(()=>{ setDev(false); setAdmin(true); });
+  }
+  // Closing the clipboard: if we got here via the dev console, hop back to the
+  // league we came from so the normal app view is unaffected.
+  function closeAdmin(){
+    setAdmin(false);
+    if(devReturn.current!==undefined){
+      const back=devReturn.current; devReturn.current=undefined;
+      A_S.devEnterLeague(back);
+    }
   }
 
   function claimOI(id){
@@ -207,8 +234,11 @@ function App(){
   return <React.Fragment>
     <StatusBar/>
     <div className="scroll" key={tab+(me?me.id:'')}>
-      <AppBar me={me} onAccount={()=>setAccount(true)}/>
-      {screens[tab]}
+      <AppBar me={me} onAccount={()=>setAccount(true)} onDev={()=>setDev(true)}/>
+      {/* When the dev console hops into another league, the active participant
+          isn't a member there, so `me` is null — render nothing behind the
+          full-screen admin overlay rather than letting a screen read me.team. */}
+      {me ? screens[tab] : null}
     </div>
     <TabBar tab={tab} setTab={setTab}/>
 
@@ -220,7 +250,8 @@ function App(){
 
     {draw && <window.DrawMoment participant={draw.participant} forceTeam={draw.forceTeam}
       onDone={()=>{ const wasReplay=draw.replay; setDraw(null); if(!wasReplay){ setTab('me'); setTimeout(()=>window.wcConfetti&&window.wcConfetti({y:.4}),200);} }}/>}
-    {admin && <window.AdminGate onClose={()=>setAdmin(false)}/>}
+    {admin && <window.AdminGate onClose={closeAdmin}/>}
+    {dev && <window.DevConsole onClose={()=>setDev(false)} onAdmin={devAdmin}/>}
 
     <window.ToastLayer/>
     <window.ConfettiLayer/>

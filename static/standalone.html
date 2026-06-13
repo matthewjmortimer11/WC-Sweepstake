@@ -380,7 +380,7 @@ button:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(245,200,0,.55);borde
 
 <!-- Single source of truth: generated from wc_data.py by scripts/build_snapshot.py.
      No-op when the server injects window.WC_DATA above (live mode). -->
-<script type="text/babel" src="tweaks-panel.jsx?v=20260613-ui-polish"></script>
+<script type="text/babel" src="tweaks-panel.jsx?v=20260613-devtool"></script>
 
 <script>
 /* ===========================================================================
@@ -864,6 +864,25 @@ button:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(245,200,0,.55);borde
       }).catch(function () {});
     },
 
+    // ===== DEV CONSOLE (hidden cross-league admin) =====
+    // Verify the master key server-side and list every league. Never stores the
+    // key; the server never sends it back.
+    devListLeagues: function (key) {
+      if (!LIVE) {
+        var L = activeLeague() || { code: 'OI', name: 'The Office Sweepstake', seeded: true };
+        return Promise.resolve({ leagues: [Object.assign({ entrants: cache.length }, L)] });
+      }
+      return fetch('/api/dev/leagues', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: key }) })
+        .then(function (r) { return r.json().then(function (j) { if (!r.ok) throw new Error(j.detail || 'Developer access denied'); return j; }); });
+    },
+    // Make any league active (no password — dev only) and pull its state.
+    // Passing null clears the active league. Used to enter and to restore.
+    devEnterLeague: function (L) {
+      if (L && L.code) setActiveLeague({ id: L.id, code: L.code, name: L.name, seeded: !!L.seeded });
+      else lsSet(K.league, null);
+      return Store.refresh().then(function () { rebuild(); emit(); });
+    },
+
     // ===== ADMIN (scoped to the active league) =====
     adminState: function () { return admin; },
     teamsAlive: function () { return WC.TEAM_LIST.filter(function (t) { return t.alive; }).length; },
@@ -921,6 +940,513 @@ button:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(245,200,0,.55);borde
 
   window.Store = Store;
 })();
+
+</script>
+
+<script type="text/babel">
+/* ===========================================================================
+   WHEESHT — REFEREE WHISTLE MASCOT (side profile)
+   The silhouette reads as a real ref whistle seen side-on: round resonating
+   chamber (the head/body), a tapered mouthpiece projecting left, the
+   rectangular sound-window cut into the top at the junction, and a finger
+   ring on top. Bold uniform black outline, flat grey fills, rubber-hose arms
+   with white gloves and big shoes. Ten animated moods. The Scottish mood adds
+   a neatly-cocked tam + saltire cheeks WITHOUT breaking the whistle outline.
+   Exports window.WheeshtMascot (also aliased to window.Wheesht).
+   =========================================================================== */
+(function () {
+  var R = window.React;
+
+  if (!document.getElementById('wheesht-mascot-css')) {
+    var css = document.createElement('style'); css.id = 'wheesht-mascot-css';
+    css.textContent = [
+      '.wm-svg{overflow:visible;display:block}',
+      '.wm-breathe{transform-box:fill-box;transform-origin:50% 92%;animation:wmBreathe 3.4s ease-in-out infinite}',
+      '@keyframes wmBreathe{0%,100%{transform:translateY(0) scale(1)}50%{transform:translateY(-2px) scale(1.012,1.022)}}',
+      '.wm-stage{transform-box:fill-box;transform-origin:50% 92%}',
+      '.wm-a-idle{animation:wmIdle 4s ease-in-out infinite}',
+      '@keyframes wmIdle{0%,100%{transform:translateY(0) rotate(-1.5deg)}50%{transform:translateY(-5px) rotate(1.5deg)}}',
+      '.wm-a-bounce{animation:wmBounce 1s cubic-bezier(.3,.7,.3,1) infinite}',
+      '@keyframes wmBounce{0%,100%{transform:translateY(0) rotate(-3deg) scale(1)}30%{transform:translateY(-18px) rotate(3deg) scale(1.05,.95)}55%{transform:translateY(3px) rotate(-1deg) scale(.96,1.04)}}',
+      '.wm-a-jitter{animation:wmJitter .3s ease-in-out infinite}',
+      '@keyframes wmJitter{0%,100%{transform:translate(0,0) rotate(0)}25%{transform:translate(-2px,.5px) rotate(-1.4deg)}75%{transform:translate(2px,.5px) rotate(1.4deg)}}',
+      '.wm-a-throb{animation:wmThrob .55s ease-in-out infinite}',
+      '@keyframes wmThrob{0%,100%{transform:scale(1) rotate(-1deg)}50%{transform:scale(1.06,.96) rotate(1.5deg)}}',
+      '.wm-a-sway{animation:wmSway 3.2s ease-in-out infinite}',
+      '@keyframes wmSway{0%,100%{transform:translateY(2px) rotate(-3.5deg)}50%{transform:translateY(4px) rotate(3.5deg)}}',
+      '.wm-a-lean{animation:wmLean 2.8s ease-in-out infinite}',
+      '@keyframes wmLean{0%,100%{transform:rotate(-4deg) translateX(-1px)}50%{transform:rotate(3deg) translateX(2px)}}',
+      '.wm-a-pop{animation:wmPop .5s cubic-bezier(.2,1.5,.4,1) both, wmFloat 2.8s ease-in-out .5s infinite}',
+      '@keyframes wmPop{0%{transform:scale(.6) translateY(10px)}100%{transform:scale(1) translateY(0)}}',
+      '@keyframes wmFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}',
+      '.wm-lid{transform-box:fill-box;transform-origin:50% 0;transform:scaleY(0)}',
+      '.wm-blink{animation:wmBlink var(--b,5s) ease-in-out infinite}',
+      '@keyframes wmBlink{0%,93%,100%{transform:scaleY(0)}96%,97.5%{transform:scaleY(1)}}',
+      '.wm-armL{transform-box:fill-box;transform-origin:90% 8%;animation:wmArmL 3s ease-in-out infinite}',
+      '@keyframes wmArmL{0%,100%{transform:rotate(0)}50%{transform:rotate(-10deg)}}',
+      '.wm-armR{transform-box:fill-box;transform-origin:10% 8%;animation:wmArmR 3s ease-in-out infinite}',
+      '@keyframes wmArmR{0%,100%{transform:rotate(0)}50%{transform:rotate(10deg)}}',
+      '.wm-wave{transform-box:fill-box;transform-origin:10% 95%;animation:wmWave 1s ease-in-out infinite}',
+      '@keyframes wmWave{0%,100%{transform:rotate(-14deg)}50%{transform:rotate(18deg)}}',
+      '.wm-drip{transform-box:fill-box;transform-origin:50% 0;animation:wmDrip 1.8s ease-in infinite}',
+      '@keyframes wmDrip{0%{transform:translateY(0) scaleY(.6);opacity:0}30%{opacity:1}100%{transform:translateY(26px) scaleY(1);opacity:0}}',
+      '.wm-tw{transform-box:fill-box;transform-origin:center;animation:wmTw 1.4s ease-in-out infinite}',
+      '@keyframes wmTw{0%,100%{transform:scale(.4);opacity:.2}50%{transform:scale(1);opacity:1}}',
+      '.wm-tw.d1{animation-delay:.5s}.wm-tw.d2{animation-delay:.9s}',
+      '.wm-toot{transform-box:fill-box;transform-origin:100% 50%;animation:wmToot 1.1s ease-out infinite}',
+      '@keyframes wmToot{0%{transform:scale(.3) translate(0,0);opacity:0}30%{opacity:.9}100%{transform:scale(1.2) translate(-18px,0);opacity:0}}',
+      '.wm-puff{transform-box:fill-box;transform-origin:0 50%;animation:wmPuff 1.1s ease-out infinite}',
+      '@keyframes wmPuff{0%{transform:scale(.3);opacity:0}30%{opacity:.9}100%{transform:scale(1.4) translateX(12px);opacity:0}}'
+    ].join('\n');
+    document.head.appendChild(css);
+  }
+
+  var INK = '#15181c';
+  var SW = 7;
+  var CANON = ['neutral', 'happy', 'celebrating', 'shocked', 'nervous', 'confident', 'angry', 'crying', 'mischievous', 'scottish'];
+  var ALIAS = { welcome: 'happy', smug: 'confident', outraged: 'shocked', delighted: 'celebrating', suspicious: 'mischievous', wounded: 'crying', solemn: 'neutral', broadcast: 'confident', drumroll: 'nervous' };
+  function resolve(m) { if (CANON.indexOf(m) >= 0) return m; if (ALIAS[m]) return ALIAS[m]; return 'neutral'; }
+
+  // whistle geometry — chamber centre + face anchors (face on the round body)
+  var BC = { x: 162, y: 128, rx: 60, ry: 58 };   // body / resonating chamber
+  var L = { x: 146, y: 120 }, RY = { x: 182, y: 120 };  // eyes
+  var MX = 164, MY = 152;                                // mouth centre
+
+  var CFG = {
+    neutral:     { e: 'open',  brow: 'rest',  m: 'soft',  arms: 'rest',    anim: 'idle',   fx: null },
+    happy:       { e: 'open',  brow: 'up',    m: 'smile', arms: 'thumbs',  anim: 'idle',   fx: null },
+    celebrating: { e: 'joy',   brow: 'up',    m: 'grin',  arms: 'up',      anim: 'bounce', fx: 'spark' },
+    shocked:     { e: 'wide',  brow: 'high',  m: 'oh',    arms: 'startle', anim: 'pop',    fx: 'bolt' },
+    nervous:     { e: 'worry', brow: 'worry', m: 'wavy',  arms: 'fidget',  anim: 'jitter', fx: 'sweat' },
+    confident:   { e: 'half',  brow: 'cocky', m: 'smirk', arms: 'hip',     anim: 'idle',   fx: 'toot' },
+    angry:       { e: 'narrow',brow: 'angry', m: 'shout', arms: 'card',    anim: 'throb',  fx: 'steam' },
+    crying:      { e: 'shut',  brow: 'sad',   m: 'wail',  arms: 'face',    anim: 'sway',   fx: 'tears' },
+    mischievous: { e: 'half',  brow: 'sly',   m: 'sly',   arms: 'rub',     anim: 'lean',   fx: 'spark1' },
+    scottish:    { e: 'joy',   brow: 'up',    m: 'grin',  arms: 'wave',    anim: 'bounce', fx: 'spark' }
+  };
+
+  var BROWS = {
+    rest:  ['M' + (L.x - 15) + ',' + (L.y - 20) + ' Q' + L.x + ',' + (L.y - 26) + ' ' + (L.x + 13) + ',' + (L.y - 20), 'M' + (RY.x - 13) + ',' + (RY.y - 20) + ' Q' + RY.x + ',' + (RY.y - 26) + ' ' + (RY.x + 15) + ',' + (RY.y - 20)],
+    up:    ['M' + (L.x - 15) + ',' + (L.y - 24) + ' Q' + L.x + ',' + (L.y - 34) + ' ' + (L.x + 13) + ',' + (L.y - 25), 'M' + (RY.x - 13) + ',' + (RY.y - 25) + ' Q' + RY.x + ',' + (RY.y - 34) + ' ' + (RY.x + 15) + ',' + (RY.y - 24)],
+    high:  ['M' + (L.x - 15) + ',' + (L.y - 28) + ' Q' + L.x + ',' + (L.y - 38) + ' ' + (L.x + 13) + ',' + (L.y - 29), 'M' + (RY.x - 13) + ',' + (RY.y - 29) + ' Q' + RY.x + ',' + (RY.y - 38) + ' ' + (RY.x + 15) + ',' + (RY.y - 28)],
+    worry: ['M' + (L.x - 15) + ',' + (L.y - 22) + ' Q' + L.x + ',' + (L.y - 28) + ' ' + (L.x + 13) + ',' + (L.y - 25), 'M' + (RY.x - 13) + ',' + (RY.y - 20) + ' Q' + RY.x + ',' + (RY.y - 25) + ' ' + (RY.x + 15) + ',' + (RY.y - 22)],
+    cocky: ['M' + (L.x - 15) + ',' + (L.y - 20) + ' Q' + L.x + ',' + (L.y - 22) + ' ' + (L.x + 13) + ',' + (L.y - 28), 'M' + (RY.x - 13) + ',' + (RY.y - 19) + ' Q' + RY.x + ',' + (RY.y - 21) + ' ' + (RY.x + 15) + ',' + (RY.y - 27)],
+    angry: ['M' + (L.x - 16) + ',' + (L.y - 26) + ' L' + (L.x + 13) + ',' + (L.y - 13), 'M' + (RY.x + 16) + ',' + (RY.y - 26) + ' L' + (RY.x - 13) + ',' + (RY.y - 13)],
+    sad:   ['M' + (L.x - 14) + ',' + (L.y - 14) + ' Q' + L.x + ',' + (L.y - 26) + ' ' + (L.x + 14) + ',' + (L.y - 20), 'M' + (RY.x - 14) + ',' + (RY.y - 20) + ' Q' + RY.x + ',' + (RY.y - 26) + ' ' + (RY.x + 16) + ',' + (RY.y - 14)],
+    sly:   ['M' + (L.x - 15) + ',' + (L.y - 18) + ' Q' + L.x + ',' + (L.y - 21) + ' ' + (L.x + 13) + ',' + (L.y - 27), 'M' + (RY.x - 13) + ',' + (RY.y - 18) + ' Q' + RY.x + ',' + (RY.y - 20) + ' ' + (RY.x + 15) + ',' + (RY.y - 26)]
+  };
+
+  function defs(uid) {
+    return R.createElement('defs', null,
+      R.createElement('linearGradient', { id: uid + 'g', x1: '0', y1: '0', x2: '0', y2: '1' },
+        R.createElement('stop', { offset: '0', stopColor: '#dde2e7' }),
+        R.createElement('stop', { offset: '0.5', stopColor: '#bcc4cc' }),
+        R.createElement('stop', { offset: '1', stopColor: '#98a2ab' })),
+      R.createElement('linearGradient', { id: uid + 'gm', x1: '0', y1: '0', x2: '0', y2: '1' },
+        R.createElement('stop', { offset: '0', stopColor: '#c9d0d7' }),
+        R.createElement('stop', { offset: '1', stopColor: '#8b95a0' })),
+      R.createElement('pattern', { id: uid + 'tn', width: '13', height: '13', patternUnits: 'userSpaceOnUse' },
+        R.createElement('rect', { width: '13', height: '13', fill: '#1f3d2e' }),
+        R.createElement('rect', { width: '13', height: '13', fill: '#10325a', opacity: '0.45' }),
+        R.createElement('rect', { x: '0', width: '4', height: '13', fill: '#9b1b2e' }),
+        R.createElement('rect', { y: '0', width: '13', height: '4', fill: '#9b1b2e' }),
+        R.createElement('rect', { x: '8', width: '1.3', height: '13', fill: '#e7d27a', opacity: '0.8' })));
+  }
+
+  function eye(uid, c, x, y, scale, blink, delay) {
+    scale = scale || 1; var ink = INK;
+    if (c === 'joy') return R.createElement('path', { d: 'M' + (x - 14 * scale) + ',' + (y + 3) + ' Q' + x + ',' + (y - 14 * scale) + ' ' + (x + 14 * scale) + ',' + (y + 3), fill: 'none', stroke: ink, strokeWidth: 6 * scale, strokeLinecap: 'round' });
+    if (c === 'shut') return R.createElement('path', { d: 'M' + (x - 13 * scale) + ',' + (y - 1) + ' Q' + x + ',' + (y + 8 * scale) + ' ' + (x + 13 * scale) + ',' + (y - 1), fill: 'none', stroke: ink, strokeWidth: 6 * scale, strokeLinecap: 'round' });
+    var rx = 14 * scale, ry = 17 * scale, pr = 7.5 * scale;
+    if (c === 'wide') { rx = 16 * scale; ry = 20 * scale; pr = 6 * scale; }
+    if (c === 'narrow') { ry = 10 * scale; pr = 6.5 * scale; }
+    if (c === 'half' || c === 'worry') ry = 14 * scale;
+    var px = x, py = y + 2;
+    var els = [
+      R.createElement('ellipse', { key: 'w', cx: x, cy: y, rx: rx, ry: ry, fill: '#fff', stroke: ink, strokeWidth: 4 * scale }),
+      R.createElement('circle', { key: 'p', cx: px, cy: py, r: pr, fill: '#15181c' }),
+      R.createElement('circle', { key: 'g', cx: px - 2.5 * scale, cy: py - 3 * scale, r: 2.4 * scale, fill: '#fff' })
+    ];
+    if (c === 'half') els.push(R.createElement('path', { key: 'l', d: 'M' + (x - rx - 1) + ',' + (y - 2) + ' a' + rx + ',' + ry + ' 0 0 1 ' + (rx * 2 + 2) + ',0 l0,-' + (ry + 4) + ' l-' + (rx * 2 + 2) + ',0 Z', fill: 'url(#' + uid + 'g)', stroke: ink, strokeWidth: 4 * scale, strokeLinejoin: 'round' }));
+    if (c === 'worry') els.push(R.createElement('path', { key: 'l', d: 'M' + (x - rx - 1) + ',' + (y - 5) + ' a' + rx + ',' + ry + ' 0 0 1 ' + (rx * 2 + 2) + ',0 l0,-' + (ry + 6) + ' l-' + (rx * 2 + 2) + ',0 Z', fill: 'url(#' + uid + 'g)', stroke: ink, strokeWidth: 4 * scale, strokeLinejoin: 'round' }));
+    if (blink) els.push(R.createElement('ellipse', { key: 'b', className: 'wm-lid wm-blink', style: { '--b': delay }, cx: x, cy: y, rx: rx + 1, ry: ry + 1, fill: 'url(#' + uid + 'g)', stroke: ink, strokeWidth: 4 * scale }));
+    return R.createElement('g', null, els);
+  }
+
+  function mouth(style) {
+    var ink = INK, lip = '#d8536e', x = MX, y = MY;
+    switch (style) {
+      case 'smile': return R.createElement('path', { d: 'M' + (x - 22) + ',' + (y - 4) + ' Q' + x + ',' + (y + 16) + ' ' + (x + 22) + ',' + (y - 4) + ' Q' + x + ',' + (y + 6) + ' ' + (x - 22) + ',' + (y - 4) + ' Z', fill: ink });
+      case 'grin': return R.createElement('g', null,
+        R.createElement('path', { d: 'M' + (x - 26) + ',' + (y - 6) + ' Q' + x + ',' + (y + 22) + ' ' + (x + 26) + ',' + (y - 6) + ' Q' + x + ',' + (y + 4) + ' ' + (x - 26) + ',' + (y - 6) + ' Z', fill: ink }),
+        R.createElement('path', { d: 'M' + (x - 21) + ',' + (y - 5) + ' L' + (x + 21) + ',' + (y - 5) + ' Q' + x + ',' + (y + 1) + ' ' + (x - 21) + ',' + (y - 5) + ' Z', fill: '#fff' }),
+        R.createElement('path', { d: 'M' + (x - 9) + ',' + (y + 11) + ' Q' + x + ',' + (y + 16) + ' ' + (x + 9) + ',' + (y + 11) + ' Q' + x + ',' + (y + 14) + ' ' + (x - 9) + ',' + (y + 11) + ' Z', fill: lip }));
+      case 'oh': return R.createElement('ellipse', { cx: x, cy: y + 2, rx: 11, ry: 14, fill: ink });
+      case 'shout': return R.createElement('g', null,
+        R.createElement('path', { d: 'M' + (x - 21) + ',' + (y - 6) + ' Q' + x + ',' + (y - 2) + ' ' + (x + 21) + ',' + (y - 6) + ' Q' + (x + 13) + ',' + (y + 19) + ' ' + x + ',' + (y + 19) + ' Q' + (x - 13) + ',' + (y + 19) + ' ' + (x - 21) + ',' + (y - 6) + ' Z', fill: ink }),
+        R.createElement('path', { d: 'M' + (x - 17) + ',' + (y - 5) + ' L' + (x + 17) + ',' + (y - 5) + ' Q' + x + ',' + (y - 1) + ' ' + (x - 17) + ',' + (y - 5) + ' Z', fill: '#fff' }));
+      case 'smirk': return R.createElement('path', { d: 'M' + (x - 19) + ',' + (y - 2) + ' Q' + (x + 4) + ',' + (y + 12) + ' ' + (x + 21) + ',' + (y - 12), fill: 'none', stroke: ink, strokeWidth: 6, strokeLinecap: 'round' });
+      case 'sly': return R.createElement('path', { d: 'M' + (x - 19) + ',' + (y - 4) + ' Q' + (x - 2) + ',' + (y + 10) + ' ' + (x + 13) + ',' + (y + 2) + ' Q' + (x + 21) + ',' + (y - 1) + ' ' + (x + 23) + ',' + (y - 9), fill: 'none', stroke: ink, strokeWidth: 5.5, strokeLinecap: 'round' });
+      case 'wavy': return R.createElement('path', { d: 'M' + (x - 19) + ',' + y + ' q7,-7 13,0 q7,7 13,0 q6,-6 6,-2', fill: 'none', stroke: ink, strokeWidth: 5, strokeLinecap: 'round' });
+      case 'wail': return R.createElement('g', null,
+        R.createElement('path', { d: 'M' + (x - 19) + ',' + (y + 4) + ' Q' + x + ',' + (y - 15) + ' ' + (x + 19) + ',' + (y + 4) + ' Q' + x + ',' + (y + 19) + ' ' + (x - 19) + ',' + (y + 4) + ' Z', fill: ink }),
+        R.createElement('path', { d: 'M' + (x - 10) + ',' + (y + 4) + ' Q' + x + ',' + (y - 2) + ' ' + (x + 10) + ',' + (y + 4) + ' Q' + x + ',' + (y + 10) + ' ' + (x - 10) + ',' + (y + 4) + ' Z', fill: lip }));
+      case 'soft': default: return R.createElement('path', { d: 'M' + (x - 17) + ',' + (y - 2) + ' Q' + x + ',' + (y + 9) + ' ' + (x + 17) + ',' + (y - 2), fill: 'none', stroke: ink, strokeWidth: 6, strokeLinecap: 'round' });
+    }
+  }
+
+  function hose(uid, d, cls) {
+    return R.createElement('g', { className: cls || '' },
+      R.createElement('path', { d: d, fill: 'none', stroke: INK, strokeWidth: 15, strokeLinecap: 'round' }),
+      R.createElement('path', { d: d, fill: 'none', stroke: 'url(#' + uid + 'gm)', strokeWidth: 8, strokeLinecap: 'round' }));
+  }
+  function glove(x, y, kind) {
+    var els = [R.createElement('circle', { key: 'g', cx: x, cy: y, r: 14, fill: '#fff', stroke: INK, strokeWidth: 5 })];
+    if (kind === 'thumb') els.push(R.createElement('path', { key: 't', d: 'M' + (x - 3) + ',' + (y - 11) + ' q-7,-9 1,-15 q6,-3 8,4 l-1,11', fill: '#fff', stroke: INK, strokeWidth: 5, strokeLinejoin: 'round' }));
+    else els.push(R.createElement('path', { key: 'k', d: 'M' + (x - 8) + ',' + (y - 2) + ' q8,5 16,0', fill: 'none', stroke: INK, strokeWidth: 3, strokeLinecap: 'round', opacity: .5 }));
+    return R.createElement('g', null, els);
+  }
+
+  // shoulders: left lower-left of chamber, right at chamber right
+  function arms(uid, style) {
+    switch (style) {
+      case 'up': return R.createElement('g', null,
+        hose(uid, 'M118,156 Q92,138 88,108', 'wm-armL'), glove(86, 102, 'thumb'),
+        hose(uid, 'M212,140 Q238,124 244,96', 'wm-armR'), glove(246, 90, 'thumb'));
+      case 'thumbs': return R.createElement('g', null,
+        hose(uid, 'M116,160 Q98,172 102,190', ''), glove(102, 194, 'thumb'),
+        hose(uid, 'M212,142 Q236,134 240,108', ''), glove(242, 102, 'thumb'));
+      case 'wave': return R.createElement('g', null,
+        hose(uid, 'M116,162 Q98,174 102,192', ''), glove(102, 196, 'thumb'),
+        R.createElement('g', { className: 'wm-wave' }, hose(uid, 'M212,138 Q240,120 248,92', ''), glove(250, 86, 'thumb')));
+      case 'hip': return R.createElement('g', null,
+        hose(uid, 'M118,166 Q100,178 110,194', ''), glove(112, 198, ''),
+        hose(uid, 'M210,156 Q230,168 220,194', ''), glove(222, 198, ''));
+      case 'startle': return R.createElement('g', null,
+        hose(uid, 'M116,150 Q90,142 80,150', ''), glove(76, 150, ''),
+        hose(uid, 'M212,140 Q240,132 250,142', ''), glove(254, 144, ''));
+      case 'fidget': return R.createElement('g', null,
+        hose(uid, 'M120,166 Q110,180 122,188', ''), glove(126, 192, ''),
+        hose(uid, 'M210,156 Q222,170 210,180', ''), glove(206, 184, ''));
+      case 'card': return R.createElement('g', null,
+        hose(uid, 'M118,164 Q100,174 108,192', ''), glove(110, 196, ''),
+        R.createElement('g', { transform: 'rotate(-10 240 96)' },
+          hose(uid, 'M212,138 Q234,116 234,96', ''),
+          R.createElement('rect', { x: '222', y: '60', width: '24', height: '34', rx: '4', fill: '#E8272A', stroke: INK, strokeWidth: '5' })));
+      case 'face': return R.createElement('g', null,
+        hose(uid, 'M122,150 Q112,164 132,170', ''), glove(136, 172, ''),
+        hose(uid, 'M208,144 Q220,158 200,166', ''), glove(196, 168, ''));
+      case 'rub': return R.createElement('g', null,
+        hose(uid, 'M122,164 Q112,176 130,184', ''), glove(134, 187, ''),
+        hose(uid, 'M208,158 Q220,170 202,178', ''), glove(198, 181, ''));
+      case 'rest': default: return R.createElement('g', null,
+        hose(uid, 'M118,160 Q102,174 110,192', 'wm-armL'), glove(112, 196, ''),
+        hose(uid, 'M212,150 Q228,164 220,192', 'wm-armR'), glove(222, 196, ''));
+    }
+  }
+
+  function legs() {
+    var x1 = MX - 22, x2 = MX + 22, top = 178, knee = 206;
+    function leg(x, dir) {
+      return R.createElement('g', { key: 'lg' + x },
+        R.createElement('path', { d: 'M' + x + ',' + top + ' L' + x + ',' + knee, fill: 'none', stroke: INK, strokeWidth: 15, strokeLinecap: 'round' }),
+        R.createElement('path', { d: 'M' + x + ',' + top + ' L' + x + ',' + knee, fill: 'none', stroke: '#98a2ab', strokeWidth: 7, strokeLinecap: 'round' }),
+        R.createElement('path', { d: 'M' + (x - 6) + ',' + (knee - 4) + ' q-' + (dir > 0 ? 4 : 20) + ',2 -' + (dir > 0 ? 4 : 22) + ',14 q0,7 12,7 l' + (dir > 0 ? 26 : 20) + ',0 q9,0 9,-8 q0,-9 -12,-12 Z', fill: INK }),
+        R.createElement('rect', { x: x - (dir > 0 ? 16 : 24), y: knee + 12, width: 38, height: 5, rx: 2.5, fill: '#fff' }));
+    }
+    return R.createElement('g', null, leg(x1, -1), leg(x2, 1));
+  }
+
+  function star(cx, cy, s, fill, cls) {
+    return R.createElement('path', { className: cls, transform: 'translate(' + cx + ',' + cy + ')', d: 'M0,' + (-s) + ' L' + (s * .3) + ',' + (-s * .3) + ' L' + s + ',0 L' + (s * .3) + ',' + (s * .3) + ' L0,' + s + ' L' + (-s * .3) + ',' + (s * .3) + ' L' + (-s) + ',0 L' + (-s * .3) + ',' + (-s * .3) + ' Z', fill: fill, stroke: INK, strokeWidth: 1.4 });
+  }
+
+  function fx(uid, kind) {
+    switch (kind) {
+      case 'spark': return R.createElement('g', null, star(70, 58, 8, '#F5C800', 'wm-tw'), star(232, 56, 7, '#F5C800', 'wm-tw d1'), star(228, 150, 5, '#F5C800', 'wm-tw d2'), star(78, 150, 5, '#F5C800', 'wm-tw d1'));
+      case 'spark1': return star(224, 152, 7, '#F5C800', 'wm-tw');
+      case 'bolt': return R.createElement('g', { stroke: '#E8272A', strokeWidth: 4.5, strokeLinecap: 'round' }, R.createElement('line', { x1: '162', y1: '46', x2: '162', y2: '30' }), R.createElement('line', { x1: '198', y1: '52', x2: '210', y2: '40' }), R.createElement('line', { x1: '126', y1: '52', x2: '114', y2: '40' }));
+      case 'sweat': return R.createElement('ellipse', { className: 'wm-drip', cx: '210', cy: '96', rx: '5.5', ry: '9', fill: '#5BB6E8', stroke: INK, strokeWidth: '1.5' });
+      case 'tears': return R.createElement('g', null,
+        R.createElement('ellipse', { className: 'wm-drip', cx: L.x - 2, cy: L.y + 22, rx: '5.5', ry: '9', fill: '#5BB6E8', stroke: INK, strokeWidth: '1.5' }),
+        R.createElement('ellipse', { className: 'wm-drip', cx: RY.x + 2, cy: RY.y + 22, rx: '5', ry: '8', fill: '#5BB6E8', stroke: INK, strokeWidth: '1.5', style: { animationDelay: '.7s' } }));
+      case 'steam': return R.createElement('g', { transform: 'translate(214,76)', fill: '#cfd8df' },
+        R.createElement('circle', { className: 'wm-puff', cx: '0', cy: '0', r: '6' }),
+        R.createElement('circle', { className: 'wm-puff', cx: '2', cy: '10', r: '5', style: { animationDelay: '.4s' } }));
+      default: return null;
+    }
+  }
+
+  // tam cocked on the upper-left of the chamber; ring stays visible top-right
+  function tam(uid) {
+    var cx = 134, top = 78;
+    return R.createElement('g', { transform: 'translate(' + cx + ',' + top + ') rotate(-20) translate(' + (-cx) + ',' + (-top) + ')' },
+      R.createElement('ellipse', { cx: cx, cy: top - 5, rx: 46, ry: 18, fill: '#262a31' }),
+      R.createElement('ellipse', { cx: cx - 12, cy: top - 11, rx: 22, ry: 8, fill: '#363d47', opacity: .85 }),
+      R.createElement('path', { d: 'M' + (cx - 40) + ',' + (top + 3) + ' Q' + cx + ',' + (top + 16) + ' ' + (cx + 40) + ',' + (top + 3) + ' L' + (cx + 40) + ',' + (top + 10) + ' Q' + cx + ',' + (top + 23) + ' ' + (cx - 40) + ',' + (top + 10) + ' Z', fill: 'url(#' + uid + 'tn)', stroke: INK, strokeWidth: 3 }),
+      R.createElement('ellipse', { cx: cx, cy: top + 3, rx: 40, ry: 10, fill: 'none', stroke: INK, strokeWidth: 3 }),
+      R.createElement('circle', { cx: cx, cy: top - 22, r: 8, fill: '#E8272A', stroke: INK, strokeWidth: 3 }),
+      R.createElement('circle', { cx: cx - 3, cy: top - 24, r: 2.2, fill: '#ff8a98' }));
+  }
+
+  function WheeshtMascot(props) {
+    var mood = resolve(props.mood);
+    var c = CFG[mood];
+    var size = props.size || 170;
+    var animate = !!props.animate;
+    var uid = R.useMemo(function () { return 'm' + Math.random().toString(36).slice(2, 8); }, []);
+    var delay = R.useMemo(function () { return (4.4 + Math.random() * 2.4).toFixed(2) + 's'; }, []);
+    var canBlink = animate && (c.e === 'open' || c.e === 'half' || c.e === 'wide' || c.e === 'narrow' || c.e === 'worry');
+    var scottish = mood === 'scottish';
+
+    // --- the whistle hardware (side profile, drawn upright) ---
+    var hardware = R.createElement('g', null,
+      // finger ring on top (slightly right of centre, clear of the sound window)
+      R.createElement('g', null,
+        R.createElement('path', { d: 'M186,78 q-2,-18 ' + (-2) + ',-22', fill: 'none', stroke: INK, strokeWidth: SW }),
+        R.createElement('circle', { cx: 188, cy: 50, r: 16, fill: 'none', stroke: INK, strokeWidth: SW }),
+        R.createElement('circle', { cx: 188, cy: 50, r: 16, fill: 'none', stroke: 'url(#' + uid + 'gm)', strokeWidth: SW - 4 })),
+      // mouthpiece tube projecting left from the chamber
+      R.createElement('path', { d: 'M40,104 q-8,0 -8,14 q0,14 8,14 l78,4 0,-40 Z', fill: 'url(#' + uid + 'gm)', stroke: INK, strokeWidth: SW, strokeLinejoin: 'round' }),
+      // chamber (round body)
+      R.createElement('ellipse', { cx: BC.x, cy: BC.y, rx: BC.rx, ry: BC.ry, fill: 'url(#' + uid + 'g)', stroke: INK, strokeWidth: SW }),
+      // rectangular sound window cut into the TOP at the mouthpiece junction
+      R.createElement('path', { d: 'M96,96 l30,-2 0,-16 q-30,0 -34,4 Z', fill: INK }),
+      R.createElement('path', { d: 'M99,92 l24,-1.4 0,-9 q-22,0 -26,2 Z', fill: '#3a424b' }),
+      // chamber top highlight
+      R.createElement('path', { d: 'M118,98 Q160,86 200,100', fill: 'none', stroke: '#eef2f5', strokeWidth: 7, strokeLinecap: 'round', opacity: .65 })
+    );
+
+    var stage = R.createElement('g', { className: 'wm-stage' + (animate ? ' wm-a-' + c.anim : '') },
+      animate && c.fx === 'toot' ? R.createElement('g', { className: 'wm-toot' },
+        R.createElement('path', { d: 'M30,118 q-12,0 -12,8 q0,8 12,8', fill: 'none', stroke: '#aab4bd', strokeWidth: 4, strokeLinecap: 'round' }),
+        R.createElement('path', { d: 'M20,126 q-7,0 -7,4', fill: 'none', stroke: '#aab4bd', strokeWidth: 3.5, strokeLinecap: 'round', opacity: .6 })) : null,
+      legs(),
+      arms(uid, c.arms),
+      hardware,
+      // tartan band wrapped round the mouthpiece (scottish, subtle)
+      scottish ? R.createElement('rect', { x: 70, y: 96, width: 11, height: 44, rx: 2, fill: 'url(#' + uid + 'tn)', stroke: INK, strokeWidth: 2.5 }) : null,
+      c.fx ? fx(uid, c.fx) : null,
+      // cheeks
+      scottish
+        ? R.createElement('g', null, saltCheek(L.x - 2, L.y + 22), saltCheek(RY.x + 2, RY.y + 22, .85))
+        : R.createElement('g', null,
+            R.createElement('ellipse', { cx: L.x - 2, cy: L.y + 22, rx: 10, ry: 7, fill: '#F0708F', opacity: .5 }),
+            R.createElement('ellipse', { cx: RY.x + 2, cy: RY.y + 22, rx: 9, ry: 6, fill: '#F0708F', opacity: .45 })),
+      // face
+      eye(uid, c.e, L.x, L.y, 1, canBlink, delay),
+      eye(uid, c.e, RY.x, RY.y, 1, canBlink, delay),
+      R.createElement('path', { d: BROWS[c.brow][0], fill: 'none', stroke: INK, strokeWidth: 6, strokeLinecap: 'round' }),
+      R.createElement('path', { d: BROWS[c.brow][1], fill: 'none', stroke: INK, strokeWidth: 6, strokeLinecap: 'round' }),
+      mouth(c.m),
+      scottish ? tam(uid) : null
+    );
+
+    return R.createElement('svg', { className: 'wm-svg', viewBox: '0 0 276 240', width: size, height: size * (240 / 276), style: { display: 'block' } },
+      defs(uid),
+      R.createElement('ellipse', { cx: 164, cy: 226, rx: 62, ry: 11, fill: '#1A1A1A', opacity: .14 }),
+      R.createElement('g', { className: animate ? 'wm-breathe' : '' }, stage));
+  }
+  function saltCheek(cx, cy, s) {
+    s = s || 1;
+    return R.createElement('g', { transform: 'translate(' + (cx - 10 * s) + ',' + (cy - 7 * s) + ') scale(' + s + ')' },
+      R.createElement('rect', { x: 0, y: 0, width: 20, height: 14, rx: 3, fill: '#0a4aa0', opacity: .92 }),
+      R.createElement('path', { d: 'M0,0 L20,14 M20,0 L0,14', stroke: '#fff', strokeWidth: 3 }));
+  }
+
+  window.WheeshtMascot = WheeshtMascot;
+  window.Wheesht = WheeshtMascot;
+})();
+
+</script>
+
+<script type="text/babel">
+/* ===========================================================================
+   UI KIT — sticker-album / match-programme components.
+   Exported to window. Relies on CSS vars + classes defined in index.html.
+   =========================================================================== */
+const { useState, useEffect, useRef, useMemo } = React;
+
+/* ---- Card ---------------------------------------------------------------- */
+function Card(props) {
+  const cls = 'wc-card' + (props.bordered ? ' wc-card--bd' : '') + (props.flat ? ' wc-card--flat' : '') + (props.className ? ' ' + props.className : '');
+  return <div className={cls} style={props.style} onClick={props.onClick}>{props.children}</div>;
+}
+
+/* ---- Button -------------------------------------------------------------- */
+function Btn(props) {
+  const variant = props.variant || 'primary';
+  return (
+    <button type="button" disabled={props.disabled}
+      onClick={props.onClick}
+      className={'wc-btn wc-btn--' + variant + (props.block ? ' wc-btn--block' : '') + (props.sm ? ' wc-btn--sm' : '')}
+      style={props.style}>
+      {props.children}
+    </button>
+  );
+}
+
+/* ---- Flag chip ----------------------------------------------------------- */
+function Flag(props) {
+  const t = typeof props.team === 'string' ? window.WC.TEAMS[props.team] : props.team;
+  const sz = props.size || 30;
+  if (!t) return null;
+  return <span className="wc-flag" style={{ fontSize: sz, lineHeight: 1 }} title={t.name}>{t.flag}</span>;
+}
+
+/* ---- Avatar (initials) --------------------------------------------------- */
+function Avatar(props) {
+  const p = props.person;
+  const sz = props.size || 36;
+  return (
+    <span className="wc-avatar" style={{
+      width: sz, height: sz, background: p.isYou ? 'var(--ink)' : p.color,
+      fontSize: sz * 0.36, opacity: (props.dim ? 0.4 : 1),
+    }}>{p.isYou ? 'YOU' : p.initials}</span>
+  );
+}
+
+/* ---- Chip ---------------------------------------------------------------- */
+function Chip(props) {
+  return <span className={'wc-chip' + (props.tone ? ' wc-chip--' + props.tone : '')} style={props.style}>{props.children}</span>;
+}
+
+/* ---- Stamp (ELIMINATED / QUALIFIED) -------------------------------------- */
+function Stamp(props) {
+  const tone = props.tone || 'red';
+  return <span className={'wc-stamp wc-stamp--' + tone} style={Object.assign({ transform: 'rotate(' + (props.rotate == null ? -8 : props.rotate) + 'deg)' }, props.style)}>{props.children}</span>;
+}
+
+/* ---- Progress ring ------------------------------------------------------- */
+function ProgressRing(props) {
+  const size = props.size || 46, sw = props.stroke || 6;
+  const r = (size - sw) / 2, c = 2 * Math.PI * r;
+  const pct = Math.max(0, Math.min(1, props.value));
+  return (
+    <svg width={size} height={size} style={{ display: 'block' }}>
+      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="rgba(26,26,26,.12)" strokeWidth={sw} />
+      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={props.color || 'var(--red)'} strokeWidth={sw}
+        strokeDasharray={c} strokeDashoffset={c * (1 - pct)} strokeLinecap="round"
+        transform={'rotate(-90 ' + size / 2 + ' ' + size / 2 + ')'} style={{ transition: 'stroke-dashoffset .8s cubic-bezier(.2,.8,.2,1)' }} />
+      {props.children && <foreignObject x="0" y="0" width={size} height={size}>
+        <div style={{ width: size, height: size, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: size * 0.28 }}>{props.children}</div>
+      </foreignObject>}
+    </svg>
+  );
+}
+
+/* ---- Segment comparison bar (animated) ----------------------------------- */
+function SegmentBar(props) {
+  const a = props.a, b = props.b; // {name, value 0-100}
+  const total = a.value + b.value || 1;
+  const aw = Math.round(100 * a.value / total);
+  const ref = useRef(null);
+  const [shown, setShown] = useState(false);
+  useEffect(function () {
+    const el = ref.current; if (!el) return;
+    const io = new IntersectionObserver(function (e) { if (e[0].isIntersecting) setShown(true); }, { threshold: 0.4 });
+    io.observe(el); return function () { io.disconnect(); };
+  }, []);
+  const aWin = a.value >= b.value;
+  return (
+    <div ref={ref} className="wc-seg">
+      <div className="wc-seg__head">
+        <span><b style={{ color: aWin ? 'var(--ink)' : 'inherit' }}>{a.name}</b> {a.value}%</span>
+        <span>{b.value}% <b style={{ color: !aWin ? 'var(--ink)' : 'inherit' }}>{b.name}</b></span>
+      </div>
+      <div className="wc-seg__track">
+        <div className="wc-seg__fill" style={{ width: (shown ? aw : 50) + '%' }} />
+        <div className="wc-seg__mid" style={{ left: (shown ? aw : 50) + '%' }} />
+      </div>
+    </div>
+  );
+}
+
+/* ---- Wheesht speech block ------------------------------------------------ */
+function WheeshtSays(props) {
+  return (
+    <div className={'wc-says' + (props.compact ? ' wc-says--compact' : '')}>
+      <div className="wc-says__av"><window.Wheesht mood={props.mood || 'neutral'} size={props.avSize || 64} animate={props.animate} /></div>
+      <div className="wc-says__bubble">
+        {props.label && <div className="wc-says__name">Wheesht{props.label === true ? '' : ' · ' + props.label}</div>}
+        <div className="wc-says__text">{props.children}</div>
+      </div>
+    </div>
+  );
+}
+
+/* ---- Section heading ----------------------------------------------------- */
+function SectionHead(props) {
+  return <div className="wc-sec"><h3>{props.children}</h3>{props.aside && <span>{props.aside}</span>}</div>;
+}
+
+/* ---- Toast layer (imperative: window.wcToast(msg, mood)) ----------------- */
+function ToastLayer() {
+  const [items, setItems] = useState([]);
+  useEffect(function () {
+    window.wcToast = function (text, mood) {
+      const id = Date.now() + Math.random();
+      setItems(function (xs) { return xs.concat([{ id: id, text: text, mood: mood || 'neutral' }]); });
+      setTimeout(function () { setItems(function (xs) { return xs.filter(function (x) { return x.id !== id; }); }); }, 4200);
+    };
+  }, []);
+  return (
+    <div className="wc-toasts">
+      {items.map(function (t) {
+        return <div key={t.id} className="wc-toast">
+          <window.Wheesht mood={t.mood} size={40} />
+          <div className="wc-toast__txt">{t.text}</div>
+        </div>;
+      })}
+    </div>
+  );
+}
+
+/* ---- Confetti layer (imperative: window.wcConfetti(opts)) ---------------- */
+function ConfettiLayer() {
+  const cv = useRef(null);
+  useEffect(function () {
+    const canvas = cv.current; const ctx = canvas.getContext('2d');
+    let parts = []; let raf = null;
+    function resize() { const r = canvas.parentNode.getBoundingClientRect(); canvas.width = r.width; canvas.height = r.height; }
+    resize(); window.addEventListener('resize', resize);
+    const colors = ['#F5C800', '#E8272A', '#1A1A1A', '#1a7a44', '#0a3b8c', '#fff'];
+    function tick() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      parts.forEach(function (p) {
+        p.vy += 0.18; p.x += p.vx; p.y += p.vy; p.rot += p.vr;
+        ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot);
+        ctx.fillStyle = p.c; ctx.fillRect(-p.s / 2, -p.s / 2, p.s, p.s * 0.5);
+        ctx.restore();
+      });
+      parts = parts.filter(function (p) { return p.y < canvas.height + 40; });
+      if (parts.length) raf = requestAnimationFrame(tick); else { raf = null; ctx.clearRect(0, 0, canvas.width, canvas.height); }
+    }
+    window.wcConfetti = function (opts) {
+      opts = opts || {}; resize();
+      const mul = (window.__celMul == null ? 1 : window.__celMul);
+      if (mul <= 0) return;
+      const cols = opts.colors || colors;
+      const n = Math.round((opts.count || 140) * mul);
+      const ox = canvas.width * (opts.x == null ? 0.5 : opts.x);
+      const oy = canvas.height * (opts.y == null ? 0.42 : opts.y);
+      for (let i = 0; i < n; i++) {
+        const ang = Math.random() * Math.PI * 2;
+        const spd = 4 + Math.random() * 9;
+        parts.push({ x: ox, y: oy, vx: Math.cos(ang) * spd, vy: Math.sin(ang) * spd - 4, s: 7 + Math.random() * 9, rot: Math.random() * 6, vr: (Math.random() - 0.5) * 0.4, c: cols[(Math.random() * cols.length) | 0] });
+      }
+      if (!raf) raf = requestAnimationFrame(tick);
+    };
+    return function () { window.removeEventListener('resize', resize); if (raf) cancelAnimationFrame(raf); };
+  }, []);
+  return <canvas ref={cv} className="wc-confetti" />;
+}
+
+Object.assign(window, {
+  Card: Card, Btn: Btn, Flag: Flag, Avatar: Avatar, Chip: Chip, Stamp: Stamp,
+  ProgressRing: ProgressRing, SegmentBar: SegmentBar, WheeshtSays: WheeshtSays,
+  SectionHead: SectionHead, ToastLayer: ToastLayer, ConfettiLayer: ConfettiLayer,
+});
 
 </script>
 
@@ -1466,794 +1992,6 @@ Object.assign(window, {
   TweakSlider, TweakToggle, TweakRadio, TweakSelect,
   TweakText, TweakNumber, TweakColor, TweakButton,
 });
-
-</script>
-
-<script type="text/babel">
-/* ===========================================================================
-   WHEESHT — REFEREE WHISTLE MASCOT (side profile)
-   The silhouette reads as a real ref whistle seen side-on: round resonating
-   chamber (the head/body), a tapered mouthpiece projecting left, the
-   rectangular sound-window cut into the top at the junction, and a finger
-   ring on top. Bold uniform black outline, flat grey fills, rubber-hose arms
-   with white gloves and big shoes. Ten animated moods. The Scottish mood adds
-   a neatly-cocked tam + saltire cheeks WITHOUT breaking the whistle outline.
-   Exports window.WheeshtMascot (also aliased to window.Wheesht).
-   =========================================================================== */
-(function () {
-  var R = window.React;
-
-  if (!document.getElementById('wheesht-mascot-css')) {
-    var css = document.createElement('style'); css.id = 'wheesht-mascot-css';
-    css.textContent = [
-      '.wm-svg{overflow:visible;display:block}',
-      '.wm-breathe{transform-box:fill-box;transform-origin:50% 92%;animation:wmBreathe 3.4s ease-in-out infinite}',
-      '@keyframes wmBreathe{0%,100%{transform:translateY(0) scale(1)}50%{transform:translateY(-2px) scale(1.012,1.022)}}',
-      '.wm-stage{transform-box:fill-box;transform-origin:50% 92%}',
-      '.wm-a-idle{animation:wmIdle 4s ease-in-out infinite}',
-      '@keyframes wmIdle{0%,100%{transform:translateY(0) rotate(-1.5deg)}50%{transform:translateY(-5px) rotate(1.5deg)}}',
-      '.wm-a-bounce{animation:wmBounce 1s cubic-bezier(.3,.7,.3,1) infinite}',
-      '@keyframes wmBounce{0%,100%{transform:translateY(0) rotate(-3deg) scale(1)}30%{transform:translateY(-18px) rotate(3deg) scale(1.05,.95)}55%{transform:translateY(3px) rotate(-1deg) scale(.96,1.04)}}',
-      '.wm-a-jitter{animation:wmJitter .3s ease-in-out infinite}',
-      '@keyframes wmJitter{0%,100%{transform:translate(0,0) rotate(0)}25%{transform:translate(-2px,.5px) rotate(-1.4deg)}75%{transform:translate(2px,.5px) rotate(1.4deg)}}',
-      '.wm-a-throb{animation:wmThrob .55s ease-in-out infinite}',
-      '@keyframes wmThrob{0%,100%{transform:scale(1) rotate(-1deg)}50%{transform:scale(1.06,.96) rotate(1.5deg)}}',
-      '.wm-a-sway{animation:wmSway 3.2s ease-in-out infinite}',
-      '@keyframes wmSway{0%,100%{transform:translateY(2px) rotate(-3.5deg)}50%{transform:translateY(4px) rotate(3.5deg)}}',
-      '.wm-a-lean{animation:wmLean 2.8s ease-in-out infinite}',
-      '@keyframes wmLean{0%,100%{transform:rotate(-4deg) translateX(-1px)}50%{transform:rotate(3deg) translateX(2px)}}',
-      '.wm-a-pop{animation:wmPop .5s cubic-bezier(.2,1.5,.4,1) both, wmFloat 2.8s ease-in-out .5s infinite}',
-      '@keyframes wmPop{0%{transform:scale(.6) translateY(10px)}100%{transform:scale(1) translateY(0)}}',
-      '@keyframes wmFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}',
-      '.wm-lid{transform-box:fill-box;transform-origin:50% 0;transform:scaleY(0)}',
-      '.wm-blink{animation:wmBlink var(--b,5s) ease-in-out infinite}',
-      '@keyframes wmBlink{0%,93%,100%{transform:scaleY(0)}96%,97.5%{transform:scaleY(1)}}',
-      '.wm-armL{transform-box:fill-box;transform-origin:90% 8%;animation:wmArmL 3s ease-in-out infinite}',
-      '@keyframes wmArmL{0%,100%{transform:rotate(0)}50%{transform:rotate(-10deg)}}',
-      '.wm-armR{transform-box:fill-box;transform-origin:10% 8%;animation:wmArmR 3s ease-in-out infinite}',
-      '@keyframes wmArmR{0%,100%{transform:rotate(0)}50%{transform:rotate(10deg)}}',
-      '.wm-wave{transform-box:fill-box;transform-origin:10% 95%;animation:wmWave 1s ease-in-out infinite}',
-      '@keyframes wmWave{0%,100%{transform:rotate(-14deg)}50%{transform:rotate(18deg)}}',
-      '.wm-drip{transform-box:fill-box;transform-origin:50% 0;animation:wmDrip 1.8s ease-in infinite}',
-      '@keyframes wmDrip{0%{transform:translateY(0) scaleY(.6);opacity:0}30%{opacity:1}100%{transform:translateY(26px) scaleY(1);opacity:0}}',
-      '.wm-tw{transform-box:fill-box;transform-origin:center;animation:wmTw 1.4s ease-in-out infinite}',
-      '@keyframes wmTw{0%,100%{transform:scale(.4);opacity:.2}50%{transform:scale(1);opacity:1}}',
-      '.wm-tw.d1{animation-delay:.5s}.wm-tw.d2{animation-delay:.9s}',
-      '.wm-toot{transform-box:fill-box;transform-origin:100% 50%;animation:wmToot 1.1s ease-out infinite}',
-      '@keyframes wmToot{0%{transform:scale(.3) translate(0,0);opacity:0}30%{opacity:.9}100%{transform:scale(1.2) translate(-18px,0);opacity:0}}',
-      '.wm-puff{transform-box:fill-box;transform-origin:0 50%;animation:wmPuff 1.1s ease-out infinite}',
-      '@keyframes wmPuff{0%{transform:scale(.3);opacity:0}30%{opacity:.9}100%{transform:scale(1.4) translateX(12px);opacity:0}}'
-    ].join('\n');
-    document.head.appendChild(css);
-  }
-
-  var INK = '#15181c';
-  var SW = 7;
-  var CANON = ['neutral', 'happy', 'celebrating', 'shocked', 'nervous', 'confident', 'angry', 'crying', 'mischievous', 'scottish'];
-  var ALIAS = { welcome: 'happy', smug: 'confident', outraged: 'shocked', delighted: 'celebrating', suspicious: 'mischievous', wounded: 'crying', solemn: 'neutral', broadcast: 'confident', drumroll: 'nervous' };
-  function resolve(m) { if (CANON.indexOf(m) >= 0) return m; if (ALIAS[m]) return ALIAS[m]; return 'neutral'; }
-
-  // whistle geometry — chamber centre + face anchors (face on the round body)
-  var BC = { x: 162, y: 128, rx: 60, ry: 58 };   // body / resonating chamber
-  var L = { x: 146, y: 120 }, RY = { x: 182, y: 120 };  // eyes
-  var MX = 164, MY = 152;                                // mouth centre
-
-  var CFG = {
-    neutral:     { e: 'open',  brow: 'rest',  m: 'soft',  arms: 'rest',    anim: 'idle',   fx: null },
-    happy:       { e: 'open',  brow: 'up',    m: 'smile', arms: 'thumbs',  anim: 'idle',   fx: null },
-    celebrating: { e: 'joy',   brow: 'up',    m: 'grin',  arms: 'up',      anim: 'bounce', fx: 'spark' },
-    shocked:     { e: 'wide',  brow: 'high',  m: 'oh',    arms: 'startle', anim: 'pop',    fx: 'bolt' },
-    nervous:     { e: 'worry', brow: 'worry', m: 'wavy',  arms: 'fidget',  anim: 'jitter', fx: 'sweat' },
-    confident:   { e: 'half',  brow: 'cocky', m: 'smirk', arms: 'hip',     anim: 'idle',   fx: 'toot' },
-    angry:       { e: 'narrow',brow: 'angry', m: 'shout', arms: 'card',    anim: 'throb',  fx: 'steam' },
-    crying:      { e: 'shut',  brow: 'sad',   m: 'wail',  arms: 'face',    anim: 'sway',   fx: 'tears' },
-    mischievous: { e: 'half',  brow: 'sly',   m: 'sly',   arms: 'rub',     anim: 'lean',   fx: 'spark1' },
-    scottish:    { e: 'joy',   brow: 'up',    m: 'grin',  arms: 'wave',    anim: 'bounce', fx: 'spark' }
-  };
-
-  var BROWS = {
-    rest:  ['M' + (L.x - 15) + ',' + (L.y - 20) + ' Q' + L.x + ',' + (L.y - 26) + ' ' + (L.x + 13) + ',' + (L.y - 20), 'M' + (RY.x - 13) + ',' + (RY.y - 20) + ' Q' + RY.x + ',' + (RY.y - 26) + ' ' + (RY.x + 15) + ',' + (RY.y - 20)],
-    up:    ['M' + (L.x - 15) + ',' + (L.y - 24) + ' Q' + L.x + ',' + (L.y - 34) + ' ' + (L.x + 13) + ',' + (L.y - 25), 'M' + (RY.x - 13) + ',' + (RY.y - 25) + ' Q' + RY.x + ',' + (RY.y - 34) + ' ' + (RY.x + 15) + ',' + (RY.y - 24)],
-    high:  ['M' + (L.x - 15) + ',' + (L.y - 28) + ' Q' + L.x + ',' + (L.y - 38) + ' ' + (L.x + 13) + ',' + (L.y - 29), 'M' + (RY.x - 13) + ',' + (RY.y - 29) + ' Q' + RY.x + ',' + (RY.y - 38) + ' ' + (RY.x + 15) + ',' + (RY.y - 28)],
-    worry: ['M' + (L.x - 15) + ',' + (L.y - 22) + ' Q' + L.x + ',' + (L.y - 28) + ' ' + (L.x + 13) + ',' + (L.y - 25), 'M' + (RY.x - 13) + ',' + (RY.y - 20) + ' Q' + RY.x + ',' + (RY.y - 25) + ' ' + (RY.x + 15) + ',' + (RY.y - 22)],
-    cocky: ['M' + (L.x - 15) + ',' + (L.y - 20) + ' Q' + L.x + ',' + (L.y - 22) + ' ' + (L.x + 13) + ',' + (L.y - 28), 'M' + (RY.x - 13) + ',' + (RY.y - 19) + ' Q' + RY.x + ',' + (RY.y - 21) + ' ' + (RY.x + 15) + ',' + (RY.y - 27)],
-    angry: ['M' + (L.x - 16) + ',' + (L.y - 26) + ' L' + (L.x + 13) + ',' + (L.y - 13), 'M' + (RY.x + 16) + ',' + (RY.y - 26) + ' L' + (RY.x - 13) + ',' + (RY.y - 13)],
-    sad:   ['M' + (L.x - 14) + ',' + (L.y - 14) + ' Q' + L.x + ',' + (L.y - 26) + ' ' + (L.x + 14) + ',' + (L.y - 20), 'M' + (RY.x - 14) + ',' + (RY.y - 20) + ' Q' + RY.x + ',' + (RY.y - 26) + ' ' + (RY.x + 16) + ',' + (RY.y - 14)],
-    sly:   ['M' + (L.x - 15) + ',' + (L.y - 18) + ' Q' + L.x + ',' + (L.y - 21) + ' ' + (L.x + 13) + ',' + (L.y - 27), 'M' + (RY.x - 13) + ',' + (RY.y - 18) + ' Q' + RY.x + ',' + (RY.y - 20) + ' ' + (RY.x + 15) + ',' + (RY.y - 26)]
-  };
-
-  function defs(uid) {
-    return R.createElement('defs', null,
-      R.createElement('linearGradient', { id: uid + 'g', x1: '0', y1: '0', x2: '0', y2: '1' },
-        R.createElement('stop', { offset: '0', stopColor: '#dde2e7' }),
-        R.createElement('stop', { offset: '0.5', stopColor: '#bcc4cc' }),
-        R.createElement('stop', { offset: '1', stopColor: '#98a2ab' })),
-      R.createElement('linearGradient', { id: uid + 'gm', x1: '0', y1: '0', x2: '0', y2: '1' },
-        R.createElement('stop', { offset: '0', stopColor: '#c9d0d7' }),
-        R.createElement('stop', { offset: '1', stopColor: '#8b95a0' })),
-      R.createElement('pattern', { id: uid + 'tn', width: '13', height: '13', patternUnits: 'userSpaceOnUse' },
-        R.createElement('rect', { width: '13', height: '13', fill: '#1f3d2e' }),
-        R.createElement('rect', { width: '13', height: '13', fill: '#10325a', opacity: '0.45' }),
-        R.createElement('rect', { x: '0', width: '4', height: '13', fill: '#9b1b2e' }),
-        R.createElement('rect', { y: '0', width: '13', height: '4', fill: '#9b1b2e' }),
-        R.createElement('rect', { x: '8', width: '1.3', height: '13', fill: '#e7d27a', opacity: '0.8' })));
-  }
-
-  function eye(uid, c, x, y, scale, blink, delay) {
-    scale = scale || 1; var ink = INK;
-    if (c === 'joy') return R.createElement('path', { d: 'M' + (x - 14 * scale) + ',' + (y + 3) + ' Q' + x + ',' + (y - 14 * scale) + ' ' + (x + 14 * scale) + ',' + (y + 3), fill: 'none', stroke: ink, strokeWidth: 6 * scale, strokeLinecap: 'round' });
-    if (c === 'shut') return R.createElement('path', { d: 'M' + (x - 13 * scale) + ',' + (y - 1) + ' Q' + x + ',' + (y + 8 * scale) + ' ' + (x + 13 * scale) + ',' + (y - 1), fill: 'none', stroke: ink, strokeWidth: 6 * scale, strokeLinecap: 'round' });
-    var rx = 14 * scale, ry = 17 * scale, pr = 7.5 * scale;
-    if (c === 'wide') { rx = 16 * scale; ry = 20 * scale; pr = 6 * scale; }
-    if (c === 'narrow') { ry = 10 * scale; pr = 6.5 * scale; }
-    if (c === 'half' || c === 'worry') ry = 14 * scale;
-    var px = x, py = y + 2;
-    var els = [
-      R.createElement('ellipse', { key: 'w', cx: x, cy: y, rx: rx, ry: ry, fill: '#fff', stroke: ink, strokeWidth: 4 * scale }),
-      R.createElement('circle', { key: 'p', cx: px, cy: py, r: pr, fill: '#15181c' }),
-      R.createElement('circle', { key: 'g', cx: px - 2.5 * scale, cy: py - 3 * scale, r: 2.4 * scale, fill: '#fff' })
-    ];
-    if (c === 'half') els.push(R.createElement('path', { key: 'l', d: 'M' + (x - rx - 1) + ',' + (y - 2) + ' a' + rx + ',' + ry + ' 0 0 1 ' + (rx * 2 + 2) + ',0 l0,-' + (ry + 4) + ' l-' + (rx * 2 + 2) + ',0 Z', fill: 'url(#' + uid + 'g)', stroke: ink, strokeWidth: 4 * scale, strokeLinejoin: 'round' }));
-    if (c === 'worry') els.push(R.createElement('path', { key: 'l', d: 'M' + (x - rx - 1) + ',' + (y - 5) + ' a' + rx + ',' + ry + ' 0 0 1 ' + (rx * 2 + 2) + ',0 l0,-' + (ry + 6) + ' l-' + (rx * 2 + 2) + ',0 Z', fill: 'url(#' + uid + 'g)', stroke: ink, strokeWidth: 4 * scale, strokeLinejoin: 'round' }));
-    if (blink) els.push(R.createElement('ellipse', { key: 'b', className: 'wm-lid wm-blink', style: { '--b': delay }, cx: x, cy: y, rx: rx + 1, ry: ry + 1, fill: 'url(#' + uid + 'g)', stroke: ink, strokeWidth: 4 * scale }));
-    return R.createElement('g', null, els);
-  }
-
-  function mouth(style) {
-    var ink = INK, lip = '#d8536e', x = MX, y = MY;
-    switch (style) {
-      case 'smile': return R.createElement('path', { d: 'M' + (x - 22) + ',' + (y - 4) + ' Q' + x + ',' + (y + 16) + ' ' + (x + 22) + ',' + (y - 4) + ' Q' + x + ',' + (y + 6) + ' ' + (x - 22) + ',' + (y - 4) + ' Z', fill: ink });
-      case 'grin': return R.createElement('g', null,
-        R.createElement('path', { d: 'M' + (x - 26) + ',' + (y - 6) + ' Q' + x + ',' + (y + 22) + ' ' + (x + 26) + ',' + (y - 6) + ' Q' + x + ',' + (y + 4) + ' ' + (x - 26) + ',' + (y - 6) + ' Z', fill: ink }),
-        R.createElement('path', { d: 'M' + (x - 21) + ',' + (y - 5) + ' L' + (x + 21) + ',' + (y - 5) + ' Q' + x + ',' + (y + 1) + ' ' + (x - 21) + ',' + (y - 5) + ' Z', fill: '#fff' }),
-        R.createElement('path', { d: 'M' + (x - 9) + ',' + (y + 11) + ' Q' + x + ',' + (y + 16) + ' ' + (x + 9) + ',' + (y + 11) + ' Q' + x + ',' + (y + 14) + ' ' + (x - 9) + ',' + (y + 11) + ' Z', fill: lip }));
-      case 'oh': return R.createElement('ellipse', { cx: x, cy: y + 2, rx: 11, ry: 14, fill: ink });
-      case 'shout': return R.createElement('g', null,
-        R.createElement('path', { d: 'M' + (x - 21) + ',' + (y - 6) + ' Q' + x + ',' + (y - 2) + ' ' + (x + 21) + ',' + (y - 6) + ' Q' + (x + 13) + ',' + (y + 19) + ' ' + x + ',' + (y + 19) + ' Q' + (x - 13) + ',' + (y + 19) + ' ' + (x - 21) + ',' + (y - 6) + ' Z', fill: ink }),
-        R.createElement('path', { d: 'M' + (x - 17) + ',' + (y - 5) + ' L' + (x + 17) + ',' + (y - 5) + ' Q' + x + ',' + (y - 1) + ' ' + (x - 17) + ',' + (y - 5) + ' Z', fill: '#fff' }));
-      case 'smirk': return R.createElement('path', { d: 'M' + (x - 19) + ',' + (y - 2) + ' Q' + (x + 4) + ',' + (y + 12) + ' ' + (x + 21) + ',' + (y - 12), fill: 'none', stroke: ink, strokeWidth: 6, strokeLinecap: 'round' });
-      case 'sly': return R.createElement('path', { d: 'M' + (x - 19) + ',' + (y - 4) + ' Q' + (x - 2) + ',' + (y + 10) + ' ' + (x + 13) + ',' + (y + 2) + ' Q' + (x + 21) + ',' + (y - 1) + ' ' + (x + 23) + ',' + (y - 9), fill: 'none', stroke: ink, strokeWidth: 5.5, strokeLinecap: 'round' });
-      case 'wavy': return R.createElement('path', { d: 'M' + (x - 19) + ',' + y + ' q7,-7 13,0 q7,7 13,0 q6,-6 6,-2', fill: 'none', stroke: ink, strokeWidth: 5, strokeLinecap: 'round' });
-      case 'wail': return R.createElement('g', null,
-        R.createElement('path', { d: 'M' + (x - 19) + ',' + (y + 4) + ' Q' + x + ',' + (y - 15) + ' ' + (x + 19) + ',' + (y + 4) + ' Q' + x + ',' + (y + 19) + ' ' + (x - 19) + ',' + (y + 4) + ' Z', fill: ink }),
-        R.createElement('path', { d: 'M' + (x - 10) + ',' + (y + 4) + ' Q' + x + ',' + (y - 2) + ' ' + (x + 10) + ',' + (y + 4) + ' Q' + x + ',' + (y + 10) + ' ' + (x - 10) + ',' + (y + 4) + ' Z', fill: lip }));
-      case 'soft': default: return R.createElement('path', { d: 'M' + (x - 17) + ',' + (y - 2) + ' Q' + x + ',' + (y + 9) + ' ' + (x + 17) + ',' + (y - 2), fill: 'none', stroke: ink, strokeWidth: 6, strokeLinecap: 'round' });
-    }
-  }
-
-  function hose(uid, d, cls) {
-    return R.createElement('g', { className: cls || '' },
-      R.createElement('path', { d: d, fill: 'none', stroke: INK, strokeWidth: 15, strokeLinecap: 'round' }),
-      R.createElement('path', { d: d, fill: 'none', stroke: 'url(#' + uid + 'gm)', strokeWidth: 8, strokeLinecap: 'round' }));
-  }
-  function glove(x, y, kind) {
-    var els = [R.createElement('circle', { key: 'g', cx: x, cy: y, r: 14, fill: '#fff', stroke: INK, strokeWidth: 5 })];
-    if (kind === 'thumb') els.push(R.createElement('path', { key: 't', d: 'M' + (x - 3) + ',' + (y - 11) + ' q-7,-9 1,-15 q6,-3 8,4 l-1,11', fill: '#fff', stroke: INK, strokeWidth: 5, strokeLinejoin: 'round' }));
-    else els.push(R.createElement('path', { key: 'k', d: 'M' + (x - 8) + ',' + (y - 2) + ' q8,5 16,0', fill: 'none', stroke: INK, strokeWidth: 3, strokeLinecap: 'round', opacity: .5 }));
-    return R.createElement('g', null, els);
-  }
-
-  // shoulders: left lower-left of chamber, right at chamber right
-  function arms(uid, style) {
-    switch (style) {
-      case 'up': return R.createElement('g', null,
-        hose(uid, 'M118,156 Q92,138 88,108', 'wm-armL'), glove(86, 102, 'thumb'),
-        hose(uid, 'M212,140 Q238,124 244,96', 'wm-armR'), glove(246, 90, 'thumb'));
-      case 'thumbs': return R.createElement('g', null,
-        hose(uid, 'M116,160 Q98,172 102,190', ''), glove(102, 194, 'thumb'),
-        hose(uid, 'M212,142 Q236,134 240,108', ''), glove(242, 102, 'thumb'));
-      case 'wave': return R.createElement('g', null,
-        hose(uid, 'M116,162 Q98,174 102,192', ''), glove(102, 196, 'thumb'),
-        R.createElement('g', { className: 'wm-wave' }, hose(uid, 'M212,138 Q240,120 248,92', ''), glove(250, 86, 'thumb')));
-      case 'hip': return R.createElement('g', null,
-        hose(uid, 'M118,166 Q100,178 110,194', ''), glove(112, 198, ''),
-        hose(uid, 'M210,156 Q230,168 220,194', ''), glove(222, 198, ''));
-      case 'startle': return R.createElement('g', null,
-        hose(uid, 'M116,150 Q90,142 80,150', ''), glove(76, 150, ''),
-        hose(uid, 'M212,140 Q240,132 250,142', ''), glove(254, 144, ''));
-      case 'fidget': return R.createElement('g', null,
-        hose(uid, 'M120,166 Q110,180 122,188', ''), glove(126, 192, ''),
-        hose(uid, 'M210,156 Q222,170 210,180', ''), glove(206, 184, ''));
-      case 'card': return R.createElement('g', null,
-        hose(uid, 'M118,164 Q100,174 108,192', ''), glove(110, 196, ''),
-        R.createElement('g', { transform: 'rotate(-10 240 96)' },
-          hose(uid, 'M212,138 Q234,116 234,96', ''),
-          R.createElement('rect', { x: '222', y: '60', width: '24', height: '34', rx: '4', fill: '#E8272A', stroke: INK, strokeWidth: '5' })));
-      case 'face': return R.createElement('g', null,
-        hose(uid, 'M122,150 Q112,164 132,170', ''), glove(136, 172, ''),
-        hose(uid, 'M208,144 Q220,158 200,166', ''), glove(196, 168, ''));
-      case 'rub': return R.createElement('g', null,
-        hose(uid, 'M122,164 Q112,176 130,184', ''), glove(134, 187, ''),
-        hose(uid, 'M208,158 Q220,170 202,178', ''), glove(198, 181, ''));
-      case 'rest': default: return R.createElement('g', null,
-        hose(uid, 'M118,160 Q102,174 110,192', 'wm-armL'), glove(112, 196, ''),
-        hose(uid, 'M212,150 Q228,164 220,192', 'wm-armR'), glove(222, 196, ''));
-    }
-  }
-
-  function legs() {
-    var x1 = MX - 22, x2 = MX + 22, top = 178, knee = 206;
-    function leg(x, dir) {
-      return R.createElement('g', { key: 'lg' + x },
-        R.createElement('path', { d: 'M' + x + ',' + top + ' L' + x + ',' + knee, fill: 'none', stroke: INK, strokeWidth: 15, strokeLinecap: 'round' }),
-        R.createElement('path', { d: 'M' + x + ',' + top + ' L' + x + ',' + knee, fill: 'none', stroke: '#98a2ab', strokeWidth: 7, strokeLinecap: 'round' }),
-        R.createElement('path', { d: 'M' + (x - 6) + ',' + (knee - 4) + ' q-' + (dir > 0 ? 4 : 20) + ',2 -' + (dir > 0 ? 4 : 22) + ',14 q0,7 12,7 l' + (dir > 0 ? 26 : 20) + ',0 q9,0 9,-8 q0,-9 -12,-12 Z', fill: INK }),
-        R.createElement('rect', { x: x - (dir > 0 ? 16 : 24), y: knee + 12, width: 38, height: 5, rx: 2.5, fill: '#fff' }));
-    }
-    return R.createElement('g', null, leg(x1, -1), leg(x2, 1));
-  }
-
-  function star(cx, cy, s, fill, cls) {
-    return R.createElement('path', { className: cls, transform: 'translate(' + cx + ',' + cy + ')', d: 'M0,' + (-s) + ' L' + (s * .3) + ',' + (-s * .3) + ' L' + s + ',0 L' + (s * .3) + ',' + (s * .3) + ' L0,' + s + ' L' + (-s * .3) + ',' + (s * .3) + ' L' + (-s) + ',0 L' + (-s * .3) + ',' + (-s * .3) + ' Z', fill: fill, stroke: INK, strokeWidth: 1.4 });
-  }
-
-  function fx(uid, kind) {
-    switch (kind) {
-      case 'spark': return R.createElement('g', null, star(70, 58, 8, '#F5C800', 'wm-tw'), star(232, 56, 7, '#F5C800', 'wm-tw d1'), star(228, 150, 5, '#F5C800', 'wm-tw d2'), star(78, 150, 5, '#F5C800', 'wm-tw d1'));
-      case 'spark1': return star(224, 152, 7, '#F5C800', 'wm-tw');
-      case 'bolt': return R.createElement('g', { stroke: '#E8272A', strokeWidth: 4.5, strokeLinecap: 'round' }, R.createElement('line', { x1: '162', y1: '46', x2: '162', y2: '30' }), R.createElement('line', { x1: '198', y1: '52', x2: '210', y2: '40' }), R.createElement('line', { x1: '126', y1: '52', x2: '114', y2: '40' }));
-      case 'sweat': return R.createElement('ellipse', { className: 'wm-drip', cx: '210', cy: '96', rx: '5.5', ry: '9', fill: '#5BB6E8', stroke: INK, strokeWidth: '1.5' });
-      case 'tears': return R.createElement('g', null,
-        R.createElement('ellipse', { className: 'wm-drip', cx: L.x - 2, cy: L.y + 22, rx: '5.5', ry: '9', fill: '#5BB6E8', stroke: INK, strokeWidth: '1.5' }),
-        R.createElement('ellipse', { className: 'wm-drip', cx: RY.x + 2, cy: RY.y + 22, rx: '5', ry: '8', fill: '#5BB6E8', stroke: INK, strokeWidth: '1.5', style: { animationDelay: '.7s' } }));
-      case 'steam': return R.createElement('g', { transform: 'translate(214,76)', fill: '#cfd8df' },
-        R.createElement('circle', { className: 'wm-puff', cx: '0', cy: '0', r: '6' }),
-        R.createElement('circle', { className: 'wm-puff', cx: '2', cy: '10', r: '5', style: { animationDelay: '.4s' } }));
-      default: return null;
-    }
-  }
-
-  // tam cocked on the upper-left of the chamber; ring stays visible top-right
-  function tam(uid) {
-    var cx = 134, top = 78;
-    return R.createElement('g', { transform: 'translate(' + cx + ',' + top + ') rotate(-20) translate(' + (-cx) + ',' + (-top) + ')' },
-      R.createElement('ellipse', { cx: cx, cy: top - 5, rx: 46, ry: 18, fill: '#262a31' }),
-      R.createElement('ellipse', { cx: cx - 12, cy: top - 11, rx: 22, ry: 8, fill: '#363d47', opacity: .85 }),
-      R.createElement('path', { d: 'M' + (cx - 40) + ',' + (top + 3) + ' Q' + cx + ',' + (top + 16) + ' ' + (cx + 40) + ',' + (top + 3) + ' L' + (cx + 40) + ',' + (top + 10) + ' Q' + cx + ',' + (top + 23) + ' ' + (cx - 40) + ',' + (top + 10) + ' Z', fill: 'url(#' + uid + 'tn)', stroke: INK, strokeWidth: 3 }),
-      R.createElement('ellipse', { cx: cx, cy: top + 3, rx: 40, ry: 10, fill: 'none', stroke: INK, strokeWidth: 3 }),
-      R.createElement('circle', { cx: cx, cy: top - 22, r: 8, fill: '#E8272A', stroke: INK, strokeWidth: 3 }),
-      R.createElement('circle', { cx: cx - 3, cy: top - 24, r: 2.2, fill: '#ff8a98' }));
-  }
-
-  function WheeshtMascot(props) {
-    var mood = resolve(props.mood);
-    var c = CFG[mood];
-    var size = props.size || 170;
-    var animate = !!props.animate;
-    var uid = R.useMemo(function () { return 'm' + Math.random().toString(36).slice(2, 8); }, []);
-    var delay = R.useMemo(function () { return (4.4 + Math.random() * 2.4).toFixed(2) + 's'; }, []);
-    var canBlink = animate && (c.e === 'open' || c.e === 'half' || c.e === 'wide' || c.e === 'narrow' || c.e === 'worry');
-    var scottish = mood === 'scottish';
-
-    // --- the whistle hardware (side profile, drawn upright) ---
-    var hardware = R.createElement('g', null,
-      // finger ring on top (slightly right of centre, clear of the sound window)
-      R.createElement('g', null,
-        R.createElement('path', { d: 'M186,78 q-2,-18 ' + (-2) + ',-22', fill: 'none', stroke: INK, strokeWidth: SW }),
-        R.createElement('circle', { cx: 188, cy: 50, r: 16, fill: 'none', stroke: INK, strokeWidth: SW }),
-        R.createElement('circle', { cx: 188, cy: 50, r: 16, fill: 'none', stroke: 'url(#' + uid + 'gm)', strokeWidth: SW - 4 })),
-      // mouthpiece tube projecting left from the chamber
-      R.createElement('path', { d: 'M40,104 q-8,0 -8,14 q0,14 8,14 l78,4 0,-40 Z', fill: 'url(#' + uid + 'gm)', stroke: INK, strokeWidth: SW, strokeLinejoin: 'round' }),
-      // chamber (round body)
-      R.createElement('ellipse', { cx: BC.x, cy: BC.y, rx: BC.rx, ry: BC.ry, fill: 'url(#' + uid + 'g)', stroke: INK, strokeWidth: SW }),
-      // rectangular sound window cut into the TOP at the mouthpiece junction
-      R.createElement('path', { d: 'M96,96 l30,-2 0,-16 q-30,0 -34,4 Z', fill: INK }),
-      R.createElement('path', { d: 'M99,92 l24,-1.4 0,-9 q-22,0 -26,2 Z', fill: '#3a424b' }),
-      // chamber top highlight
-      R.createElement('path', { d: 'M118,98 Q160,86 200,100', fill: 'none', stroke: '#eef2f5', strokeWidth: 7, strokeLinecap: 'round', opacity: .65 })
-    );
-
-    var stage = R.createElement('g', { className: 'wm-stage' + (animate ? ' wm-a-' + c.anim : '') },
-      animate && c.fx === 'toot' ? R.createElement('g', { className: 'wm-toot' },
-        R.createElement('path', { d: 'M30,118 q-12,0 -12,8 q0,8 12,8', fill: 'none', stroke: '#aab4bd', strokeWidth: 4, strokeLinecap: 'round' }),
-        R.createElement('path', { d: 'M20,126 q-7,0 -7,4', fill: 'none', stroke: '#aab4bd', strokeWidth: 3.5, strokeLinecap: 'round', opacity: .6 })) : null,
-      legs(),
-      arms(uid, c.arms),
-      hardware,
-      // tartan band wrapped round the mouthpiece (scottish, subtle)
-      scottish ? R.createElement('rect', { x: 70, y: 96, width: 11, height: 44, rx: 2, fill: 'url(#' + uid + 'tn)', stroke: INK, strokeWidth: 2.5 }) : null,
-      c.fx ? fx(uid, c.fx) : null,
-      // cheeks
-      scottish
-        ? R.createElement('g', null, saltCheek(L.x - 2, L.y + 22), saltCheek(RY.x + 2, RY.y + 22, .85))
-        : R.createElement('g', null,
-            R.createElement('ellipse', { cx: L.x - 2, cy: L.y + 22, rx: 10, ry: 7, fill: '#F0708F', opacity: .5 }),
-            R.createElement('ellipse', { cx: RY.x + 2, cy: RY.y + 22, rx: 9, ry: 6, fill: '#F0708F', opacity: .45 })),
-      // face
-      eye(uid, c.e, L.x, L.y, 1, canBlink, delay),
-      eye(uid, c.e, RY.x, RY.y, 1, canBlink, delay),
-      R.createElement('path', { d: BROWS[c.brow][0], fill: 'none', stroke: INK, strokeWidth: 6, strokeLinecap: 'round' }),
-      R.createElement('path', { d: BROWS[c.brow][1], fill: 'none', stroke: INK, strokeWidth: 6, strokeLinecap: 'round' }),
-      mouth(c.m),
-      scottish ? tam(uid) : null
-    );
-
-    return R.createElement('svg', { className: 'wm-svg', viewBox: '0 0 276 240', width: size, height: size * (240 / 276), style: { display: 'block' } },
-      defs(uid),
-      R.createElement('ellipse', { cx: 164, cy: 226, rx: 62, ry: 11, fill: '#1A1A1A', opacity: .14 }),
-      R.createElement('g', { className: animate ? 'wm-breathe' : '' }, stage));
-  }
-  function saltCheek(cx, cy, s) {
-    s = s || 1;
-    return R.createElement('g', { transform: 'translate(' + (cx - 10 * s) + ',' + (cy - 7 * s) + ') scale(' + s + ')' },
-      R.createElement('rect', { x: 0, y: 0, width: 20, height: 14, rx: 3, fill: '#0a4aa0', opacity: .92 }),
-      R.createElement('path', { d: 'M0,0 L20,14 M20,0 L0,14', stroke: '#fff', strokeWidth: 3 }));
-  }
-
-  window.WheeshtMascot = WheeshtMascot;
-  window.Wheesht = WheeshtMascot;
-})();
-
-</script>
-
-<script type="text/babel">
-/* ===========================================================================
-   UI KIT — sticker-album / match-programme components.
-   Exported to window. Relies on CSS vars + classes defined in index.html.
-   =========================================================================== */
-const { useState, useEffect, useRef, useMemo } = React;
-
-/* ---- Card ---------------------------------------------------------------- */
-function Card(props) {
-  const cls = 'wc-card' + (props.bordered ? ' wc-card--bd' : '') + (props.flat ? ' wc-card--flat' : '') + (props.className ? ' ' + props.className : '');
-  return <div className={cls} style={props.style} onClick={props.onClick}>{props.children}</div>;
-}
-
-/* ---- Button -------------------------------------------------------------- */
-function Btn(props) {
-  const variant = props.variant || 'primary';
-  return (
-    <button type="button" disabled={props.disabled}
-      onClick={props.onClick}
-      className={'wc-btn wc-btn--' + variant + (props.block ? ' wc-btn--block' : '') + (props.sm ? ' wc-btn--sm' : '')}
-      style={props.style}>
-      {props.children}
-    </button>
-  );
-}
-
-/* ---- Flag chip ----------------------------------------------------------- */
-function Flag(props) {
-  const t = typeof props.team === 'string' ? window.WC.TEAMS[props.team] : props.team;
-  const sz = props.size || 30;
-  if (!t) return null;
-  return <span className="wc-flag" style={{ fontSize: sz, lineHeight: 1 }} title={t.name}>{t.flag}</span>;
-}
-
-/* ---- Avatar (initials) --------------------------------------------------- */
-function Avatar(props) {
-  const p = props.person;
-  const sz = props.size || 36;
-  return (
-    <span className="wc-avatar" style={{
-      width: sz, height: sz, background: p.isYou ? 'var(--ink)' : p.color,
-      fontSize: sz * 0.36, opacity: (props.dim ? 0.4 : 1),
-    }}>{p.isYou ? 'YOU' : p.initials}</span>
-  );
-}
-
-/* ---- Chip ---------------------------------------------------------------- */
-function Chip(props) {
-  return <span className={'wc-chip' + (props.tone ? ' wc-chip--' + props.tone : '')} style={props.style}>{props.children}</span>;
-}
-
-/* ---- Stamp (ELIMINATED / QUALIFIED) -------------------------------------- */
-function Stamp(props) {
-  const tone = props.tone || 'red';
-  return <span className={'wc-stamp wc-stamp--' + tone} style={Object.assign({ transform: 'rotate(' + (props.rotate == null ? -8 : props.rotate) + 'deg)' }, props.style)}>{props.children}</span>;
-}
-
-/* ---- Progress ring ------------------------------------------------------- */
-function ProgressRing(props) {
-  const size = props.size || 46, sw = props.stroke || 6;
-  const r = (size - sw) / 2, c = 2 * Math.PI * r;
-  const pct = Math.max(0, Math.min(1, props.value));
-  return (
-    <svg width={size} height={size} style={{ display: 'block' }}>
-      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="rgba(26,26,26,.12)" strokeWidth={sw} />
-      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={props.color || 'var(--red)'} strokeWidth={sw}
-        strokeDasharray={c} strokeDashoffset={c * (1 - pct)} strokeLinecap="round"
-        transform={'rotate(-90 ' + size / 2 + ' ' + size / 2 + ')'} style={{ transition: 'stroke-dashoffset .8s cubic-bezier(.2,.8,.2,1)' }} />
-      {props.children && <foreignObject x="0" y="0" width={size} height={size}>
-        <div style={{ width: size, height: size, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: size * 0.28 }}>{props.children}</div>
-      </foreignObject>}
-    </svg>
-  );
-}
-
-/* ---- Segment comparison bar (animated) ----------------------------------- */
-function SegmentBar(props) {
-  const a = props.a, b = props.b; // {name, value 0-100}
-  const total = a.value + b.value || 1;
-  const aw = Math.round(100 * a.value / total);
-  const ref = useRef(null);
-  const [shown, setShown] = useState(false);
-  useEffect(function () {
-    const el = ref.current; if (!el) return;
-    const io = new IntersectionObserver(function (e) { if (e[0].isIntersecting) setShown(true); }, { threshold: 0.4 });
-    io.observe(el); return function () { io.disconnect(); };
-  }, []);
-  const aWin = a.value >= b.value;
-  return (
-    <div ref={ref} className="wc-seg">
-      <div className="wc-seg__head">
-        <span><b style={{ color: aWin ? 'var(--ink)' : 'inherit' }}>{a.name}</b> {a.value}%</span>
-        <span>{b.value}% <b style={{ color: !aWin ? 'var(--ink)' : 'inherit' }}>{b.name}</b></span>
-      </div>
-      <div className="wc-seg__track">
-        <div className="wc-seg__fill" style={{ width: (shown ? aw : 50) + '%' }} />
-        <div className="wc-seg__mid" style={{ left: (shown ? aw : 50) + '%' }} />
-      </div>
-    </div>
-  );
-}
-
-/* ---- Wheesht speech block ------------------------------------------------ */
-function WheeshtSays(props) {
-  return (
-    <div className={'wc-says' + (props.compact ? ' wc-says--compact' : '')}>
-      <div className="wc-says__av"><window.Wheesht mood={props.mood || 'neutral'} size={props.avSize || 64} animate={props.animate} /></div>
-      <div className="wc-says__bubble">
-        {props.label && <div className="wc-says__name">Wheesht{props.label === true ? '' : ' · ' + props.label}</div>}
-        <div className="wc-says__text">{props.children}</div>
-      </div>
-    </div>
-  );
-}
-
-/* ---- Section heading ----------------------------------------------------- */
-function SectionHead(props) {
-  return <div className="wc-sec"><h3>{props.children}</h3>{props.aside && <span>{props.aside}</span>}</div>;
-}
-
-/* ---- Toast layer (imperative: window.wcToast(msg, mood)) ----------------- */
-function ToastLayer() {
-  const [items, setItems] = useState([]);
-  useEffect(function () {
-    window.wcToast = function (text, mood) {
-      const id = Date.now() + Math.random();
-      setItems(function (xs) { return xs.concat([{ id: id, text: text, mood: mood || 'neutral' }]); });
-      setTimeout(function () { setItems(function (xs) { return xs.filter(function (x) { return x.id !== id; }); }); }, 4200);
-    };
-  }, []);
-  return (
-    <div className="wc-toasts">
-      {items.map(function (t) {
-        return <div key={t.id} className="wc-toast">
-          <window.Wheesht mood={t.mood} size={40} />
-          <div className="wc-toast__txt">{t.text}</div>
-        </div>;
-      })}
-    </div>
-  );
-}
-
-/* ---- Confetti layer (imperative: window.wcConfetti(opts)) ---------------- */
-function ConfettiLayer() {
-  const cv = useRef(null);
-  useEffect(function () {
-    const canvas = cv.current; const ctx = canvas.getContext('2d');
-    let parts = []; let raf = null;
-    function resize() { const r = canvas.parentNode.getBoundingClientRect(); canvas.width = r.width; canvas.height = r.height; }
-    resize(); window.addEventListener('resize', resize);
-    const colors = ['#F5C800', '#E8272A', '#1A1A1A', '#1a7a44', '#0a3b8c', '#fff'];
-    function tick() {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      parts.forEach(function (p) {
-        p.vy += 0.18; p.x += p.vx; p.y += p.vy; p.rot += p.vr;
-        ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot);
-        ctx.fillStyle = p.c; ctx.fillRect(-p.s / 2, -p.s / 2, p.s, p.s * 0.5);
-        ctx.restore();
-      });
-      parts = parts.filter(function (p) { return p.y < canvas.height + 40; });
-      if (parts.length) raf = requestAnimationFrame(tick); else { raf = null; ctx.clearRect(0, 0, canvas.width, canvas.height); }
-    }
-    window.wcConfetti = function (opts) {
-      opts = opts || {}; resize();
-      const mul = (window.__celMul == null ? 1 : window.__celMul);
-      if (mul <= 0) return;
-      const cols = opts.colors || colors;
-      const n = Math.round((opts.count || 140) * mul);
-      const ox = canvas.width * (opts.x == null ? 0.5 : opts.x);
-      const oy = canvas.height * (opts.y == null ? 0.42 : opts.y);
-      for (let i = 0; i < n; i++) {
-        const ang = Math.random() * Math.PI * 2;
-        const spd = 4 + Math.random() * 9;
-        parts.push({ x: ox, y: oy, vx: Math.cos(ang) * spd, vy: Math.sin(ang) * spd - 4, s: 7 + Math.random() * 9, rot: Math.random() * 6, vr: (Math.random() - 0.5) * 0.4, c: cols[(Math.random() * cols.length) | 0] });
-      }
-      if (!raf) raf = requestAnimationFrame(tick);
-    };
-    return function () { window.removeEventListener('resize', resize); if (raf) cancelAnimationFrame(raf); };
-  }, []);
-  return <canvas ref={cv} className="wc-confetti" />;
-}
-
-Object.assign(window, {
-  Card: Card, Btn: Btn, Flag: Flag, Avatar: Avatar, Chip: Chip, Stamp: Stamp,
-  ProgressRing: ProgressRing, SegmentBar: SegmentBar, WheeshtSays: WheeshtSays,
-  SectionHead: SectionHead, ToastLayer: ToastLayer, ConfettiLayer: ConfettiLayer,
-});
-
-</script>
-
-<script type="text/babel">
-/* ===========================================================================
-   MOMENT SCREENS — full-screen takeovers
-   Entry & Setup · The Draw · Result & Commentary · The Final
-   =========================================================================== */
-const WCm = window.WC; const Wm = window.Wheesht;
-const { Card:Cm, Btn:Bm, Flag:Fm, Avatar:Am, Chip:Chm, Stamp:Stm } = window;
-const Rm = React;
-
-const inputStyle = {
-  width:'100%', border:'2.5px solid var(--ink)', borderRadius:13, padding:'13px 14px',
-  fontFamily:'var(--body)', fontWeight:600, fontSize:16, background:'#fff', color:'var(--ink)',
-  outline:'none', marginTop:6,
-};
-function Label(p){ return <label style={{fontWeight:800,fontSize:13,fontFamily:'var(--disp)',letterSpacing:'.02em'}}>{p.children}</label>; }
-
-/* =================== ENTRY & SETUP =================== */
-function EntryMoment(props){
-  const [name,setName]=Rm.useState('');
-  const [city,setCity]=Rm.useState('London');
-  const [wish,setWish]=Rm.useState('');
-  function go(){
-    if(name.trim()){ WCm.YOU.name = name.trim(); WCm.YOU.initials='YOU'; }
-    if(wish.trim()) WCm.YOU.wish = wish.trim();
-    props.onDone();
-  }
-  return (
-    <div className="moment">
-      <div className="mscroll" style={{padding:'30px 22px 30px'}}>
-        <div style={{textAlign:'center'}}>
-          <div style={{display:'inline-block'}} className="pop"><Wm mood="welcome" size={150} animate/></div>
-          <div className="dh" style={{fontSize:34,marginTop:6,lineHeight:.98}}>Right.<br/>Let’s get this started.</div>
-          <div style={{display:'inline-flex',marginTop:12,background:'var(--ink)',color:'#fff',borderRadius:'16px 16px 16px 5px',padding:'10px 14px',maxWidth:300}}>
-            <div style={{fontSize:14,fontWeight:600,lineHeight:1.35}}><span style={{color:'var(--yellow)',fontWeight:800}}>Wheesht is watching.</span> Officially impartial. Constitutionally otherwise.</div>
-          </div>
-        </div>
-
-        <div style={{marginTop:24,display:'flex',flexDirection:'column',gap:15}}>
-          <div><Label>Your name</Label>
-            <input style={inputStyle} value={name} onChange={e=>setName(e.target.value)} placeholder="What do we call ye?"/></div>
-          <div><Label>Your city</Label>
-            <div style={{display:'flex',gap:8,marginTop:6}}>
-              {['London','Edinburgh','Remote'].map(c=>(
-                <button key={c} onClick={()=>setCity(c)} className="wc-btn wc-btn--sm" style={{flex:1,background:city===c?'var(--yellow)':'#fff',boxShadow:city===c?'0 4px 0 var(--ink)':'0 4px 0 var(--shadow)'}}>{c}</button>
-              ))}
-            </div></div>
-          <div><Label>The team ye wish you’d drawn <span style={{color:'var(--ink2)',fontWeight:600}}>(optional)</span></Label>
-            <input style={inputStyle} value={wish} onChange={e=>setWish(e.target.value)} placeholder="We won’t tell. Wheesht might."/></div>
-        </div>
-
-        <Cm bordered style={{marginTop:18,background:'var(--yellow)'}}>
-          <div style={{fontSize:12,fontWeight:800,letterSpacing:'.05em',textTransform:'uppercase'}}>Your buy-in</div>
-          <div className="dh" style={{fontSize:30,margin:'2px 0 4px'}}>You’re putting in £20.</div>
-          <div style={{fontSize:14,fontWeight:600}}>That’s <b>4 pints in Edinburgh</b>, <b>11 in Buenos Aires</b>, or one very optimistic claim on {WCm.POT.toLocaleString('en-GB')} quid.</div>
-        </Cm>
-
-        <div style={{marginTop:18,display:'flex',flexDirection:'column',gap:10}}>
-          <Bm variant="ink" block onClick={go}>See the draw →</Bm>
-          <div style={{textAlign:'center',fontSize:13,fontWeight:700,color:'var(--ink2)'}}>or <span style={{textDecoration:'underline'}}>enter a group code</span></div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* =================== THE DRAW =================== */
-function DrawMoment(props){
-  const [phase,setPhase]=Rm.useState('ready'); // ready | rolling | revealed
-  const [idx,setIdx]=Rm.useState(0);
-  const teams=WCm.TEAM_LIST;
-  const target=teams.findIndex(t=>t.code==='CRO');
-  const timer=Rm.useRef(null);
-
-  function spin(){
-    setPhase('rolling');
-    const fast=24, slow=11, total=fast+slow;
-    let k=0;
-    function step(){
-      k++;
-      if(k>=total){ setIdx(target); setPhase('revealed'); window.wcConfetti&&window.wcConfetti({y:.4,count:170}); return; }
-      setIdx(k % teams.length);
-      const into = k-fast;
-      const delay = into<=0 ? 48 : 48 + into*into*3.2;
-      timer.current=setTimeout(step,delay);
-    }
-    timer.current=setTimeout(step,48);
-  }
-  Rm.useEffect(()=>()=>clearTimeout(timer.current),[]);
-
-  const cur=teams[idx];
-  const t=WCm.TEAMS['CRO'];
-  return (
-    <div className="moment ink">
-      <div className="mscroll" style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',minHeight:'100%',padding:'30px 22px',textAlign:'center'}}>
-        {phase!=='revealed' && <>
-          <div className="dh" style={{fontSize:14,letterSpacing:'.16em',color:'var(--yellow)'}}>THE DRAW</div>
-          <div style={{margin:'14px 0'}}><Wm mood="drumroll" size={130} animate={phase==='rolling'}/></div>
-          <div className="dh" style={{fontSize:24,lineHeight:1.02,maxWidth:300}}>
-            {phase==='ready'?'Wheesht is administering the draw. Personally.':'…'}
-          </div>
-          <div style={{margin:'22px auto',width:200,height:200,borderRadius:28,border:'4px solid var(--yellow)',background:'#000',display:'flex',alignItems:'center',justifyContent:'center',boxShadow:'0 0 0 6px rgba(245,200,0,.18)',overflow:'hidden'}}>
-            <span style={{fontSize:108,lineHeight:1,filter: phase==='rolling'?'blur(1px)':'none'}}>{cur.flag}</span>
-          </div>
-          {phase==='ready'
-            ? <Bm variant="primary" onClick={spin} style={{marginTop:6}}>Do the draw</Bm>
-            : <div className="dh" style={{fontSize:16,color:'var(--yellow)',marginTop:6}}>Drawing…</div>}
-        </>}
-
-        {phase==='revealed' && <div className="pop" style={{width:'100%'}}>
-          <div className="dh" style={{fontSize:14,letterSpacing:'.16em',color:'var(--yellow)'}}>YE’VE DRAWN</div>
-          <div style={{fontSize:120,lineHeight:1,margin:'10px 0'}}>{t.flag}</div>
-          <div className="dh" style={{fontSize:44}}>{t.name}</div>
-          <div style={{display:'flex',gap:8,justifyContent:'center',margin:'12px 0 4px'}}>
-            <Chm tone="yellow">Group {t.group}</Chm>
-            <Chm style={{background:'#fff'}}>Odds {t.odds}</Chm>
-          </div>
-          <div style={{marginTop:18,display:'flex',gap:11,alignItems:'flex-end',textAlign:'left',background:'#fff',color:'var(--ink)',borderRadius:18,padding:14}}>
-            <Wm mood="suspicious" size={70}/>
-            <div>
-              <div className="dh" style={{fontSize:11,letterSpacing:'.06em',color:'var(--red)'}}>WHEESHT’S VERDICT</div>
-              <div style={{fontSize:15,fontWeight:600,lineHeight:1.32,marginTop:3}}>{WCm.LINES.drawYou}</div>
-            </div>
-          </div>
-          <div style={{marginTop:18,display:'flex',flexDirection:'column',gap:10}}>
-            <Bm variant="primary" block onClick={()=>{window.wcToast&&window.wcToast('Draw shared to the group. The slagging begins.','smug');}}>Share your draw to the group</Bm>
-            <Bm variant="ghost" block onClick={props.onDone} style={{background:'transparent',color:'#fff',boxShadow:'0 4px 0 rgba(255,255,255,.25)'}}>Into the dashboard →</Bm>
-          </div>
-        </div>}
-      </div>
-    </div>
-  );
-}
-
-/* =================== RESULT & COMMENTARY =================== */
-const SEED_REACTIONS=[
-  {who:'Davie M.',e:'😱'},{who:'Sarah from Sales',e:'💀'},{who:'Big Steve',e:'😭'},{who:'Priya K.',e:'🍿'},{who:'Rab',e:'🏴󠁧󠁢󠁳󠁣󠁴󠁿'},
-];
-function ResultMoment(props){
-  const A=WCm.TEAMS['NOR'],B=WCm.TEAMS['ENG'];
-  const [reacts,setReacts]=Rm.useState(SEED_REACTIONS);
-  function react(e){ setReacts(r=>[{who:'You',e}].concat(r)); }
-  return (
-    <div className="moment ink">
-      <div className="mscroll" style={{padding:'26px 22px 30px'}}>
-        <div className="dh" style={{textAlign:'center',fontSize:13,letterSpacing:'.16em',color:'var(--yellow)'}}>FULL TIME · ROUND OF 16</div>
-        <Stm tone="red" rotate={4} style={{display:'block',width:'fit-content',margin:'12px auto 0',fontSize:13,background:'rgba(232,39,42,.12)'}}>UPSET</Stm>
-        <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:14,margin:'16px 0'}}>
-          <div style={{textAlign:'center'}}><div style={{fontSize:64}}>{A.flag}</div><div className="dh" style={{fontSize:16,marginTop:4}}>Norway</div></div>
-          <div className="dh" style={{fontSize:54,whiteSpace:'nowrap'}}>2–1</div>
-          <div style={{textAlign:'center',opacity:.55}}><div style={{fontSize:64}}>{B.flag}</div><div className="dh" style={{fontSize:16,marginTop:4,textDecoration:'line-through'}}>England</div></div>
-        </div>
-
-        <div style={{display:'flex',gap:11,alignItems:'flex-end',background:'#fff',color:'var(--ink)',borderRadius:18,padding:14}}>
-          <Wm mood="england" size={78} animate/>
-          <div><div className="dh" style={{fontSize:11,letterSpacing:'.06em',color:'var(--red)'}}>WHEESHT’S POST-MATCH</div>
-            <div style={{fontSize:15,fontWeight:600,lineHeight:1.32,marginTop:3}}>{WCm.LINES.england}</div></div>
-        </div>
-
-        {/* official elimination statement */}
-        <div style={{marginTop:16,background:'#000',border:'2px solid #333',borderRadius:18,padding:16}}>
-          <div className="dh" style={{fontSize:11,letterSpacing:'.16em',color:'#888'}}>★ OFFICIAL STATEMENT ★</div>
-          <div style={{display:'flex',alignItems:'center',gap:10,margin:'10px 0'}}>
-            <Am person={WCm.ownersOf('ENG')[0]} size={40}/>
-            <div><div className="dh" style={{fontSize:18,color:'#fff'}}>{ownerName_m('ENG')}</div>
-              <Stm tone="red" rotate={-5} style={{fontSize:11,marginTop:3}}>ELIMINATED</Stm></div>
-          </div>
-          <div style={{fontSize:13,fontWeight:500,color:'#ccc',lineHeight:1.4,fontStyle:'italic'}}>“Your England are out. Wheesht is sorry for your loss. Wheesht is, however, fine.”</div>
-        </div>
-
-        {/* reactions */}
-        <div className="dh" style={{fontSize:13,letterSpacing:'.08em',color:'var(--yellow)',margin:'20px 0 8px'}}>THE GROUP CHAT</div>
-        <div style={{display:'flex',gap:7,marginBottom:12}}>
-          {['😱','💀','😭','🍿','🤣','🔥'].map(e=>(
-            <button key={e} onClick={()=>react(e)} style={{flex:1,fontSize:22,padding:'8px 0',background:'#fff',border:'2.5px solid var(--ink)',borderRadius:13,cursor:'pointer'}}>{e}</button>
-          ))}
-        </div>
-        <div style={{display:'flex',flexDirection:'column',gap:7}}>
-          {reacts.map((r,i)=>(
-            <div key={i} className={i===0?'rise':''} style={{display:'flex',alignItems:'center',gap:10,background:'rgba(255,255,255,.07)',borderRadius:12,padding:'8px 12px'}}>
-              <span style={{fontSize:13,fontWeight:800,flex:1,color:r.who==='You'?'var(--yellow)':'#fff'}}>{r.who}</span>
-              <span style={{fontSize:22}}>{r.e}</span>
-            </div>
-          ))}
-        </div>
-        <div style={{marginTop:18}}><Bm variant="primary" block onClick={props.onDone}>Done. Survived. Barely. →</Bm></div>
-      </div>
-    </div>
-  );
-  function ownerName_m(c){ const o=WCm.ownersOf(c); return o.length?o[0].name:'nobody'; }
-}
-
-/* =================== THE FINAL =================== */
-function Countdown(){
-  const [s,setS]=Rm.useState(2*3600+14*60+9);
-  Rm.useEffect(()=>{ const id=setInterval(()=>setS(x=>x>0?x-1:0),1000); return ()=>clearInterval(id); },[]);
-  const hh=String(Math.floor(s/3600)).padStart(2,'0');
-  const mm=String(Math.floor((s%3600)/60)).padStart(2,'0');
-  const ss=String(s%60).padStart(2,'0');
-  return (
-    <div style={{display:'flex',gap:8,justifyContent:'center'}}>
-      {[[hh,'HRS'],[mm,'MIN'],[ss,'SEC']].map((u,i)=>(
-        <div key={i} style={{background:'#000',border:'2.5px solid var(--yellow)',borderRadius:13,padding:'8px 12px',minWidth:60,textAlign:'center'}}>
-          <div className="dh" style={{fontSize:30,color:'#fff'}}>{u[0]}</div>
-          <div style={{fontSize:10,fontWeight:800,letterSpacing:'.1em',color:'var(--yellow)'}}>{u[1]}</div>
-        </div>
-      ))}
-    </div>
-  );
-}
-function FinalMoment(props){
-  const [done,setDone]=Rm.useState(false);
-  const A=WCm.TEAMS['ESP'],B=WCm.TEAMS['FRA'];
-  const champOwner=WCm.ownersOf('ESP')[0];
-  const win=Math.round(WCm.POT*0.6);
-  function play(){
-    setDone(true);
-    window.wcConfetti&&window.wcConfetti({count:240,y:.35});
-    setTimeout(()=>window.wcConfetti&&window.wcConfetti({count:160,x:.25,y:.4}),500);
-    setTimeout(()=>window.wcConfetti&&window.wcConfetti({count:160,x:.75,y:.4}),900);
-  }
-  return (
-    <div className="moment ink">
-      <div className="mscroll" style={{padding:'26px 22px 30px',textAlign:'center'}}>
-        {!done && <>
-          <div className="dh" style={{fontSize:14,letterSpacing:'.16em',color:'var(--yellow)'}}>THE FINAL</div>
-          <div style={{fontSize:13,fontWeight:700,color:'#bbb',marginTop:4}}>{WCm.meta.finalVenue} · {WCm.meta.finalDate}</div>
-          <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:12,margin:'20px 0'}}>
-            <Final1 t={A}/>
-            <Wm mood="broadcast" size={92} animate/>
-            <Final1 t={B}/>
-          </div>
-          <div style={{margin:'8px 0 18px'}}><Countdown/></div>
-          <div style={{background:'#fff',color:'var(--ink)',borderRadius:18,padding:14,display:'flex',gap:11,alignItems:'flex-end',textAlign:'left'}}>
-            <Wm mood="drumroll" size={70}/>
-            <div style={{fontSize:15,fontWeight:600,lineHeight:1.34}}>{WCm.LINES.finalBuild}</div>
-          </div>
-          <div style={{marginTop:18}}><Bm variant="primary" block onClick={play}>Blow the whistle. Kick it off. →</Bm></div>
-        </>}
-
-        {done && <div className="pop">
-          <div style={{fontSize:64,marginTop:6}}>🏆</div>
-          <div className="dh" style={{fontSize:14,letterSpacing:'.16em',color:'var(--yellow)',marginTop:4}}>CHAMPIONS OF THE WORLD</div>
-          <div style={{fontSize:96,lineHeight:1,margin:'8px 0'}}>{A.flag}</div>
-          <div className="dh" style={{fontSize:46}}>Spain</div>
-          <div style={{fontSize:15,fontWeight:700,color:'#bbb',marginTop:2}}>beat France 2–1 after extra time</div>
-
-          <div style={{marginTop:20,background:'var(--yellow)',color:'var(--ink)',borderRadius:20,padding:18}}>
-            <div style={{fontSize:12,fontWeight:800,letterSpacing:'.05em',textTransform:'uppercase'}}>Your sweepstake winner</div>
-            <div className="dh" style={{fontSize:34,margin:'4px 0'}}>{champOwner?champOwner.name:'—'}</div>
-            <div style={{fontSize:14,fontWeight:700}}>held Spain from the very first draw. Insufferable. Deserved.</div>
-            <div className="dh" style={{fontSize:52,marginTop:10}}>{('£'+win.toLocaleString('en-GB'))}</div>
-            <div style={{fontSize:12,fontWeight:700}}>60% of the {('£'+WCm.POT.toLocaleString('en-GB'))} pot</div>
-          </div>
-
-          <div style={{marginTop:16,textAlign:'left',background:'#fff',color:'var(--ink)',borderRadius:18,padding:14,display:'flex',gap:11,alignItems:'flex-end'}}>
-            <Wm mood="delighted" size={76} animate/>
-            <div><div className="dh" style={{fontSize:11,letterSpacing:'.06em',color:'var(--red)'}}>WHEESHT’S LAST WORD</div>
-            <div style={{fontSize:15,fontWeight:600,lineHeight:1.32,marginTop:3}}>That’s yer lot. Thirty-one days, sixty-four kicks of Wheesht’s heart, one whistle. Scotland would’ve won it. Away ye go.</div></div>
-          </div>
-          <div style={{marginTop:18}}><Bm variant="primary" block onClick={props.onDone}>Claim your winnings</Bm></div>
-        </div>}
-      </div>
-    </div>
-  );
-  function Final1(p){
-    const owner=WCm.ownersOf(p.t.code)[0];
-    return <div style={{textAlign:'center'}}>
-      <div style={{fontSize:58}}>{p.t.flag}</div>
-      <div className="dh" style={{fontSize:18,marginTop:4,color:'#fff'}}>{p.t.name}</div>
-      <div style={{fontSize:11,fontWeight:700,color:'var(--yellow)'}}>{owner?owner.name:'nobody'}</div>
-      <div style={{fontSize:11,fontWeight:600,color:'#999'}}>{p.t.odds}</div>
-    </div>;
-  }
-}
-
-/* NOTE: EntryMoment & DrawMoment are superseded by screens-onboarding.jsx.
-   Only the result & final takeovers are exported from here now. */
-Object.assign(window,{ ResultMoment, FinalMoment });
 
 </script>
 
@@ -4447,6 +4185,311 @@ window.AdminGate = AdminGate;
 
 <script type="text/babel">
 /* ===========================================================================
+   CHAT — simple group message wall. Live only (requires WC_LIVE / server).
+   Polls every 15 s; messages are appended locally on send for instant feel.
+   =========================================================================== */
+const WCch = window.WC;
+const Sch = window.Store;
+const Wch = window.Wheesht;
+const { useState: cState, useEffect: cEffect, useRef: cRef } = React;
+
+function ChatScreen() {
+  const me = Sch.active();
+  const [msgs, setMsgs] = cState([]);
+  const [text, setText] = cState('');
+  const [busy, setBusy] = cState(false);
+  const [err, setErr] = cState(false);
+  const listRef = cRef(null);
+  const isLive = !!window.WC_LIVE;
+  const leagueCode = Sch.leagueCode && Sch.leagueCode();
+
+  function scrollBottom() {
+    setTimeout(function() {
+      if (listRef.current) listRef.current.scrollTop = listRef.current.scrollHeight;
+    }, 60);
+  }
+
+  function load() {
+    if (!leagueCode) {
+      setMsgs([]);
+      setErr(false);
+      return;
+    }
+    fetch(Sch.api('/chat')).then(function(r) {
+      return r.json().then(function(data) {
+        if (!r.ok) throw new Error((data && data.detail) || 'Chat failed');
+        return data;
+      });
+    }).then(function(data) {
+      setMsgs(Array.isArray(data) ? data : []);
+      setErr(false);
+    }).catch(function() { setErr(true); });
+  }
+
+  cEffect(function() {
+    if (!isLive || !leagueCode) return;
+    load();
+    scrollBottom();
+    var iv = setInterval(load, 15000);
+    return function() { clearInterval(iv); };
+  }, [isLive, leagueCode]);
+
+  cEffect(function() { scrollBottom(); }, [msgs.length]);
+
+  function send() {
+    if (!text.trim() || !me || busy || !leagueCode) return;
+    setBusy(true);
+    fetch(Sch.api('/chat'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ author_id: me.id, text: text.trim() }),
+    }).then(function(r) {
+      return r.json().then(function(msg) {
+        if (!r.ok) throw new Error((msg && msg.detail) || 'Message failed');
+        return msg;
+      });
+    }).then(function(msg) {
+      if (msg && msg.id) setMsgs(function(prev) { return prev.concat([msg]); });
+      setText('');
+      setBusy(false);
+      setErr(false);
+    }).catch(function() { setBusy(false); setErr(true); });
+  }
+
+  if (!isLive) {
+    return (
+      <div style={{ padding: '48px 22px', textAlign: 'center' }}>
+        <Wch mood="mischievous" size={88} animate />
+        <div className="dh" style={{ fontSize: 22, marginTop: 12 }}>Group chat</div>
+        <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--ink2)', marginTop: 8, lineHeight: 1.5 }}>
+          Chat only works when connected to the sweepstake server.<br />Open the shared link to join the conversation.
+        </div>
+      </div>
+    );
+  }
+
+  if (!leagueCode) {
+    return (
+      <div style={{ padding: '48px 22px', textAlign: 'center' }}>
+        <Wch mood="neutral" size={88} animate />
+        <div className="dh" style={{ fontSize: 22, marginTop: 12 }}>Group chat</div>
+        <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--ink2)', marginTop: 8, lineHeight: 1.5 }}>
+          Join or create a league to use chat.
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100dvh - 146px - env(safe-area-inset-top, 0px))' }}>
+
+      {/* message list */}
+      <div ref={listRef} style={{ flex: 1, overflowY: 'auto', padding: '14px 14px 6px' }}>
+        {msgs.length === 0 && !err && (
+          <div style={{ textAlign: 'center', padding: '44px 0', color: 'var(--ink2)', fontSize: 13.5, fontWeight: 600 }}>
+            <Wch mood="neutral" size={64} animate />
+            <div style={{ marginTop: 8 }}>Nothing yet. Wheesht is listening.</div>
+          </div>
+        )}
+        {err && (
+          <button onClick={load} style={{ width: '100%', border: 'none', background: 'none', cursor: 'pointer', textAlign: 'center', padding: '32px 0', color: 'var(--ink2)', fontFamily: 'var(--body)', fontSize: 13, fontWeight: 700 }}>
+            Couldn't load messages — tap to retry.
+          </button>
+        )}
+        {msgs.map(function(msg) {
+          var isMe = me && msg.author_id === me.id;
+          var t = WCch.TEAMS[msg.team];
+          var d = new Date(msg.ts);
+          var timeStr = d.getHours().toString().padStart(2,'0') + ':' + d.getMinutes().toString().padStart(2,'0');
+          return (
+            <div key={msg.id} style={{ display: 'flex', gap: 9, marginBottom: 14, flexDirection: isMe ? 'row-reverse' : 'row', alignItems: 'flex-end' }}>
+              {!isMe && (
+                <div style={{ width: 34, height: 34, borderRadius: '50%', background: msg.color || '#333', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--disp)', fontWeight: 800, fontSize: 12, flexShrink: 0, boxShadow: '0 2px 0 rgba(0,0,0,.15)' }}>
+                  {msg.initials || '?'}
+                </div>
+              )}
+              <div style={{ maxWidth: '74%' }}>
+                {!isMe && (
+                  <div style={{ fontSize: 10.5, fontWeight: 800, color: 'var(--ink2)', marginBottom: 4, letterSpacing: '.01em' }}>
+                    {msg.author}{t ? (' ' + t.flag) : ''}
+                  </div>
+                )}
+                <div style={{
+                  background: isMe ? 'var(--ink)' : '#fff',
+                  color: isMe ? '#fff' : 'var(--ink)',
+                  border: isMe ? 'none' : '2px solid var(--line)',
+                  borderRadius: isMe ? '18px 18px 5px 18px' : '18px 18px 18px 5px',
+                  padding: '10px 13px',
+                  fontSize: 14, fontWeight: 500, lineHeight: 1.42,
+                  wordBreak: 'break-word',
+                }}>
+                  {msg.text}
+                </div>
+                <div style={{ fontSize: 10, color: 'var(--ink2)', fontWeight: 600, marginTop: 3, textAlign: isMe ? 'right' : 'left', paddingLeft: isMe ? 0 : 2 }}>
+                  {timeStr}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* input bar */}
+      {me ? (
+        <div style={{ display: 'flex', gap: 9, padding: '9px 12px 12px', borderTop: '1.5px solid var(--line)', background: 'var(--bg)', flexShrink: 0 }}>
+          <input
+            style={{ flex: 1, border: '2.5px solid var(--ink)', borderRadius: 22, padding: '10px 14px', fontFamily: 'var(--body)', fontSize: 14, fontWeight: 500, background: '#fff', outline: 'none', color: 'var(--ink)' }}
+            value={text}
+            onChange={function(e) { setText(e.target.value); }}
+            onKeyDown={function(e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }}
+            placeholder="Say something…"
+            maxLength={280}
+          />
+          <button
+            onClick={send}
+            disabled={!text.trim() || busy}
+            style={{ background: 'var(--ink)', color: '#fff', border: 'none', borderRadius: 22, padding: '10px 16px', fontFamily: 'var(--disp)', fontWeight: 800, fontSize: 14, cursor: text.trim() && !busy ? 'pointer' : 'default', opacity: text.trim() && !busy ? 1 : 0.35, flexShrink: 0, boxShadow: '0 4px 0 rgba(0,0,0,.35)' }}
+          >
+            Send
+          </button>
+        </div>
+      ) : (
+        <div style={{ padding: '12px 16px', textAlign: 'center', fontSize: 13, color: 'var(--ink2)', fontWeight: 600, borderTop: '1.5px solid var(--line)' }}>
+          Pick who you are to join the chat.
+        </div>
+      )}
+    </div>
+  );
+}
+
+window.ChatScreen = ChatScreen;
+
+</script>
+
+<script type="text/babel">
+/* ===========================================================================
+   DEV CONSOLE — hidden cross-league admin.
+
+   Reached by a secret gesture (tap the top-bar mascot seven times). Verifies a
+   master developer key SERVER-side (never shipped to the browser), then lists
+   every league so the developer can drop into any one and open its organiser
+   clipboard. Choosing a league switches the active league and opens AdminGate;
+   the caller restores the previous league when the clipboard closes.
+   =========================================================================== */
+const Wdev = window.Wheesht;
+const Sdev = window.Store;
+const { useState: devState } = React;
+
+function DevConsole(props) {
+  const [step, setStep] = devState('auth');     // auth | list
+  const [key, setKey] = devState('');
+  const [leagues, setLeagues] = devState([]);
+  const [q, setQ] = devState('');
+  const [busy, setBusy] = devState(false);
+  const [err, setErr] = devState(false);
+
+  function authenticate() {
+    if (!key.trim() || busy) return;
+    setBusy(true); setErr(false);
+    Sdev.devListLeagues(key.trim()).then(function (j) {
+      setLeagues((j && j.leagues) || []);
+      setStep('list');
+      setBusy(false);
+    }).catch(function () { setErr(true); setBusy(false); setKey(''); });
+  }
+
+  const fld = {
+    width: '100%', border: '2.5px solid var(--ink)', borderRadius: 14, padding: '13px 16px',
+    fontFamily: 'var(--disp)', fontWeight: 800, fontSize: 20, textAlign: 'center',
+    letterSpacing: '.06em', marginTop: 14, outline: 'none', background: '#fff',
+  };
+
+  const close = (
+    <button onClick={props.onClose} style={{ position: 'absolute', top: 16, right: 16, border: 'none', background: 'var(--ink)', color: '#fff', width: 34, height: 34, borderRadius: 10, fontSize: 18, fontWeight: 900, cursor: 'pointer', zIndex: 2 }}>✕</button>
+  );
+
+  if (step === 'auth') {
+    return (
+      <div className="moment ink" style={{ alignItems: 'center', justifyContent: 'center', padding: '0 26px' }}>
+        {close}
+        <div className={'rise' + (err ? ' shake' : '')} style={{ width: '100%', maxWidth: 340, textAlign: 'center' }}>
+          <Wdev mood={err ? 'shocked' : 'mischievous'} size={92} animate />
+          <div className="dh" style={{ fontSize: 24, marginTop: 10, color: '#fff' }}>Developer console</div>
+          <div style={{ fontSize: 13.5, fontWeight: 600, color: '#b8af9e', marginTop: 6, lineHeight: 1.45 }}>
+            {err ? 'Wrong key. Wheesht guards the master clipboard closely.' : 'The master key. This opens every league on the server.'}
+          </div>
+          <input
+            autoFocus type="password" value={key}
+            onChange={function (e) { setKey(e.target.value); setErr(false); }}
+            onKeyDown={function (e) { if (e.key === 'Enter') authenticate(); }}
+            placeholder="Master key" style={fld}
+          />
+          <button onClick={authenticate} disabled={!key.trim() || busy} className="wc-btn wc-btn--primary wc-btn--block" style={{ marginTop: 14, opacity: key.trim() && !busy ? 1 : 0.4 }}>
+            {busy ? 'Checking…' : 'Unlock every league'}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const term = q.trim().toLowerCase();
+  const shown = term
+    ? leagues.filter(function (L) { return (L.name || '').toLowerCase().indexOf(term) >= 0 || (L.code || '').toLowerCase().indexOf(term) >= 0; })
+    : leagues;
+
+  return (
+    <div className="moment" style={{ background: 'var(--bg)' }}>
+      <div style={{ position: 'sticky', top: 0, zIndex: 5, background: 'var(--ink)', color: '#fff', padding: '16px 18px 12px', display: 'flex', alignItems: 'center', gap: 11 }}>
+        <Wdev mood="confident" size={44} />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div className="dh" style={{ fontSize: 20, color: '#fff', lineHeight: 1 }}>Developer console</div>
+          <div style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--yellow)' }}>{leagues.length} league{leagues.length === 1 ? '' : 's'} on the server</div>
+        </div>
+        <button onClick={props.onClose} style={{ border: 'none', background: 'rgba(255,255,255,.16)', color: '#fff', width: 34, height: 34, borderRadius: 10, fontSize: 18, fontWeight: 900, cursor: 'pointer' }}>✕</button>
+      </div>
+
+      <div className="mscroll" style={{ padding: '14px 18px 30px' }}>
+        <input
+          value={q} onChange={function (e) { setQ(e.target.value); }}
+          placeholder="Search by name or code…"
+          style={{ width: '100%', border: '2px solid var(--line)', borderRadius: 12, padding: '11px 14px', fontFamily: 'var(--body)', fontWeight: 600, fontSize: 14, background: '#fff', outline: 'none', marginBottom: 14 }}
+        />
+
+        {shown.length === 0 && (
+          <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--ink2)', fontWeight: 600, fontSize: 13.5 }}>
+            <Wdev mood="neutral" size={56} animate />
+            <div style={{ marginTop: 8 }}>No leagues match.</div>
+          </div>
+        )}
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {shown.map(function (L) {
+            return (
+              <div key={L.code} className="tap" style={{ display: 'flex', alignItems: 'center', gap: 11, background: '#fff', border: '2.5px solid var(--ink)', borderRadius: 16, padding: '12px 13px', boxShadow: '0 4px 0 var(--shadow)' }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div className="dh" style={{ fontSize: 17, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{L.name}</div>
+                  <div style={{ display: 'flex', gap: 6, marginTop: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+                    <span className="wc-chip" style={{ fontSize: 11 }}>{L.code}</span>
+                    <span style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--ink2)' }}>{L.entrants} entrant{L.entrants === 1 ? '' : 's'}</span>
+                    {L.seeded && <span className="wc-chip wc-chip--yellow" style={{ fontSize: 10.5 }}>seeded</span>}
+                  </div>
+                </div>
+                <button onClick={function () { props.onAdmin(L); }} className="wc-btn wc-btn--sm wc-btn--ink" style={{ flex: '0 0 auto' }}>Administer →</button>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+window.DevConsole = DevConsole;
+
+</script>
+
+<script type="text/babel">
+/* ===========================================================================
    APP SHELL — identity gate · onboarding flow · tab nav · account switcher ·
    admin tweaks.
    =========================================================================== */
@@ -4481,6 +4524,7 @@ function StatusBar(){
 function AppBar(props){
   const me = props.me;
   const ref = React.useRef(null);
+  const taps = React.useRef({n:0,t:0});
   React.useEffect(()=>{
     const bar = ref.current; if(!bar) return;
     const sc = bar.closest('.scroll'); if(!sc) return;
@@ -4489,8 +4533,15 @@ function AppBar(props){
     sc.addEventListener('scroll', onScroll, {passive:true});
     return ()=> sc.removeEventListener('scroll', onScroll);
   },[]);
+  // Secret gesture: tap the mascot 7 times within ~2.5s to open the dev console.
+  function secretTap(){
+    const now = Date.now();
+    taps.current.n = (now - taps.current.t < 2500) ? taps.current.n + 1 : 1;
+    taps.current.t = now;
+    if(taps.current.n >= 7){ taps.current.n = 0; props.onDev && props.onDev(); }
+  }
   return <div className="appbar" ref={ref}>
-    <div className="mk"><A_W mood="confident" size={42}/></div>
+    <div className="mk" onClick={secretTap} style={{cursor:'default'}}><A_W mood="confident" size={42}/></div>
     <div style={{flex:1,minWidth:0}}>
       <h1>{(A_WC.league&&A_WC.league.name)||A_WC.meta.name}</h1>
       <p>{A_WC.meta.season} · {A_WC.meta.stageLabel}</p>
@@ -4569,6 +4620,8 @@ function App(){
   const [draw,setDraw]=aState(null);            // {forceTeam, replay}
   const [account,setAccount]=aState(false);
   const [admin,setAdmin]=aState(false);
+  const [dev,setDev]=aState(false);             // hidden dev console overlay
+  const devReturn=React.useRef(undefined);      // league to restore after dev admin
   const [organiser,setOrganiser]=aState(false); // true while creating a league
   const [,tick]=aState(0);
   const [t,setTweak]=window.useTweaks(TW_DEFAULTS);
@@ -4604,6 +4657,23 @@ function App(){
   }
   function resumeAccount(id){
     Promise.resolve(A_S.resumeAccount?A_S.resumeAccount(id):A_S.setActive(id)).then(()=>{ setFlow('app'); setTab('me'); });
+  }
+
+  // Dev console picked a league to administer: remember where we were, switch
+  // into it (no password), unlock the clipboard, open admin.
+  function devAdmin(league){
+    devReturn.current = A_S.activeLeague() || null;
+    try{ sessionStorage.setItem('wheesht_admin_ok','1'); }catch(e){}
+    Promise.resolve(A_S.devEnterLeague(league)).then(()=>{ setDev(false); setAdmin(true); });
+  }
+  // Closing the clipboard: if we got here via the dev console, hop back to the
+  // league we came from so the normal app view is unaffected.
+  function closeAdmin(){
+    setAdmin(false);
+    if(devReturn.current!==undefined){
+      const back=devReturn.current; devReturn.current=undefined;
+      A_S.devEnterLeague(back);
+    }
   }
 
   function claimOI(id){
@@ -4655,8 +4725,11 @@ function App(){
   return <React.Fragment>
     <StatusBar/>
     <div className="scroll" key={tab+(me?me.id:'')}>
-      <AppBar me={me} onAccount={()=>setAccount(true)}/>
-      {screens[tab]}
+      <AppBar me={me} onAccount={()=>setAccount(true)} onDev={()=>setDev(true)}/>
+      {/* When the dev console hops into another league, the active participant
+          isn't a member there, so `me` is null — render nothing behind the
+          full-screen admin overlay rather than letting a screen read me.team. */}
+      {me ? screens[tab] : null}
     </div>
     <TabBar tab={tab} setTab={setTab}/>
 
@@ -4668,7 +4741,8 @@ function App(){
 
     {draw && <window.DrawMoment participant={draw.participant} forceTeam={draw.forceTeam}
       onDone={()=>{ const wasReplay=draw.replay; setDraw(null); if(!wasReplay){ setTab('me'); setTimeout(()=>window.wcConfetti&&window.wcConfetti({y:.4}),200);} }}/>}
-    {admin && <window.AdminGate onClose={()=>setAdmin(false)}/>}
+    {admin && <window.AdminGate onClose={closeAdmin}/>}
+    {dev && <window.DevConsole onClose={()=>setDev(false)} onAdmin={devAdmin}/>}
 
     <window.ToastLayer/>
     <window.ConfettiLayer/>
@@ -4693,6 +4767,108 @@ function App(){
 }
 
 ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+
+</script>
+
+<script type="text/babel">
+/* ===========================================================================
+   DESKTOP STAGE — live side panels beside the device.
+
+   Runs only on wide screens (the phone view ignores all of this). It:
+     • mounts two live React panels beside the device (pot/standings + the
+       prediction league leaderboard),
+     • wires a persisted on/off toggle for the ambient backdrop motion.
+   =========================================================================== */
+(function () {
+  if (typeof window === 'undefined') return;
+  var DESKTOP = window.matchMedia && window.matchMedia('(min-width:561px)').matches;
+  if (!DESKTOP) return;                       // phones stay clean
+
+  var WCs = window.WC || {};
+  var Ss = window.Store;
+  var R = window.React;
+  var RD = window.ReactDOM;
+  if (!R || !RD) return;
+
+  var h = R.createElement;
+
+  /* ---- motion toggle (persisted) ---------------------------------------- */
+  var MK = 'wheesht_motion_v1';
+  function motionOn() { try { return localStorage.getItem(MK) !== 'off'; } catch (e) { return true; } }
+  function applyMotion() { document.body.classList.toggle('motion-off', !motionOn()); }
+  applyMotion();
+
+  /* ---- toggle button ---------------------------------------------------- */
+  var btn = document.getElementById('stage-toggle');
+  if (btn) {
+    function label() { return (motionOn() ? '⚽  Animation on' : '⚽  Animation off'); }
+    btn.textContent = label();
+    btn.addEventListener('click', function () {
+      try { localStorage.setItem(MK, motionOn() ? 'off' : 'on'); } catch (e) {}
+      applyMotion();
+      btn.textContent = label();
+    });
+  }
+
+  /* ---- live panels ------------------------------------------------------ */
+  function money(n) { return '£' + (n || 0).toLocaleString('en-GB'); }
+
+  function Stat(props) {
+    return h('div', { className: 'sp-stat' },
+      h('span', { className: 'sp-stat__n' }, props.value),
+      h('span', { className: 'sp-stat__l' }, props.label));
+  }
+
+  function LeftPanel() {
+    var meta = (window.WC && window.WC.meta) || {};
+    var pot = (window.WC && window.WC.POT) || 0;
+    return h('div', { className: 'sp' },
+      h('div', { className: 'sp-kicker' }, 'The Office Sweepstake'),
+      h('div', { className: 'sp-title' }, 'World Cup 2026'),
+      h('div', { className: 'sp-pot' }, money(pot)),
+      h('div', { className: 'sp-pot__l' }, 'in the pot'),
+      h('div', { className: 'sp-stats' },
+        h(Stat, { value: meta.stillIn != null ? meta.stillIn : '—', label: 'still in' }),
+        h(Stat, { value: meta.out != null ? meta.out : '—', label: 'out' }),
+        h(Stat, { value: meta.teamsLeft != null ? meta.teamsLeft : '—', label: 'teams left' })));
+  }
+
+  function RightPanel() {
+    var rows = (Ss && Ss.rankedByPred) ? Ss.rankedByPred().slice(0, 5) : [];
+    return h('div', { className: 'sp sp--r' },
+      h('div', { className: 'sp-kicker' }, 'On the record'),
+      h('div', { className: 'sp-title' }, 'Prediction league'),
+      h('div', { className: 'sp-lb' },
+        rows.length === 0
+          ? h('div', { className: 'sp-empty' }, 'No predictions banked yet.')
+          : rows.map(function (p, i) {
+              return h('div', { className: 'sp-row', key: p.id || i },
+                h('span', { className: 'sp-rank' }, i + 1),
+                h('span', { className: 'sp-av', style: { background: p.color || '#333' } }, p.initials || '?'),
+                h('span', { className: 'sp-name' }, p.name),
+                h('span', { className: 'sp-pts' }, (p.predScore || 0) + ' pts'));
+            })));
+  }
+
+  function mount(id, Comp) {
+    var el = document.getElementById(id);
+    if (!el) return null;
+    var root = RD.createRoot(el);
+    root.render(h(Comp));
+    return root;
+  }
+
+  var leftRoot = mount('stage-left', LeftPanel);
+  var rightRoot = mount('stage-right', RightPanel);
+
+  // Re-render panels when the store changes (picks, sign-ups, sync).
+  if (Ss && Ss.subscribe) {
+    Ss.subscribe(function () {
+      if (leftRoot) leftRoot.render(h(LeftPanel));
+      if (rightRoot) rightRoot.render(h(RightPanel));
+    });
+  }
+})();
 
 </script>
 </body>
