@@ -62,6 +62,8 @@
       includeLtMember: WC.meta.includeLtMember !== false,
       charitySplit: WC.meta.charitySplit != null ? Number(WC.meta.charitySplit) : CHARITY_SPLIT,
       purpose: WC.meta.purpose || 'work',
+      locations: WC.meta.locations || ['Edinburgh', 'London'],
+      locationsFreeText: !!WC.meta.locationsFreeText,
     },
   };
   WC.TEAM_LIST.forEach(function (t) { BASE.teams[t.code] = { alive: t.alive, stage: t.stage, rounds: t.rounds }; });
@@ -95,6 +97,8 @@
     WC.meta.includeLocation = !admin.meta || admin.meta.includeLocation !== false;
     WC.meta.includeLtMember = !admin.meta || admin.meta.includeLtMember !== false;
     WC.meta.purpose = (admin.meta && admin.meta.purpose) || BASE.meta.purpose;
+    WC.meta.locations = (admin.meta && Array.isArray(admin.meta.locations) && admin.meta.locations.length) ? admin.meta.locations : BASE.meta.locations;
+    WC.meta.locationsFreeText = admin.meta && admin.meta.locationsFreeText != null ? !!admin.meta.locationsFreeText : BASE.meta.locationsFreeText;
     WC.charitySplit = (admin.meta && admin.meta.charitySplit != null) ? Number(admin.meta.charitySplit) : BASE.meta.charitySplit;
     var fee = admin.meta && admin.meta.entryFee != null ? Number(admin.meta.entryFee) : BASE.fee;
     WC.FEE = isFinite(fee) && fee >= 0 ? fee : BASE.fee;
@@ -452,6 +456,22 @@
       admin.meta = admin.meta || {}; admin.meta.includeLtMember = !!on;
       commitAdmin();
     },
+    locations: function () {
+      var v = admin.meta && admin.meta.locations;
+      return (Array.isArray(v) && v.length) ? v : BASE.meta.locations;
+    },
+    setLocations: function (arr) {
+      admin.meta = admin.meta || {}; admin.meta.locations = arr;
+      commitAdmin();
+    },
+    locationsFreeText: function () {
+      if (admin.meta && admin.meta.locationsFreeText != null) return !!admin.meta.locationsFreeText;
+      return BASE.meta.locationsFreeText;
+    },
+    setLocationsFreeText: function (on) {
+      admin.meta = admin.meta || {}; admin.meta.locationsFreeText = !!on;
+      commitAdmin();
+    },
     setCharitySplit: function (split) {
       var n = Math.max(0, Math.min(1, Number(split)));
       if (!isFinite(n)) return;
@@ -495,6 +515,8 @@
         includeLtMember: keep.includeLtMember,
         charitySplit: keep.charitySplit,
         purpose: keep.purpose,
+        locations: keep.locations,
+        locationsFreeText: keep.locationsFreeText,
       }};
       commitAdmin();
     }

@@ -62,11 +62,13 @@ function EditProfile(props) {
   const me = props.me;
   const [name, setName] = dState(me.name);
   const [dept, setDept] = dState(me.department || '');
-  const [loc, setLoc] = dState(me.location || 'Edinburgh');
   const [lt, setLt] = dState(!!me.ltMember);
   const includeDept = Sd.includeDepartment ? Sd.includeDepartment() : true;
   const includeLocation = Sd.includeLocation ? Sd.includeLocation() : true;
   const includeLtMember = Sd.includeLtMember ? Sd.includeLtMember() : true;
+  const locationOpts = Sd.locations ? Sd.locations() : ['Edinburgh', 'London'];
+  const locationsFreeText = Sd.locationsFreeText ? Sd.locationsFreeText() : false;
+  const [loc, setLoc] = dState(me.location || locationOpts[0] || 'Edinburgh');
   const fld = { width: '100%', border: '2.5px solid var(--ink)', borderRadius: 12, padding: '11px 13px', fontFamily: 'var(--body)', fontWeight: 600, fontSize: 15, marginTop: 6, outline: 'none' };
   function seg(val, set, opts) {
     return <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>{opts.map(o =>
@@ -81,7 +83,20 @@ function EditProfile(props) {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 13 }}>
           <div><label style={{ fontWeight: 800, fontSize: 13, fontFamily: 'var(--disp)' }}>Full name</label><input style={fld} value={name} onChange={e => setName(e.target.value)} /></div>
           {includeDept && <div><label style={{ fontWeight: 800, fontSize: 13, fontFamily: 'var(--disp)' }}>Team / department</label><input style={fld} value={dept} onChange={e => setDept(e.target.value)} placeholder="optional" /></div>}
-          {includeLocation && <div><label style={{ fontWeight: 800, fontSize: 13, fontFamily: 'var(--disp)' }}>Location</label>{seg(loc, setLoc, [{ value: 'Edinburgh', label: 'Edinburgh' }, { value: 'London', label: 'London' }])}</div>}
+          {includeLocation && <div>
+            <label style={{ fontWeight: 800, fontSize: 13, fontFamily: 'var(--disp)' }}>Location</label>
+            {locationsFreeText
+              ? <>
+                  <input style={fld} value={loc} onChange={e => setLoc(e.target.value)} placeholder="Your office or location" list="wh-locs-edit" />
+                  <datalist id="wh-locs-edit">{locationOpts.map(l => <option key={l} value={l} />)}</datalist>
+                </>
+              : locationOpts.length <= 3
+                ? seg(loc, setLoc, locationOpts.map(l => ({ value: l, label: l })))
+                : <select style={fld} value={loc} onChange={e => setLoc(e.target.value)}>
+                    {locationOpts.map(l => <option key={l} value={l}>{l}</option>)}
+                  </select>
+            }
+          </div>}
           {includeLtMember && <div><label style={{ fontWeight: 800, fontSize: 13, fontFamily: 'var(--disp)' }}>Leadership Team?</label>{seg(lt, setLt, [{ value: false, label: 'No' }, { value: true, label: 'Yes' }])}</div>}
         </div>
         <div style={{ marginTop: 18 }}>

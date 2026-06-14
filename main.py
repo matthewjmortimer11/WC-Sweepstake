@@ -270,6 +270,9 @@ def _league_state(league: League, league_people: List[Dict[str, Any]], admin: Di
         meta["charitySplit"] = max(0.0, min(1.0, float(cs))) if cs is not None else 0.5
     except (TypeError, ValueError):
         meta["charitySplit"] = 0.5
+    locs = admin_meta.get("locations")
+    meta["locations"] = [str(x) for x in locs] if isinstance(locs, list) and locs else ["Edinburgh", "London"]
+    meta["locationsFreeText"] = bool(admin_meta.get("locationsFreeText", False))
     data["meta"] = meta
     data["pot"] = len(people) * fee
     return data

@@ -212,12 +212,16 @@ function SettingsAdmin() {
    const feeNow = Sa.entryFee ? Sa.entryFee() : WCa.FEE;
    const [fee, setFee] = aState2(String(feeNow || 0));
    React.useEffect(() => setFee(String(feeNow || 0)), [feeNow]);
+   const locationsNow = Sa.locations ? Sa.locations() : ['Edinburgh', 'London'];
+   const [locInput, setLocInput] = aState2(locationsNow.join(', '));
+   React.useEffect(() => setLocInput(locationsNow.join(', ')), [locationsNow.join(',')]);
    const entrants = Sa.allSync().length;
    const split = Sa.charitySplit ? Sa.charitySplit() : 0.5;
    const purpose = Sa.purpose ? Sa.purpose() : 'work';
    const includeDept = Sa.includeDepartment ? Sa.includeDepartment() : true;
    const includeLocation = Sa.includeLocation ? Sa.includeLocation() : true;
    const includeLtMember = Sa.includeLtMember ? Sa.includeLtMember() : true;
+   const locationsFreeText = Sa.locationsFreeText ? Sa.locationsFreeText() : false;
    const n = Number(fee);
    const feeNum = isFinite(n) && n >= 0 ? n : feeNow;
    const gross = entrants * feeNum;
@@ -229,6 +233,12 @@ function SettingsAdmin() {
      if (!isFinite(val) || val < 0) { setFee(String(feeNow || 0)); return; }
      Sa.setEntryFee(val);
      if (window.wcToast) window.wcToast('Entry fee set to £' + val.toLocaleString('en-GB'), 'confident');
+   }
+   function saveLocations() {
+     const arr = locInput.split(',').map(s => s.trim()).filter(Boolean);
+     if (!arr.length) return;
+     Sa.setLocations(arr);
+     if (window.wcToast) window.wcToast(arr.length + ' location' + (arr.length > 1 ? 's' : '') + ' saved.', 'confident');
    }
    function toggleRow(onClick, on, title, text) {
      return <button onClick={onClick} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 11, textAlign: 'left', border: '2px solid var(--line)', borderRadius: 13, background: '#fff', padding: '11px 12px', cursor: 'pointer', marginBottom: 8 }}>
@@ -292,6 +302,22 @@ function SettingsAdmin() {
        <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink2)', marginBottom: 16, lineHeight: 1.4 }}>
          {purpose === 'work' ? 'Shows department, location and LT fields. You can toggle them individually below.' : 'Just names — no work details collected. Individual toggles below still apply.'}
        </div>
+
+       <SHa>Locations</SHa>
+       <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink2)', marginBottom: 8, lineHeight: 1.4 }}>List your offices or locations, separated by commas. People pick from these when signing up.</div>
+       <div style={{ display: 'flex', gap: 7, alignItems: 'center', marginBottom: 8 }}>
+         <input value={locInput} onChange={e => setLocInput(e.target.value)} onBlur={saveLocations}
+           onKeyDown={e => e.key === 'Enter' && saveLocations()}
+           style={{ flex: 1, border: '2px solid var(--ink)', borderRadius: 11, padding: '9px 12px', fontFamily: 'var(--body)', fontWeight: 600, fontSize: 14, outline: 'none', background: '#fff' }}
+           placeholder="e.g. Edinburgh, London, Remote" />
+         <button onClick={saveLocations} className="wc-btn wc-btn--sm wc-btn--ink">Save</button>
+       </div>
+       {toggleRow(
+         () => Sa.setLocationsFreeText(!locationsFreeText),
+         locationsFreeText,
+         'Allow custom location',
+         locationsFreeText ? 'People can type their own location (your list shows as suggestions).' : 'People must pick from your list above.'
+       )}
 
        <SHa>Signup fields</SHa>
        {toggleRow(

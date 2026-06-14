@@ -33887,6 +33887,8 @@ button:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(245,200,0,.55);borde
       includeLtMember: WC.meta.includeLtMember !== false,
       charitySplit: WC.meta.charitySplit != null ? Number(WC.meta.charitySplit) : CHARITY_SPLIT,
       purpose: WC.meta.purpose || 'work',
+      locations: WC.meta.locations || ['Edinburgh', 'London'],
+      locationsFreeText: !!WC.meta.locationsFreeText,
     },
   };
   WC.TEAM_LIST.forEach(function (t) { BASE.teams[t.code] = { alive: t.alive, stage: t.stage, rounds: t.rounds }; });
@@ -33920,6 +33922,8 @@ button:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(245,200,0,.55);borde
     WC.meta.includeLocation = !admin.meta || admin.meta.includeLocation !== false;
     WC.meta.includeLtMember = !admin.meta || admin.meta.includeLtMember !== false;
     WC.meta.purpose = (admin.meta && admin.meta.purpose) || BASE.meta.purpose;
+    WC.meta.locations = (admin.meta && Array.isArray(admin.meta.locations) && admin.meta.locations.length) ? admin.meta.locations : BASE.meta.locations;
+    WC.meta.locationsFreeText = admin.meta && admin.meta.locationsFreeText != null ? !!admin.meta.locationsFreeText : BASE.meta.locationsFreeText;
     WC.charitySplit = (admin.meta && admin.meta.charitySplit != null) ? Number(admin.meta.charitySplit) : BASE.meta.charitySplit;
     var fee = admin.meta && admin.meta.entryFee != null ? Number(admin.meta.entryFee) : BASE.fee;
     WC.FEE = isFinite(fee) && fee >= 0 ? fee : BASE.fee;
@@ -34277,6 +34281,22 @@ button:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(245,200,0,.55);borde
       admin.meta = admin.meta || {}; admin.meta.includeLtMember = !!on;
       commitAdmin();
     },
+    locations: function () {
+      var v = admin.meta && admin.meta.locations;
+      return (Array.isArray(v) && v.length) ? v : BASE.meta.locations;
+    },
+    setLocations: function (arr) {
+      admin.meta = admin.meta || {}; admin.meta.locations = arr;
+      commitAdmin();
+    },
+    locationsFreeText: function () {
+      if (admin.meta && admin.meta.locationsFreeText != null) return !!admin.meta.locationsFreeText;
+      return BASE.meta.locationsFreeText;
+    },
+    setLocationsFreeText: function (on) {
+      admin.meta = admin.meta || {}; admin.meta.locationsFreeText = !!on;
+      commitAdmin();
+    },
     setCharitySplit: function (split) {
       var n = Math.max(0, Math.min(1, Number(split)));
       if (!isFinite(n)) return;
@@ -34320,6 +34340,8 @@ button:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(245,200,0,.55);borde
         includeLtMember: keep.includeLtMember,
         charitySplit: keep.charitySplit,
         purpose: keep.purpose,
+        locations: keep.locations,
+        locationsFreeText: keep.locationsFreeText,
       }};
       commitAdmin();
     }
@@ -38549,11 +38571,13 @@ function FindMyEntry(props) {
 function OnboardingForm(props) {
   const [name, setName] = oState('');
   const [dept, setDept] = oState('');
-  const [loc, setLoc] = oState('Edinburgh');
-  const [lt, setLt] = oState(false);
   const includeDept = So.includeDepartment ? So.includeDepartment() : true;
   const includeLocation = So.includeLocation ? So.includeLocation() : true;
   const includeLtMember = So.includeLtMember ? So.includeLtMember() : true;
+  const locationOpts = So.locations ? So.locations() : ['Edinburgh', 'London'];
+  const locationsFreeText = So.locationsFreeText ? So.locationsFreeText() : false;
+  const [loc, setLoc] = oState(locationOpts[0] || 'Edinburgh');
+  const [lt, setLt] = oState(false);
   const ok = name.trim().length > 0;
   const split = So.charitySplit ? So.charitySplit() : 0.5;
   const fee = WCo.FEE || 0;
@@ -38634,17 +38658,32 @@ function OnboardingForm(props) {
     value: d
   })))), includeLocation && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement(Lab, {
     opt: true
-  }, "Location"), /*#__PURE__*/React.createElement(Seg, {
+  }, "Location"), locationsFreeText ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("input", {
+    style: inp,
+    value: loc,
+    onChange: e => setLoc(e.target.value),
+    placeholder: "Your office or location",
+    list: "wh-locs"
+  }), /*#__PURE__*/React.createElement("datalist", {
+    id: "wh-locs"
+  }, locationOpts.map(l => /*#__PURE__*/React.createElement("option", {
+    key: l,
+    value: l
+  })))) : locationOpts.length <= 3 ? /*#__PURE__*/React.createElement(Seg, {
     value: loc,
     onChange: setLoc,
-    options: [{
-      value: 'Edinburgh',
-      label: 'Edinburgh'
-    }, {
-      value: 'London',
-      label: 'London'
-    }]
-  })), includeLtMember && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement(Lab, {
+    options: locationOpts.map(l => ({
+      value: l,
+      label: l
+    }))
+  }) : /*#__PURE__*/React.createElement("select", {
+    style: inp,
+    value: loc,
+    onChange: e => setLoc(e.target.value)
+  }, locationOpts.map(l => /*#__PURE__*/React.createElement("option", {
+    key: l,
+    value: l
+  }, l)))), includeLtMember && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement(Lab, {
     opt: true
   }, "Leadership Team member?"), /*#__PURE__*/React.createElement(Seg, {
     value: lt,
@@ -39353,11 +39392,13 @@ function EditProfile(props) {
   const me = props.me;
   const [name, setName] = dState(me.name);
   const [dept, setDept] = dState(me.department || '');
-  const [loc, setLoc] = dState(me.location || 'Edinburgh');
   const [lt, setLt] = dState(!!me.ltMember);
   const includeDept = Sd.includeDepartment ? Sd.includeDepartment() : true;
   const includeLocation = Sd.includeLocation ? Sd.includeLocation() : true;
   const includeLtMember = Sd.includeLtMember ? Sd.includeLtMember() : true;
+  const locationOpts = Sd.locations ? Sd.locations() : ['Edinburgh', 'London'];
+  const locationsFreeText = Sd.locationsFreeText ? Sd.locationsFreeText() : false;
+  const [loc, setLoc] = dState(me.location || locationOpts[0] || 'Edinburgh');
   const fld = {
     width: '100%',
     border: '2.5px solid var(--ink)',
@@ -39459,13 +39500,28 @@ function EditProfile(props) {
       fontSize: 13,
       fontFamily: 'var(--disp)'
     }
-  }, "Location"), seg(loc, setLoc, [{
-    value: 'Edinburgh',
-    label: 'Edinburgh'
-  }, {
-    value: 'London',
-    label: 'London'
-  }])), includeLtMember && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+  }, "Location"), locationsFreeText ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("input", {
+    style: fld,
+    value: loc,
+    onChange: e => setLoc(e.target.value),
+    placeholder: "Your office or location",
+    list: "wh-locs-edit"
+  }), /*#__PURE__*/React.createElement("datalist", {
+    id: "wh-locs-edit"
+  }, locationOpts.map(l => /*#__PURE__*/React.createElement("option", {
+    key: l,
+    value: l
+  })))) : locationOpts.length <= 3 ? seg(loc, setLoc, locationOpts.map(l => ({
+    value: l,
+    label: l
+  }))) : /*#__PURE__*/React.createElement("select", {
+    style: fld,
+    value: loc,
+    onChange: e => setLoc(e.target.value)
+  }, locationOpts.map(l => /*#__PURE__*/React.createElement("option", {
+    key: l,
+    value: l
+  }, l)))), includeLtMember && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
     style: {
       fontWeight: 800,
       fontSize: 13,
@@ -40070,12 +40126,15 @@ function Market(props) {
   const m = props.market,
     me = props.me,
     onPick = props.onPick;
-  const resolved = m.answer != null;
-  const pick = me.picks ? me.picks[m.key] : null;
   const isTwo = m.kind === 'team2';
+  const isTeam = m.kind === 'team' || isTwo;
+  // team2 answer is an array; only resolved when it has 2 entries
+  const resolved = isTwo ? Array.isArray(m.answer) && m.answer.length > 0 : m.answer != null;
+  const pick = me.picks ? me.picks[m.key] : null;
   const picked = id => isTwo ? Array.isArray(pick) && pick.indexOf(id) >= 0 : pick === id;
-  const correctVal = resolved ? isTwo ? null : m.answer : null;
-  const gotIt = resolved && (isTwo ? false : pick === m.answer);
+  const gotIt = resolved && (isTwo ? Array.isArray(pick) && Array.isArray(m.answer) && pick.length === m.answer.length && pick.every(id => m.answer.indexOf(id) >= 0) : pick === m.answer);
+  const [teamQ, setTeamQ] = pState('');
+  const presetCodes = isTeam ? new Set(m.options) : new Set();
   function choose(id) {
     if (resolved) return;
     if (isTwo) {
@@ -40086,7 +40145,11 @@ function Market(props) {
       }
       onPick(m.key, arr);
     } else onPick(m.key, picked(id) ? null : id);
+    setTeamQ('');
   }
+  const teamResults = isTeam && !resolved && teamQ.trim() ? WCp.TEAM_LIST.filter(t => !presetCodes.has(t.code) && (t.name.toLowerCase().indexOf(teamQ.toLowerCase()) >= 0 || t.code.toLowerCase().indexOf(teamQ.toLowerCase()) >= 0)).slice(0, 6) : [];
+  const hasPick = pick != null && (!isTwo || Array.isArray(pick) && pick.length > 0);
+  const hasFullPick = pick != null && (!isTwo || Array.isArray(pick) && pick.length === 2);
   return /*#__PURE__*/React.createElement(Cp, {
     style: {
       marginBottom: 12
@@ -40106,7 +40169,7 @@ function Market(props) {
       lineHeight: 1.05
     }
   }, m.q), /*#__PURE__*/React.createElement(Chp, {
-    tone: resolved ? gotIt ? 'green' : 'red' : pick != null && (!isTwo || pick.length === 2) ? 'yellow' : 'ghost',
+    tone: resolved ? gotIt ? 'green' : 'red' : hasFullPick ? 'yellow' : 'ghost',
     style: {
       whiteSpace: 'nowrap',
       flex: '0 0 auto'
@@ -40127,7 +40190,7 @@ function Market(props) {
   }, m.options.map((opt, i) => {
     const o = optLabel(m, opt);
     const on = picked(o.id);
-    const isAnswer = resolved && (isTwo ? false : o.id === m.answer);
+    const isAnswer = resolved && (isTwo ? Array.isArray(m.answer) && m.answer.indexOf(o.id) >= 0 : o.id === m.answer);
     const wrong = resolved && on && !isAnswer;
     let bg = '#fff',
       bd = 'var(--line)';
@@ -40199,7 +40262,97 @@ function Market(props) {
         flex: '0 0 auto'
       }
     }, on ? '✓' : ''));
-  })));
+  })), isTeam && !resolved && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 10,
+      borderTop: '1.5px solid var(--line)',
+      paddingTop: 10
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      fontWeight: 800,
+      color: 'var(--ink2)',
+      marginBottom: 6,
+      textTransform: 'uppercase',
+      letterSpacing: '.05em'
+    }
+  }, "Search all 48 teams"), /*#__PURE__*/React.createElement("input", {
+    value: teamQ,
+    onChange: e => setTeamQ(e.target.value),
+    placeholder: "Type a team name\u2026",
+    style: {
+      width: '100%',
+      boxSizing: 'border-box',
+      border: '2px solid var(--line)',
+      borderRadius: 10,
+      padding: '8px 11px',
+      fontFamily: 'var(--body)',
+      fontWeight: 600,
+      fontSize: 14,
+      outline: 'none'
+    }
+  }), teamResults.length > 0 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      flexDirection: 'column',
+      gap: 5,
+      marginTop: 6
+    }
+  }, teamResults.map(t => {
+    const on = picked(t.code);
+    return /*#__PURE__*/React.createElement("button", {
+      key: t.code,
+      onClick: () => choose(t.code),
+      style: {
+        display: 'flex',
+        alignItems: 'center',
+        gap: 10,
+        padding: '8px 11px',
+        border: '2px solid ' + (on ? 'var(--ink)' : 'var(--line)'),
+        borderRadius: 11,
+        background: on ? 'var(--yellow)' : '#fff',
+        cursor: 'pointer',
+        fontFamily: 'var(--body)',
+        textAlign: 'left'
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 22
+      }
+    }, t.flag), /*#__PURE__*/React.createElement("div", {
+      style: {
+        flex: 1,
+        minWidth: 0
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontWeight: 800,
+        fontSize: 13.5
+      }
+    }, t.name), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 11,
+        fontWeight: 600,
+        color: 'var(--ink2)'
+      }
+    }, "Group ", t.group, " \xB7 ", t.odds)), /*#__PURE__*/React.createElement("span", {
+      style: {
+        width: 20,
+        height: 20,
+        borderRadius: '50%',
+        border: '2px solid var(--ink)',
+        background: on ? 'var(--ink)' : '#fff',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        color: '#fff',
+        fontSize: 12,
+        fontWeight: 900,
+        flex: '0 0 auto'
+      }
+    }, on ? '✓' : ''));
+  }))));
 }
 function PredLeaderboard(props) {
   const me = props.me;
@@ -41149,12 +41302,16 @@ function SettingsAdmin() {
   const feeNow = Sa.entryFee ? Sa.entryFee() : WCa.FEE;
   const [fee, setFee] = aState2(String(feeNow || 0));
   React.useEffect(() => setFee(String(feeNow || 0)), [feeNow]);
+  const locationsNow = Sa.locations ? Sa.locations() : ['Edinburgh', 'London'];
+  const [locInput, setLocInput] = aState2(locationsNow.join(', '));
+  React.useEffect(() => setLocInput(locationsNow.join(', ')), [locationsNow.join(',')]);
   const entrants = Sa.allSync().length;
   const split = Sa.charitySplit ? Sa.charitySplit() : 0.5;
   const purpose = Sa.purpose ? Sa.purpose() : 'work';
   const includeDept = Sa.includeDepartment ? Sa.includeDepartment() : true;
   const includeLocation = Sa.includeLocation ? Sa.includeLocation() : true;
   const includeLtMember = Sa.includeLtMember ? Sa.includeLtMember() : true;
+  const locationsFreeText = Sa.locationsFreeText ? Sa.locationsFreeText() : false;
   const n = Number(fee);
   const feeNum = isFinite(n) && n >= 0 ? n : feeNow;
   const gross = entrants * feeNum;
@@ -41179,6 +41336,12 @@ function SettingsAdmin() {
     }
     Sa.setEntryFee(val);
     if (window.wcToast) window.wcToast('Entry fee set to £' + val.toLocaleString('en-GB'), 'confident');
+  }
+  function saveLocations() {
+    const arr = locInput.split(',').map(s => s.trim()).filter(Boolean);
+    if (!arr.length) return;
+    Sa.setLocations(arr);
+    if (window.wcToast) window.wcToast(arr.length + ' location' + (arr.length > 1 ? 's' : '') + ' saved.', 'confident');
   }
   function toggleRow(onClick, on, title, text) {
     return /*#__PURE__*/React.createElement("button", {
@@ -41361,7 +41524,42 @@ function SettingsAdmin() {
       marginBottom: 16,
       lineHeight: 1.4
     }
-  }, purpose === 'work' ? 'Shows department, location and LT fields. You can toggle them individually below.' : 'Just names — no work details collected. Individual toggles below still apply.'), /*#__PURE__*/React.createElement(SHa, null, "Signup fields"), toggleRow(() => Sa.setIncludeDepartment(!includeDept), includeDept, 'Team / department', includeDept ? 'Shown on signup, editing and directory.' : 'Hidden from signup, editing and directory.'), toggleRow(() => Sa.setIncludeLocation(!includeLocation), includeLocation, 'Location', includeLocation ? 'Shown on signup and profile editing.' : 'Hidden — not collected.'), toggleRow(() => Sa.setIncludeLtMember(!includeLtMember), includeLtMember, 'Leadership Team member', includeLtMember ? 'Shown on signup and profile editing.' : 'Hidden — not collected.'));
+  }, purpose === 'work' ? 'Shows department, location and LT fields. You can toggle them individually below.' : 'Just names — no work details collected. Individual toggles below still apply.'), /*#__PURE__*/React.createElement(SHa, null, "Locations"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      fontWeight: 600,
+      color: 'var(--ink2)',
+      marginBottom: 8,
+      lineHeight: 1.4
+    }
+  }, "List your offices or locations, separated by commas. People pick from these when signing up."), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: 7,
+      alignItems: 'center',
+      marginBottom: 8
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    value: locInput,
+    onChange: e => setLocInput(e.target.value),
+    onBlur: saveLocations,
+    onKeyDown: e => e.key === 'Enter' && saveLocations(),
+    style: {
+      flex: 1,
+      border: '2px solid var(--ink)',
+      borderRadius: 11,
+      padding: '9px 12px',
+      fontFamily: 'var(--body)',
+      fontWeight: 600,
+      fontSize: 14,
+      outline: 'none',
+      background: '#fff'
+    },
+    placeholder: "e.g. Edinburgh, London, Remote"
+  }), /*#__PURE__*/React.createElement("button", {
+    onClick: saveLocations,
+    className: "wc-btn wc-btn--sm wc-btn--ink"
+  }, "Save")), toggleRow(() => Sa.setLocationsFreeText(!locationsFreeText), locationsFreeText, 'Allow custom location', locationsFreeText ? 'People can type their own location (your list shows as suggestions).' : 'People must pick from your list above.'), /*#__PURE__*/React.createElement(SHa, null, "Signup fields"), toggleRow(() => Sa.setIncludeDepartment(!includeDept), includeDept, 'Team / department', includeDept ? 'Shown on signup, editing and directory.' : 'Hidden from signup, editing and directory.'), toggleRow(() => Sa.setIncludeLocation(!includeLocation), includeLocation, 'Location', includeLocation ? 'Shown on signup and profile editing.' : 'Hidden — not collected.'), toggleRow(() => Sa.setIncludeLtMember(!includeLtMember), includeLtMember, 'Leadership Team member', includeLtMember ? 'Shown on signup and profile editing.' : 'Hidden — not collected.'));
 }
 function AdminPanel(props) {
   const [, bump] = aState2(0);

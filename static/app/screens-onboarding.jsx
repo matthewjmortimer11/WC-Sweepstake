@@ -244,11 +244,13 @@ function FindMyEntry(props) {
 function OnboardingForm(props) {
   const [name, setName] = oState('');
   const [dept, setDept] = oState('');
-  const [loc, setLoc] = oState('Edinburgh');
-  const [lt, setLt] = oState(false);
   const includeDept = So.includeDepartment ? So.includeDepartment() : true;
   const includeLocation = So.includeLocation ? So.includeLocation() : true;
   const includeLtMember = So.includeLtMember ? So.includeLtMember() : true;
+  const locationOpts = So.locations ? So.locations() : ['Edinburgh', 'London'];
+  const locationsFreeText = So.locationsFreeText ? So.locationsFreeText() : false;
+  const [loc, setLoc] = oState(locationOpts[0] || 'Edinburgh');
+  const [lt, setLt] = oState(false);
   const ok = name.trim().length > 0;
   const split = So.charitySplit ? So.charitySplit() : 0.5;
   const fee = WCo.FEE || 0;
@@ -276,7 +278,17 @@ function OnboardingForm(props) {
           </div>}
           {includeLocation && <div>
             <Lab opt>Location</Lab>
-            <Seg value={loc} onChange={setLoc} options={[{ value: 'Edinburgh', label: 'Edinburgh' }, { value: 'London', label: 'London' }]} />
+            {locationsFreeText
+              ? <>
+                  <input style={inp} value={loc} onChange={e => setLoc(e.target.value)} placeholder="Your office or location" list="wh-locs" />
+                  <datalist id="wh-locs">{locationOpts.map(l => <option key={l} value={l} />)}</datalist>
+                </>
+              : locationOpts.length <= 3
+                ? <Seg value={loc} onChange={setLoc} options={locationOpts.map(l => ({ value: l, label: l }))} />
+                : <select style={inp} value={loc} onChange={e => setLoc(e.target.value)}>
+                    {locationOpts.map(l => <option key={l} value={l}>{l}</option>)}
+                  </select>
+            }
           </div>}
           {includeLtMember && <div>
             <Lab opt>Leadership Team member?</Lab>
