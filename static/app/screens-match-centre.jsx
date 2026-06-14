@@ -19,7 +19,20 @@ const { useState: mcState, useEffect: mcEffect, useRef: mcRef } = React;
 
 function mcTeam(code) { return WCmc.TEAMS[code] || { code: code || 'TBD', name: code || 'To be decided', flag: '🏳️', group: '?' }; }
 function mcName(code) { return mcTeam(code).name; }
-function mcStatus(f) { return f.status || 'upcoming'; }
+function mcHasScore(f) { return !!(f && f.score && f.score[0] != null && f.score[1] != null); }
+function mcStatus(f) {
+  const raw = (f && f.status) || 'upcoming';
+  if (raw === 'done' || mcHasScore(f)) return 'done';
+  if (raw === 'live') return 'live';
+  const ko = mcKickoffMs(f);
+  if (ko == null) return raw;
+  const age = Date.now() - ko;
+  if (age < 0) return 'upcoming';
+  // Until an organiser records a result, treat the match window as live, then
+  // flag it as needing an update rather than showing stale countdown copy.
+  if (age <= 135 * 60 * 1000) return 'live';
+  return 'needsResult';
+}
 function mcOrd(n) { const s = ['th', 'st', 'nd', 'rd'], v = n % 100; return n + (s[(v - 20) % 10] || s[v] || s[0]); }
 function mcStageRank(st) { return ({ final: 6, sf: 5, qf: 4, r16: 3, r32: 2, group: 1 })[st] || 1; }
 function mcStageLabel(f) {
@@ -208,11 +221,12 @@ function MCTeamCol(props) {
 /* ---- the match card ----------------------------------------------------- */
 function MatchCard(props) {
   const f = props.f, me = props.me, owned = props.owned, onWhatIf = props.onWhatIf;
-  const st = mcStatus(f), live = st === 'live', done = st === 'done';
+  const st = mcStatus(f), live = st === 'live', done = st === 'done', needsResult = st === 'needsResult';
   const stake = mcStake(me, f);
   const imp = mcImportance(f, me, stake.pts, owned);
   const ms = mcKickoffMs(f);
-  const soon = !done && !live && ms != null && (ms - Date.now() < 24 * 3600 * 1000) && (ms - Date.now() > -3600 * 1000);
+  const until = ms == null ? null : ms - Date.now();
+  const soon = st === 'upcoming' && until != null && until < 24 * 3600 * 1000 && until > 0;
   const remaining = useCountdown(soon ? ms : null);
   const impact = (live || done) ? mcImpact(f) : null;
   const oa = owned[f.a] || 0, ob = owned[f.b] || 0;
@@ -234,6 +248,7 @@ function MatchCard(props) {
         <div style={{ flex: '0 0 auto', textAlign: 'right' }}>
           {live ? <span className="mc-livedot" style={{ fontSize: 11, fontWeight: 900, color: 'var(--red)', whiteSpace: 'nowrap' }}>● LIVE</span>
             : done ? <Chmc tone="ink">FT</Chmc>
+              : needsResult ? <Chmc tone="red" style={{ whiteSpace: 'nowrap' }}>Result needed</Chmc>
               : soon ? <Chmc tone="yellow" style={{ whiteSpace: 'nowrap' }}>⏱ {mcFmt(remaining)}</Chmc>
                 : <span style={{ fontSize: 12, fontWeight: 800 }}>{f.time}</span>}
         </div>
@@ -245,6 +260,7 @@ function MatchCard(props) {
         <div style={{ flex: '0 0 auto', textAlign: 'center', minWidth: 56 }}>
           {live ? <LiveScore f={f} />
             : done && f.score ? <span className="dh" style={{ fontSize: 30 }}>{f.score[0]}<span style={{ color: 'var(--ink2)', fontSize: 18 }}>:</span>{f.score[1]}</span>
+              : needsResult ? <div><div className="dh" style={{ fontSize: 15, color: 'var(--red)', lineHeight: 1.05 }}>Result</div><div style={{ fontSize: 10, fontWeight: 800, color: 'var(--ink2)', marginTop: 2 }}>needed</div></div>
               : <div><div className="dh" style={{ fontSize: 18, color: 'var(--ink2)' }}>v</div>{soon && <div style={{ fontSize: 10, fontWeight: 800, color: 'var(--ink2)', marginTop: 2 }}>{mcFmt(remaining)}</div>}</div>}
         </div>
         <MCTeamCol code={f.b} owners={ob} lose={aw} dim={aw} />
@@ -341,6 +357,7 @@ function MatchCentreScreen() {
 
   const liveList = all.filter(f => mcStatus(f) === 'live');
   const upcoming = all.filter(f => mcStatus(f) === 'upcoming');
+  const needsResultList = all.filter(f => mcStatus(f) === 'needsResult');
   // hero: your team's next, else the most important upcoming, else the first
   const nextMine = mineTeam ? upcoming.find(f => f.a === mineTeam || f.b === mineTeam) : null;
   let heroPick = null;
@@ -360,6 +377,7 @@ function MatchCentreScreen() {
   else if (filter === 'owned') list = list.filter(f => owned[f.a] || owned[f.b]);
   else if (filter === 'done') list = list.filter(f => mcStatus(f) === 'done');
   else if (filter === 'upcoming') list = list.filter(f => mcStatus(f) === 'upcoming');
+  else if (filter === 'needsResult') list = list.filter(f => mcStatus(f) === 'needsResult');
 
   const byDate = []; const seen = {};
   list.forEach(f => {
@@ -369,6 +387,7 @@ function MatchCentreScreen() {
 
   const doneCount = all.filter(f => mcStatus(f) === 'done').length;
   const filters = [['all', 'All'], ['mine', 'My team'], ['owned', 'In the draw'], ['upcoming', 'Upcoming'], ['done', 'Finished']];
+  if (needsResultList.length) filters.splice(3, 0, ['needsResult', 'Needs result']);
 
   return (
     <React.Fragment>
@@ -378,8 +397,8 @@ function MatchCentreScreen() {
           <div className="dh" style={{ fontSize: 26 }}>Match Centre</div>
           <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink2)' }}>
             {liveList.length > 0
-              ? <><b style={{ color: 'var(--red)' }}>{liveList.length} live now</b> · {upcoming.length} to come</>
-              : <>{all.length} fixtures · {doneCount} played · kick-off {WCmc.meta.kickoff || 'soon'}</>}
+              ? <><b style={{ color: 'var(--red)' }}>{liveList.length} live now</b> · {upcoming.length} to come{needsResultList.length ? ' · ' + needsResultList.length + ' need results' : ''}</>
+              : <>{all.length} fixtures · {doneCount} played{needsResultList.length ? ' · ' + needsResultList.length + ' need results' : ' · kick-off ' + (WCmc.meta.kickoff || 'soon')}</>}
           </div>
         </div>
       </div>
