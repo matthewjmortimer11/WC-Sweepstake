@@ -16,12 +16,15 @@ function Icon(props){
   if(props.name==='players') return <svg width="26" height="26" viewBox="0 0 24 24"><circle cx="8.5" cy="9" r="2.8" {...common}/><circle cx="16" cy="9.5" r="2.3" {...common}/><path d="M3.5 18c0-2.8 2.2-4.3 5-4.3s5 1.5 5 4.3M14 17.6c0-2 .9-3.4 3.4-3.4 2 0 3.1 1.2 3.1 3" {...common}/></svg>;
   if(props.name==='predictions') return <svg width="26" height="26" viewBox="0 0 24 24"><path d="M12 3.5l2.4 4.9 5.4.8-3.9 3.8.9 5.4-4.8-2.5-4.8 2.5.9-5.4L4.2 9.2l5.4-.8z" {...common}/></svg>;
   if(props.name==='chat') return <svg width="26" height="26" viewBox="0 0 24 24"><path d="M4 4h16a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H8l-4 4V6a2 2 0 0 1 2-2z" {...common}/></svg>;
+  if(props.name==='summary') return <svg width="26" height="26" viewBox="0 0 24 24"><path d="M5.5 3h13l-1.5 8a5 5 0 0 1-10 0zM5.5 5.5H3a1.5 1.5 0 0 0 0 3h2.5M18.5 5.5H21a1.5 1.5 0 0 0 0 3h-2.5M12 11v6M9 21h6" {...common}/></svg>;
   return <svg width="26" height="26" viewBox="0 0 24 24"><rect x="5" y="3.5" width="14" height="17" rx="2.5" {...common}/><line x1="8.5" y1="8" x2="15.5" y2="8" {...common}/><line x1="8.5" y1="12" x2="15.5" y2="12" {...common}/><line x1="8.5" y1="16" x2="13" y2="16" {...common}/></svg>;
 }
 
 function StatusBar(){
+  const [time, setTime] = React.useState(()=>{const d=new Date();return d.getHours().toString().padStart(2,'0')+':'+d.getMinutes().toString().padStart(2,'0');});
+  React.useEffect(()=>{const iv=setInterval(()=>{const d=new Date();setTime(d.getHours().toString().padStart(2,'0')+':'+d.getMinutes().toString().padStart(2,'0'));},10000);return()=>clearInterval(iv);},[]);
   return <div className="statusbar">
-    <span>20:06</span>
+    <span>{time}</span>
     <span className="dots">
       <svg width="18" height="12" viewBox="0 0 18 12"><g fill="var(--ink)"><rect x="0" y="8" width="3" height="4" rx="1"/><rect x="5" y="5" width="3" height="7" rx="1"/><rect x="10" y="2.5" width="3" height="9.5" rx="1"/><rect x="15" y="0" width="3" height="12" rx="1"/></g></svg>
       <svg width="17" height="12" viewBox="0 0 17 12" fill="none" stroke="var(--ink)" strokeWidth="1.6"><path d="M1 4.2C3.2 2 6 1 8.5 1S13.8 2 16 4.2M3.4 6.6C4.9 5.2 6.7 4.6 8.5 4.6s3.6.6 5.1 2M5.8 9c.8-.7 1.7-1 2.7-1s1.9.3 2.7 1"/></svg>
