@@ -600,6 +600,16 @@ function AdminGate(props) {
 
    if (ok) return <AdminPanel onClose={props.onClose} />;
 
+   // Which code does this league expect? The seeded main league uses the
+   // organiser PIN; a self-created league uses its own password.
+   const league = Sa.activeLeague && Sa.activeLeague();
+   const seeded = !!(league && league.seeded);
+   const hint = !serverAuth
+     ? 'Preview mode — the clipboard is open.'
+     : seeded
+       ? 'Use the organiser PIN for this league.'
+       : 'Use the password you set when you created “' + ((league && league.name) || 'this league') + '”.';
+
    function submit() {
      if (!entry || busy) return;
      if (!serverAuth) { setOk(true); return; }
@@ -621,7 +631,10 @@ function AdminGate(props) {
          <Wa mood={bad ? 'shocked' : 'mischievous'} size={92} animate />
          <div className="dh" style={{ fontSize: 24, marginTop: 10 }}>Organiser only.</div>
          <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--ink2)', marginTop: 6, lineHeight: 1.45 }}>
-           {bad ? 'Wrong code. Wheesht is watching. Try again.' : "Enter the organiser code. Wheesht doesn't hand the clipboard to just anyone."}
+           {bad ? 'Wrong code. Wheesht is watching. Try again.' : "Wheesht doesn't hand the clipboard to just anyone."}
+         </div>
+         <div style={{ fontSize: 12, fontWeight: 700, color: bad ? 'var(--red)' : 'var(--ink2)', marginTop: 8, background: 'var(--bg2)', border: '2px solid var(--line)', borderRadius: 11, padding: '8px 11px', lineHeight: 1.4 }}>
+           {hint}
          </div>
          <input
            autoFocus
