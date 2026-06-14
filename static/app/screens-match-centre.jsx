@@ -207,7 +207,7 @@ function MCTeamCol(props) {
 
 /* ---- the match card ----------------------------------------------------- */
 function MatchCard(props) {
-  const f = props.f, me = props.me, owned = props.owned;
+  const f = props.f, me = props.me, owned = props.owned, onWhatIf = props.onWhatIf;
   const st = mcStatus(f), live = st === 'live', done = st === 'done';
   const stake = mcStake(me, f);
   const imp = mcImportance(f, me, stake.pts, owned);
@@ -281,6 +281,14 @@ function MatchCard(props) {
         <div style={{ marginTop: 10, background: 'var(--bg)', borderRadius: 11, padding: '8px 11px', fontSize: 11.5, fontWeight: 700, color: 'var(--ink2)' }}>
           🏆 {impact.text}
         </div>}
+
+      {/* What If? entry point */}
+      <div style={{ marginTop: 10, display: 'flex', justifyContent: 'flex-end' }}>
+        <button onClick={() => onWhatIf && onWhatIf(f)}
+          style={{ border: '1.5px solid var(--line)', background: 'none', cursor: 'pointer', borderRadius: 999, fontSize: 11, fontWeight: 800, color: 'var(--ink2)', padding: '4px 12px', letterSpacing: '.02em' }}>
+          What If? →
+        </button>
+      </div>
     </Cmc>
   );
 }
@@ -326,6 +334,7 @@ function NextHero(props) {
 function MatchCentreScreen() {
   const me = Smc ? Smc.active() : null;
   const [filter, setFilter] = mcState('all');
+  const [wiFixture, setWiFixture] = mcState(null);
   const owned = mcOwned();
   const all = (WCmc.FIXTURES || []).slice();
   const mineTeam = me ? me.team : null;
@@ -362,6 +371,7 @@ function MatchCentreScreen() {
   const filters = [['all', 'All'], ['mine', 'My team'], ['owned', 'In the draw'], ['upcoming', 'Upcoming'], ['done', 'Finished']];
 
   return (
+    <React.Fragment>
     <div className="pad">
       <div className="appbar" style={{ padding: '2px 0 12px' }}>
         <div>
@@ -377,7 +387,7 @@ function MatchCentreScreen() {
       {/* LIVE NOW — top priority */}
       {liveList.length > 0 && <>
         <SHmc aside="updating live">● Live now</SHmc>
-        {liveList.map(f => <MatchCard key={f.id} f={f} me={me} owned={owned} />)}
+        {liveList.map(f => <MatchCard key={f.id} f={f} me={me} owned={owned} onWhatIf={setWiFixture} />)}
       </>}
 
       {/* NEXT UP hero with countdown */}
@@ -409,10 +419,12 @@ function MatchCentreScreen() {
       {byDate.map((day, i) => (
         <div key={i}>
           <SHmc aside={day.items.length + ' ' + (day.items.length === 1 ? 'game' : 'games')}>{day.label}</SHmc>
-          {day.items.map(f => <MatchCard key={f.id} f={f} me={me} owned={owned} />)}
+          {day.items.map(f => <MatchCard key={f.id} f={f} me={me} owned={owned} onWhatIf={setWiFixture} />)}
         </div>
       ))}
     </div>
+    {wiFixture && <window.WhatIfSheet f={wiFixture} me={me} onClose={() => setWiFixture(null)} />}
+    </React.Fragment>
   );
 }
 
