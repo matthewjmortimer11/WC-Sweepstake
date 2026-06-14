@@ -7,6 +7,21 @@ const A_W = window.Wheesht;
 const A_S = window.Store;
 const { useState: aState, useEffect: aEffect } = React;
 
+/* ---- Easter egg (basic — built to extend later) ----------------------------
+   A wee hidden treat: tap the league title five times quickly. For now it just
+   pops some confetti and a hidden Wheesht line. Richer rewards (badges, secret
+   stats, a mini-game) can hang off window.__wheeshtEgg without touching the UI. */
+const EGG_LINES = [
+  'Wheesht kent ye’d go poking. Away ye go, ya nosy beggar.',
+  'A hidden whistle! Dinnae tell the others. Wheesht certainly won’t.',
+  'Five taps. Wheesht respects a curious mind. Reluctantly.',
+  'Ye found the secret. There’s nae prize. Yet. Wheesht is working on it.',
+];
+window.__wheeshtEgg = function(){
+  try{ window.wcConfetti && window.wcConfetti({ y:.32, count:90 }); }catch(e){}
+  try{ window.wcToast && window.wcToast(EGG_LINES[(Math.random()*EGG_LINES.length)|0], 'mischievous'); }catch(e){}
+};
+
 /* ---- tab icons ---- */
 function Icon(props){
   const sw=2.4;
@@ -37,6 +52,7 @@ function AppBar(props){
   const me = props.me;
   const ref = React.useRef(null);
   const taps = React.useRef({n:0,t:0});
+  const eggTaps = React.useRef({n:0,t:0});
   React.useEffect(()=>{
     const bar = ref.current; if(!bar) return;
     const sc = bar.closest('.scroll'); if(!sc) return;
@@ -52,10 +68,17 @@ function AppBar(props){
     taps.current.t = now;
     if(taps.current.n >= 7){ taps.current.n = 0; props.onDev && props.onDev(); }
   }
+  // Easter egg: tap the league title 5 times within ~1.8s.
+  function eggTap(){
+    const now = Date.now();
+    eggTaps.current.n = (now - eggTaps.current.t < 1800) ? eggTaps.current.n + 1 : 1;
+    eggTaps.current.t = now;
+    if(eggTaps.current.n >= 5){ eggTaps.current.n = 0; window.__wheeshtEgg && window.__wheeshtEgg(); }
+  }
   return <div className="appbar" ref={ref}>
     <div className="mk" onClick={secretTap} style={{cursor:'default'}}><A_W mood="confident" size={42}/></div>
     <div style={{flex:1,minWidth:0}}>
-      <h1>{(A_WC.league&&A_WC.league.name)||A_WC.meta.name}</h1>
+      <h1 onClick={eggTap} style={{cursor:'default'}}>{(A_WC.league&&A_WC.league.name)||A_WC.meta.name}</h1>
       <p>{A_WC.meta.season} · {A_WC.meta.stageLabel}</p>
     </div>
     {me && <button onClick={props.onAccount} style={{border:'none',background:'none',cursor:'pointer',padding:0,marginLeft:2}}>
