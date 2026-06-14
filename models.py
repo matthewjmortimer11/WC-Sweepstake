@@ -146,6 +146,15 @@ class Profile(Base):
     league_id: Mapped[str] = mapped_column(
         String, ForeignKey("leagues.id"), nullable=False, index=True
     )
+    # Editable alias shown everywhere user-facing. The participant's original full
+    # name (config roster for seeded entries, onboarding name otherwise) is NEVER
+    # overwritten — it stays on Participant as the organiser's base. Empty here
+    # means "fall back to the base name".
+    #
+    # NOTE: `profiles` shipped a deploy earlier WITHOUT this column, so for an
+    # already-created table create_all will not add it. main._ensure_schema()
+    # runs an idempotent ALTER TABLE ... ADD COLUMN IF NOT EXISTS at startup.
+    display_name: Mapped[str] = mapped_column(String, nullable=False, default="")
     # Three-letter team code the entrant *supports* (distinct from the team they
     # were drawn). Empty until they pick one.
     favourite_team: Mapped[str] = mapped_column(String, nullable=False, default="")

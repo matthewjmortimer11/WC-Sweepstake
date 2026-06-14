@@ -31,10 +31,21 @@ function Flag(props) {
   return <span className="wc-flag" style={{ fontSize: sz, lineHeight: 1 }} title={t.name}>{t.flag}</span>;
 }
 
-/* ---- Avatar (initials) --------------------------------------------------- */
+/* ---- Avatar (photo with initials fallback) ------------------------------- */
 function Avatar(props) {
-  const p = props.person;
+  const p = props.person || {};
   const sz = props.size || 36;
+  const url = (!p.isYou && window.Store && window.Store.avatarUrl) ? window.Store.avatarUrl(p) : null;
+  const [broken, setBroken] = useState(false);
+  useEffect(function () { setBroken(false); }, [url]);
+  if (url && !broken) {
+    return (
+      <span className="wc-avatar" style={{ width: sz, height: sz, padding: 0, overflow: 'hidden', background: p.color, opacity: (props.dim ? 0.4 : 1) }}>
+        <img src={url} alt="" onError={function () { setBroken(true); }}
+          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+      </span>
+    );
+  }
   return (
     <span className="wc-avatar" style={{
       width: sz, height: sz, background: p.isYou ? 'var(--ink)' : p.color,
@@ -46,6 +57,43 @@ function Avatar(props) {
 /* ---- Chip ---------------------------------------------------------------- */
 function Chip(props) {
   return <span className={'wc-chip' + (props.tone ? ' wc-chip--' + props.tone : '')} style={props.style}>{props.children}</span>;
+}
+
+/* ---- Achievement badges (computed client-side, no new DB) ---------------- */
+function badgesFor(p) {
+  const S = window.Store, WC = window.WC;
+  const out = [];
+  if (!p || !S) return out;
+  if (p.isOrganiser) out.push({ icon: '🛡️', label: 'Organiser' });
+  const total = S.visiblePredictions ? S.visiblePredictions().length : 0;
+  const made = S.madeVisiblePredictions ? S.madeVisiblePredictions(p) : 0;
+  if (total && made >= total) out.push({ icon: '🎯', label: 'Full card', tone: 'green' });
+  const score = S.predScoreOf ? S.predScoreOf(p) : 0;
+  if (score > 0) out.push({ icon: '✅', label: score + ' pts', tone: 'green' });
+  let rank = 0;
+  if (S.rankedByPred) { const r = S.rankedByPred().find(function (x) { return x.id === p.id; }); rank = r ? r.predRank : 0; }
+  if (rank === 1) out.push({ icon: '🥇', label: 'Top of the league', tone: 'yellow' });
+  else if (rank === 2) out.push({ icon: '🥈', label: '2nd overall', tone: 'yellow' });
+  else if (rank === 3) out.push({ icon: '🥉', label: '3rd overall', tone: 'yellow' });
+  const t = WC.TEAMS[p.team];
+  if (t) out.push(t.alive ? { icon: '🟢', label: 'Team still in', tone: 'green' } : { icon: '💀', label: 'Knocked out', tone: 'red' });
+  const fav = S.favTeam ? S.favTeam(p) : null;
+  if (fav) out.push({ icon: fav.flag, label: fav.name + ' fan', tone: 'ghost' });
+  return out;
+}
+function Badges(props) {
+  const list = badgesFor(props.person);
+  if (!list.length) return null;
+  const shown = props.max ? list.slice(0, props.max) : list;
+  return (
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+      {shown.map(function (b, i) {
+        return <span key={i} className={'wc-chip' + (b.tone ? ' wc-chip--' + b.tone : '')} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+          <span style={{ fontSize: 13, lineHeight: 1 }}>{b.icon}</span>{b.label}
+        </span>;
+      })}
+    </div>
+  );
 }
 
 /* ---- Stamp (ELIMINATED / QUALIFIED) -------------------------------------- */
@@ -208,4 +256,5 @@ Object.assign(window, {
   Card: Card, Btn: Btn, Flag: Flag, Avatar: Avatar, Chip: Chip, Stamp: Stamp,
   ProgressRing: ProgressRing, SegmentBar: SegmentBar, WheeshtSays: WheeshtSays,
   SectionHead: SectionHead, ToastLayer: ToastLayer, ConfettiLayer: ConfettiLayer,
+  Badges: Badges,
 });

@@ -194,7 +194,7 @@ function LbRow(props) {
       <span className="dh" style={{ fontSize: 16, width: 22, textAlign: 'center', color: i === 0 ? 'var(--red)' : 'var(--ink2)' }}>{i + 1}</span>
       <Ap person={Object.assign({}, p, { isYou: false })} size={32} />
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontWeight: 800, fontSize: 14, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name}{isMe && ' (you)'}</div>
+        <div style={{ fontWeight: 800, fontSize: 14, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{Sp.shownName ? Sp.shownName(p) : p.name}{isMe && ' (you)'}</div>
         <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--ink2)' }}>{p.location}{p.ltMember ? ' · LT' : ''}</div>
       </div>
       <Chp tone={i === 0 ? 'yellow' : 'ghost'}>{p.predScore} pts</Chp>

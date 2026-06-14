@@ -125,7 +125,7 @@ function AccountSheet(props){
             <button onClick={()=>{A_S.setActive(p.id);props.onClose();}} style={{display:'flex',alignItems:'center',gap:11,flex:1,minWidth:0,background:'none',border:'none',cursor:'pointer',textAlign:'left',padding:0}}>
               <window.Avatar person={Object.assign({},p,{isYou:false})} size={40}/>
               <div style={{flex:1,minWidth:0}}>
-                <div className="dh" style={{fontSize:16}}>{p.name}{on&&' ·'} {on&&<span style={{fontSize:11,color:'var(--ink2)'}}>active</span>}</div>
+                <div className="dh" style={{fontSize:16}}>{A_S.shownName?A_S.shownName(p):p.name}{on&&' ·'} {on&&<span style={{fontSize:11,color:'var(--ink2)'}}>active</span>}</div>
                 <div style={{fontSize:11.5,fontWeight:700,color:'var(--ink2)'}}>{p.location}{includeDept && p.department?' · '+p.department:''}</div>
               </div>
               {t&&<window.Flag team={t} size={24}/>}

@@ -22,6 +22,7 @@
     admin: 'wheesht_admin_v1', removed: 'wheesht_removed_v1',
     league: 'wheesht_league_v1', leagues: 'wheesht_leagues_v1',
     adminTokens: 'wheesht_admin_tokens_v1',
+    profiles: 'wheesht_profiles_v1',
   };
 
   var CHARITY_SPLIT = 0.5;
@@ -179,6 +180,31 @@
     if (p.alive === t.alive && p.stage === t.stage) return p;
     return Object.assign({}, p, { alive: t.alive, stage: t.stage });
   }
+  // ---- profiles (display name, favourite team, avatar) --------------------
+  // Device-local cache keyed by participant id. In MOCK mode it is the only
+  // source; in LIVE mode it overlays the server fields so an upload/edit shows
+  // instantly (the avatarDataUrl gives an immediate preview before the byte
+  // round-trip). Server values still flow in via the people payload.
+  function localProfiles() { return lsGet(K.profiles, {}); }
+  function localProfile(id) { var all = localProfiles(); return (id && all[id]) || null; }
+  function setLocalProfile(id, patch) {
+    if (!id) return;
+    var all = localProfiles();
+    all[id] = Object.assign({}, all[id] || {}, patch);
+    lsSet(K.profiles, all);
+  }
+
+  function overlayProfile(p) {
+    var lp = localProfile(p.id);
+    if (!lp) return p;
+    var out = Object.assign({}, p);
+    if (lp.displayName != null) out.displayName = lp.displayName;
+    if (lp.favouriteTeam != null) out.favouriteTeam = lp.favouriteTeam;
+    if (lp.avatarDataUrl) out._avatarDataUrl = lp.avatarDataUrl;
+    if (lp.avatarVersion != null) out.avatarVersion = Math.max(lp.avatarVersion, p.avatarVersion || 0);
+    return out;
+  }
+
   function rebuild() {
     var code = leagueCode();
     var seen = {};
@@ -188,12 +214,12 @@
     mine.forEach(function (p) {
       if (seen[p.id] || removed.indexOf(p.id) >= 0) return;
       if (code && p.leagueCode && p.leagueCode !== code) return;
-      seen[p.id] = 1; cache.push(liveStatus(p));
+      seen[p.id] = 1; cache.push(overlayProfile(liveStatus(p)));
     });
     // server/seed people are already league-scoped by the backend
     (WC.PEOPLE || []).forEach(function (p) {
       if (seen[p.id] || removed.indexOf(p.id) >= 0) return;
-      seen[p.id] = 1; cache.push(liveStatus(p));
+      seen[p.id] = 1; cache.push(overlayProfile(liveStatus(p)));
     });
   }
   rebuild();
@@ -480,6 +506,78 @@
         if (person) { person = Object.assign({}, person, { leagueCode: leagueCode() }); mine = mine.concat([person]); lsSet(K.mine, mine); }
       }
       emit();
+    },
+
+    // ===== PROFILES (identity layer: display name · favourite team · avatar) =====
+    // The shown name everywhere user-facing — the editable display name, falling
+    // back to the original full name the organiser always keeps.
+    shownName: function (p) {
+      if (!p) return '';
+      return ((p.displayName || '').trim()) || p.name || '';
+    },
+    favTeam: function (p) {
+      var code = p && (p.favouriteTeam || '').trim();
+      return code ? (WC.TEAMS[code] || null) : null;
+    },
+    // URL/dataURL for a person's avatar image, or null if they have none (the
+    // caller falls back to the initials badge). A fresh upload's data URL wins
+    // so the change shows instantly; otherwise the versioned server endpoint.
+    avatarUrl: function (p) {
+      if (!p) return null;
+      if (p._avatarDataUrl) return p._avatarDataUrl;
+      if (LIVE && (p.avatarVersion || 0) > 0 && leagueCode()) {
+        return api('/participants/' + encodeURIComponent(p.id) + '/avatar') + '?v=' + p.avatarVersion;
+      }
+      return null;
+    },
+    // Save display name / favourite team. Patch may include either field.
+    saveProfile: function (id, patch) {
+      patch = patch || {};
+      var local = {};
+      if (patch.displayName != null) local.displayName = String(patch.displayName).slice(0, 40);
+      if (patch.favouriteTeam != null) local.favouriteTeam = (patch.favouriteTeam || '').toUpperCase();
+      setLocalProfile(id, local);
+      rebuild(); emit();
+      if (LIVE && leagueCode()) {
+        var body = {};
+        if (patch.displayName != null) body.displayName = local.displayName;
+        if (patch.favouriteTeam != null) body.favouriteTeam = local.favouriteTeam;
+        return fetch(api('/participants/' + id + '/profile'), { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+          .then(parseJson).then(function (j) { return j; })
+          .catch(function (e) { toastError(e, 'Could not save profile'); });
+      }
+      return Promise.resolve({ ok: true });
+    },
+    // Store a cropped/resized data URL as the avatar. Keeps it locally for an
+    // instant preview, then persists to Postgres in LIVE mode.
+    uploadAvatar: function (id, dataUrl) {
+      if (!id || !dataUrl) return Promise.resolve({ ok: false });
+      var prev = (localProfile(id) || {}).avatarVersion || 0;
+      setLocalProfile(id, { avatarDataUrl: dataUrl, avatarVersion: prev + 1 });
+      rebuild(); emit();
+      if (LIVE && leagueCode()) {
+        return fetch(api('/participants/' + id + '/avatar'), { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ dataUrl: dataUrl }) })
+          .then(parseJson)
+          .then(function (j) {
+            // Adopt the server's version so the cached URL lines up on refresh.
+            if (j && j.avatarVersion != null) setLocalProfile(id, { avatarVersion: j.avatarVersion });
+            return j;
+          })
+          .catch(function (e) { toastError(e, 'Could not save photo'); });
+      }
+      return Promise.resolve({ ok: true });
+    },
+    removeAvatar: function (id) {
+      if (!id) return Promise.resolve({ ok: false });
+      var all = localProfiles();
+      if (all[id]) { delete all[id].avatarDataUrl; lsSet(K.profiles, all); }
+      setLocalProfile(id, { avatarVersion: 0 });
+      rebuild(); emit();
+      if (LIVE && leagueCode()) {
+        return fetch(api('/participants/' + id + '/avatar'), { method: 'DELETE', headers: { 'Content-Type': 'application/json' } })
+          .then(parseJson).catch(function (e) { toastError(e, 'Could not remove photo'); });
+      }
+      return Promise.resolve({ ok: true });
     },
 
     refresh: function () {

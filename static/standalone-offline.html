@@ -33829,6 +33829,7 @@ button:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(245,200,0,.55);borde
     admin: 'wheesht_admin_v1', removed: 'wheesht_removed_v1',
     league: 'wheesht_league_v1', leagues: 'wheesht_leagues_v1',
     adminTokens: 'wheesht_admin_tokens_v1',
+    profiles: 'wheesht_profiles_v1',
   };
 
   var CHARITY_SPLIT = 0.5;
@@ -33986,6 +33987,31 @@ button:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(245,200,0,.55);borde
     if (p.alive === t.alive && p.stage === t.stage) return p;
     return Object.assign({}, p, { alive: t.alive, stage: t.stage });
   }
+  // ---- profiles (display name, favourite team, avatar) --------------------
+  // Device-local cache keyed by participant id. In MOCK mode it is the only
+  // source; in LIVE mode it overlays the server fields so an upload/edit shows
+  // instantly (the avatarDataUrl gives an immediate preview before the byte
+  // round-trip). Server values still flow in via the people payload.
+  function localProfiles() { return lsGet(K.profiles, {}); }
+  function localProfile(id) { var all = localProfiles(); return (id && all[id]) || null; }
+  function setLocalProfile(id, patch) {
+    if (!id) return;
+    var all = localProfiles();
+    all[id] = Object.assign({}, all[id] || {}, patch);
+    lsSet(K.profiles, all);
+  }
+
+  function overlayProfile(p) {
+    var lp = localProfile(p.id);
+    if (!lp) return p;
+    var out = Object.assign({}, p);
+    if (lp.displayName != null) out.displayName = lp.displayName;
+    if (lp.favouriteTeam != null) out.favouriteTeam = lp.favouriteTeam;
+    if (lp.avatarDataUrl) out._avatarDataUrl = lp.avatarDataUrl;
+    if (lp.avatarVersion != null) out.avatarVersion = Math.max(lp.avatarVersion, p.avatarVersion || 0);
+    return out;
+  }
+
   function rebuild() {
     var code = leagueCode();
     var seen = {};
@@ -33995,12 +34021,12 @@ button:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(245,200,0,.55);borde
     mine.forEach(function (p) {
       if (seen[p.id] || removed.indexOf(p.id) >= 0) return;
       if (code && p.leagueCode && p.leagueCode !== code) return;
-      seen[p.id] = 1; cache.push(liveStatus(p));
+      seen[p.id] = 1; cache.push(overlayProfile(liveStatus(p)));
     });
     // server/seed people are already league-scoped by the backend
     (WC.PEOPLE || []).forEach(function (p) {
       if (seen[p.id] || removed.indexOf(p.id) >= 0) return;
-      seen[p.id] = 1; cache.push(liveStatus(p));
+      seen[p.id] = 1; cache.push(overlayProfile(liveStatus(p)));
     });
   }
   rebuild();
@@ -34287,6 +34313,78 @@ button:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(245,200,0,.55);borde
         if (person) { person = Object.assign({}, person, { leagueCode: leagueCode() }); mine = mine.concat([person]); lsSet(K.mine, mine); }
       }
       emit();
+    },
+
+    // ===== PROFILES (identity layer: display name · favourite team · avatar) =====
+    // The shown name everywhere user-facing — the editable display name, falling
+    // back to the original full name the organiser always keeps.
+    shownName: function (p) {
+      if (!p) return '';
+      return ((p.displayName || '').trim()) || p.name || '';
+    },
+    favTeam: function (p) {
+      var code = p && (p.favouriteTeam || '').trim();
+      return code ? (WC.TEAMS[code] || null) : null;
+    },
+    // URL/dataURL for a person's avatar image, or null if they have none (the
+    // caller falls back to the initials badge). A fresh upload's data URL wins
+    // so the change shows instantly; otherwise the versioned server endpoint.
+    avatarUrl: function (p) {
+      if (!p) return null;
+      if (p._avatarDataUrl) return p._avatarDataUrl;
+      if (LIVE && (p.avatarVersion || 0) > 0 && leagueCode()) {
+        return api('/participants/' + encodeURIComponent(p.id) + '/avatar') + '?v=' + p.avatarVersion;
+      }
+      return null;
+    },
+    // Save display name / favourite team. Patch may include either field.
+    saveProfile: function (id, patch) {
+      patch = patch || {};
+      var local = {};
+      if (patch.displayName != null) local.displayName = String(patch.displayName).slice(0, 40);
+      if (patch.favouriteTeam != null) local.favouriteTeam = (patch.favouriteTeam || '').toUpperCase();
+      setLocalProfile(id, local);
+      rebuild(); emit();
+      if (LIVE && leagueCode()) {
+        var body = {};
+        if (patch.displayName != null) body.displayName = local.displayName;
+        if (patch.favouriteTeam != null) body.favouriteTeam = local.favouriteTeam;
+        return fetch(api('/participants/' + id + '/profile'), { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+          .then(parseJson).then(function (j) { return j; })
+          .catch(function (e) { toastError(e, 'Could not save profile'); });
+      }
+      return Promise.resolve({ ok: true });
+    },
+    // Store a cropped/resized data URL as the avatar. Keeps it locally for an
+    // instant preview, then persists to Postgres in LIVE mode.
+    uploadAvatar: function (id, dataUrl) {
+      if (!id || !dataUrl) return Promise.resolve({ ok: false });
+      var prev = (localProfile(id) || {}).avatarVersion || 0;
+      setLocalProfile(id, { avatarDataUrl: dataUrl, avatarVersion: prev + 1 });
+      rebuild(); emit();
+      if (LIVE && leagueCode()) {
+        return fetch(api('/participants/' + id + '/avatar'), { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ dataUrl: dataUrl }) })
+          .then(parseJson)
+          .then(function (j) {
+            // Adopt the server's version so the cached URL lines up on refresh.
+            if (j && j.avatarVersion != null) setLocalProfile(id, { avatarVersion: j.avatarVersion });
+            return j;
+          })
+          .catch(function (e) { toastError(e, 'Could not save photo'); });
+      }
+      return Promise.resolve({ ok: true });
+    },
+    removeAvatar: function (id) {
+      if (!id) return Promise.resolve({ ok: false });
+      var all = localProfiles();
+      if (all[id]) { delete all[id].avatarDataUrl; lsSet(K.profiles, all); }
+      setLocalProfile(id, { avatarVersion: 0 });
+      rebuild(); emit();
+      if (LIVE && leagueCode()) {
+        return fetch(api('/participants/' + id + '/avatar'), { method: 'DELETE', headers: { 'Content-Type': 'application/json' } })
+          .then(parseJson).catch(function (e) { toastError(e, 'Could not remove photo'); });
+      }
+      return Promise.resolve({ ok: true });
     },
 
     refresh: function () {
@@ -35335,10 +35433,40 @@ function Flag(props) {
   }, t.flag);
 }
 
-/* ---- Avatar (initials) --------------------------------------------------- */
+/* ---- Avatar (photo with initials fallback) ------------------------------- */
 function Avatar(props) {
-  const p = props.person;
+  const p = props.person || {};
   const sz = props.size || 36;
+  const url = !p.isYou && window.Store && window.Store.avatarUrl ? window.Store.avatarUrl(p) : null;
+  const [broken, setBroken] = useState(false);
+  useEffect(function () {
+    setBroken(false);
+  }, [url]);
+  if (url && !broken) {
+    return /*#__PURE__*/React.createElement("span", {
+      className: "wc-avatar",
+      style: {
+        width: sz,
+        height: sz,
+        padding: 0,
+        overflow: 'hidden',
+        background: p.color,
+        opacity: props.dim ? 0.4 : 1
+      }
+    }, /*#__PURE__*/React.createElement("img", {
+      src: url,
+      alt: "",
+      onError: function () {
+        setBroken(true);
+      },
+      style: {
+        width: '100%',
+        height: '100%',
+        objectFit: 'cover',
+        display: 'block'
+      }
+    }));
+  }
   return /*#__PURE__*/React.createElement("span", {
     className: "wc-avatar",
     style: {
@@ -35357,6 +35485,95 @@ function Chip(props) {
     className: 'wc-chip' + (props.tone ? ' wc-chip--' + props.tone : ''),
     style: props.style
   }, props.children);
+}
+
+/* ---- Achievement badges (computed client-side, no new DB) ---------------- */
+function badgesFor(p) {
+  const S = window.Store,
+    WC = window.WC;
+  const out = [];
+  if (!p || !S) return out;
+  if (p.isOrganiser) out.push({
+    icon: '🛡️',
+    label: 'Organiser'
+  });
+  const total = S.visiblePredictions ? S.visiblePredictions().length : 0;
+  const made = S.madeVisiblePredictions ? S.madeVisiblePredictions(p) : 0;
+  if (total && made >= total) out.push({
+    icon: '🎯',
+    label: 'Full card',
+    tone: 'green'
+  });
+  const score = S.predScoreOf ? S.predScoreOf(p) : 0;
+  if (score > 0) out.push({
+    icon: '✅',
+    label: score + ' pts',
+    tone: 'green'
+  });
+  let rank = 0;
+  if (S.rankedByPred) {
+    const r = S.rankedByPred().find(function (x) {
+      return x.id === p.id;
+    });
+    rank = r ? r.predRank : 0;
+  }
+  if (rank === 1) out.push({
+    icon: '🥇',
+    label: 'Top of the league',
+    tone: 'yellow'
+  });else if (rank === 2) out.push({
+    icon: '🥈',
+    label: '2nd overall',
+    tone: 'yellow'
+  });else if (rank === 3) out.push({
+    icon: '🥉',
+    label: '3rd overall',
+    tone: 'yellow'
+  });
+  const t = WC.TEAMS[p.team];
+  if (t) out.push(t.alive ? {
+    icon: '🟢',
+    label: 'Team still in',
+    tone: 'green'
+  } : {
+    icon: '💀',
+    label: 'Knocked out',
+    tone: 'red'
+  });
+  const fav = S.favTeam ? S.favTeam(p) : null;
+  if (fav) out.push({
+    icon: fav.flag,
+    label: fav.name + ' fan',
+    tone: 'ghost'
+  });
+  return out;
+}
+function Badges(props) {
+  const list = badgesFor(props.person);
+  if (!list.length) return null;
+  const shown = props.max ? list.slice(0, props.max) : list;
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      flexWrap: 'wrap',
+      gap: 6
+    }
+  }, shown.map(function (b, i) {
+    return /*#__PURE__*/React.createElement("span", {
+      key: i,
+      className: 'wc-chip' + (b.tone ? ' wc-chip--' + b.tone : ''),
+      style: {
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 4
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 13,
+        lineHeight: 1
+      }
+    }, b.icon), b.label);
+  }));
 }
 
 /* ---- Stamp (ELIMINATED / QUALIFIED) -------------------------------------- */
@@ -35668,7 +35885,8 @@ Object.assign(window, {
   WheeshtSays: WheeshtSays,
   SectionHead: SectionHead,
   ToastLayer: ToastLayer,
-  ConfettiLayer: ConfettiLayer
+  ConfettiLayer: ConfettiLayer,
+  Badges: Badges
 });
 </script>
 
@@ -39462,6 +39680,39 @@ function stageName(t) {
   if (t.stage === 'out-r32') return 'Out · Round of 32';
   return 'Out · Group stage';
 }
+
+// Read a chosen image file, square-crop (cover) and shrink it to a small JPEG
+// data URL on the device, so only ~tens of KB ever travel to Postgres.
+function resizeToDataUrl(file, size, cb) {
+  const s = size || 256;
+  const reader = new FileReader();
+  reader.onload = function (e) {
+    const img = new Image();
+    img.onload = function () {
+      const canvas = document.createElement('canvas');
+      canvas.width = s;
+      canvas.height = s;
+      const ctx = canvas.getContext('2d');
+      const scale = Math.max(s / img.width, s / img.height);
+      const w = img.width * scale,
+        h = img.height * scale;
+      ctx.drawImage(img, (s - w) / 2, (s - h) / 2, w, h);
+      try {
+        cb(canvas.toDataURL('image/jpeg', 0.82));
+      } catch (err) {
+        cb(null);
+      }
+    };
+    img.onerror = function () {
+      cb(null);
+    };
+    img.src = e.target.result;
+  };
+  reader.onerror = function () {
+    cb(null);
+  };
+  reader.readAsDataURL(file);
+}
 function dashTeam(code) {
   return WCd.TEAMS[code] || {
     code: code || '?',
@@ -39500,10 +39751,11 @@ function overallRank(me) {
 }
 function ProfileHeader(props) {
   const me = props.me;
-  const t = dashTeam(me.team);
   const includeDept = Sd.includeDepartment ? Sd.includeDepartment() : true;
   const includeLocation = Sd.includeLocation ? Sd.includeLocation() : true;
   const includeLtMember = Sd.includeLtMember ? Sd.includeLtMember() : true;
+  const fav = Sd.favTeam ? Sd.favTeam(me) : null;
+  const shown = Sd.shownName ? Sd.shownName(me) : me.name;
   const chips = [includeLocation && me.location && me.location, includeDept && me.department, includeLtMember && me.ltMember && 'LT'].filter(Boolean);
   return /*#__PURE__*/React.createElement(Cd, {
     bordered: true,
@@ -39514,23 +39766,65 @@ function ProfileHeader(props) {
       alignItems: 'center',
       gap: 13
     }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: props.onEdit,
+    style: {
+      position: 'relative',
+      border: 'none',
+      background: 'none',
+      padding: 0,
+      cursor: 'pointer',
+      borderRadius: '50%',
+      flex: '0 0 auto'
+    }
   }, /*#__PURE__*/React.createElement(Ad, {
     person: Object.assign({}, me, {
       isYou: false
     }),
     size: 56
-  }), /*#__PURE__*/React.createElement("div", {
+  }), /*#__PURE__*/React.createElement("span", {
+    style: {
+      position: 'absolute',
+      right: -2,
+      bottom: -2,
+      width: 22,
+      height: 22,
+      borderRadius: '50%',
+      background: 'var(--ink)',
+      color: '#fff',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      border: '2px solid var(--bg)',
+      fontSize: 11
+    }
+  }, "\u270E")), /*#__PURE__*/React.createElement("div", {
     style: {
       flex: 1,
       minWidth: 0
     }
   }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: 7
+    }
+  }, /*#__PURE__*/React.createElement("div", {
     className: "dh",
     style: {
       fontSize: 24,
-      lineHeight: 1
+      lineHeight: 1,
+      whiteSpace: 'nowrap',
+      overflow: 'hidden',
+      textOverflow: 'ellipsis'
     }
-  }, me.name), chips.length > 0 && /*#__PURE__*/React.createElement("div", {
+  }, shown), fav && /*#__PURE__*/React.createElement("span", {
+    title: 'Supports ' + fav.name,
+    style: {
+      fontSize: 20,
+      flex: '0 0 auto'
+    }
+  }, fav.flag)), chips.length > 0 && /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
       gap: 6,
@@ -39545,23 +39839,36 @@ function ProfileHeader(props) {
     className: "wc-btn wc-btn--sm",
     style: {
       padding: '8px 12px',
-      boxShadow: '0 4px 0 var(--shadow)'
+      boxShadow: '0 4px 0 var(--shadow)',
+      flex: '0 0 auto'
     }
-  }, "Edit")));
+  }, "Edit")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 12
+    }
+  }, /*#__PURE__*/React.createElement(window.Badges, {
+    person: me,
+    max: 4
+  })));
 }
 function EditProfile(props) {
   const me = props.me;
-  const [name, setName] = dState(me.name);
+  const [dispName, setDispName] = dState(me.displayName || '');
+  const [fav, setFav] = dState(me.favouriteTeam || '');
   const [dept, setDept] = dState(me.department || '');
   const [lt, setLt] = dState(!!me.ltMember);
+  const [busy, setBusy] = dState(false);
+  const fileRef = React.useRef(null);
   const includeDept = Sd.includeDepartment ? Sd.includeDepartment() : true;
   const includeLocation = Sd.includeLocation ? Sd.includeLocation() : true;
   const includeLtMember = Sd.includeLtMember ? Sd.includeLtMember() : true;
   const locationOpts = Sd.locations ? Sd.locations() : ['Edinburgh', 'London'];
   const locationsFreeText = Sd.locationsFreeText ? Sd.locationsFreeText() : false;
   const [loc, setLoc] = dState(me.location || locationOpts[0] || 'Edinburgh');
+  const hasPhoto = !!(Sd.avatarUrl && Sd.avatarUrl(me));
   const fld = {
     width: '100%',
+    boxSizing: 'border-box',
     border: '2.5px solid var(--ink)',
     borderRadius: 12,
     padding: '11px 13px',
@@ -39570,6 +39877,11 @@ function EditProfile(props) {
     fontSize: 15,
     marginTop: 6,
     outline: 'none'
+  };
+  const lbl = {
+    fontWeight: 800,
+    fontSize: 13,
+    fontFamily: 'var(--disp)'
   };
   function seg(val, set, opts) {
     return /*#__PURE__*/React.createElement("div", {
@@ -39589,6 +39901,22 @@ function EditProfile(props) {
       }
     }, o.label)));
   }
+  function onFile(e) {
+    const f = e.target.files && e.target.files[0];
+    e.target.value = '';
+    if (!f) return;
+    setBusy(true);
+    resizeToDataUrl(f, 256, function (durl) {
+      if (durl) {
+        Sd.uploadAvatar(me.id, durl);
+        if (window.wcHaptic) window.wcHaptic('success');
+      } else if (window.wcToast) {
+        window.wcToast("That image wouldn't load. Try another.", 'crying');
+      }
+      setBusy(false);
+    });
+  }
+  const teamOpts = (WCd.TEAM_LIST || []).slice().sort((a, b) => a.name.localeCompare(b.name));
   return /*#__PURE__*/React.createElement("div", {
     style: {
       position: 'absolute',
@@ -39612,7 +39940,9 @@ function EditProfile(props) {
       background: 'var(--bg)',
       borderRadius: '26px 26px 0 0',
       padding: '18px 18px 26px',
-      boxShadow: '0 -20px 50px rgba(0,0,0,.3)'
+      boxShadow: '0 -20px 50px rgba(0,0,0,.3)',
+      maxHeight: '88vh',
+      overflowY: 'auto'
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
@@ -39628,39 +39958,99 @@ function EditProfile(props) {
       fontSize: 22,
       marginBottom: 14
     }
-  }, "Edit your details"), /*#__PURE__*/React.createElement("div", {
+  }, "Edit your profile"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: 14,
+      marginBottom: 16
+    }
+  }, /*#__PURE__*/React.createElement(Ad, {
+    person: Object.assign({}, me, {
+      isYou: false
+    }),
+    size: 64
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1,
+      minWidth: 0
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    ref: fileRef,
+    type: "file",
+    accept: "image/*",
+    onChange: onFile,
+    style: {
+      display: 'none'
+    }
+  }), /*#__PURE__*/React.createElement("button", {
+    onClick: () => fileRef.current && fileRef.current.click(),
+    disabled: busy,
+    className: "wc-btn wc-btn--sm",
+    style: {
+      boxShadow: '0 4px 0 var(--shadow)',
+      opacity: busy ? 0.5 : 1
+    }
+  }, busy ? 'Working…' : hasPhoto ? 'Change photo' : 'Upload photo'), hasPhoto && /*#__PURE__*/React.createElement("button", {
+    onClick: () => Sd.removeAvatar(me.id),
+    style: {
+      marginLeft: 9,
+      border: 'none',
+      background: 'none',
+      cursor: 'pointer',
+      fontSize: 12.5,
+      fontWeight: 800,
+      color: 'var(--ink2)'
+    }
+  }, "Remove"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      fontWeight: 600,
+      color: 'var(--ink2)',
+      marginTop: 6,
+      lineHeight: 1.35
+    }
+  }, "Square works best. No photo? Your initials stay."))), /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
       flexDirection: 'column',
       gap: 13
     }
   }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
-    style: {
-      fontWeight: 800,
-      fontSize: 13,
-      fontFamily: 'var(--disp)'
-    }
-  }, "Full name"), /*#__PURE__*/React.createElement("input", {
+    style: lbl
+  }, "Display name"), /*#__PURE__*/React.createElement("input", {
     style: fld,
-    value: name,
-    onChange: e => setName(e.target.value)
-  })), includeDept && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+    value: dispName,
+    onChange: e => setDispName(e.target.value),
+    placeholder: me.name,
+    maxLength: 40
+  }), /*#__PURE__*/React.createElement("div", {
     style: {
-      fontWeight: 800,
-      fontSize: 13,
-      fontFamily: 'var(--disp)'
+      fontSize: 11,
+      fontWeight: 600,
+      color: 'var(--ink2)',
+      marginTop: 5
     }
+  }, "Shown to everyone. The organiser still sees your full name: ", /*#__PURE__*/React.createElement("b", null, me.name), ".")), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+    style: lbl
+  }, "Favourite team"), /*#__PURE__*/React.createElement("select", {
+    style: fld,
+    value: fav,
+    onChange: e => setFav(e.target.value)
+  }, /*#__PURE__*/React.createElement("option", {
+    value: ""
+  }, "\u2014 none \u2014"), teamOpts.map(t => /*#__PURE__*/React.createElement("option", {
+    key: t.code,
+    value: t.code
+  }, t.flag + ' ' + t.name)))), includeDept && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+    style: lbl
   }, "Team / department"), /*#__PURE__*/React.createElement("input", {
     style: fld,
     value: dept,
     onChange: e => setDept(e.target.value),
     placeholder: "optional"
   })), includeLocation && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
-    style: {
-      fontWeight: 800,
-      fontSize: 13,
-      fontFamily: 'var(--disp)'
-    }
+    style: lbl
   }, "Location"), locationsFreeText ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("input", {
     style: fld,
     value: loc,
@@ -39683,11 +40073,7 @@ function EditProfile(props) {
     key: l,
     value: l
   }, l)))), includeLtMember && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
-    style: {
-      fontWeight: 800,
-      fontSize: 13,
-      fontFamily: 'var(--disp)'
-    }
+    style: lbl
   }, "Leadership Team?"), seg(lt, setLt, [{
     value: false,
     label: 'No'
@@ -39702,8 +40088,13 @@ function EditProfile(props) {
     variant: "ink",
     block: true,
     onClick: () => {
+      Sd.saveProfile(me.id, {
+        displayName: dispName.trim(),
+        favouriteTeam: fav
+      });
+      // Keep the base name untouched (organiser's record); only details change.
       Sd.update(me.id, {
-        name: name.trim() || me.name,
+        name: me.name,
         department: includeDept ? dept.trim() : me.department,
         location: includeLocation ? loc : me.location,
         city: includeLocation ? loc : me.city,
@@ -40232,7 +40623,7 @@ function MeScreen(props) {
     }
   }), /*#__PURE__*/React.createElement(Saysd, {
     mood: greetMood,
-    label: 'hey ' + me.name.split(' ')[0],
+    label: 'hey ' + (Sd.shownName ? Sd.shownName(me) : me.name).split(' ')[0],
     animate: true
   }, pre ? /*#__PURE__*/React.createElement(React.Fragment, null, "You've drawn ", t.name, ". No games yet \u2014 get your predictions in while the slate's clean.") : t.alive ? /*#__PURE__*/React.createElement(React.Fragment, null, t.name, " are still standing. Keep your predictions sharp \u2014 the pot's in play.") : /*#__PURE__*/React.createElement(React.Fragment, null, "Your team is out, but the predictions league is still live. Wheesht isn't done with you yet.")), /*#__PURE__*/React.createElement(SHd, null, "Your team"), /*#__PURE__*/React.createElement(TeamCard, {
     me: me,
@@ -40395,8 +40786,9 @@ function ownerLabel(owners, code, meId) {
   };
   const mine = list.some(p => p.id === meId);
   const primary = mine ? list.find(p => p.id === meId) : list[0];
+  const nm = Sc && Sc.shownName ? Sc.shownName(primary) : primary.name;
   return {
-    name: primary.name,
+    name: nm,
     mine: mine,
     extra: list.length - 1,
     person: primary
@@ -41604,7 +41996,7 @@ function LbRow(props) {
       overflow: 'hidden',
       textOverflow: 'ellipsis'
     }
-  }, p.name, isMe && ' (you)'), /*#__PURE__*/React.createElement("div", {
+  }, Sp.shownName ? Sp.shownName(p) : p.name, isMe && ' (you)'), /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 11,
       fontWeight: 700,
@@ -46573,7 +46965,7 @@ function AccountSheet(props) {
       style: {
         fontSize: 16
       }
-    }, p.name, on && ' ·', " ", on && /*#__PURE__*/React.createElement("span", {
+    }, A_S.shownName ? A_S.shownName(p) : p.name, on && ' ·', " ", on && /*#__PURE__*/React.createElement("span", {
       style: {
         fontSize: 11,
         color: 'var(--ink2)'

@@ -13,6 +13,8 @@ for it persist to the database like any other league.
 """
 
 import asyncio
+import base64
+import binascii
 import hashlib
 import hmac
 import json
@@ -28,15 +30,15 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from fastapi import FastAPI, Header, HTTPException
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse, Response
 from pydantic import BaseModel
-from sqlalchemy import func, select
+from sqlalchemy import func, select, text
 from sqlalchemy.exc import IntegrityError
 
 import standings
 import sync
 from db import AsyncSessionLocal, engine
-from models import AdminOverride, Base, ChatMessage, League, Participant
+from models import AdminOverride, Base, ChatMessage, League, Participant, Profile, ProfileAsset
 from wc_data import _initials, generate_wc_data, get_admin_pin, get_league_seed
 
 log = logging.getLogger(__name__)
@@ -45,6 +47,15 @@ log = logging.getLogger(__name__)
 _wc_data = generate_wc_data()
 _ROSTER: List[Dict[str, Any]] = _wc_data["people"]  # seeded league base roster
 _CONFIG_LEAGUE_CODE: str = _wc_data["league"]["code"]
+# Valid team codes a member may pick as their FAVOURITE team (distinct from the
+# team they were drawn). Used to validate profile writes.
+_TEAM_CODES: set = {t["code"] for t in _wc_data.get("teams", [])}
+
+# Avatar bytes are resized/cropped on the client to a small square before upload;
+# this ceiling is a generous backstop against an oversized or hand-crafted body.
+_MAX_AVATAR_BYTES = 600 * 1024
+_ALLOWED_AVATAR_TYPES = {"image/jpeg", "image/png", "image/webp"}
+_MAX_DISPLAY_NAME = 40
 
 _HTML_TEMPLATE = Path("templates/index.html").read_text(encoding="utf-8")
 
@@ -196,9 +207,18 @@ def _participant_to_dict(p: Participant, league_code: str) -> Dict[str, Any]:
     }
 
 
-def _league_people(league: League, rows: List[Participant]) -> List[Dict[str, Any]]:
+def _league_people(
+    league: League,
+    rows: List[Participant],
+    profiles: Optional[Dict[str, Profile]] = None,
+) -> List[Dict[str, Any]]:
     """Seeded base roster (config) overlaid with DB rows (which win on id);
     tombstoned rows hide the matching base entry. Non-seeded leagues are DB-only.
+
+    Profile data (display name, favourite team, avatar version) is additive and
+    overlaid on top of BOTH config base entries and DB rows. The base `name` is
+    never touched — `displayName` is a separate field so the organiser always
+    keeps the original full name.
     """
     by_id: Dict[str, Dict[str, Any]] = {}
     if league.seeded and league.code == _CONFIG_LEAGUE_CODE:
@@ -209,7 +229,32 @@ def _league_people(league: League, rows: List[Participant]) -> List[Dict[str, An
             by_id.pop(r.id, None)
             continue
         by_id[r.id] = _participant_to_dict(r, league.code)
+
+    profiles = profiles or {}
+    for pid, d in by_id.items():
+        prof = profiles.get(pid)
+        d["displayName"] = (getattr(prof, "display_name", "") or "") if prof else ""
+        d["favouriteTeam"] = (getattr(prof, "favourite_team", "") or "") if prof else ""
+        d["avatarVersion"] = (getattr(prof, "avatar_version", 0) or 0) if prof else 0
+        d["avatarSource"] = (getattr(prof, "avatar_source", "") or "") if prof else ""
     return list(by_id.values())
+
+
+async def _profiles_for(session, league: League) -> Dict[str, Profile]:
+    res = await session.execute(select(Profile).where(Profile.league_id == league.id))
+    return {p.participant_id: p for p in res.scalars().all()}
+
+
+async def _participant_in_league(session, league: League, participant_id: str) -> bool:
+    """True when this id is a real entrant of the league: a (non-removed) DB row,
+    or a seeded base roster id for the config league. Used to gate profile writes
+    so a profile can't be attached to a stranger's id."""
+    row = await session.get(Participant, participant_id)
+    if row is not None and row.league_id == league.id and not row.removed:
+        return True
+    if league.seeded and league.code == _CONFIG_LEAGUE_CODE:
+        return any(rp["id"] == participant_id for rp in _ROSTER)
+    return False
 
 
 # ── State assembly ────────────────────────────────────────────────────────────
@@ -441,10 +486,32 @@ async def _migrate_legacy_json(session, league: League) -> None:
 
 # ── Lifespan ──────────────────────────────────────────────────────────────────
 
+async def _ensure_schema() -> None:
+    """Idempotent column adds for tables that shipped in an earlier deploy.
+
+    `create_all` only ever CREATEs missing tables — it never ALTERs an existing
+    one. The `profiles` table was deployed before `display_name` existed, so on
+    any database where that table already exists the column would be missing.
+    `ADD COLUMN IF NOT EXISTS` is a no-op when create_all already made the table
+    fresh (with the column) and a clean add when it pre-existed without it.
+    """
+    statements = [
+        "ALTER TABLE profiles ADD COLUMN IF NOT EXISTS display_name VARCHAR NOT NULL DEFAULT ''",
+    ]
+    async with engine.begin() as conn:
+        for stmt in statements:
+            await conn.execute(text(stmt))
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+
+    try:
+        await _ensure_schema()
+    except Exception as exc:  # never let a migration crash boot
+        log.error("Schema ensure failed: %s", exc)
 
     try:
         await _seed_and_migrate()
@@ -563,7 +630,8 @@ async def league_state(code: str):
             raise HTTPException(status_code=404, detail="league not found")
         rows = await _participant_rows(session, league)
         admin = await _get_admin_data(session, league)
-    return _league_state(league, _league_people(league, rows), admin)
+        profiles = await _profiles_for(session, league)
+    return _league_state(league, _league_people(league, rows, profiles), admin)
 
 
 # ── Participants (league-scoped) ──────────────────────────────────────────────
@@ -721,6 +789,170 @@ async def set_pick(code: str, participant_id: str, payload: PickPayload):
         return {"ok": True, "picks": picks}
 
 
+# ── Profiles & avatars (league-scoped) ────────────────────────────────────────
+# Identity layer: an editable display name, a favourite team, and an avatar image
+# stored in Postgres. All keyed by participant id, additive to the existing
+# entrant — the base `name` is never overwritten (organiser keeps the original).
+# Writes are open (no admin token) to match the existing trust model where
+# anyone on the device can edit entrant details; hard moderation lives in the
+# organiser tools.
+
+class ProfilePayload(BaseModel):
+    displayName: Optional[str] = None
+    favouriteTeam: Optional[str] = None
+
+
+def _profile_to_dict(prof: Optional[Profile]) -> Dict[str, Any]:
+    return {
+        "displayName": (getattr(prof, "display_name", "") or "") if prof else "",
+        "favouriteTeam": (getattr(prof, "favourite_team", "") or "") if prof else "",
+        "avatarSource": (getattr(prof, "avatar_source", "") or "") if prof else "",
+        "avatarVersion": (getattr(prof, "avatar_version", 0) or 0) if prof else 0,
+    }
+
+
+@app.get("/api/leagues/{code}/participants/{participant_id}/profile")
+async def get_profile(code: str, participant_id: str):
+    async with AsyncSessionLocal() as session:
+        league = await _get_league_by_code(session, code.upper())
+        if league is None:
+            raise HTTPException(status_code=404, detail="league not found")
+        prof = await session.get(Profile, participant_id)
+        if prof is not None and prof.league_id != league.id:
+            prof = None
+        return _profile_to_dict(prof)
+
+
+@app.put("/api/leagues/{code}/participants/{participant_id}/profile")
+async def put_profile(code: str, participant_id: str, payload: ProfilePayload):
+    async with AsyncSessionLocal() as session:
+        league = await _get_league_by_code(session, code.upper())
+        if league is None:
+            raise HTTPException(status_code=404, detail="league not found")
+        if not await _participant_in_league(session, league, participant_id):
+            raise HTTPException(status_code=404, detail="participant not found")
+
+        fav = payload.favouriteTeam
+        if fav is not None:
+            fav = (fav or "").strip().upper()
+            if fav and fav not in _TEAM_CODES:
+                raise HTTPException(status_code=400, detail="unknown team")
+
+        prof = await session.get(Profile, participant_id)
+        if prof is None:
+            prof = Profile(
+                participant_id=participant_id, league_id=league.id,
+                display_name="", favourite_team="", avatar_source="",
+                avatar_version=0, updated_at=_now(),
+            )
+            session.add(prof)
+        if payload.displayName is not None:
+            prof.display_name = (payload.displayName or "").strip()[:_MAX_DISPLAY_NAME]
+        if fav is not None:
+            prof.favourite_team = fav
+        prof.updated_at = _now()
+        await session.commit()
+        return {"ok": True, "profile": _profile_to_dict(prof)}
+
+
+class AvatarPayload(BaseModel):
+    # A data URL: "data:image/jpeg;base64,…". The client crops/resizes first.
+    dataUrl: str
+
+
+def _decode_data_url(data_url: str) -> tuple[str, bytes]:
+    m = re.match(r"data:([\w/+.\-]+);base64,(.*)$", data_url or "", re.DOTALL)
+    if not m:
+        raise HTTPException(status_code=400, detail="expected a base64 image data URL")
+    ctype = m.group(1).lower()
+    if ctype not in _ALLOWED_AVATAR_TYPES:
+        raise HTTPException(status_code=400, detail="unsupported image type")
+    try:
+        raw = base64.b64decode(m.group(2), validate=True)
+    except (binascii.Error, ValueError):
+        raise HTTPException(status_code=400, detail="invalid base64 image")
+    if not raw:
+        raise HTTPException(status_code=400, detail="empty image")
+    if len(raw) > _MAX_AVATAR_BYTES:
+        raise HTTPException(status_code=413, detail="image too large")
+    return ctype, raw
+
+
+@app.put("/api/leagues/{code}/participants/{participant_id}/avatar")
+async def put_avatar(code: str, participant_id: str, payload: AvatarPayload):
+    ctype, raw = _decode_data_url(payload.dataUrl)
+    async with AsyncSessionLocal() as session:
+        league = await _get_league_by_code(session, code.upper())
+        if league is None:
+            raise HTTPException(status_code=404, detail="league not found")
+        if not await _participant_in_league(session, league, participant_id):
+            raise HTTPException(status_code=404, detail="participant not found")
+
+        asset = await session.get(ProfileAsset, participant_id)
+        if asset is None:
+            asset = ProfileAsset(
+                participant_id=participant_id, league_id=league.id,
+                content_type=ctype, data=raw, updated_at=_now(),
+            )
+            session.add(asset)
+        else:
+            asset.league_id = league.id
+            asset.content_type = ctype
+            asset.data = raw
+            asset.updated_at = _now()
+
+        prof = await session.get(Profile, participant_id)
+        if prof is None:
+            prof = Profile(
+                participant_id=participant_id, league_id=league.id,
+                display_name="", favourite_team="", avatar_source="upload",
+                avatar_version=1, updated_at=_now(),
+            )
+            session.add(prof)
+        else:
+            prof.avatar_source = "upload"
+            prof.avatar_version = (prof.avatar_version or 0) + 1
+            prof.updated_at = _now()
+        await session.commit()
+        return {"ok": True, "avatarVersion": prof.avatar_version}
+
+
+@app.get("/api/leagues/{code}/participants/{participant_id}/avatar")
+async def get_avatar(code: str, participant_id: str):
+    async with AsyncSessionLocal() as session:
+        league = await _get_league_by_code(session, code.upper())
+        if league is None:
+            raise HTTPException(status_code=404, detail="league not found")
+        asset = await session.get(ProfileAsset, participant_id)
+        if asset is None or asset.league_id != league.id:
+            raise HTTPException(status_code=404, detail="no avatar")
+        # The URL carries a ?v={version} cache-buster, so the bytes for a given
+        # URL never change — safe to cache hard.
+        return Response(
+            content=asset.data,
+            media_type=asset.content_type or "image/jpeg",
+            headers={"Cache-Control": "public, max-age=86400"},
+        )
+
+
+@app.delete("/api/leagues/{code}/participants/{participant_id}/avatar")
+async def delete_avatar(code: str, participant_id: str):
+    async with AsyncSessionLocal() as session:
+        league = await _get_league_by_code(session, code.upper())
+        if league is None:
+            raise HTTPException(status_code=404, detail="league not found")
+        asset = await session.get(ProfileAsset, participant_id)
+        if asset is not None and asset.league_id == league.id:
+            await session.delete(asset)
+        prof = await session.get(Profile, participant_id)
+        if prof is not None and prof.league_id == league.id:
+            prof.avatar_source = ""
+            prof.avatar_version = (prof.avatar_version or 0) + 1
+            prof.updated_at = _now()
+        await session.commit()
+        return {"ok": True}
+
+
 # ── Admin overrides (league-scoped) ───────────────────────────────────────────
 
 class AdminPayload(BaseModel):
@@ -791,13 +1023,16 @@ async def post_chat(code: str, payload: ChatPayload):
         if league is None:
             raise HTTPException(status_code=404, detail="league not found")
         rows = await _participant_rows(session, league)
-        people = _league_people(league, rows)
+        profiles = await _profiles_for(session, league)
+        people = _league_people(league, rows, profiles)
         person = next((p for p in people if p["id"] == payload.author_id), None)
         if person is None:
             raise HTTPException(status_code=400, detail="unknown participant for this league")
+        # Show the member's chosen display name on the wall; fall back to base.
+        author_name = (person.get("displayName") or "").strip() or person["name"]
         msg = ChatMessage(
             id=uuid.uuid4().hex[:10], league_id=league.id, author_id=person["id"],
-            author=person["name"], initials=person.get("initials", "?"),
+            author=author_name, initials=person.get("initials", "?"),
             color=person.get("color", "#333"), team=person.get("team", ""),
             text=text, ts=int(time.time() * 1000),
         )

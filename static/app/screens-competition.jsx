@@ -67,7 +67,8 @@ function ownerLabel(owners, code, meId) {
   if (!list.length) return { name: 'Unclaimed', mine: false, extra: 0, person: null };
   const mine = list.some(p => p.id === meId);
   const primary = mine ? list.find(p => p.id === meId) : list[0];
-  return { name: primary.name, mine: mine, extra: list.length - 1, person: primary };
+  const nm = (Sc && Sc.shownName) ? Sc.shownName(primary) : primary.name;
+  return { name: nm, mine: mine, extra: list.length - 1, person: primary };
 }
 
 /* ---- qualification read (honest, non-speculative) ----------------------- */

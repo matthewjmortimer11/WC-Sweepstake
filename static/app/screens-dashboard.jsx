@@ -20,6 +20,29 @@ function stageName(t) {
   return 'Out · Group stage';
 }
 
+// Read a chosen image file, square-crop (cover) and shrink it to a small JPEG
+// data URL on the device, so only ~tens of KB ever travel to Postgres.
+function resizeToDataUrl(file, size, cb) {
+  const s = size || 256;
+  const reader = new FileReader();
+  reader.onload = function (e) {
+    const img = new Image();
+    img.onload = function () {
+      const canvas = document.createElement('canvas');
+      canvas.width = s; canvas.height = s;
+      const ctx = canvas.getContext('2d');
+      const scale = Math.max(s / img.width, s / img.height);
+      const w = img.width * scale, h = img.height * scale;
+      ctx.drawImage(img, (s - w) / 2, (s - h) / 2, w, h);
+      try { cb(canvas.toDataURL('image/jpeg', 0.82)); } catch (err) { cb(null); }
+    };
+    img.onerror = function () { cb(null); };
+    img.src = e.target.result;
+  };
+  reader.onerror = function () { cb(null); };
+  reader.readAsDataURL(file);
+}
+
 function dashTeam(code) { return WCd.TEAMS[code] || { code: code || '?', name: code || 'TBD', flag: '🏳️', rounds: 0, stage: 'group', odds: '0' }; }
 function dashPredictionResolved(m) {
   if (m.kind === 'team2') return Array.isArray(m.answer) && m.answer.length > 0 && m.answer.every(function (x) { return x != null; });
@@ -44,10 +67,12 @@ function overallRank(me) {
 }
 
 function ProfileHeader(props) {
-  const me = props.me; const t = dashTeam(me.team);
+  const me = props.me;
   const includeDept = Sd.includeDepartment ? Sd.includeDepartment() : true;
   const includeLocation = Sd.includeLocation ? Sd.includeLocation() : true;
   const includeLtMember = Sd.includeLtMember ? Sd.includeLtMember() : true;
+  const fav = Sd.favTeam ? Sd.favTeam(me) : null;
+  const shown = Sd.shownName ? Sd.shownName(me) : me.name;
   const chips = [
     includeLocation && me.location && me.location,
     includeDept && me.department,
@@ -56,14 +81,23 @@ function ProfileHeader(props) {
   return (
     <Cd bordered className="pop">
       <div style={{ display: 'flex', alignItems: 'center', gap: 13 }}>
-        <Ad person={Object.assign({}, me, { isYou: false })} size={56} />
+        <button onClick={props.onEdit} style={{ position: 'relative', border: 'none', background: 'none', padding: 0, cursor: 'pointer', borderRadius: '50%', flex: '0 0 auto' }}>
+          <Ad person={Object.assign({}, me, { isYou: false })} size={56} />
+          <span style={{ position: 'absolute', right: -2, bottom: -2, width: 22, height: 22, borderRadius: '50%', background: 'var(--ink)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid var(--bg)', fontSize: 11 }}>✎</span>
+        </button>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div className="dh" style={{ fontSize: 24, lineHeight: 1 }}>{me.name}</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+            <div className="dh" style={{ fontSize: 24, lineHeight: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{shown}</div>
+            {fav && <span title={'Supports ' + fav.name} style={{ fontSize: 20, flex: '0 0 auto' }}>{fav.flag}</span>}
+          </div>
           {chips.length > 0 && <div style={{ display: 'flex', gap: 6, marginTop: 7, flexWrap: 'wrap' }}>
             {chips.map((c, i) => <Chd key={i} tone={c === 'LT' ? 'yellow' : undefined}>{c}</Chd>)}
           </div>}
         </div>
-        <button onClick={props.onEdit} className="wc-btn wc-btn--sm" style={{ padding: '8px 12px', boxShadow: '0 4px 0 var(--shadow)' }}>Edit</button>
+        <button onClick={props.onEdit} className="wc-btn wc-btn--sm" style={{ padding: '8px 12px', boxShadow: '0 4px 0 var(--shadow)', flex: '0 0 auto' }}>Edit</button>
+      </div>
+      <div style={{ marginTop: 12 }}>
+        <window.Badges person={me} max={4} />
       </div>
     </Cd>
   );
@@ -71,31 +105,77 @@ function ProfileHeader(props) {
 
 function EditProfile(props) {
   const me = props.me;
-  const [name, setName] = dState(me.name);
+  const [dispName, setDispName] = dState(me.displayName || '');
+  const [fav, setFav] = dState(me.favouriteTeam || '');
   const [dept, setDept] = dState(me.department || '');
   const [lt, setLt] = dState(!!me.ltMember);
+  const [busy, setBusy] = dState(false);
+  const fileRef = React.useRef(null);
   const includeDept = Sd.includeDepartment ? Sd.includeDepartment() : true;
   const includeLocation = Sd.includeLocation ? Sd.includeLocation() : true;
   const includeLtMember = Sd.includeLtMember ? Sd.includeLtMember() : true;
   const locationOpts = Sd.locations ? Sd.locations() : ['Edinburgh', 'London'];
   const locationsFreeText = Sd.locationsFreeText ? Sd.locationsFreeText() : false;
   const [loc, setLoc] = dState(me.location || locationOpts[0] || 'Edinburgh');
-  const fld = { width: '100%', border: '2.5px solid var(--ink)', borderRadius: 12, padding: '11px 13px', fontFamily: 'var(--body)', fontWeight: 600, fontSize: 15, marginTop: 6, outline: 'none' };
+  const hasPhoto = !!(Sd.avatarUrl && Sd.avatarUrl(me));
+  const fld = { width: '100%', boxSizing: 'border-box', border: '2.5px solid var(--ink)', borderRadius: 12, padding: '11px 13px', fontFamily: 'var(--body)', fontWeight: 600, fontSize: 15, marginTop: 6, outline: 'none' };
+  const lbl = { fontWeight: 800, fontSize: 13, fontFamily: 'var(--disp)' };
   function seg(val, set, opts) {
     return <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>{opts.map(o =>
       <button key={String(o.value)} onClick={() => set(o.value)} className="wc-btn wc-btn--sm" style={{ flex: 1, background: val === o.value ? 'var(--yellow)' : '#fff', boxShadow: val === o.value ? '0 4px 0 var(--ink)' : '0 4px 0 var(--shadow)' }}>{o.label}</button>)}</div>;
   }
+  function onFile(e) {
+    const f = e.target.files && e.target.files[0];
+    e.target.value = '';
+    if (!f) return;
+    setBusy(true);
+    resizeToDataUrl(f, 256, function (durl) {
+      if (durl) {
+        Sd.uploadAvatar(me.id, durl);
+        if (window.wcHaptic) window.wcHaptic('success');
+      } else if (window.wcToast) {
+        window.wcToast("That image wouldn't load. Try another.", 'crying');
+      }
+      setBusy(false);
+    });
+  }
+  const teamOpts = (WCd.TEAM_LIST || []).slice().sort((a, b) => a.name.localeCompare(b.name));
   return (
     <div style={{ position: 'absolute', inset: 0, zIndex: 70, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
       <div onClick={props.onClose} style={{ position: 'absolute', inset: 0, background: 'rgba(26,26,26,.45)' }} />
-      <div className="rise" style={{ position: 'relative', background: 'var(--bg)', borderRadius: '26px 26px 0 0', padding: '18px 18px 26px', boxShadow: '0 -20px 50px rgba(0,0,0,.3)' }}>
+      <div className="rise" style={{ position: 'relative', background: 'var(--bg)', borderRadius: '26px 26px 0 0', padding: '18px 18px 26px', boxShadow: '0 -20px 50px rgba(0,0,0,.3)', maxHeight: '88vh', overflowY: 'auto' }}>
         <div style={{ width: 44, height: 5, borderRadius: 3, background: 'var(--line)', margin: '0 auto 14px' }} />
-        <div className="dh" style={{ fontSize: 22, marginBottom: 14 }}>Edit your details</div>
+        <div className="dh" style={{ fontSize: 22, marginBottom: 14 }}>Edit your profile</div>
+
+        {/* ---- avatar ---- */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 16 }}>
+          <Ad person={Object.assign({}, me, { isYou: false })} size={64} />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <input ref={fileRef} type="file" accept="image/*" onChange={onFile} style={{ display: 'none' }} />
+            <button onClick={() => fileRef.current && fileRef.current.click()} disabled={busy} className="wc-btn wc-btn--sm" style={{ boxShadow: '0 4px 0 var(--shadow)', opacity: busy ? 0.5 : 1 }}>
+              {busy ? 'Working…' : hasPhoto ? 'Change photo' : 'Upload photo'}
+            </button>
+            {hasPhoto && <button onClick={() => Sd.removeAvatar(me.id)} style={{ marginLeft: 9, border: 'none', background: 'none', cursor: 'pointer', fontSize: 12.5, fontWeight: 800, color: 'var(--ink2)' }}>Remove</button>}
+            <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--ink2)', marginTop: 6, lineHeight: 1.35 }}>Square works best. No photo? Your initials stay.</div>
+          </div>
+        </div>
+
         <div style={{ display: 'flex', flexDirection: 'column', gap: 13 }}>
-          <div><label style={{ fontWeight: 800, fontSize: 13, fontFamily: 'var(--disp)' }}>Full name</label><input style={fld} value={name} onChange={e => setName(e.target.value)} /></div>
-          {includeDept && <div><label style={{ fontWeight: 800, fontSize: 13, fontFamily: 'var(--disp)' }}>Team / department</label><input style={fld} value={dept} onChange={e => setDept(e.target.value)} placeholder="optional" /></div>}
+          <div>
+            <label style={lbl}>Display name</label>
+            <input style={fld} value={dispName} onChange={e => setDispName(e.target.value)} placeholder={me.name} maxLength={40} />
+            <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--ink2)', marginTop: 5 }}>Shown to everyone. The organiser still sees your full name: <b>{me.name}</b>.</div>
+          </div>
+          <div>
+            <label style={lbl}>Favourite team</label>
+            <select style={fld} value={fav} onChange={e => setFav(e.target.value)}>
+              <option value="">— none —</option>
+              {teamOpts.map(t => <option key={t.code} value={t.code}>{t.flag + ' ' + t.name}</option>)}
+            </select>
+          </div>
+          {includeDept && <div><label style={lbl}>Team / department</label><input style={fld} value={dept} onChange={e => setDept(e.target.value)} placeholder="optional" /></div>}
           {includeLocation && <div>
-            <label style={{ fontWeight: 800, fontSize: 13, fontFamily: 'var(--disp)' }}>Location</label>
+            <label style={lbl}>Location</label>
             {locationsFreeText
               ? <>
                   <input style={fld} value={loc} onChange={e => setLoc(e.target.value)} placeholder="Your office or location" list="wh-locs-edit" />
@@ -108,12 +188,14 @@ function EditProfile(props) {
                   </select>
             }
           </div>}
-          {includeLtMember && <div><label style={{ fontWeight: 800, fontSize: 13, fontFamily: 'var(--disp)' }}>Leadership Team?</label>{seg(lt, setLt, [{ value: false, label: 'No' }, { value: true, label: 'Yes' }])}</div>}
+          {includeLtMember && <div><label style={lbl}>Leadership Team?</label>{seg(lt, setLt, [{ value: false, label: 'No' }, { value: true, label: 'Yes' }])}</div>}
         </div>
         <div style={{ marginTop: 18 }}>
           <Bd variant="ink" block onClick={() => {
+            Sd.saveProfile(me.id, { displayName: dispName.trim(), favouriteTeam: fav });
+            // Keep the base name untouched (organiser's record); only details change.
             Sd.update(me.id, {
-              name: name.trim() || me.name,
+              name: me.name,
               department: includeDept ? dept.trim() : me.department,
               location: includeLocation ? loc : me.location,
               city: includeLocation ? loc : me.city,
@@ -303,7 +385,7 @@ function MeScreen(props) {
     <div className="pad">
       <ProfileHeader me={me} onEdit={() => setEdit(true)} />
       <div style={{ height: 12 }} />
-      <Saysd mood={greetMood} label={'hey ' + me.name.split(' ')[0]} animate>
+      <Saysd mood={greetMood} label={'hey ' + (Sd.shownName ? Sd.shownName(me) : me.name).split(' ')[0]} animate>
         {pre ? <>You've drawn {t.name}. No games yet — get your predictions in while the slate's clean.</> : (t.alive ? <>{t.name} are still standing. Keep your predictions sharp — the pot's in play.</> : <>Your team is out, but the predictions league is still live. Wheesht isn't done with you yet.</>)}
       </Saysd>
       <SHd>Your team</SHd>
