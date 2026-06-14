@@ -78,7 +78,7 @@ def _next_sleep(fixtures: list[CanonicalFixture]) -> int:
       3600 s— nothing imminent (quiet period / off-season).
     """
     now = datetime.now(tz=timezone.utc)
-    if any(f.status == "live" for f in fixtures):
+    if any(f.status in ("live", "halfTime") for f in fixtures):
         return 60
     soon = now + timedelta(minutes=20)
     if any(f.status == "upcoming" and now <= f.kickoff_utc <= soon for f in fixtures):

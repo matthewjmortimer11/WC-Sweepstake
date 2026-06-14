@@ -21,6 +21,17 @@ function stageName(t) {
 }
 
 function dashTeam(code) { return WCd.TEAMS[code] || { code: code || '?', name: code || 'TBD', flag: '🏳️', rounds: 0, stage: 'group', odds: '0' }; }
+function dashPredictionResolved(m) {
+  if (m.kind === 'team2') return Array.isArray(m.answer) && m.answer.length > 0 && m.answer.every(function (x) { return x != null; });
+  return m.answer != null;
+}
+function dashPickComplete(m, picks) {
+  const v = picks ? picks[m.key] : null;
+  if (v == null) return false;
+  if (m.kind === 'team2') return Array.isArray(v) && v.length === 2;
+  if (m.kind === 'number') return v !== '' && isFinite(Number(v));
+  return true;
+}
 
 function overallRank(me) {
   const rows = Sd.allSync().slice().sort((a, b) => {
@@ -172,8 +183,15 @@ function PredCard(props) {
   const ranked = Sd.rankedByPred(); const meR = ranked.find(p => p.id === me.id);
   const rank = meR ? meR.predRank : ranked.length;
   const submitted = Sd.madeVisiblePredictions ? Sd.madeVisiblePredictions(me) : (me.picks ? Object.keys(me.picks).length : 0);
-  const totalMkts = Sd.visiblePredictions ? Sd.visiblePredictions().length : (WCd.predictions || Sd.PREDICTIONS).length;
+  const markets = Sd.visiblePredictions ? Sd.visiblePredictions() : (WCd.predictions || Sd.PREDICTIONS);
+  const totalMkts = markets.length;
+  const openLeft = markets.filter(m => !dashPredictionResolved(m) && !dashPickComplete(m, me.picks || {})).length;
   const locked = Sd.predictionsLocked ? Sd.predictionsLocked() : !!WCd.meta.predictionsLocked;
+  const note = locked
+    ? 'Locked in. Time to pretend you were confident all along.'
+    : openLeft
+      ? openLeft + ' prediction' + (openLeft === 1 ? '' : 's') + ' left. Easy points only if you actually submit them.'
+      : 'Full card in. You may now judge everyone else professionally.';
   return (
     <Cd>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
@@ -188,8 +206,11 @@ function PredCard(props) {
           </div>
         ))}
       </div>
+      <div style={{ marginTop: 10, fontSize: 12.5, fontWeight: 700, color: 'var(--ink2)', lineHeight: 1.35 }}>
+        {note}
+      </div>
       <div style={{ marginTop: 11 }}>
-        <Bd variant="primary" block sm onClick={props.onOpen}>{submitted < totalMkts && !locked ? 'Finish your predictions →' : 'See my predictions →'}</Bd>
+        <Bd variant="primary" block sm onClick={props.onOpen}>{openLeft > 0 && !locked ? 'Finish your predictions →' : 'See my predictions →'}</Bd>
       </div>
     </Cd>
   );

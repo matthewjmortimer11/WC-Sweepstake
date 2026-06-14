@@ -14,6 +14,14 @@ function isResolved(m) {
   return m.answer != null;
 }
 
+function pickComplete(m, picks) {
+  const v = picks ? picks[m.key] : null;
+  if (v == null) return false;
+  if (m.kind === 'team2') return Array.isArray(v) && v.length === 2;
+  if (m.kind === 'number') return v !== '' && isFinite(Number(v));
+  return true;
+}
+
 function optLabel(m, opt) {
   if (m.kind === 'player') return { main: opt.name, sub: WCp.TEAMS[opt.team] ? WCp.TEAMS[opt.team].name : '', flag: WCp.TEAMS[opt.team] ? WCp.TEAMS[opt.team].flag : '', id: opt.id };
   if (m.kind === 'stage') return { main: opt, sub: '', flag: '', id: opt };
@@ -202,6 +210,9 @@ function PredictionsScreen(props) {
   const open = markets.filter(m => !isResolved(m));
   const graded = markets.filter(m => isResolved(m));
   const made = Sp.madeVisiblePredictions ? Sp.madeVisiblePredictions(me) : (me.picks ? Object.keys(me.picks).filter(k => me.picks[k] != null && (!Array.isArray(me.picks[k]) || me.picks[k].length)).length : 0);
+  const missing = open.filter(m => !pickComplete(m, me.picks || {}));
+  const allOpenMade = open.length > 0 && missing.length === 0;
+  const nextMissing = missing[0];
   const predDeadline = WCp.meta && WCp.meta.predDeadline;
   const deadlinePassed = predDeadline && new Date() > new Date(predDeadline);
   const locked = Sp.predictionsLocked ? Sp.predictionsLocked() : (!!(WCp.meta && WCp.meta.predictionsLocked) || !!deadlinePassed);
@@ -214,7 +225,9 @@ function PredictionsScreen(props) {
       <div className="appbar" style={{ padding: '2px 0 12px' }}>
         <div>
           <div className="dh" style={{ fontSize: 26 }}>Predictions</div>
-          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink2)' }}>{made} of {markets.length} made · {Sp.predScoreOf(me)} pts banked</div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink2)' }}>
+            {made} of {markets.length} made · {missing.length ? missing.length + ' still to call' : 'all open calls in'} · {Sp.predScoreOf(me)} pts banked
+          </div>
         </div>
       </div>
       {locked && <div style={{ display: 'flex', alignItems: 'center', gap: 9, background: 'var(--ink)', color: '#fff', borderRadius: 13, padding: '10px 13px', marginBottom: 12, fontSize: 13, fontWeight: 700 }}>
@@ -224,8 +237,18 @@ function PredictionsScreen(props) {
       {!locked && predDeadline && <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--ink2)', marginBottom: 10, padding: '7px 12px', background: 'rgba(245,200,0,.2)', borderRadius: 10 }}>
         Picks lock at {fmtDeadline(predDeadline)} — get yours in.
       </div>}
+      {!locked && nextMissing && <Cp flat style={{ marginBottom: 12, padding: '11px 13px', background: 'rgba(245,200,0,.22)', border: '2px solid rgba(26,26,26,.16)' }}>
+        <div style={{ fontSize: 10.5, fontWeight: 900, letterSpacing: '.07em', textTransform: 'uppercase', color: 'var(--ink2)' }}>Next call to make</div>
+        <div className="dh" style={{ fontSize: 18, marginTop: 3 }}>{nextMissing.q}</div>
+        <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--ink2)', marginTop: 3 }}>{missing.length === 1 ? 'Last one. No pressure, obviously.' : missing.length + ' picks left on the card.'}</div>
+      </Cp>}
+      {!locked && allOpenMade && <Cp flat style={{ marginBottom: 12, padding: '11px 13px', background: 'rgba(26,122,68,.10)', border: '2px solid rgba(26,122,68,.28)' }}>
+        <div style={{ fontSize: 10.5, fontWeight: 900, letterSpacing: '.07em', textTransform: 'uppercase', color: 'var(--green)' }}>All calls made</div>
+        <div className="dh" style={{ fontSize: 18, marginTop: 3 }}>Full card submitted.</div>
+        <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--ink2)', marginTop: 3 }}>You can still change picks until they lock. Wheesht has the draft in pencil.</div>
+      </Cp>}
       <Saysp mood="mischievous" label="on the record" animate>{WCp.LINES.predOpen}</Saysp>
-      <SHp aside="still open">Make your call</SHp>
+      <SHp aside={open.length ? (missing.length ? missing.length + ' left' : 'all in') : 'closed'}>{allOpenMade ? 'Review your calls' : 'Make your call'}</SHp>
       {open.map(m => <Market key={m.key} market={m} me={me} onPick={onPick} locked={locked} />)}
       {graded.length > 0 && <>
         <SHp aside="graded">Already settled</SHp>

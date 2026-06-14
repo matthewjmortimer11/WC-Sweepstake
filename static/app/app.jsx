@@ -96,14 +96,12 @@ function AppBar(props){
 }
 
 function TabBar(props){
-  const predictionsLocked = A_S.predictionsLocked && A_S.predictionsLocked();
   const tabs=[['me','You'],['games','Games'],['players','Group'],['predictions','Predict'],['chat','Chat'],['summary','Verdict']];
   return <div className="tabbar tabbar--6">
     {tabs.map(([k,lab])=>(
       <button key={k} className={props.tab===k?'on':''} onClick={()=>props.setTab(k)}>
         <span className="ic"><Icon name={k}/></span>
         {lab}
-        {k==='predictions' && props.tab!=='predictions' && !predictionsLocked && <span className="tabdot"/>}
       </button>
     ))}
   </div>;
@@ -343,4 +341,38 @@ function App(){
   </React.Fragment>;
 }
 
-ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+class AppErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { error: null };
+  }
+  static getDerivedStateFromError(error) {
+    return { error: error };
+  }
+  componentDidCatch(error, info) {
+    try { console.error('Wheesht crashed', error, info); } catch (e) {}
+  }
+  render() {
+    if (!this.state.error) return this.props.children;
+    const Wheesht = window.Wheesht;
+    return (
+      <div className="moment" style={{ background: 'var(--bg)', alignItems: 'center', justifyContent: 'center', padding: '28px 24px', textAlign: 'center' }}>
+        {Wheesht && <Wheesht mood="shocked" size={96} animate />}
+        <div className="dh" style={{ fontSize: 25, marginTop: 12 }}>Wheesht hit a snag.</div>
+        <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--ink2)', marginTop: 8, lineHeight: 1.45, maxWidth: 330 }}>
+          Your entry is still on this device. Refreshing usually gets you straight back in.
+        </div>
+        <div style={{ display: 'flex', gap: 9, width: '100%', maxWidth: 330, marginTop: 18 }}>
+          <button className="wc-btn wc-btn--ink wc-btn--block" onClick={() => window.location.reload()}>Refresh</button>
+          <button className="wc-btn wc-btn--ghost wc-btn--block" onClick={() => this.setState({ error: null })}>Try again</button>
+        </div>
+      </div>
+    );
+  }
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(
+  <AppErrorBoundary>
+    <App />
+  </AppErrorBoundary>
+);

@@ -3,8 +3,7 @@
 
    Runs only on wide screens (the phone view ignores all of this). It:
      • mounts two live React panels beside the device (pot/standings + the
-       prediction league leaderboard),
-     • wires a persisted on/off toggle for the ambient backdrop motion.
+       prediction league leaderboard).
    =========================================================================== */
 (function () {
   if (typeof window === 'undefined') return;
@@ -18,24 +17,6 @@
   if (!R || !RD) return;
 
   var h = R.createElement;
-
-  /* ---- motion toggle (persisted) ---------------------------------------- */
-  var MK = 'wheesht_motion_v1';
-  function motionOn() { try { return localStorage.getItem(MK) !== 'off'; } catch (e) { return true; } }
-  function applyMotion() { document.body.classList.toggle('motion-off', !motionOn()); }
-  applyMotion();
-
-  /* ---- toggle button ---------------------------------------------------- */
-  var btn = document.getElementById('stage-toggle');
-  if (btn) {
-    function label() { return (motionOn() ? '⚽  Animation on' : '⚽  Animation off'); }
-    btn.textContent = label();
-    btn.addEventListener('click', function () {
-      try { localStorage.setItem(MK, motionOn() ? 'off' : 'on'); } catch (e) {}
-      applyMotion();
-      btn.textContent = label();
-    });
-  }
 
   /* ---- live panels ------------------------------------------------------ */
   function money(n) { return '£' + (n || 0).toLocaleString('en-GB'); }

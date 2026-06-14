@@ -900,7 +900,45 @@ _JS_TYPES = {
     ".js": "application/javascript",
     ".jsx": "application/javascript",
     ".css": "text/css",
+    ".webmanifest": "application/manifest+json",
+    ".png": "image/png",
 }
+
+
+def _safe_static_path(base: Path, filename: str) -> Path:
+    root = base.resolve()
+    path = (base / filename).resolve()
+    if not path.is_file() or root not in path.parents:
+        raise HTTPException(status_code=404)
+    return path
+
+
+@app.get("/manifest.webmanifest")
+async def web_manifest():
+    return FileResponse(
+        _STATIC / "manifest.webmanifest",
+        media_type="application/manifest+json",
+        headers={"Cache-Control": "public, max-age=300"},
+    )
+
+
+@app.get("/sw.js")
+async def service_worker():
+    return FileResponse(
+        _STATIC / "sw.js",
+        media_type="application/javascript",
+        headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
+    )
+
+
+@app.get("/icons/{filename:path}")
+async def pwa_icon(filename: str):
+    path = _safe_static_path(_STATIC / "icons", filename)
+    return FileResponse(
+        path,
+        media_type=_JS_TYPES.get(path.suffix, "application/octet-stream"),
+        headers={"Cache-Control": "public, max-age=31536000, immutable"},
+    )
 
 
 @app.get("/tweaks-panel.jsx")
@@ -910,9 +948,7 @@ async def tweaks_panel():
 
 @app.get("/app/{filename:path}")
 async def app_static(filename: str):
-    path = _STATIC / "app" / filename
-    if not path.exists() or not path.is_file():
-        raise HTTPException(status_code=404)
+    path = _safe_static_path(_STATIC / "app", filename)
     mt = _JS_TYPES.get(path.suffix, "application/octet-stream")
     return FileResponse(path, media_type=mt)
 
