@@ -7,7 +7,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, Optional
 
-from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, Integer, String
+from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, Integer, LargeBinary, String
 from sqlalchemy.types import JSON
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -128,6 +128,50 @@ class ChatMessage(Base):
     team: Mapped[str] = mapped_column(String, nullable=False, default="")
     text: Mapped[str] = mapped_column(String, nullable=False)
     ts: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
+
+
+class Profile(Base):
+    """Light, fast-to-read profile metadata for one participant: their chosen
+    favourite team, which avatar source is in use, and an integer version bumped
+    on every avatar change (used purely for cache-busting the image URL).
+
+    The avatar *bytes* live separately in ProfileAsset so this row stays cheap to
+    list. Both are NEW tables, so they are created cleanly by
+    Base.metadata.create_all — no column migration on the existing
+    `participants` table is required (create_all never ALTERs)."""
+
+    __tablename__ = "profiles"
+
+    participant_id: Mapped[str] = mapped_column(String, primary_key=True)
+    league_id: Mapped[str] = mapped_column(
+        String, ForeignKey("leagues.id"), nullable=False, index=True
+    )
+    # Three-letter team code the entrant *supports* (distinct from the team they
+    # were drawn). Empty until they pick one.
+    favourite_team: Mapped[str] = mapped_column(String, nullable=False, default="")
+    # upload | google | generated   (generated = initials fallback, no asset row)
+    avatar_source: Mapped[str] = mapped_column(String, nullable=False, default="")
+    avatar_version: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class ProfileAsset(Base):
+    """The avatar image bytes for one participant, stored directly in Postgres.
+
+    Railway containers are ephemeral (disk is wiped on every redeploy), so the
+    database is the only durable home for these. Images are resized/cropped on
+    the client before upload, so each row is a small (~tens of KB) square — well
+    within a comfortable budget even for a few hundred entrants."""
+
+    __tablename__ = "profile_assets"
+
+    participant_id: Mapped[str] = mapped_column(String, primary_key=True)
+    league_id: Mapped[str] = mapped_column(
+        String, ForeignKey("leagues.id"), nullable=False, index=True
+    )
+    content_type: Mapped[str] = mapped_column(String, nullable=False, default="image/jpeg")
+    data: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
 
 class AdminOverride(Base):
