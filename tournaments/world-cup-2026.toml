@@ -482,6 +482,20 @@ kind = "team"
 points = 10
 options = ["ESP", "BRA", "ARG", "FRA"]
 [[markets]]
+key = "totalGoals"
+q = "How many goals will be scored?"
+kind = "number"
+points = 10
+placeholder = "Total tournament goals"
+options = []
+[[markets]]
+key = "totalCards"
+q = "How many cards will be given?"
+kind = "number"
+points = 10
+placeholder = "Total yellow + red cards"
+options = []
+[[markets]]
 key = "youngPlayer"
 q = "Best Young Player"
 kind = "player"

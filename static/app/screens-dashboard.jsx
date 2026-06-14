@@ -171,8 +171,8 @@ function PredCard(props) {
   const score = Sd.predScoreOf(me); const max = Sd.maxPredPoints();
   const ranked = Sd.rankedByPred(); const meR = ranked.find(p => p.id === me.id);
   const rank = meR ? meR.predRank : ranked.length;
-  const submitted = me.picks ? Object.keys(me.picks).length : 0;
-  const totalMkts = (WCd.predictions || Sd.PREDICTIONS).length;
+  const submitted = Sd.madeVisiblePredictions ? Sd.madeVisiblePredictions(me) : (me.picks ? Object.keys(me.picks).length : 0);
+  const totalMkts = Sd.visiblePredictions ? Sd.visiblePredictions().length : (WCd.predictions || Sd.PREDICTIONS).length;
   const locked = Sd.predictionsLocked ? Sd.predictionsLocked() : !!WCd.meta.predictionsLocked;
   return (
     <Cd>
@@ -243,8 +243,8 @@ function ActivityFeed(props) {
   const pre = PRE();
   const items = [];
   if (pre) {
-    const submitted = me.picks ? Object.keys(me.picks).length : 0;
-    const totalMkts = (WCd.predictions || Sd.PREDICTIONS).length;
+    const submitted = Sd.madeVisiblePredictions ? Sd.madeVisiblePredictions(me) : (me.picks ? Object.keys(me.picks).length : 0);
+    const totalMkts = Sd.visiblePredictions ? Sd.visiblePredictions().length : (WCd.predictions || Sd.PREDICTIONS).length;
     items.push({ m: 'confident', t: 'You drew ' + t.name + ' ' + t.flag, d: 'Group ' + t.group + '. Locked in. May the football gods be kind.', when: 'just now' });
     if (submitted < totalMkts) items.push({ m: 'mischievous', t: 'Predictions are open', d: (totalMkts - submitted) + ' still to call before kick-off. Get them in.', when: 'now' });
     else items.push({ m: 'happy', t: 'All predictions in', d: 'Every market called. Wheesht has them in writing.', when: 'now' });

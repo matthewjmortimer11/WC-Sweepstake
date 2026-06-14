@@ -176,6 +176,7 @@ function PredAdmin(props) {
    }
    function id(opt) { return m.kind === 'player' ? opt.id : opt; }
    const isTwo = m.kind === 'team2';
+   const isNumber = m.kind === 'number';
    const ans = m.answer;
    const hiddenPreds = Sa.hiddenPredictions ? Sa.hiddenPredictions() : [];
    const isHidden = hiddenPreds.indexOf(m.key) >= 0;
@@ -187,6 +188,10 @@ function PredAdmin(props) {
      } else Sa.setPredictionAnswer(m.key, ans === oid ? null : oid);
    }
    const picked = (oid) => isTwo ? (Array.isArray(ans) && ans.indexOf(oid) >= 0) : ans === oid;
+   function setNumberAnswer(v) {
+     if (v === '') Sa.setPredictionAnswer(m.key, null);
+     else Sa.setPredictionAnswer(m.key, Number(v));
+   }
    return (
      <Ca flat style={{ padding: '11px 13px', marginBottom: 8, opacity: isHidden ? 0.55 : 1 }}>
        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, gap: 8 }}>
@@ -197,8 +202,22 @@ function PredAdmin(props) {
          </button>
          <Cha tone={ans != null && (!isTwo || ans.length) ? 'green' : 'ghost'}>{ans != null && (!isTwo || ans.length) ? 'set' : 'open'}</Cha>
        </div>
-       {!isHidden && <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-         {m.options.map((opt, i) => {
+       {!isHidden && isNumber && (
+         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+           <input
+             type="number"
+             min="0"
+             step="1"
+             value={ans == null ? '' : ans}
+             onChange={e => setNumberAnswer(e.target.value)}
+             placeholder={m.placeholder || 'Set result'}
+             style={{ flex: 1, border: '2px solid var(--ink)', borderRadius: 10, padding: '8px 10px', fontFamily: 'var(--body)', fontWeight: 800, fontSize: 14, outline: 'none', background: '#fff' }}
+           />
+           {ans != null && <button onClick={() => Sa.setPredictionAnswer(m.key, null)} className="wc-btn wc-btn--sm">Clear</button>}
+         </div>
+       )}
+       {!isHidden && !isNumber && <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+         {(m.options || []).map((opt, i) => {
            const on = picked(id(opt));
            return <button key={i} onClick={() => choose(id(opt))}
              style={{ border: '2px solid ' + (on ? 'var(--ink)' : 'var(--line)'), background: on ? 'var(--yellow)' : '#fff', borderRadius: 10, padding: '6px 10px', fontFamily: 'var(--body)', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>{label(opt)}</button>;

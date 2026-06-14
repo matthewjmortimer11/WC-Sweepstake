@@ -24,6 +24,7 @@ function optLabel(m, opt) {
 function Market(props) {
   const m = props.market, me = props.me, onPick = props.onPick;
   const isTwo = m.kind === 'team2';
+  const isNumber = m.kind === 'number';
   const isTeam = m.kind === 'team' || isTwo;
   const locked = !!props.locked;
   const resolved = isResolved(m);
@@ -31,9 +32,10 @@ function Market(props) {
   const picked = (id) => isTwo ? (Array.isArray(pick) && pick.indexOf(id) >= 0) : pick === id;
   const gotIt = resolved && (isTwo
     ? (Array.isArray(pick) && Array.isArray(m.answer) && pick.length === m.answer.length && pick.every(id => m.answer.indexOf(id) >= 0))
+    : isNumber ? Number(pick) === Number(m.answer)
     : pick === m.answer);
   const [teamQ, setTeamQ] = pState('');
-  const presetCodes = isTeam ? new Set(m.options) : new Set();
+  const presetCodes = isTeam ? new Set(m.options || []) : new Set();
 
   function choose(id) {
     if (resolved || locked) return;
@@ -50,8 +52,14 @@ function Market(props) {
     ? WCp.TEAM_LIST.filter(t => !presetCodes.has(t.code) && (t.name.toLowerCase().indexOf(teamQ.toLowerCase()) >= 0 || t.code.toLowerCase().indexOf(teamQ.toLowerCase()) >= 0)).slice(0, 6)
     : [];
 
-  const hasPick = pick != null && (!isTwo || (Array.isArray(pick) && pick.length > 0));
-  const hasFullPick = pick != null && (!isTwo || (Array.isArray(pick) && pick.length === 2));
+  function chooseNumber(v) {
+    if (resolved || locked) return;
+    if (v === '') onPick(m.key, null);
+    else onPick(m.key, Number(v));
+  }
+
+  const hasPick = isNumber ? (pick != null && pick !== '' && isFinite(Number(pick))) : (pick != null && (!isTwo || (Array.isArray(pick) && pick.length > 0)));
+  const hasFullPick = isNumber ? hasPick : (pick != null && (!isTwo || (Array.isArray(pick) && pick.length === 2)));
 
   return (
     <Cp style={{ marginBottom: 12 }}>
@@ -62,10 +70,27 @@ function Market(props) {
         </Chp>
       </div>
       <div style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--ink2)', marginBottom: 9 }}>
-        {resolved ? 'Result is in' : locked ? 'Predictions locked' : isTwo ? 'Pick the two finalists' : 'Open · tap to pick'}
+        {resolved ? 'Result is in' : locked ? 'Predictions locked' : isTwo ? 'Pick the two finalists' : isNumber ? 'Open · type your answer' : 'Open · tap to pick'}
       </div>
+      {isNumber && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '10px 12px', border: '2.5px solid ' + (hasPick ? 'var(--ink)' : 'var(--line)'), borderRadius: 13, background: hasPick && !resolved ? 'var(--yellow)' : '#fff' }}>
+          <input
+            type="number"
+            min="0"
+            step="1"
+            value={pick == null ? '' : pick}
+            onChange={e => chooseNumber(e.target.value)}
+            disabled={resolved || locked}
+            placeholder={m.placeholder || 'Type a number'}
+            style={{ flex: 1, minWidth: 0, border: 'none', outline: 'none', background: 'transparent', fontFamily: 'var(--disp)', fontWeight: 800, fontSize: 22, color: 'var(--ink)' }}
+          />
+          {resolved && <Chp tone={gotIt ? 'green' : 'red'} style={{ flex: '0 0 auto' }}>Answer: {m.answer}</Chp>}
+          {!resolved && locked && hasPick && <Chp tone="yellow" style={{ flex: '0 0 auto' }}>Your pick</Chp>}
+        </div>
+      )}
+      {!isNumber && <>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
-        {m.options.map((opt, i) => {
+        {(m.options || []).map((opt, i) => {
           const o = optLabel(m, opt);
           const on = picked(o.id);
           const isAnswer = resolved && (isTwo ? (Array.isArray(m.answer) && m.answer.indexOf(o.id) >= 0) : o.id === m.answer);
@@ -91,6 +116,7 @@ function Market(props) {
           );
         })}
       </div>
+      </>}
       {isTeam && !resolved && !locked && (
         <div style={{ marginTop: 10, borderTop: '1.5px solid var(--line)', paddingTop: 10 }}>
           <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--ink2)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '.05em' }}>Search all 48 teams</div>
@@ -163,11 +189,10 @@ function PredictionsScreen(props) {
   const me = Sp.active();
   const [, bump] = pState(0);
   if (!me) return null;
-  const hiddenPredictions = (WCp.meta && WCp.meta.hiddenPredictions) || [];
-  const markets = (WCp.predictions || Sp.PREDICTIONS).filter(m => hiddenPredictions.indexOf(m.key) < 0);
+  const markets = Sp.visiblePredictions ? Sp.visiblePredictions() : (WCp.predictions || Sp.PREDICTIONS).filter(m => ((WCp.meta && WCp.meta.hiddenPredictions) || []).indexOf(m.key) < 0);
   const open = markets.filter(m => !isResolved(m));
   const graded = markets.filter(m => isResolved(m));
-  const made = me.picks ? Object.keys(me.picks).filter(k => me.picks[k] != null && (!Array.isArray(me.picks[k]) || me.picks[k].length)).length : 0;
+  const made = Sp.madeVisiblePredictions ? Sp.madeVisiblePredictions(me) : (me.picks ? Object.keys(me.picks).filter(k => me.picks[k] != null && (!Array.isArray(me.picks[k]) || me.picks[k].length)).length : 0);
   const predDeadline = WCp.meta && WCp.meta.predDeadline;
   const deadlinePassed = predDeadline && new Date() > new Date(predDeadline);
   const locked = Sp.predictionsLocked ? Sp.predictionsLocked() : (!!(WCp.meta && WCp.meta.predictionsLocked) || !!deadlinePassed);

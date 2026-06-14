@@ -231,11 +231,28 @@
         var pick = p.picks[m.key];
         if (pick == null) return;
         if (m.kind === 'team2') { if (Array.isArray(pick) && Array.isArray(m.answer) && pick.length === m.answer.length && pick.slice().sort().join() === m.answer.slice().sort().join()) s += m.points; }
+        else if (m.kind === 'number') { if (Number(pick) === Number(m.answer)) s += m.points; }
         else if (pick === m.answer) s += m.points;
       });
       return s;
     }
     return p.predScore || 0;
+  }
+  function visiblePredictions() {
+    var hidden = (WC.meta && Array.isArray(WC.meta.hiddenPredictions)) ? WC.meta.hiddenPredictions : [];
+    return (WC.PREDICTIONS || []).filter(function (m) { return hidden.indexOf(m.key) < 0; });
+  }
+  function pickComplete(m, picks) {
+    if (!m || !picks) return false;
+    var v = picks[m.key];
+    if (v == null) return false;
+    if (m.kind === 'team2') return Array.isArray(v) && v.length === 2;
+    if (m.kind === 'number') return v !== '' && isFinite(Number(v));
+    return true;
+  }
+  function madeVisiblePredictions(p) {
+    var picks = (p && p.picks) || {};
+    return visiblePredictions().filter(function (m) { return pickComplete(m, picks); }).length;
   }
 
   function withScores(list) {
@@ -370,7 +387,9 @@
     getSync: function (id) { for (var i = 0; i < cache.length; i++) if (cache[i].id === id) return cache[i]; return null; },
     rankedByPred: rankedByPred,
     predScoreOf: predScoreOf,
-    maxPredPoints: function () { return (WC.PREDICTIONS || []).reduce(function (a, m) { return a + m.points; }, 0); },
+    visiblePredictions: visiblePredictions,
+    madeVisiblePredictions: madeVisiblePredictions,
+    maxPredPoints: function () { return visiblePredictions().reduce(function (a, m) { return a + m.points; }, 0); },
     predictionsLocked: function () {
       var deadline = WC.meta && WC.meta.predDeadline;
       var deadlinePassed = !!(deadline && new Date() > new Date(deadline));
@@ -586,11 +605,13 @@
       admin.meta.hiddenPredictions = hidden;
       commitAdmin();
       if (!nowHidden) {
+        var mkt = (WC.PREDICTIONS || []).find(function (m) { return m.key === key; });
         var deadline = admin.meta && admin.meta.predDeadline;
-        if (deadline && new Date() > new Date(deadline)) {
-          var mkt = (WC.PREDICTIONS || []).find(function (m) { return m.key === key; });
-          postWheeshtChat('"' + (mkt ? mkt.q : key) + '" is now open for picks. Wheesht has re-opened this market. The deadline has passed — make your call now.', 'mischievous');
-        }
+        var afterDeadline = deadline && new Date() > new Date(deadline);
+        var msg = 'New prediction available: "' + (mkt ? mkt.q : key) + '". Get your pick in.';
+        if (afterDeadline) msg += ' The old deadline has passed, so make the call now.';
+        postWheeshtChat(msg, 'mischievous');
+        if (window.wcToast) window.wcToast('Prediction opened: ' + (mkt ? mkt.q : key), 'mischievous');
       }
     },
     setCharitySplit: function (split) {

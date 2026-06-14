@@ -143,7 +143,8 @@ def _build_predictions(cfg: dict) -> list[dict]:
     for m in cfg["markets"]:
         out.append({
             "key": m["key"], "q": m["q"], "kind": m["kind"],
-            "points": m["points"], "answer": None, "options": m["options"],
+            "points": m["points"], "answer": None, "options": m.get("options", []),
+            "placeholder": m.get("placeholder", ""),
         })
     return out
 
