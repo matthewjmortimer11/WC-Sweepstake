@@ -227,7 +227,13 @@ def _resolve(league_people: List[Dict[str, Any]], admin: Dict[str, Any]):
     predictions = standings.grade_predictions(_wc_data["predictions"], teams, fixtures, ladder)
     for m in predictions:
         if m["key"] in admin_preds:
-            m["answer"] = admin_preds[m["key"]]
+            ans = admin_preds[m["key"]]
+            if m.get("kind") == "team2":
+                # Only apply if both teams are known non-null strings (guards stale [null,null] data)
+                if isinstance(ans, list) and len(ans) >= 2 and all(isinstance(x, str) and x for x in ans):
+                    m["answer"] = ans
+            else:
+                m["answer"] = ans
 
     return teams, fixtures, people, predictions, phase
 
@@ -274,6 +280,7 @@ def _league_state(league: League, league_people: List[Dict[str, Any]], admin: Di
     meta["locations"] = [str(x) for x in locs] if isinstance(locs, list) and locs else ["Edinburgh", "London"]
     meta["locationsFreeText"] = bool(admin_meta.get("locationsFreeText", False))
     meta["predDeadline"] = admin_meta.get("predDeadline") or None
+    meta["hiddenPredictions"] = list(admin_meta.get("hiddenPredictions") or [])
     data["meta"] = meta
     data["pot"] = len(people) * fee
     return data
@@ -724,6 +731,34 @@ async def post_chat(code: str, payload: ChatPayload):
             id=uuid.uuid4().hex[:10], league_id=league.id, author_id=person["id"],
             author=person["name"], initials=person.get("initials", "?"),
             color=person.get("color", "#333"), team=person.get("team", ""),
+            text=text, ts=int(time.time() * 1000),
+        )
+        session.add(msg)
+        await session.commit()
+        return _chat_to_dict(msg)
+
+
+class SystemChatPayload(BaseModel):
+    text: str
+    mood: str = "confident"
+
+
+@app.post("/api/leagues/{code}/chat/system")
+async def post_system_chat(code: str, payload: SystemChatPayload):
+    """Post a Wheesht announcement banner to the league chat.
+    Triggered server-side by admin actions (deadline change, market toggle)."""
+    text = payload.text.strip()[:400]
+    if not text:
+        raise HTTPException(status_code=400, detail="empty message")
+    async with AsyncSessionLocal() as session:
+        league = await _get_league_by_code(session, code.upper())
+        if league is None:
+            raise HTTPException(status_code=404, detail="league not found")
+        msg = ChatMessage(
+            id=uuid.uuid4().hex[:10], league_id=league.id,
+            author_id="wheesht", author="Wheesht",
+            initials="W", color="#1A1A1A",
+            team=payload.mood,  # repurpose team field to carry the mood for rendering
             text=text, ts=int(time.time() * 1000),
         )
         session.add(msg)

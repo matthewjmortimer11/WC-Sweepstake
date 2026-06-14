@@ -112,9 +112,27 @@ function ChatScreen() {
         )}
         {msgs.map(function(msg) {
           var isMe = me && msg.author_id === me.id;
+          var isWheesht = msg.author_id === 'wheesht';
           var t = WCch.TEAMS[msg.team];
           var d = new Date(msg.ts);
           var timeStr = d.getHours().toString().padStart(2,'0') + ':' + d.getMinutes().toString().padStart(2,'0');
+
+          if (isWheesht) {
+            var mood = msg.team || 'confident'; // team field carries the mood for system messages
+            return (
+              <div key={msg.id} style={{ display: 'flex', gap: 11, marginBottom: 16, alignItems: 'flex-start', background: 'var(--ink)', borderRadius: 18, padding: '12px 14px' }}>
+                <div style={{ flexShrink: 0 }}>
+                  <Wch mood={mood} size={42} animate />
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase', color: 'var(--yellow)', marginBottom: 4 }}>Wheesht · announcement</div>
+                  <div style={{ fontSize: 13.5, fontWeight: 600, color: '#fff', lineHeight: 1.42, wordBreak: 'break-word' }}>{msg.text}</div>
+                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,.4)', fontWeight: 600, marginTop: 4 }}>{timeStr}</div>
+                </div>
+              </div>
+            );
+          }
+
           return (
             <div key={msg.id} style={{ display: 'flex', gap: 9, marginBottom: 14, flexDirection: isMe ? 'row-reverse' : 'row', alignItems: 'flex-end' }}>
               {!isMe && (

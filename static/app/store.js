@@ -65,6 +65,7 @@
       locations: WC.meta.locations || ['Edinburgh', 'London'],
       locationsFreeText: !!WC.meta.locationsFreeText,
       predDeadline: WC.meta.predDeadline || null,
+      hiddenPredictions: WC.meta.hiddenPredictions || [],
     },
   };
   WC.TEAM_LIST.forEach(function (t) { BASE.teams[t.code] = { alive: t.alive, stage: t.stage, rounds: t.rounds }; });
@@ -101,6 +102,7 @@
     WC.meta.locations = (admin.meta && Array.isArray(admin.meta.locations) && admin.meta.locations.length) ? admin.meta.locations : BASE.meta.locations;
     WC.meta.locationsFreeText = admin.meta && admin.meta.locationsFreeText != null ? !!admin.meta.locationsFreeText : BASE.meta.locationsFreeText;
     WC.meta.predDeadline = (admin.meta && admin.meta.predDeadline) || BASE.meta.predDeadline || null;
+    WC.meta.hiddenPredictions = (admin.meta && Array.isArray(admin.meta.hiddenPredictions)) ? admin.meta.hiddenPredictions : BASE.meta.hiddenPredictions;
     WC.charitySplit = (admin.meta && admin.meta.charitySplit != null) ? Number(admin.meta.charitySplit) : BASE.meta.charitySplit;
     var fee = admin.meta && admin.meta.entryFee != null ? Number(admin.meta.entryFee) : BASE.fee;
     WC.FEE = isFinite(fee) && fee >= 0 ? fee : BASE.fee;
@@ -220,6 +222,17 @@
     var rows = withScores(cache).sort(function (a, b) { return b.predScore - a.predScore; });
     rows.forEach(function (r, i) { r.predRank = i + 1; });
     return rows;
+  }
+
+  function postWheeshtChat(text, mood) {
+    if (!LIVE) return;
+    var c = leagueCode();
+    if (!c) return;
+    fetch(api('/chat/system'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: text, mood: mood || 'confident' }),
+    }).catch(function () {});
   }
 
   var Store = {
@@ -477,8 +490,38 @@
     predDeadline: function () { return (admin.meta && admin.meta.predDeadline) || BASE.meta.predDeadline || null; },
     setPredDeadline: function (dt) {
       admin.meta = admin.meta || {};
-      if (dt) admin.meta.predDeadline = dt; else delete admin.meta.predDeadline;
+      var chatText;
+      if (dt) {
+        admin.meta.predDeadline = dt;
+        var dateStr = '';
+        try { dateStr = new Date(dt).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' }); } catch (e) { dateStr = dt; }
+        chatText = ['The prediction deadline has been updated. Picks lock at ' + dateStr + '. Wheesht has made a note.', 'nervous'];
+      } else {
+        delete admin.meta.predDeadline;
+        chatText = ['The prediction deadline has been cleared. Picks are open until further notice. Wheesht is watching.', 'mischievous'];
+      }
       commitAdmin();
+      if (chatText) postWheeshtChat(chatText[0], chatText[1]);
+    },
+    hiddenPredictions: function () {
+      return (admin.meta && Array.isArray(admin.meta.hiddenPredictions)) ? admin.meta.hiddenPredictions : BASE.meta.hiddenPredictions;
+    },
+    togglePredictionHidden: function (key) {
+      admin.meta = admin.meta || {};
+      var hidden = Array.isArray(admin.meta.hiddenPredictions) ? admin.meta.hiddenPredictions.slice() : [];
+      var idx = hidden.indexOf(key);
+      var nowHidden;
+      if (idx >= 0) { hidden.splice(idx, 1); nowHidden = false; }
+      else { hidden.push(key); nowHidden = true; }
+      admin.meta.hiddenPredictions = hidden;
+      commitAdmin();
+      if (!nowHidden) {
+        var deadline = admin.meta && admin.meta.predDeadline;
+        if (deadline && new Date() > new Date(deadline)) {
+          var mkt = (WC.PREDICTIONS || []).find(function (m) { return m.key === key; });
+          postWheeshtChat('"' + (mkt ? mkt.q : key) + '" is now open for picks. Wheesht has re-opened this market. The deadline has passed — make your call now.', 'mischievous');
+        }
+      }
     },
     setCharitySplit: function (split) {
       var n = Math.max(0, Math.min(1, Number(split)));
@@ -526,6 +569,7 @@
         locations: keep.locations,
         locationsFreeText: keep.locationsFreeText,
         predDeadline: keep.predDeadline,
+        hiddenPredictions: keep.hiddenPredictions,
       }};
       commitAdmin();
     }

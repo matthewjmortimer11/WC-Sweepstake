@@ -163,7 +163,8 @@ function PredictionsScreen(props) {
   const me = Sp.active();
   const [, bump] = pState(0);
   if (!me) return null;
-  const markets = WCp.predictions || Sp.PREDICTIONS;
+  const hiddenPredictions = (WCp.meta && WCp.meta.hiddenPredictions) || [];
+  const markets = (WCp.predictions || Sp.PREDICTIONS).filter(m => hiddenPredictions.indexOf(m.key) < 0);
   const open = markets.filter(m => !isResolved(m));
   const graded = markets.filter(m => isResolved(m));
   const made = me.picks ? Object.keys(me.picks).filter(k => me.picks[k] != null && (!Array.isArray(me.picks[k]) || me.picks[k].length)).length : 0;
