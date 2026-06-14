@@ -564,6 +564,10 @@ id = "oi-08"
 name = "Alex Cole"
 team = "BIH"
 [[roster]]
+id = "oi-09"
+name = "Matthew Mortimer"
+team = "BRA"
+[[roster]]
 id = "oi-10"
 name = "John Anthony"
 team = "MAR"
