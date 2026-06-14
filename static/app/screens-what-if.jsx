@@ -193,7 +193,9 @@ function WhatIfSheet(props) {
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
           <span style={{ fontSize: 26 }}>{ta.flag}</span>
-          <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink2)' }}>v</span>
+          {hypo
+            ? <span className="dh pop" key={outcome} style={{ fontSize: 17, color: 'var(--red)' }}>{hypo[0]}–{hypo[1]}</span>
+            : <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink2)' }}>v</span>}
           <span style={{ fontSize: 26 }}>{tb.flag}</span>
         </div>
       </div>
