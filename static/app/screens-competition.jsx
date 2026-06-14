@@ -249,8 +249,8 @@ function MyGroupDashboard(props) {
           const qualifies = r.pos <= 2;
           const gd = r.GF - r.GA;
           return (
-            <React.Fragment key={r.code}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 2px', borderRadius: 9, margin: '2px 0', background: isMe ? 'rgba(245,200,0,.22)' : 'transparent', opacity: r.team.alive ? 1 : .5 }}>
+            <React.Fragment key={r.code + '-' + r.pos}>
+              <div className={showMove && r.move > 0 ? 'lb-up' : showMove && r.move < 0 ? 'lb-dn' : ''} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 2px', borderRadius: 9, margin: '2px 0', background: isMe ? 'rgba(245,200,0,.22)' : 'transparent', opacity: r.team.alive ? 1 : .5 }}>
                 <span className="dh" style={{ width: 18, textAlign: 'center', fontSize: 15, color: qualifies && G.hasResults ? 'var(--green)' : 'var(--ink2)' }}>{r.pos}</span>
                 <MoveTag move={r.move} show={showMove} />
                 <Fc team={r.team} size={22} />

@@ -181,6 +181,29 @@ function ConfettiLayer() {
   return <canvas ref={cv} className="wc-confetti" />;
 }
 
+/* ---- Haptic feedback (Android vibrate + iOS 18+ PWA navigator.vibrate) -- */
+window.wcHaptic = function(type) {
+  try {
+    if (!navigator.vibrate) return;
+    var p = { light: [8], medium: [18], success: [10, 55, 14] };
+    navigator.vibrate(p[type] || p.light);
+  } catch(e) {}
+};
+
+/* ---- Leaderboard row-movement CSS (injected once) ----------------------- */
+(function() {
+  if (document.getElementById('wc-lb-anim')) return;
+  var s = document.createElement('style');
+  s.id = 'wc-lb-anim';
+  s.textContent = [
+    '@keyframes lb-pop-up{0%{box-shadow:0 0 0 2.5px var(--green),0 0 0 5px rgba(26,122,68,.15)}to{box-shadow:0 0 0 0 transparent}}',
+    '@keyframes lb-pop-dn{0%{box-shadow:0 0 0 2.5px var(--red),0 0 0 5px rgba(232,39,42,.12)}to{box-shadow:0 0 0 0 transparent}}',
+    '.lb-up{animation:lb-pop-up 1s cubic-bezier(.2,.8,.2,1) forwards}',
+    '.lb-dn{animation:lb-pop-dn 1s cubic-bezier(.2,.8,.2,1) forwards}',
+  ].join('');
+  document.head.appendChild(s);
+})();
+
 Object.assign(window, {
   Card: Card, Btn: Btn, Flag: Flag, Avatar: Avatar, Chip: Chip, Stamp: Stamp,
   ProgressRing: ProgressRing, SegmentBar: SegmentBar, WheeshtSays: WheeshtSays,

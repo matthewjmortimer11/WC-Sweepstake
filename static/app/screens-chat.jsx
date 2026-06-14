@@ -67,6 +67,7 @@ function ChatScreen() {
       setText('');
       setBusy(false);
       setErr(false);
+      window.wcHaptic && window.wcHaptic('light');
     }).catch(function() { setBusy(false); setErr(true); });
   }
 

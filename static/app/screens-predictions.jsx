@@ -39,13 +39,22 @@ function Market(props) {
 
   function choose(id) {
     if (resolved || locked) return;
+    let made = false;
     if (isTwo) {
       let arr = Array.isArray(pick) ? pick.slice() : [];
       if (arr.indexOf(id) >= 0) arr = arr.filter(x => x !== id);
-      else { arr.push(id); if (arr.length > 2) arr.shift(); }
+      else { arr.push(id); if (arr.length > 2) arr.shift(); made = true; }
       onPick(m.key, arr);
-    } else onPick(m.key, picked(id) ? null : id);
+    } else {
+      const toggling = picked(id);
+      onPick(m.key, toggling ? null : id);
+      made = !toggling;
+    }
     setTeamQ('');
+    if (made) {
+      window.wcHaptic && window.wcHaptic('light');
+      window.wcConfetti && window.wcConfetti({ count: 28, y: 0.5, x: 0.5 });
+    }
   }
 
   const teamResults = isTeam && !resolved && teamQ.trim()
