@@ -18,12 +18,6 @@ function wiTeam(code) {
   return WCwi.TEAMS[code] || { code: code || 'TBD', name: code || 'TBD', flag: '🏳️', group: '?' };
 }
 
-function wiHypoScore(outcome) {
-  if (outcome === 'a') return [1, 0];
-  if (outcome === 'b') return [0, 1];
-  return [0, 0];
-}
-
 function wiTally(teams, fixtures) {
   const rec = {};
   teams.forEach(t => { rec[t.code] = { code: t.code, team: t, Pts: 0, GF: 0, GA: 0, P: 0 }; });
@@ -145,18 +139,37 @@ function WiGroupTable(props) {
   );
 }
 
+/* ---- goal stepper ------------------------------------------------------- */
+function WiGoalStepper(props) {
+  const btn = (label, delta, disabled) => (
+    <button onClick={() => !disabled && props.onBump(delta)} disabled={disabled}
+      style={{ width: 28, height: 28, borderRadius: 9, border: '2px solid var(--ink)', background: '#fff', cursor: disabled ? 'default' : 'pointer', fontFamily: 'var(--disp)', fontWeight: 800, fontSize: 16, lineHeight: 1, color: 'var(--ink)', opacity: disabled ? .35 : 1, padding: 0 }}>{label}</button>
+  );
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+      {btn('−', -1, props.value <= 0)}
+      <span className="dh" style={{ fontSize: 22, width: 18, textAlign: 'center' }}>{props.value}</span>
+      {btn('+', 1, false)}
+    </div>
+  );
+}
+
 /* ---- the overlay (portalled to #root so it covers the full phone screen) */
 function WhatIfSheet(props) {
   const f = props.f;
   const me = props.me;
-  const [outcome, setOutcome] = wiState(null);
+  // score is [goalsA, goalsB] (or null before a pick). The outcome is derived,
+  // so a quick "1–0" preset and a hand-entered scoreline share one code path.
+  const [score, setScore] = wiState(null);
 
   if (!f) return null;
 
   const ta = wiTeam(f.a), tb = wiTeam(f.b);
   const isGroup = (f.stage || 'group') === 'group';
 
-  const hypo = outcome ? wiHypoScore(outcome) : null;
+  const outcome = score ? (score[0] > score[1] ? 'a' : score[1] > score[0] ? 'b' : 'draw') : null;
+  const hypo = score;
+  const koLevel = !isGroup && outcome === 'draw'; // knockouts can't end level
   const groupRows = (hypo && isGroup) ? wiGroupImpact(f, hypo) : null;
   const sweepRows = groupRows ? wiSweepImpact(groupRows) : [];
   const bigWinner = sweepRows.find(r => r.move > 0);
@@ -168,8 +181,15 @@ function WhatIfSheet(props) {
 
   const stageLabel = { final: 'Final', sf: 'Semi-final', qf: 'Quarter-final', r16: 'Round of 16', r32: 'Round of 32' }[f.stage] || null;
 
-  const koAdvance = outcome ? (outcome === 'a' ? ta : tb) : null;
-  const koOut = outcome ? (outcome === 'a' ? tb : ta) : null;
+  const koAdvance = (outcome === 'a' || outcome === 'b') ? (outcome === 'a' ? ta : tb) : null;
+  const koOut = (outcome === 'a' || outcome === 'b') ? (outcome === 'a' ? tb : ta) : null;
+
+  const presetScore = { a: [1, 0], draw: [0, 0], b: [0, 1] };
+  const bumpGoal = (side, delta) => {
+    const base = score || [0, 0];
+    const next = side === 0 ? [Math.max(0, base[0] + delta), base[1]] : [base[0], Math.max(0, base[1] + delta)];
+    setScore(next);
+  };
 
   // Which scenario is the user's drawn team winning? Star it so they instantly
   // see the result that helps them.
@@ -211,25 +231,45 @@ function WhatIfSheet(props) {
             </div>
             <div style={{ display: 'flex', gap: 6 }}>
               {scenarios.map(([k, lab]) => (
-                <button key={k} onClick={() => setOutcome(outcome === k ? null : k)}
+                <button key={k} onClick={() => setScore(outcome === k ? null : presetScore[k])}
                   className={'wc-btn wc-btn--sm' + (outcome === k ? ' wc-btn--primary' : '')}
                   style={{ flex: 1, fontSize: 12, padding: '11px 6px', boxShadow: outcome === k ? '0 4px 0 var(--ink)' : '0 4px 0 var(--shadow)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                   {lab}
                 </button>
               ))}
             </div>
+
+            {/* exact scoreline stepper — appears once a scenario is picked */}
+            {score && (
+              <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, background: 'var(--bg2)', border: '2px solid var(--line)', borderRadius: 13, padding: '9px 12px' }}>
+                <span style={{ fontSize: 22 }}>{ta.flag}</span>
+                <WiGoalStepper value={score[0]} onBump={(d) => bumpGoal(0, d)} />
+                <span className="dh" style={{ fontSize: 16, color: 'var(--ink2)' }}>–</span>
+                <WiGoalStepper value={score[1]} onBump={(d) => bumpGoal(1, d)} />
+                <span style={{ fontSize: 22 }}>{tb.flag}</span>
+              </div>
+            )}
           </div>
 
           {/* idle state */}
-          {!outcome && (
+          {!score && (
             <div style={{ textAlign: 'center', padding: '36px 0 24px' }}>
               <Wwi mood="confident" size={68} animate />
               <div className="dh" style={{ fontSize: 20, marginTop: 12 }}>Run the numbers</div>
               <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--ink2)', marginTop: 5, lineHeight: 1.4 }}>
                 {isGroup
-                  ? 'Select a result to see how the group table shifts and who wins or loses in the sweepstake.'
-                  : 'Select a result to see who advances and what it means for the draw.'}
+                  ? 'Pick a winner — or set the exact score — to see how the group table shifts and who wins or loses in the sweepstake.'
+                  : 'Pick a winner — or set the exact score — to see who advances and what it means for the draw.'}
               </div>
+            </div>
+          )}
+
+          {/* knockout can't end level */}
+          {koLevel && (
+            <div style={{ textAlign: 'center', padding: '22px 12px', background: 'rgba(232,39,42,.06)', border: '2px solid var(--red)', borderRadius: 16 }}>
+              <div style={{ fontSize: 28 }}>⚖️</div>
+              <div className="dh" style={{ fontSize: 17, marginTop: 4 }}>A knockout can't end level</div>
+              <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--ink2)', marginTop: 4 }}>Nudge the score so one side comes out on top.</div>
             </div>
           )}
 
@@ -239,7 +279,7 @@ function WhatIfSheet(props) {
             <SHwi aside={'Group ' + f.group + ' · if this result stands'}>Hypothetical table</SHwi>
             <WiGroupTable rows={groupRows} fa={f.a} fb={f.b} />
             <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--ink2)', marginTop: 6, marginBottom: 16, lineHeight: 1.35 }}>
-              Based on results so far, with this fixture added. GD tiebreakers use a generic 1–0 or 0–0.
+              Based on results so far, with a {hypo[0]}–{hypo[1]} {ta.name} v {tb.name} added in. Adjust the score above to test the goal difference.
             </div>
 
             {/* biggest winner / loser cards */}
