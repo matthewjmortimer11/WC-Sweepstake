@@ -120,11 +120,12 @@ function SectionHead(props) {
 /* ---- Toast layer (imperative: window.wcToast(msg, mood)) ----------------- */
 function ToastLayer() {
   const [items, setItems] = useState([]);
+  function dismiss(id) { setItems(function (xs) { return xs.filter(function (x) { return x.id !== id; }); }); }
   useEffect(function () {
     window.wcToast = function (text, mood) {
       const id = Date.now() + Math.random();
       setItems(function (xs) { return xs.concat([{ id: id, text: text, mood: mood || 'neutral' }]); });
-      setTimeout(function () { setItems(function (xs) { return xs.filter(function (x) { return x.id !== id; }); }); }, 4200);
+      setTimeout(function () { setItems(function (xs) { return xs.filter(function (x) { return x.id !== id; }); }); }, 4800);
     };
   }, []);
   return (
@@ -132,7 +133,8 @@ function ToastLayer() {
       {items.map(function (t) {
         return <div key={t.id} className="wc-toast">
           <window.Wheesht mood={t.mood} size={40} />
-          <div className="wc-toast__txt">{t.text}</div>
+          <div className="wc-toast__txt" style={{flex:1}}>{t.text}</div>
+          <button onClick={function(){ dismiss(t.id); }} style={{background:'none',border:'none',color:'rgba(255,255,255,.55)',cursor:'pointer',fontSize:22,fontWeight:300,lineHeight:1,padding:'0 0 0 8px',flexShrink:0,fontFamily:'sans-serif'}}>×</button>
         </div>;
       })}
     </div>

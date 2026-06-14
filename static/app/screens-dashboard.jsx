@@ -167,6 +167,13 @@ function WinningsCard(props) {
   const pot = Sd.pot ? Sd.pot() : (WCd.POT * 0.5);
   const charity = Sd.charity ? Sd.charity() : (WCd.POT * 0.5);
   const ov = overallRank(me);
+  const rankTaps = React.useRef({n:0,t:0});
+  function rankTap(){
+    const now = Date.now();
+    rankTaps.current.n = (now - rankTaps.current.t < 1200) ? rankTaps.current.n + 1 : 1;
+    rankTaps.current.t = now;
+    if(rankTaps.current.n >= 3){ rankTaps.current.n = 0; window.__wheeshtEgg2 && window.__wheeshtEgg2(); }
+  }
   return (
     <Cd bordered>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -174,7 +181,7 @@ function WinningsCard(props) {
           <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.06em', textTransform: 'uppercase', color: 'var(--ink2)' }}>Winner takes all — if {t.name} lift the cup</div>
           <div className="dh" style={{ fontSize: 38, color: 'var(--green)', lineHeight: 1, marginTop: 2 }}>{money_d(pot)}</div>
         </div>
-        <div style={{ textAlign: 'right', background: 'var(--bg)', border: '2px solid var(--line)', borderRadius: 12, padding: '7px 11px' }}>
+        <div onClick={rankTap} style={{ textAlign: 'right', background: 'var(--bg)', border: '2px solid var(--line)', borderRadius: 12, padding: '7px 11px', cursor: 'default' }}>
           <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: '.04em', color: 'var(--ink2)' }}>OVERALL</div>
           <div className="dh" style={{ fontSize: 22 }}>#{ov.rank}<span style={{ fontSize: 13, color: 'var(--ink2)' }}>/{ov.total}</span></div>
         </div>
@@ -239,8 +246,8 @@ function MeScreen(props) {
     <div className="pad">
       <ProfileHeader me={me} onEdit={() => setEdit(true)} />
       <div style={{ height: 12 }} />
-      <Saysd mood={greetMood} label={'hiya ' + me.name.split(' ')[0]} animate>
-        {pre ? <>Ye've drawn {t.name}. Nae games yet — so get yer predictions in while the slate's clean.</> : (t.alive ? <>Yer {t.name} are still in it. Keep yer predictions sharp and the pot's in play.</> : <>Yer team's away, but the predictions league is wide open. Wheesht's no done wi' ye yet.</>)}
+      <Saysd mood={greetMood} label={'hey ' + me.name.split(' ')[0]} animate>
+        {pre ? <>You've drawn {t.name}. No games yet — get your predictions in while the slate's clean.</> : (t.alive ? <>{t.name} are still standing. Keep your predictions sharp — the pot's in play.</> : <>Your team is out, but the predictions league is still live. Wheesht isn't done with you yet.</>)}
       </Saysd>
       <SHd>Your team</SHd>
       <TeamCard me={me} onGames={props.goGames} />

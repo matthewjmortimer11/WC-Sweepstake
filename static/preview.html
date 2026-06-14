@@ -163,9 +163,9 @@ button{font-family:inherit;}
 /* ---------- confetti + toasts ---------- */
 .wc-confetti{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:80;}
 .wc-toasts{position:absolute;left:12px;right:12px;top:54px;z-index:75;display:flex;flex-direction:column;gap:8px;pointer-events:none;}
-.wc-toast{display:flex;align-items:center;gap:10px;background:var(--ink);color:#fff;border-radius:16px;padding:8px 14px 8px 8px;
-  box-shadow:0 10px 24px rgba(0,0,0,.3);animation:toastIn .4s cubic-bezier(.2,1.2,.4,1) both;}
-.wc-toast__txt{font-size:13px;font-weight:600;line-height:1.25;}
+.wc-toast{display:flex;align-items:center;gap:10px;background:var(--ink);color:#fff;border-radius:16px;padding:8px 10px 8px 8px;
+  box-shadow:0 10px 24px rgba(0,0,0,.3);animation:toastIn .4s cubic-bezier(.2,1.2,.4,1) both;pointer-events:auto;}
+.wc-toast__txt{font-size:13px;font-weight:600;line-height:1.25;flex:1;}
 @keyframes toastIn{from{transform:translateY(-16px) scale(.9);opacity:0}to{transform:none;opacity:1}}
 
 /* ---------- animations ---------- */
@@ -383,22 +383,22 @@ button:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(245,200,0,.55);borde
 
 <!-- Single source of truth: generated from wc_data.py by scripts/build_snapshot.py.
      No-op when the server injects window.WC_DATA above (live mode). -->
-<script src="app/wc-snapshot.js?v=20260614-verdict"></script>
-<script src="app/data.js?v=20260614-verdict"></script>
-<script src="app/store.js?v=20260614-verdict"></script>
-<script type="text/babel" src="app/wheesht-mascot.jsx?v=20260614-verdict"></script>
-<script type="text/babel" src="app/ui.jsx?v=20260614-verdict"></script>
-<script type="text/babel" src="tweaks-panel.jsx?v=20260614-verdict"></script>
-<script type="text/babel" src="app/screens-hub.jsx?v=20260614-verdict"></script>
-<script type="text/babel" src="app/screens-hub2.jsx?v=20260614-verdict"></script>
-<script type="text/babel" src="app/screens-onboarding.jsx?v=20260614-verdict"></script>
-<script type="text/babel" src="app/screens-dashboard.jsx?v=20260614-verdict"></script>
-<script type="text/babel" src="app/screens-predictions.jsx?v=20260614-verdict"></script>
-<script type="text/babel" src="app/screens-games.jsx?v=20260614-verdict"></script>
-<script type="text/babel" src="app/screens-admin.jsx?v=20260614-verdict"></script>
-<script type="text/babel" src="app/screens-chat.jsx?v=20260614-verdict"></script>
-<script type="text/babel" src="app/screens-dev.jsx?v=20260614-verdict"></script>
-<script type="text/babel" src="app/app.jsx?v=20260614-verdict"></script>
-<script type="text/babel" src="app/stage.jsx?v=20260614-verdict"></script>
+<script src="app/wc-snapshot.js?v=20260614-egg2"></script>
+<script src="app/data.js?v=20260614-egg2"></script>
+<script src="app/store.js?v=20260614-egg2"></script>
+<script type="text/babel" src="app/wheesht-mascot.jsx?v=20260614-egg2"></script>
+<script type="text/babel" src="app/ui.jsx?v=20260614-egg2"></script>
+<script type="text/babel" src="tweaks-panel.jsx?v=20260614-egg2"></script>
+<script type="text/babel" src="app/screens-hub.jsx?v=20260614-egg2"></script>
+<script type="text/babel" src="app/screens-hub2.jsx?v=20260614-egg2"></script>
+<script type="text/babel" src="app/screens-onboarding.jsx?v=20260614-egg2"></script>
+<script type="text/babel" src="app/screens-dashboard.jsx?v=20260614-egg2"></script>
+<script type="text/babel" src="app/screens-predictions.jsx?v=20260614-egg2"></script>
+<script type="text/babel" src="app/screens-games.jsx?v=20260614-egg2"></script>
+<script type="text/babel" src="app/screens-admin.jsx?v=20260614-egg2"></script>
+<script type="text/babel" src="app/screens-chat.jsx?v=20260614-egg2"></script>
+<script type="text/babel" src="app/screens-dev.jsx?v=20260614-egg2"></script>
+<script type="text/babel" src="app/app.jsx?v=20260614-egg2"></script>
+<script type="text/babel" src="app/stage.jsx?v=20260614-egg2"></script>
 </body>
 </html>

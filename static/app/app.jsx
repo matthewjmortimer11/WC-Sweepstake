@@ -7,19 +7,27 @@ const A_W = window.Wheesht;
 const A_S = window.Store;
 const { useState: aState, useEffect: aEffect } = React;
 
-/* ---- Easter egg (basic — built to extend later) ----------------------------
-   A wee hidden treat: tap the league title five times quickly. For now it just
-   pops some confetti and a hidden Wheesht line. Richer rewards (badges, secret
-   stats, a mini-game) can hang off window.__wheeshtEgg without touching the UI. */
+/* ---- Easter eggs (tap the league title 5× for egg 1; tap rank badge 3× for egg 2) --- */
 const EGG_LINES = [
-  'Wheesht kent ye’d go poking. Away ye go, ya nosy beggar.',
-  'A hidden whistle! Dinnae tell the others. Wheesht certainly won’t.',
-  'Five taps. Wheesht respects a curious mind. Reluctantly.',
-  'Ye found the secret. There’s nae prize. Yet. Wheesht is working on it.',
+  'Persistent. Wheesht respects that. Grudgingly.',
+  'A hidden feature, not a bug. Wheesht planned this all along.',
+  'Five taps. Impressive commitment. There is no prize. Wheesht is working on it.',
+  'You found it. Well done. Wheesht is neither confirming nor denying there are others.',
 ];
 window.__wheeshtEgg = function(){
   try{ window.wcConfetti && window.wcConfetti({ y:.32, count:90 }); }catch(e){}
   try{ window.wcToast && window.wcToast(EGG_LINES[(Math.random()*EGG_LINES.length)|0], 'mischievous'); }catch(e){}
+};
+
+const EGG2_LINES = [
+  'Ranking noted. The pot does not care. Wheesht does, slightly.',
+  'You tapped the rank. Wheesht was watching. Wheesht is always watching.',
+  'Three taps on the rank badge and Wheesht appears. Almost as if planned.',
+  'Position logged. Wheesht neither confirms nor denies this changes anything.',
+];
+window.__wheeshtEgg2 = function(){
+  try{ window.wcConfetti && window.wcConfetti({ y:.5, count:55, colors:['#F5C800','#E8272A','#fff','#1A1A1A'] }); }catch(e){}
+  try{ window.wcToast && window.wcToast(EGG2_LINES[(Math.random()*EGG2_LINES.length)|0], 'confident'); }catch(e){}
 };
 
 /* ---- tab icons ---- */
@@ -175,11 +183,36 @@ function App(){
   aEffect(()=>{
     if(flow!=='app'||!me) return;
     const pre = A_WC.meta.phase === 'pre';
+    const myTeam = A_WC.TEAMS[me.team];
     const id=setTimeout(()=>{
-      if(pre) window.wcToast&&window.wcToast('Predictions are open till kick-off. Get them in — Wheesht is taking names.','mischievous');
-      else if(!A_WC.TEAMS[me.team].alive) window.wcToast&&window.wcToast(A_WC.LINES.eliminated,'crying');
-      else window.wcToast&&window.wcToast('Yer team’s in the hat. Wheesht will be watching. Closely.','mischievous');
-      if(t.bias) setTimeout(()=>window.wcToast&&window.wcToast('Reminder: Scotland are in this tournament. Just so we’re all clear.','scottish'),1500);
+      if(pre){
+        const msgs=[
+          'Predictions are open till kick-off. Get them in — Wheesht is taking names.',
+          'Your picks won\'t make themselves. Wheesht is waiting.',
+          'Markets are open. Back your instincts. Wheesht backs nothing — but watches everything.',
+          'Get your predictions in before the first whistle. No extensions.',
+        ];
+        window.wcToast&&window.wcToast(msgs[(Math.random()*msgs.length)|0],'mischievous');
+      } else if(!myTeam.alive){
+        window.wcToast&&window.wcToast(A_WC.LINES.eliminated,'crying');
+      } else {
+        const msgs=[
+          'Your team is still in it. Wheesht is watching — with moderate approval.',
+          'Still standing. Wheesht has noted this. Nothing more to add.',
+          'Your team is in the mix. Wheesht is cautiously optimistic. Very cautiously.',
+          'In the running. Wheesht is watching. As always.',
+        ];
+        window.wcToast&&window.wcToast(msgs[(Math.random()*msgs.length)|0],'mischievous');
+      }
+      if(t.bias){
+        const scotMsgs=[
+          'Scotland are in this tournament. Just so everyone is clear.',
+          'Scotland. Still here. Wheesht is cautiously optimistic — emphasis on cautious.',
+          'A gentle reminder that Scotland are participating. Wheesht thought you should know.',
+          'Scotland update: still in it. Wheesht is fine. Everything is fine.',
+        ];
+        setTimeout(()=>window.wcToast&&window.wcToast(scotMsgs[(Math.random()*scotMsgs.length)|0],'scottish'),1600);
+      }
     },650);
     return ()=>clearTimeout(id);
   },[flow,me&&me.id]); // eslint-disable-line
@@ -217,7 +250,7 @@ function App(){
     const p=A_S.getSync(id);
     const t=p&&A_WC.TEAMS[p.team];
     setFlow('app');
-    setTimeout(()=>window.wcToast&&window.wcToast('Welcome, '+(p?p.name:'')+'! Yer team is '+((t&&t.flag)||'')+' '+(t?t.name:'')+'.',  'confident'),400);
+    setTimeout(()=>window.wcToast&&window.wcToast('Welcome, '+(p?p.name:'')+'! Your team is '+((t&&t.flag)||'')+' '+(t?t.name:'')+'.',  'confident'),400);
   }
 
   // -------- onboarding / identity flow --------
@@ -285,11 +318,11 @@ function App(){
     <window.TweaksPanel title="Tweaks">
       <window.TweakSection label="Atmosphere"/>
       <window.TweakSlider label="Celebration" value={t.celebration} min={0} max={10} step={1} onChange={v=>setTweak('celebration',v)}/>
-      <window.TweakToggle label="Wheesht’s Scottish bias" value={t.bias} onChange={v=>setTweak('bias',v)}/>
+      <window.TweakToggle label="Wheesht's Scottish bias" value={t.bias} onChange={v=>setTweak('bias',v)}/>
       <window.TweakToggle label="Match-programme texture" value={t.texture} onChange={v=>setTweak('texture',v)}/>
       <window.TweakSection label="Admin"/>
       <div style={{padding:'4px 14px 8px'}}>
-        <button onClick={()=>setAdmin(true)} style={{width:'100%',border:'none',borderRadius:11,background:'var(--ink)',color:'#fff',fontFamily:'var(--disp)',fontWeight:800,fontSize:13.5,padding:'12px',cursor:'pointer',boxShadow:'0 4px 0 #000'}}>Open Wheesht’s clipboard →</button>
+        <button onClick={()=>setAdmin(true)} style={{width:'100%',border:'none',borderRadius:11,background:'var(--ink)',color:'#fff',fontFamily:'var(--disp)',fontWeight:800,fontSize:13.5,padding:'12px',cursor:'pointer',boxShadow:'0 4px 0 #000'}}>Open Wheesht's clipboard →</button>
         <div style={{fontSize:11,fontWeight:600,color:'var(--ink2)',marginTop:6,lineHeight:1.35}}>Set results, knock teams out, grade predictions.</div>
       </div>
       <window.TweakToggle label="Lock predictions" value={t.locked} onChange={v=>setTweak('locked',v)}/>

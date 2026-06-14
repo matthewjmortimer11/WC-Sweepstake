@@ -163,9 +163,9 @@ button{font-family:inherit;}
 /* ---------- confetti + toasts ---------- */
 .wc-confetti{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:80;}
 .wc-toasts{position:absolute;left:12px;right:12px;top:54px;z-index:75;display:flex;flex-direction:column;gap:8px;pointer-events:none;}
-.wc-toast{display:flex;align-items:center;gap:10px;background:var(--ink);color:#fff;border-radius:16px;padding:8px 14px 8px 8px;
-  box-shadow:0 10px 24px rgba(0,0,0,.3);animation:toastIn .4s cubic-bezier(.2,1.2,.4,1) both;}
-.wc-toast__txt{font-size:13px;font-weight:600;line-height:1.25;}
+.wc-toast{display:flex;align-items:center;gap:10px;background:var(--ink);color:#fff;border-radius:16px;padding:8px 10px 8px 8px;
+  box-shadow:0 10px 24px rgba(0,0,0,.3);animation:toastIn .4s cubic-bezier(.2,1.2,.4,1) both;pointer-events:auto;}
+.wc-toast__txt{font-size:13px;font-weight:600;line-height:1.25;flex:1;}
 @keyframes toastIn{from{transform:translateY(-16px) scale(.9);opacity:0}to{transform:none;opacity:1}}
 
 /* ---------- animations ---------- */
@@ -383,7 +383,7 @@ button:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(245,200,0,.55);borde
 
 <!-- Single source of truth: generated from wc_data.py by scripts/build_snapshot.py.
      No-op when the server injects window.WC_DATA above (live mode). -->
-<script type="text/babel" src="tweaks-panel.jsx?v=20260614-verdict"></script>
+<script type="text/babel" src="tweaks-panel.jsx?v=20260614-egg2"></script>
 
 <script>
 /* ===========================================================================
@@ -1386,11 +1386,12 @@ function SectionHead(props) {
 /* ---- Toast layer (imperative: window.wcToast(msg, mood)) ----------------- */
 function ToastLayer() {
   const [items, setItems] = useState([]);
+  function dismiss(id) { setItems(function (xs) { return xs.filter(function (x) { return x.id !== id; }); }); }
   useEffect(function () {
     window.wcToast = function (text, mood) {
       const id = Date.now() + Math.random();
       setItems(function (xs) { return xs.concat([{ id: id, text: text, mood: mood || 'neutral' }]); });
-      setTimeout(function () { setItems(function (xs) { return xs.filter(function (x) { return x.id !== id; }); }); }, 4200);
+      setTimeout(function () { setItems(function (xs) { return xs.filter(function (x) { return x.id !== id; }); }); }, 4800);
     };
   }, []);
   return (
@@ -1398,7 +1399,8 @@ function ToastLayer() {
       {items.map(function (t) {
         return <div key={t.id} className="wc-toast">
           <window.Wheesht mood={t.mood} size={40} />
-          <div className="wc-toast__txt">{t.text}</div>
+          <div className="wc-toast__txt" style={{flex:1}}>{t.text}</div>
+          <button onClick={function(){ dismiss(t.id); }} style={{background:'none',border:'none',color:'rgba(255,255,255,.55)',cursor:'pointer',fontSize:22,fontWeight:300,lineHeight:1,padding:'0 0 0 8px',flexShrink:0,fontFamily:'sans-serif'}}>×</button>
         </div>;
       })}
     </div>
@@ -2742,7 +2744,7 @@ function AccountGate(props) {
           <div className="dh" style={{ fontSize: 30, marginTop: 8, lineHeight: 1 }}>{WCo.meta.name}</div>
           <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink2)', marginTop: 6 }}>{WCo.meta.season} · {WCo.meta.stageLabel}</div>
           <div style={{ display: 'inline-flex', marginTop: 14, background: 'var(--ink)', color: '#fff', borderRadius: '16px 16px 16px 5px', padding: '11px 15px', maxWidth: 320, textAlign: 'left' }}>
-            <div style={{ fontSize: 14, fontWeight: 600, lineHeight: 1.35 }}><span style={{ color: 'var(--yellow)', fontWeight: 800 }}>Wheesht here.</span> Officially impartial. Constitutionally Scottish. Join a league or start yer own.</div>
+            <div style={{ fontSize: 14, fontWeight: 600, lineHeight: 1.35 }}><span style={{ color: 'var(--yellow)', fontWeight: 800 }}>Wheesht here.</span> Officially impartial. Constitutionally Scottish. Join a league or start your own.</div>
           </div>
         </div>
 
@@ -2803,7 +2805,7 @@ function JoinLeague(props) {
           <Wo mood="mischievous" size={72} animate />
           <div>
             <div className="dh" style={{ fontSize: 24, lineHeight: 1 }}>Join a league</div>
-            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink2)', marginTop: 4 }}>Pop in the league code and password the organiser gave ye.</div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink2)', marginTop: 4 }}>Enter the league code and password your organiser gave you.</div>
           </div>
         </div>
         <div style={{ marginTop: 20 }}>
@@ -2868,7 +2870,7 @@ function CreateLeague(props) {
           <Wo mood="confident" size={72} animate />
           <div>
             <div className="dh" style={{ fontSize: 24, lineHeight: 1 }}>Create a league</div>
-            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink2)', marginTop: 4 }}>Ye'll be the organiser. Share the code + password with yer crew.</div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink2)', marginTop: 4 }}>You'll be the organiser. Share the code and password with your group.</div>
           </div>
         </div>
         <div style={{ marginTop: 20, display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -2908,7 +2910,7 @@ function FindMyEntry(props) {
           <Wo mood="mischievous" size={72} animate />
           <div>
             <div className="dh" style={{ fontSize: 24, lineHeight: 1 }}>Find my entry</div>
-            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink2)', marginTop: 4 }}>No password needed. Just yer name — Wheesht never forgets a face.</div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink2)', marginTop: 4 }}>No password needed. Just your name — Wheesht never forgets a face.</div>
           </div>
         </div>
         <div style={{ marginTop: 18 }}>
@@ -2919,7 +2921,7 @@ function FindMyEntry(props) {
           {q.trim() && results.length === 0 &&
             <Co flat style={{ textAlign: 'center', padding: '22px 14px' }}>
               <Wo mood="nervous" size={64} animate />
-              <div className="dh" style={{ fontSize: 17, marginTop: 6 }}>Nae sign of ye.</div>
+              <div className="dh" style={{ fontSize: 17, marginTop: 6 }}>No sign of you.</div>
               <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink2)', marginTop: 3 }}>Different spelling? Or maybe you've not entered yet.</div>
               <div style={{ marginTop: 12 }}><Bo variant="primary" sm onClick={props.onNew}>Enter as someone new →</Bo></div>
             </Co>}
@@ -2959,8 +2961,8 @@ function OnboardingForm(props) {
         <button onClick={props.onBack} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, fontWeight: 800, color: 'var(--ink2)', padding: 0, marginBottom: 10 }}>← Back</button>
         <div style={{ textAlign: 'center' }}>
           <div style={{ display: 'inline-block' }} className="pop"><Wo mood="confident" size={120} animate track /></div>
-          <div className="dh" style={{ fontSize: 28, marginTop: 4, lineHeight: 1 }}>Let's get ye signed up.</div>
-          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink2)', marginTop: 6 }}>Takes ten seconds. The only bit Wheesht actually needs is yer name.</div>
+          <div className="dh" style={{ fontSize: 28, marginTop: 4, lineHeight: 1 }}>Let's get you signed up.</div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink2)', marginTop: 6 }}>Takes ten seconds. The only thing Wheesht actually needs is your name.</div>
         </div>
 
         <div style={{ marginTop: 22, display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -2991,7 +2993,7 @@ function OnboardingForm(props) {
 
         <div style={{ marginTop: 18 }}>
           <Bo variant="ink" block onClick={() => ok && props.onSubmit({ name: name.trim(), department: includeDept ? dept.trim() : '', location: loc, ltMember: lt })}>
-            {ok ? 'To the draw →' : 'Pop yer name in first'}
+            {ok ? 'To the draw →' : 'Add your name first'}
           </Bo>
         </div>
       </div>
@@ -3059,7 +3061,7 @@ function DrawMoment(props) {
         </>}
 
         {phase === 'revealed' && <div className="pop" style={{ width: '100%' }}>
-          <div className="dh" style={{ fontSize: 14, letterSpacing: '.16em', color: 'var(--yellow)' }}>YE'VE DRAWN</div>
+          <div className="dh" style={{ fontSize: 14, letterSpacing: '.16em', color: 'var(--yellow)' }}>YOU DREW</div>
           <div style={{ fontSize: 116, lineHeight: 1, margin: '8px 0' }}>{t.flag}</div>
           <div className="dh" style={{ fontSize: 44 }}>{t.name}</div>
           <div style={{ display: 'flex', gap: 8, justifyContent: 'center', margin: '12px 0 4px' }}>
@@ -3075,7 +3077,7 @@ function DrawMoment(props) {
             </div>
           </div>
           <div style={{ marginTop: 18, display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <Bo variant="primary" block onClick={() => window.wcToast && window.wcToast('Draw shared to the group. The slagging begins.', 'mischievous')}>Share your draw</Bo>
+            <Bo variant="primary" block onClick={() => window.wcToast && window.wcToast('Draw shared. The banter starts now.', 'mischievous')}>Share your draw</Bo>
             <Bo variant="ghost" block onClick={props.onDone} style={{ background: 'transparent', color: '#fff', boxShadow: '0 4px 0 rgba(255,255,255,.25)' }}>Into my dashboard →</Bo>
           </div>
         </div>}
@@ -3139,8 +3141,8 @@ function OIRosterPicker(props) {
         <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 16 }}>
           <Wo mood="confident" size={64} animate />
           <div>
-            <div className="dh" style={{ fontSize: 24, lineHeight: 1 }}>Who are ye?</div>
-            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink2)', marginTop: 4 }}>{league ? league.name + ' — y' : 'Y'}our team's already been drawn. Find yer name and tap it.</div>
+            <div className="dh" style={{ fontSize: 24, lineHeight: 1 }}>Who are you?</div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink2)', marginTop: 4 }}>{league ? league.name + ' — y' : 'Y'}our team has already been drawn. Find your name and tap it.</div>
           </div>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -3352,6 +3354,13 @@ function WinningsCard(props) {
   const pot = Sd.pot ? Sd.pot() : (WCd.POT * 0.5);
   const charity = Sd.charity ? Sd.charity() : (WCd.POT * 0.5);
   const ov = overallRank(me);
+  const rankTaps = React.useRef({n:0,t:0});
+  function rankTap(){
+    const now = Date.now();
+    rankTaps.current.n = (now - rankTaps.current.t < 1200) ? rankTaps.current.n + 1 : 1;
+    rankTaps.current.t = now;
+    if(rankTaps.current.n >= 3){ rankTaps.current.n = 0; window.__wheeshtEgg2 && window.__wheeshtEgg2(); }
+  }
   return (
     <Cd bordered>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -3359,7 +3368,7 @@ function WinningsCard(props) {
           <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.06em', textTransform: 'uppercase', color: 'var(--ink2)' }}>Winner takes all — if {t.name} lift the cup</div>
           <div className="dh" style={{ fontSize: 38, color: 'var(--green)', lineHeight: 1, marginTop: 2 }}>{money_d(pot)}</div>
         </div>
-        <div style={{ textAlign: 'right', background: 'var(--bg)', border: '2px solid var(--line)', borderRadius: 12, padding: '7px 11px' }}>
+        <div onClick={rankTap} style={{ textAlign: 'right', background: 'var(--bg)', border: '2px solid var(--line)', borderRadius: 12, padding: '7px 11px', cursor: 'default' }}>
           <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: '.04em', color: 'var(--ink2)' }}>OVERALL</div>
           <div className="dh" style={{ fontSize: 22 }}>#{ov.rank}<span style={{ fontSize: 13, color: 'var(--ink2)' }}>/{ov.total}</span></div>
         </div>
@@ -3424,8 +3433,8 @@ function MeScreen(props) {
     <div className="pad">
       <ProfileHeader me={me} onEdit={() => setEdit(true)} />
       <div style={{ height: 12 }} />
-      <Saysd mood={greetMood} label={'hiya ' + me.name.split(' ')[0]} animate>
-        {pre ? <>Ye've drawn {t.name}. Nae games yet — so get yer predictions in while the slate's clean.</> : (t.alive ? <>Yer {t.name} are still in it. Keep yer predictions sharp and the pot's in play.</> : <>Yer team's away, but the predictions league is wide open. Wheesht's no done wi' ye yet.</>)}
+      <Saysd mood={greetMood} label={'hey ' + me.name.split(' ')[0]} animate>
+        {pre ? <>You've drawn {t.name}. No games yet — get your predictions in while the slate's clean.</> : (t.alive ? <>{t.name} are still standing. Keep your predictions sharp — the pot's in play.</> : <>Your team is out, but the predictions league is still live. Wheesht isn't done with you yet.</>)}
       </Saysd>
       <SHd>Your team</SHd>
       <TeamCard me={me} onGames={props.goGames} />
@@ -4579,19 +4588,27 @@ const A_W = window.Wheesht;
 const A_S = window.Store;
 const { useState: aState, useEffect: aEffect } = React;
 
-/* ---- Easter egg (basic — built to extend later) ----------------------------
-   A wee hidden treat: tap the league title five times quickly. For now it just
-   pops some confetti and a hidden Wheesht line. Richer rewards (badges, secret
-   stats, a mini-game) can hang off window.__wheeshtEgg without touching the UI. */
+/* ---- Easter eggs (tap the league title 5× for egg 1; tap rank badge 3× for egg 2) --- */
 const EGG_LINES = [
-  'Wheesht kent ye’d go poking. Away ye go, ya nosy beggar.',
-  'A hidden whistle! Dinnae tell the others. Wheesht certainly won’t.',
-  'Five taps. Wheesht respects a curious mind. Reluctantly.',
-  'Ye found the secret. There’s nae prize. Yet. Wheesht is working on it.',
+  'Persistent. Wheesht respects that. Grudgingly.',
+  'A hidden feature, not a bug. Wheesht planned this all along.',
+  'Five taps. Impressive commitment. There is no prize. Wheesht is working on it.',
+  'You found it. Well done. Wheesht is neither confirming nor denying there are others.',
 ];
 window.__wheeshtEgg = function(){
   try{ window.wcConfetti && window.wcConfetti({ y:.32, count:90 }); }catch(e){}
   try{ window.wcToast && window.wcToast(EGG_LINES[(Math.random()*EGG_LINES.length)|0], 'mischievous'); }catch(e){}
+};
+
+const EGG2_LINES = [
+  'Ranking noted. The pot does not care. Wheesht does, slightly.',
+  'You tapped the rank. Wheesht was watching. Wheesht is always watching.',
+  'Three taps on the rank badge and Wheesht appears. Almost as if planned.',
+  'Position logged. Wheesht neither confirms nor denies this changes anything.',
+];
+window.__wheeshtEgg2 = function(){
+  try{ window.wcConfetti && window.wcConfetti({ y:.5, count:55, colors:['#F5C800','#E8272A','#fff','#1A1A1A'] }); }catch(e){}
+  try{ window.wcToast && window.wcToast(EGG2_LINES[(Math.random()*EGG2_LINES.length)|0], 'confident'); }catch(e){}
 };
 
 /* ---- tab icons ---- */
@@ -4747,11 +4764,36 @@ function App(){
   aEffect(()=>{
     if(flow!=='app'||!me) return;
     const pre = A_WC.meta.phase === 'pre';
+    const myTeam = A_WC.TEAMS[me.team];
     const id=setTimeout(()=>{
-      if(pre) window.wcToast&&window.wcToast('Predictions are open till kick-off. Get them in — Wheesht is taking names.','mischievous');
-      else if(!A_WC.TEAMS[me.team].alive) window.wcToast&&window.wcToast(A_WC.LINES.eliminated,'crying');
-      else window.wcToast&&window.wcToast('Yer team’s in the hat. Wheesht will be watching. Closely.','mischievous');
-      if(t.bias) setTimeout(()=>window.wcToast&&window.wcToast('Reminder: Scotland are in this tournament. Just so we’re all clear.','scottish'),1500);
+      if(pre){
+        const msgs=[
+          'Predictions are open till kick-off. Get them in — Wheesht is taking names.',
+          'Your picks won\'t make themselves. Wheesht is waiting.',
+          'Markets are open. Back your instincts. Wheesht backs nothing — but watches everything.',
+          'Get your predictions in before the first whistle. No extensions.',
+        ];
+        window.wcToast&&window.wcToast(msgs[(Math.random()*msgs.length)|0],'mischievous');
+      } else if(!myTeam.alive){
+        window.wcToast&&window.wcToast(A_WC.LINES.eliminated,'crying');
+      } else {
+        const msgs=[
+          'Your team is still in it. Wheesht is watching — with moderate approval.',
+          'Still standing. Wheesht has noted this. Nothing more to add.',
+          'Your team is in the mix. Wheesht is cautiously optimistic. Very cautiously.',
+          'In the running. Wheesht is watching. As always.',
+        ];
+        window.wcToast&&window.wcToast(msgs[(Math.random()*msgs.length)|0],'mischievous');
+      }
+      if(t.bias){
+        const scotMsgs=[
+          'Scotland are in this tournament. Just so everyone is clear.',
+          'Scotland. Still here. Wheesht is cautiously optimistic — emphasis on cautious.',
+          'A gentle reminder that Scotland are participating. Wheesht thought you should know.',
+          'Scotland update: still in it. Wheesht is fine. Everything is fine.',
+        ];
+        setTimeout(()=>window.wcToast&&window.wcToast(scotMsgs[(Math.random()*scotMsgs.length)|0],'scottish'),1600);
+      }
     },650);
     return ()=>clearTimeout(id);
   },[flow,me&&me.id]); // eslint-disable-line
@@ -4789,7 +4831,7 @@ function App(){
     const p=A_S.getSync(id);
     const t=p&&A_WC.TEAMS[p.team];
     setFlow('app');
-    setTimeout(()=>window.wcToast&&window.wcToast('Welcome, '+(p?p.name:'')+'! Yer team is '+((t&&t.flag)||'')+' '+(t?t.name:'')+'.',  'confident'),400);
+    setTimeout(()=>window.wcToast&&window.wcToast('Welcome, '+(p?p.name:'')+'! Your team is '+((t&&t.flag)||'')+' '+(t?t.name:'')+'.',  'confident'),400);
   }
 
   // -------- onboarding / identity flow --------
@@ -4857,11 +4899,11 @@ function App(){
     <window.TweaksPanel title="Tweaks">
       <window.TweakSection label="Atmosphere"/>
       <window.TweakSlider label="Celebration" value={t.celebration} min={0} max={10} step={1} onChange={v=>setTweak('celebration',v)}/>
-      <window.TweakToggle label="Wheesht’s Scottish bias" value={t.bias} onChange={v=>setTweak('bias',v)}/>
+      <window.TweakToggle label="Wheesht's Scottish bias" value={t.bias} onChange={v=>setTweak('bias',v)}/>
       <window.TweakToggle label="Match-programme texture" value={t.texture} onChange={v=>setTweak('texture',v)}/>
       <window.TweakSection label="Admin"/>
       <div style={{padding:'4px 14px 8px'}}>
-        <button onClick={()=>setAdmin(true)} style={{width:'100%',border:'none',borderRadius:11,background:'var(--ink)',color:'#fff',fontFamily:'var(--disp)',fontWeight:800,fontSize:13.5,padding:'12px',cursor:'pointer',boxShadow:'0 4px 0 #000'}}>Open Wheesht’s clipboard →</button>
+        <button onClick={()=>setAdmin(true)} style={{width:'100%',border:'none',borderRadius:11,background:'var(--ink)',color:'#fff',fontFamily:'var(--disp)',fontWeight:800,fontSize:13.5,padding:'12px',cursor:'pointer',boxShadow:'0 4px 0 #000'}}>Open Wheesht's clipboard →</button>
         <div style={{fontSize:11,fontWeight:600,color:'var(--ink2)',marginTop:6,lineHeight:1.35}}>Set results, knock teams out, grade predictions.</div>
       </div>
       <window.TweakToggle label="Lock predictions" value={t.locked} onChange={v=>setTweak('locked',v)}/>

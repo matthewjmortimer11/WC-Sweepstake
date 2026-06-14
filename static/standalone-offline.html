@@ -160,9 +160,9 @@ button{font-family:inherit;}
 /* ---------- confetti + toasts ---------- */
 .wc-confetti{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:80;}
 .wc-toasts{position:absolute;left:12px;right:12px;top:54px;z-index:75;display:flex;flex-direction:column;gap:8px;pointer-events:none;}
-.wc-toast{display:flex;align-items:center;gap:10px;background:var(--ink);color:#fff;border-radius:16px;padding:8px 14px 8px 8px;
-  box-shadow:0 10px 24px rgba(0,0,0,.3);animation:toastIn .4s cubic-bezier(.2,1.2,.4,1) both;}
-.wc-toast__txt{font-size:13px;font-weight:600;line-height:1.25;}
+.wc-toast{display:flex;align-items:center;gap:10px;background:var(--ink);color:#fff;border-radius:16px;padding:8px 10px 8px 8px;
+  box-shadow:0 10px 24px rgba(0,0,0,.3);animation:toastIn .4s cubic-bezier(.2,1.2,.4,1) both;pointer-events:auto;}
+.wc-toast__txt{font-size:13px;font-weight:600;line-height:1.25;flex:1;}
 @keyframes toastIn{from{transform:translateY(-16px) scale(.9);opacity:0}to{transform:none;opacity:1}}
 
 /* ---------- animations ---------- */
@@ -35304,6 +35304,13 @@ function SectionHead(props) {
 /* ---- Toast layer (imperative: window.wcToast(msg, mood)) ----------------- */
 function ToastLayer() {
   const [items, setItems] = useState([]);
+  function dismiss(id) {
+    setItems(function (xs) {
+      return xs.filter(function (x) {
+        return x.id !== id;
+      });
+    });
+  }
   useEffect(function () {
     window.wcToast = function (text, mood) {
       const id = Date.now() + Math.random();
@@ -35320,7 +35327,7 @@ function ToastLayer() {
             return x.id !== id;
           });
         });
-      }, 4200);
+      }, 4800);
     };
   }, []);
   return /*#__PURE__*/React.createElement("div", {
@@ -35333,8 +35340,27 @@ function ToastLayer() {
       mood: t.mood,
       size: 40
     }), /*#__PURE__*/React.createElement("div", {
-      className: "wc-toast__txt"
-    }, t.text));
+      className: "wc-toast__txt",
+      style: {
+        flex: 1
+      }
+    }, t.text), /*#__PURE__*/React.createElement("button", {
+      onClick: function () {
+        dismiss(t.id);
+      },
+      style: {
+        background: 'none',
+        border: 'none',
+        color: 'rgba(255,255,255,.55)',
+        cursor: 'pointer',
+        fontSize: 22,
+        fontWeight: 300,
+        lineHeight: 1,
+        padding: '0 0 0 8px',
+        flexShrink: 0,
+        fontFamily: 'sans-serif'
+      }
+    }, "\xD7"));
   }));
 }
 
@@ -37993,7 +38019,7 @@ function AccountGate(props) {
       color: 'var(--yellow)',
       fontWeight: 800
     }
-  }, "Wheesht here."), " Officially impartial. Constitutionally Scottish. Join a league or start yer own."))), accounts.length > 0 && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+  }, "Wheesht here."), " Officially impartial. Constitutionally Scottish. Join a league or start your own."))), accounts.length > 0 && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     className: "wc-sec",
     style: {
       margin: '26px 4px 11px'
@@ -38133,7 +38159,7 @@ function JoinLeague(props) {
       color: 'var(--ink2)',
       marginTop: 4
     }
-  }, "Pop in the league code and password the organiser gave ye."))), /*#__PURE__*/React.createElement("div", {
+  }, "Enter the league code and password your organiser gave you."))), /*#__PURE__*/React.createElement("div", {
     style: {
       marginTop: 20
     }
@@ -38262,7 +38288,7 @@ function CreateLeague(props) {
       color: 'var(--ink2)',
       marginTop: 4
     }
-  }, "Ye'll be the organiser. Share the code + password with yer crew."))), /*#__PURE__*/React.createElement("div", {
+  }, "You'll be the organiser. Share the code and password with your group."))), /*#__PURE__*/React.createElement("div", {
     style: {
       marginTop: 20,
       display: 'flex',
@@ -38374,7 +38400,7 @@ function FindMyEntry(props) {
       color: 'var(--ink2)',
       marginTop: 4
     }
-  }, "No password needed. Just yer name \u2014 Wheesht never forgets a face."))), /*#__PURE__*/React.createElement("div", {
+  }, "No password needed. Just your name \u2014 Wheesht never forgets a face."))), /*#__PURE__*/React.createElement("div", {
     style: {
       marginTop: 18
     }
@@ -38407,7 +38433,7 @@ function FindMyEntry(props) {
       fontSize: 17,
       marginTop: 6
     }
-  }, "Nae sign of ye."), /*#__PURE__*/React.createElement("div", {
+  }, "No sign of you."), /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 13,
       fontWeight: 600,
@@ -38522,14 +38548,14 @@ function OnboardingForm(props) {
       marginTop: 4,
       lineHeight: 1
     }
-  }, "Let's get ye signed up."), /*#__PURE__*/React.createElement("div", {
+  }, "Let's get you signed up."), /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 13,
       fontWeight: 600,
       color: 'var(--ink2)',
       marginTop: 6
     }
-  }, "Takes ten seconds. The only bit Wheesht actually needs is yer name.")), /*#__PURE__*/React.createElement("div", {
+  }, "Takes ten seconds. The only thing Wheesht actually needs is your name.")), /*#__PURE__*/React.createElement("div", {
     style: {
       marginTop: 22,
       display: 'flex',
@@ -38612,7 +38638,7 @@ function OnboardingForm(props) {
       location: loc,
       ltMember: lt
     })
-  }, ok ? 'To the draw →' : 'Pop yer name in first'))));
+  }, ok ? 'To the draw →' : 'Add your name first'))));
 }
 
 /* =================== THE DRAW (with special events) =================== */
@@ -38741,7 +38767,7 @@ function DrawMoment(props) {
       letterSpacing: '.16em',
       color: 'var(--yellow)'
     }
-  }, "YE'VE DRAWN"), /*#__PURE__*/React.createElement("div", {
+  }, "YOU DREW"), /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 116,
       lineHeight: 1,
@@ -38809,7 +38835,7 @@ function DrawMoment(props) {
   }, /*#__PURE__*/React.createElement(Bo, {
     variant: "primary",
     block: true,
-    onClick: () => window.wcToast && window.wcToast('Draw shared to the group. The slagging begins.', 'mischievous')
+    onClick: () => window.wcToast && window.wcToast('Draw shared. The banter starts now.', 'mischievous')
   }, "Share your draw"), /*#__PURE__*/React.createElement(Bo, {
     variant: "ghost",
     block: true,
@@ -39068,14 +39094,14 @@ function OIRosterPicker(props) {
       fontSize: 24,
       lineHeight: 1
     }
-  }, "Who are ye?"), /*#__PURE__*/React.createElement("div", {
+  }, "Who are you?"), /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 13,
       fontWeight: 600,
       color: 'var(--ink2)',
       marginTop: 4
     }
-  }, league ? league.name + ' — y' : 'Y', "our team's already been drawn. Find yer name and tap it."))), /*#__PURE__*/React.createElement("div", {
+  }, league ? league.name + ' — y' : 'Y', "our team has already been drawn. Find your name and tap it."))), /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
       flexDirection: 'column',
@@ -39655,6 +39681,19 @@ function WinningsCard(props) {
   const pot = Sd.pot ? Sd.pot() : WCd.POT * 0.5;
   const charity = Sd.charity ? Sd.charity() : WCd.POT * 0.5;
   const ov = overallRank(me);
+  const rankTaps = React.useRef({
+    n: 0,
+    t: 0
+  });
+  function rankTap() {
+    const now = Date.now();
+    rankTaps.current.n = now - rankTaps.current.t < 1200 ? rankTaps.current.n + 1 : 1;
+    rankTaps.current.t = now;
+    if (rankTaps.current.n >= 3) {
+      rankTaps.current.n = 0;
+      window.__wheeshtEgg2 && window.__wheeshtEgg2();
+    }
+  }
   return /*#__PURE__*/React.createElement(Cd, {
     bordered: true
   }, /*#__PURE__*/React.createElement("div", {
@@ -39680,12 +39719,14 @@ function WinningsCard(props) {
       marginTop: 2
     }
   }, money_d(pot))), /*#__PURE__*/React.createElement("div", {
+    onClick: rankTap,
     style: {
       textAlign: 'right',
       background: 'var(--bg)',
       border: '2px solid var(--line)',
       borderRadius: 12,
-      padding: '7px 11px'
+      padding: '7px 11px',
+      cursor: 'default'
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
@@ -39888,9 +39929,9 @@ function MeScreen(props) {
     }
   }), /*#__PURE__*/React.createElement(Saysd, {
     mood: greetMood,
-    label: 'hiya ' + me.name.split(' ')[0],
+    label: 'hey ' + me.name.split(' ')[0],
     animate: true
-  }, pre ? /*#__PURE__*/React.createElement(React.Fragment, null, "Ye've drawn ", t.name, ". Nae games yet \u2014 so get yer predictions in while the slate's clean.") : t.alive ? /*#__PURE__*/React.createElement(React.Fragment, null, "Yer ", t.name, " are still in it. Keep yer predictions sharp and the pot's in play.") : /*#__PURE__*/React.createElement(React.Fragment, null, "Yer team's away, but the predictions league is wide open. Wheesht's no done wi' ye yet.")), /*#__PURE__*/React.createElement(SHd, null, "Your team"), /*#__PURE__*/React.createElement(TeamCard, {
+  }, pre ? /*#__PURE__*/React.createElement(React.Fragment, null, "You've drawn ", t.name, ". No games yet \u2014 get your predictions in while the slate's clean.") : t.alive ? /*#__PURE__*/React.createElement(React.Fragment, null, t.name, " are still standing. Keep your predictions sharp \u2014 the pot's in play.") : /*#__PURE__*/React.createElement(React.Fragment, null, "Your team is out, but the predictions league is still live. Wheesht isn't done with you yet.")), /*#__PURE__*/React.createElement(SHd, null, "Your team"), /*#__PURE__*/React.createElement(TeamCard, {
     me: me,
     onGames: props.goGames
   }), /*#__PURE__*/React.createElement(SHd, {
@@ -42380,11 +42421,8 @@ const {
   useEffect: aEffect
 } = React;
 
-/* ---- Easter egg (basic — built to extend later) ----------------------------
-   A wee hidden treat: tap the league title five times quickly. For now it just
-   pops some confetti and a hidden Wheesht line. Richer rewards (badges, secret
-   stats, a mini-game) can hang off window.__wheeshtEgg without touching the UI. */
-const EGG_LINES = ['Wheesht kent ye’d go poking. Away ye go, ya nosy beggar.', 'A hidden whistle! Dinnae tell the others. Wheesht certainly won’t.', 'Five taps. Wheesht respects a curious mind. Reluctantly.', 'Ye found the secret. There’s nae prize. Yet. Wheesht is working on it.'];
+/* ---- Easter eggs (tap the league title 5× for egg 1; tap rank badge 3× for egg 2) --- */
+const EGG_LINES = ['Persistent. Wheesht respects that. Grudgingly.', 'A hidden feature, not a bug. Wheesht planned this all along.', 'Five taps. Impressive commitment. There is no prize. Wheesht is working on it.', 'You found it. Well done. Wheesht is neither confirming nor denying there are others.'];
 window.__wheeshtEgg = function () {
   try {
     window.wcConfetti && window.wcConfetti({
@@ -42394,6 +42432,19 @@ window.__wheeshtEgg = function () {
   } catch (e) {}
   try {
     window.wcToast && window.wcToast(EGG_LINES[Math.random() * EGG_LINES.length | 0], 'mischievous');
+  } catch (e) {}
+};
+const EGG2_LINES = ['Ranking noted. The pot does not care. Wheesht does, slightly.', 'You tapped the rank. Wheesht was watching. Wheesht is always watching.', 'Three taps on the rank badge and Wheesht appears. Almost as if planned.', 'Position logged. Wheesht neither confirms nor denies this changes anything.'];
+window.__wheeshtEgg2 = function () {
+  try {
+    window.wcConfetti && window.wcConfetti({
+      y: .5,
+      count: 55,
+      colors: ['#F5C800', '#E8272A', '#fff', '#1A1A1A']
+    });
+  } catch (e) {}
+  try {
+    window.wcToast && window.wcToast(EGG2_LINES[Math.random() * EGG2_LINES.length | 0], 'confident');
   } catch (e) {}
 };
 
@@ -42903,9 +42954,21 @@ function App() {
   aEffect(() => {
     if (flow !== 'app' || !me) return;
     const pre = A_WC.meta.phase === 'pre';
+    const myTeam = A_WC.TEAMS[me.team];
     const id = setTimeout(() => {
-      if (pre) window.wcToast && window.wcToast('Predictions are open till kick-off. Get them in — Wheesht is taking names.', 'mischievous');else if (!A_WC.TEAMS[me.team].alive) window.wcToast && window.wcToast(A_WC.LINES.eliminated, 'crying');else window.wcToast && window.wcToast('Yer team’s in the hat. Wheesht will be watching. Closely.', 'mischievous');
-      if (t.bias) setTimeout(() => window.wcToast && window.wcToast('Reminder: Scotland are in this tournament. Just so we’re all clear.', 'scottish'), 1500);
+      if (pre) {
+        const msgs = ['Predictions are open till kick-off. Get them in — Wheesht is taking names.', 'Your picks won\'t make themselves. Wheesht is waiting.', 'Markets are open. Back your instincts. Wheesht backs nothing — but watches everything.', 'Get your predictions in before the first whistle. No extensions.'];
+        window.wcToast && window.wcToast(msgs[Math.random() * msgs.length | 0], 'mischievous');
+      } else if (!myTeam.alive) {
+        window.wcToast && window.wcToast(A_WC.LINES.eliminated, 'crying');
+      } else {
+        const msgs = ['Your team is still in it. Wheesht is watching — with moderate approval.', 'Still standing. Wheesht has noted this. Nothing more to add.', 'Your team is in the mix. Wheesht is cautiously optimistic. Very cautiously.', 'In the running. Wheesht is watching. As always.'];
+        window.wcToast && window.wcToast(msgs[Math.random() * msgs.length | 0], 'mischievous');
+      }
+      if (t.bias) {
+        const scotMsgs = ['Scotland are in this tournament. Just so everyone is clear.', 'Scotland. Still here. Wheesht is cautiously optimistic — emphasis on cautious.', 'A gentle reminder that Scotland are participating. Wheesht thought you should know.', 'Scotland update: still in it. Wheesht is fine. Everything is fine.'];
+        setTimeout(() => window.wcToast && window.wcToast(scotMsgs[Math.random() * scotMsgs.length | 0], 'scottish'), 1600);
+      }
     }, 650);
     return () => clearTimeout(id);
   }, [flow, me && me.id]); // eslint-disable-line
@@ -42956,7 +43019,7 @@ function App() {
     const p = A_S.getSync(id);
     const t = p && A_WC.TEAMS[p.team];
     setFlow('app');
-    setTimeout(() => window.wcToast && window.wcToast('Welcome, ' + (p ? p.name : '') + '! Yer team is ' + (t && t.flag || '') + ' ' + (t ? t.name : '') + '.', 'confident'), 400);
+    setTimeout(() => window.wcToast && window.wcToast('Welcome, ' + (p ? p.name : '') + '! Your team is ' + (t && t.flag || '') + ' ' + (t ? t.name : '') + '.', 'confident'), 400);
   }
 
   // -------- onboarding / identity flow --------
@@ -43073,7 +43136,7 @@ function App() {
     step: 1,
     onChange: v => setTweak('celebration', v)
   }), /*#__PURE__*/React.createElement(window.TweakToggle, {
-    label: "Wheesht\u2019s Scottish bias",
+    label: "Wheesht's Scottish bias",
     value: t.bias,
     onChange: v => setTweak('bias', v)
   }), /*#__PURE__*/React.createElement(window.TweakToggle, {
@@ -43101,7 +43164,7 @@ function App() {
       cursor: 'pointer',
       boxShadow: '0 4px 0 #000'
     }
-  }, "Open Wheesht\u2019s clipboard \u2192"), /*#__PURE__*/React.createElement("div", {
+  }, "Open Wheesht's clipboard \u2192"), /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 11,
       fontWeight: 600,
