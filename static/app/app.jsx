@@ -97,7 +97,7 @@ function AppBar(props){
 
 function TabBar(props){
   const predictionsLocked = A_S.predictionsLocked && A_S.predictionsLocked();
-  const tabs=[['me','You'],['games','Games'],['players','Players'],['predictions','Predict'],['chat','Chat'],['summary','Verdict']];
+  const tabs=[['me','You'],['games','Games'],['players','Group'],['predictions','Predict'],['chat','Chat'],['summary','Verdict']];
   return <div className="tabbar tabbar--6">
     {tabs.map(([k,lab])=>(
       <button key={k} className={props.tab===k?'on':''} onClick={()=>props.setTab(k)}>
@@ -293,7 +293,7 @@ function App(){
   const screens={
     me:<window.MeScreen goPredictions={()=>setTab('predictions')} goGames={()=>setTab('games')}/>,
     games:<window.GamesScreen/>,
-    players:<window.TrackerScreen/>,
+    players:<window.CompetitionScreen/>,
     predictions:<window.PredictionsScreen/>,
     chat:<window.ChatScreen/>,
     summary:<window.SummaryScreen/>,

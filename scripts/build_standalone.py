@@ -43,6 +43,7 @@ JSX = [
     ("app", "screens-hub2.jsx"),
     ("app", "screens-onboarding.jsx"),
     ("app", "screens-dashboard.jsx"),
+    ("app", "screens-competition.jsx"),
     ("app", "screens-predictions.jsx"),
     ("app", "screens-games.jsx"),
     ("app", "screens-admin.jsx"),
