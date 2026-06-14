@@ -23,6 +23,7 @@
     league: 'wheesht_league_v1', leagues: 'wheesht_leagues_v1',
     adminTokens: 'wheesht_admin_tokens_v1',
     profiles: 'wheesht_profiles_v1',
+    acctTokens: 'wheesht_acct_tokens_v1',
   };
 
   var CHARITY_SPLIT = 0.5;
@@ -49,12 +50,18 @@
   function api(path) { var c = leagueCode(); return '/api/leagues/' + encodeURIComponent(c || '') + path; }
   function parseJson(r) {
     return r.json().catch(function () { return {}; }).then(function (j) {
-      if (!r.ok) throw new Error(j.detail || 'Request failed');
+      if (!r.ok) { var e = new Error(j.detail || 'Request failed'); e.status = r.status; throw e; }
       return j;
     });
   }
   function toastError(e, fallback) {
     if (window.wcToast) window.wcToast((e && e.message) || fallback || 'Could not save. Try again.', 'crying');
+  }
+  // A write was rejected: if the account is password-protected and our token is
+  // missing/expired (403), drop it so the next attempt re-prompts for sign-in.
+  function onWriteErr(id, e, fallback) {
+    if (e && e.status === 403) clearAcctToken(id);
+    toastError(e, fallback);
   }
   function adminToken(code) {
     var tokens = ssGet(K.adminTokens, {});
@@ -70,6 +77,22 @@
     var h = Object.assign({ 'Content-Type': 'application/json' }, extra || {});
     var token = adminToken();
     if (token) h['X-Wheesht-Admin-Token'] = token;
+    return h;
+  }
+  // Per-account sign-in tokens. Persisted (not session) so a device stays signed
+  // in across browser restarts for the token's lifetime; keyed by participant id.
+  function acctTokens() { return lsGet(K.acctTokens, {}); }
+  function acctToken(id) { var t = acctTokens(); return (id && t[id]) || ''; }
+  function setAcctToken(id, token) { if (!id || !token) return; var t = acctTokens(); t[id] = token; lsSet(K.acctTokens, t); }
+  function clearAcctToken(id) { var t = acctTokens(); if (t[id]) { delete t[id]; lsSet(K.acctTokens, t); } }
+  // Headers for a write to a (possibly protected) account: account token if we
+  // hold one, plus the organiser token when present (covers admin overrides).
+  function acctHeaders(id, extra) {
+    var h = Object.assign({ 'Content-Type': 'application/json' }, extra || {});
+    var at = acctToken(id);
+    if (at) h['X-Wheesht-Account-Token'] = at;
+    var admin = adminToken();
+    if (admin) h['X-Wheesht-Admin-Token'] = admin;
     return h;
   }
 
@@ -202,6 +225,8 @@
     if (lp.favouriteTeam != null) out.favouriteTeam = lp.favouriteTeam;
     if (lp.avatarDataUrl) out._avatarDataUrl = lp.avatarDataUrl;
     if (lp.avatarVersion != null) out.avatarVersion = Math.max(lp.avatarVersion, p.avatarVersion || 0);
+    // In MOCK/preview there is no server flag, so a locally-set lock drives the UI.
+    if (lp.hasPassword != null && !LIVE) out.hasPassword = lp.hasPassword;
     return out;
   }
 
@@ -469,10 +494,10 @@
       lsSet(K.mine, mine); rebuild();
       if (LIVE && leagueCode()) {
         try {
-          fetch(api('/participants/' + id), { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(mine[idx]) })
+          fetch(api('/participants/' + id), { method: 'PUT', headers: acctHeaders(id), body: JSON.stringify(mine[idx]) })
             .then(parseJson)
-            .catch(function (e) { toastError(e, 'Could not save profile'); Store.refresh(); });
-        } catch (e) { toastError(e, 'Could not save profile'); }
+            .catch(function (e) { onWriteErr(id, e, 'Could not save profile'); Store.refresh(); });
+        } catch (e) { onWriteErr(id, e, 'Could not save profile'); }
       }
       emit();
       return mine[idx];
@@ -487,10 +512,10 @@
       else if (LIVE && leagueCode()) {
         // seeded roster entry not yet in `mine` — persist the pick directly
         try {
-          fetch(api('/participants/' + id + '/picks'), { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: key, value: value }) })
+          fetch(api('/participants/' + id + '/picks'), { method: 'PUT', headers: acctHeaders(id), body: JSON.stringify({ key: key, value: value }) })
             .then(parseJson)
-            .catch(function (e) { toastError(e, 'Could not save pick'); Store.refresh(); });
-        } catch (e) { toastError(e, 'Could not save pick'); }
+            .catch(function (e) { onWriteErr(id, e, 'Could not save pick'); Store.refresh(); });
+        } catch (e) { onWriteErr(id, e, 'Could not save pick'); }
         emit();
       }
       return picks;
@@ -542,9 +567,9 @@
         var body = {};
         if (patch.displayName != null) body.displayName = local.displayName;
         if (patch.favouriteTeam != null) body.favouriteTeam = local.favouriteTeam;
-        return fetch(api('/participants/' + id + '/profile'), { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+        return fetch(api('/participants/' + id + '/profile'), { method: 'PUT', headers: acctHeaders(id), body: JSON.stringify(body) })
           .then(parseJson).then(function (j) { return j; })
-          .catch(function (e) { toastError(e, 'Could not save profile'); });
+          .catch(function (e) { onWriteErr(id, e, 'Could not save profile'); });
       }
       return Promise.resolve({ ok: true });
     },
@@ -556,14 +581,14 @@
       setLocalProfile(id, { avatarDataUrl: dataUrl, avatarVersion: prev + 1 });
       rebuild(); emit();
       if (LIVE && leagueCode()) {
-        return fetch(api('/participants/' + id + '/avatar'), { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ dataUrl: dataUrl }) })
+        return fetch(api('/participants/' + id + '/avatar'), { method: 'PUT', headers: acctHeaders(id), body: JSON.stringify({ dataUrl: dataUrl }) })
           .then(parseJson)
           .then(function (j) {
             // Adopt the server's version so the cached URL lines up on refresh.
             if (j && j.avatarVersion != null) setLocalProfile(id, { avatarVersion: j.avatarVersion });
             return j;
           })
-          .catch(function (e) { toastError(e, 'Could not save photo'); });
+          .catch(function (e) { onWriteErr(id, e, 'Could not save photo'); });
       }
       return Promise.resolve({ ok: true });
     },
@@ -574,11 +599,50 @@
       setLocalProfile(id, { avatarVersion: 0 });
       rebuild(); emit();
       if (LIVE && leagueCode()) {
-        return fetch(api('/participants/' + id + '/avatar'), { method: 'DELETE', headers: { 'Content-Type': 'application/json' } })
-          .then(parseJson).catch(function (e) { toastError(e, 'Could not remove photo'); });
+        return fetch(api('/participants/' + id + '/avatar'), { method: 'DELETE', headers: acctHeaders(id) })
+          .then(parseJson).catch(function (e) { onWriteErr(id, e, 'Could not remove photo'); });
       }
       return Promise.resolve({ ok: true });
     },
+
+    // ===== ACCOUNT PASSWORDS (optional sign-in lock) =====
+    // Is this entry protected by a password?
+    hasPassword: function (p) { return !!(p && p.hasPassword); },
+    // Do we hold a sign-in token for this account on this device?
+    isSignedIn: function (id) { return !!acctToken(id); },
+    // Does taking over / editing this account need a password we don't hold yet?
+    needsSignIn: function (p) { return !!(p && p.hasPassword) && !acctToken(p.id); },
+    // Prove a password; on success store a reusable token for this device.
+    authAccount: function (id, password) {
+      if (!LIVE) { setAcctToken(id, 'mock'); return Promise.resolve({ ok: true }); }
+      var c = leagueCode();
+      if (!c) return Promise.reject(new Error('Join a league first'));
+      return fetch(api('/participants/' + id + '/auth'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: password || '' }) })
+        .then(parseJson).then(function (j) { if (j && j.token) setAcctToken(id, j.token); return j; });
+    },
+    // Set, change or clear a password. opts: {newPassword, currentPassword}.
+    // newPassword '' clears the lock. Stores the fresh token on success.
+    setAccountPassword: function (id, opts) {
+      opts = opts || {};
+      var clearing = !opts.newPassword;
+      if (!LIVE) {
+        setLocalProfile(id, { hasPassword: !clearing });
+        if (clearing) clearAcctToken(id); else setAcctToken(id, 'mock');
+        rebuild(); emit();
+        return Promise.resolve({ ok: true, hasPassword: !clearing });
+      }
+      var c = leagueCode();
+      if (!c) return Promise.reject(new Error('Join a league first'));
+      return fetch(api('/participants/' + id + '/password'), {
+        method: 'PUT', headers: acctHeaders(id),
+        body: JSON.stringify({ newPassword: opts.newPassword || '', currentPassword: opts.currentPassword || '' }),
+      }).then(parseJson).then(function (j) {
+        if (j && j.token) setAcctToken(id, j.token);
+        if (clearing) clearAcctToken(id);
+        return Store.refresh().then(function () { return j; });
+      });
+    },
+    signOutAccount: function (id) { clearAcctToken(id); emit(); },
 
     refresh: function () {
       if (!LIVE) return Promise.resolve();

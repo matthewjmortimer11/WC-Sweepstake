@@ -140,6 +140,32 @@ def _require_admin(league: League, token: Optional[str]) -> None:
         raise HTTPException(status_code=403, detail="Organiser access required")
 
 
+# Per-account sign-in tokens. Same HMAC construction as the organiser token but
+# scoped to one participant, with a long TTL (it's a "stay signed in" lock, not
+# privileged access). Signed with the same server secret; never leaves verified.
+_ACCOUNT_TOKEN_TTL_SECONDS = 30 * 24 * 60 * 60  # 30 days
+
+
+def _account_token_for(league: League, participant_id: str) -> str:
+    ts = str(int(time.time()))
+    msg = f"acct:{league.id}:{participant_id}:{ts}".encode("utf-8")
+    sig = hmac.new(_ADMIN_SECRET.encode("utf-8"), msg, hashlib.sha256).hexdigest()
+    return f"a1.{ts}.{sig}"
+
+
+def _account_token_ok(league: League, participant_id: str, token: Optional[str]) -> bool:
+    try:
+        version, ts_s, sig = (token or "").split(".", 2)
+        ts = int(ts_s)
+    except (ValueError, AttributeError):
+        return False
+    if version != "a1" or int(time.time()) - ts > _ACCOUNT_TOKEN_TTL_SECONDS:
+        return False
+    msg = f"acct:{league.id}:{participant_id}:{ts_s}".encode("utf-8")
+    expected = hmac.new(_ADMIN_SECRET.encode("utf-8"), msg, hashlib.sha256).hexdigest()
+    return hmac.compare_digest(sig, expected)
+
+
 def _slugify(name: str) -> str:
     s = re.sub(r"[^a-z0-9]+", "-", (name or "").lower()).strip("-")
     return s or "league"
@@ -204,6 +230,9 @@ def _participant_to_dict(p: Participant, league_code: str) -> Dict[str, Any]:
         "picks": p.picks or {},
         "predScore": p.pred_score,
         "joinedAt": p.joined_at,
+        # Whether this entry is locked with a password (the hash itself never
+        # leaves the server). Lets the client know when to prompt for sign-in.
+        "hasPassword": bool(p.password_hash),
     }
 
 
@@ -237,6 +266,8 @@ def _league_people(
         d["favouriteTeam"] = (getattr(prof, "favourite_team", "") or "") if prof else ""
         d["avatarVersion"] = (getattr(prof, "avatar_version", 0) or 0) if prof else 0
         d["avatarSource"] = (getattr(prof, "avatar_source", "") or "") if prof else ""
+        # Config base entries (no DB row) are open until a row sets a password.
+        d.setdefault("hasPassword", False)
     return list(by_id.values())
 
 
@@ -255,6 +286,56 @@ async def _participant_in_league(session, league: League, participant_id: str) -
     if league.seeded and league.code == _CONFIG_LEAGUE_CODE:
         return any(rp["id"] == participant_id for rp in _ROSTER)
     return False
+
+
+def _seeded_base(league: League, participant_id: str) -> Optional[Dict[str, Any]]:
+    if league.seeded and league.code == _CONFIG_LEAGUE_CODE:
+        return next((rp for rp in _ROSTER if rp["id"] == participant_id), None)
+    return None
+
+
+async def _get_or_materialise(session, league: League, participant_id: str) -> Optional[Participant]:
+    """Return the DB row for an entrant, creating one from the seeded roster base
+    if it only exists in config so far (same pattern as a first pick)."""
+    row = await session.get(Participant, participant_id)
+    if row is not None and row.league_id == league.id:
+        return row
+    base = _seeded_base(league, participant_id)
+    if base is None:
+        return None
+    row = Participant(
+        id=participant_id, league_id=league.id, name=base["name"],
+        initials=base.get("initials", ""), team=base.get("team", ""),
+        color=base.get("color", "#E8272A"), location=base.get("location", "Edinburgh"),
+        city=base.get("city", "Edinburgh"), stage=base.get("stage", ""),
+        alive=bool(base.get("alive", True)), is_oi=True, picks={}, removed=False,
+    )
+    session.add(row)
+    return row
+
+
+async def _account_password_hash(session, league: League, participant_id: str) -> Optional[str]:
+    row = await session.get(Participant, participant_id)
+    if row is not None and row.league_id == league.id and not row.removed:
+        return row.password_hash
+    return None
+
+
+async def _guard_account_write(
+    session, league: League, participant_id: str,
+    account_token: Optional[str], admin_token: Optional[str],
+) -> None:
+    """Sign-in lock: a write to a PASSWORD-PROTECTED entry needs a valid account
+    token (obtained once at sign-in) or the organiser's token. Open (passwordless)
+    entries are unaffected — the existing "just tap who you are" behaviour."""
+    h = await _account_password_hash(session, league, participant_id)
+    if not h:
+        return
+    if admin_token and _admin_token_ok(league, admin_token):
+        return
+    if account_token and _account_token_ok(league, participant_id, account_token):
+        return
+    raise HTTPException(status_code=403, detail="This entry is password-protected — sign in to edit it.")
 
 
 # ── State assembly ────────────────────────────────────────────────────────────
@@ -497,6 +578,7 @@ async def _ensure_schema() -> None:
     """
     statements = [
         "ALTER TABLE profiles ADD COLUMN IF NOT EXISTS display_name VARCHAR NOT NULL DEFAULT ''",
+        "ALTER TABLE participants ADD COLUMN IF NOT EXISTS password_hash VARCHAR",
     ]
     async with engine.begin() as conn:
         for stmt in statements:
@@ -703,21 +785,34 @@ async def _upsert_participant(session, league: League, payload: ParticipantPaylo
 
 
 @app.post("/api/leagues/{code}/participants")
-async def create_participant(code: str, payload: ParticipantPayload):
+async def create_participant(
+    code: str,
+    payload: ParticipantPayload,
+    x_wheesht_account_token: Optional[str] = Header(None, alias="X-Wheesht-Account-Token"),
+    x_wheesht_admin_token: Optional[str] = Header(None, alias="X-Wheesht-Admin-Token"),
+):
     async with AsyncSessionLocal() as session:
         league = await _get_league_by_code(session, code.upper())
         if league is None:
             raise HTTPException(status_code=404, detail="league not found")
+        await _guard_account_write(session, league, payload.id, x_wheesht_account_token, x_wheesht_admin_token)
         row = await _upsert_participant(session, league, payload)
         return {"ok": True, "participant": _participant_to_dict(row, league.code)}
 
 
 @app.put("/api/leagues/{code}/participants/{participant_id}")
-async def update_participant(code: str, participant_id: str, payload: ParticipantPayload):
+async def update_participant(
+    code: str,
+    participant_id: str,
+    payload: ParticipantPayload,
+    x_wheesht_account_token: Optional[str] = Header(None, alias="X-Wheesht-Account-Token"),
+    x_wheesht_admin_token: Optional[str] = Header(None, alias="X-Wheesht-Admin-Token"),
+):
     async with AsyncSessionLocal() as session:
         league = await _get_league_by_code(session, code.upper())
         if league is None:
             raise HTTPException(status_code=404, detail="league not found")
+        await _guard_account_write(session, league, participant_id, x_wheesht_account_token, x_wheesht_admin_token)
         payload.id = participant_id
         row = await _upsert_participant(session, league, payload)
         return {"ok": True, "participant": _participant_to_dict(row, league.code)}
@@ -762,11 +857,18 @@ class PickPayload(BaseModel):
 
 
 @app.put("/api/leagues/{code}/participants/{participant_id}/picks")
-async def set_pick(code: str, participant_id: str, payload: PickPayload):
+async def set_pick(
+    code: str,
+    participant_id: str,
+    payload: PickPayload,
+    x_wheesht_account_token: Optional[str] = Header(None, alias="X-Wheesht-Account-Token"),
+    x_wheesht_admin_token: Optional[str] = Header(None, alias="X-Wheesht-Admin-Token"),
+):
     async with AsyncSessionLocal() as session:
         league = await _get_league_by_code(session, code.upper())
         if league is None:
             raise HTTPException(status_code=404, detail="league not found")
+        await _guard_account_write(session, league, participant_id, x_wheesht_account_token, x_wheesht_admin_token)
         row = await session.get(Participant, participant_id)
         if row is None or row.league_id != league.id:
             # Seeded base entry making its first pick → materialise a DB row.
@@ -824,13 +926,20 @@ async def get_profile(code: str, participant_id: str):
 
 
 @app.put("/api/leagues/{code}/participants/{participant_id}/profile")
-async def put_profile(code: str, participant_id: str, payload: ProfilePayload):
+async def put_profile(
+    code: str,
+    participant_id: str,
+    payload: ProfilePayload,
+    x_wheesht_account_token: Optional[str] = Header(None, alias="X-Wheesht-Account-Token"),
+    x_wheesht_admin_token: Optional[str] = Header(None, alias="X-Wheesht-Admin-Token"),
+):
     async with AsyncSessionLocal() as session:
         league = await _get_league_by_code(session, code.upper())
         if league is None:
             raise HTTPException(status_code=404, detail="league not found")
         if not await _participant_in_league(session, league, participant_id):
             raise HTTPException(status_code=404, detail="participant not found")
+        await _guard_account_write(session, league, participant_id, x_wheesht_account_token, x_wheesht_admin_token)
 
         fav = payload.favouriteTeam
         if fav is not None:
@@ -879,7 +988,13 @@ def _decode_data_url(data_url: str) -> tuple[str, bytes]:
 
 
 @app.put("/api/leagues/{code}/participants/{participant_id}/avatar")
-async def put_avatar(code: str, participant_id: str, payload: AvatarPayload):
+async def put_avatar(
+    code: str,
+    participant_id: str,
+    payload: AvatarPayload,
+    x_wheesht_account_token: Optional[str] = Header(None, alias="X-Wheesht-Account-Token"),
+    x_wheesht_admin_token: Optional[str] = Header(None, alias="X-Wheesht-Admin-Token"),
+):
     ctype, raw = _decode_data_url(payload.dataUrl)
     async with AsyncSessionLocal() as session:
         league = await _get_league_by_code(session, code.upper())
@@ -887,6 +1002,7 @@ async def put_avatar(code: str, participant_id: str, payload: AvatarPayload):
             raise HTTPException(status_code=404, detail="league not found")
         if not await _participant_in_league(session, league, participant_id):
             raise HTTPException(status_code=404, detail="participant not found")
+        await _guard_account_write(session, league, participant_id, x_wheesht_account_token, x_wheesht_admin_token)
 
         asset = await session.get(ProfileAsset, participant_id)
         if asset is None:
@@ -936,11 +1052,17 @@ async def get_avatar(code: str, participant_id: str):
 
 
 @app.delete("/api/leagues/{code}/participants/{participant_id}/avatar")
-async def delete_avatar(code: str, participant_id: str):
+async def delete_avatar(
+    code: str,
+    participant_id: str,
+    x_wheesht_account_token: Optional[str] = Header(None, alias="X-Wheesht-Account-Token"),
+    x_wheesht_admin_token: Optional[str] = Header(None, alias="X-Wheesht-Admin-Token"),
+):
     async with AsyncSessionLocal() as session:
         league = await _get_league_by_code(session, code.upper())
         if league is None:
             raise HTTPException(status_code=404, detail="league not found")
+        await _guard_account_write(session, league, participant_id, x_wheesht_account_token, x_wheesht_admin_token)
         asset = await session.get(ProfileAsset, participant_id)
         if asset is not None and asset.league_id == league.id:
             await session.delete(asset)
@@ -951,6 +1073,92 @@ async def delete_avatar(code: str, participant_id: str):
             prof.updated_at = _now()
         await session.commit()
         return {"ok": True}
+
+
+# ── Per-account passwords (optional sign-in lock) ─────────────────────────────
+# An account may set an OPTIONAL password. Once set it locks taking the account
+# over / resuming it on a new device, and gates writes to the entry (sign-in
+# lock: prove the password once, reuse the token). Passwordless accounts keep the
+# open "just tap who you are" behaviour. The organiser can clear a password
+# (admin token) so nobody is ever permanently locked out.
+
+_MIN_ACCOUNT_PASSWORD = 4
+
+
+class AccountAuthPayload(BaseModel):
+    password: str
+
+
+class AccountPasswordPayload(BaseModel):
+    # newPassword: non-empty → set/change; "" → clear the lock. None is invalid.
+    newPassword: Optional[str] = None
+    currentPassword: Optional[str] = None
+
+
+@app.post("/api/leagues/{code}/participants/{participant_id}/auth")
+async def account_auth(code: str, participant_id: str, payload: AccountAuthPayload):
+    """Sign in to a password-protected entry; returns a reusable account token."""
+    async with AsyncSessionLocal() as session:
+        league = await _get_league_by_code(session, code.upper())
+        if league is None:
+            raise HTTPException(status_code=404, detail="league not found")
+        h = await _account_password_hash(session, league, participant_id)
+        if not h:
+            raise HTTPException(status_code=400, detail="This entry has no password set")
+        if not _verify_password(payload.password or "", h):
+            raise HTTPException(status_code=403, detail="Wrong password")
+        return {"ok": True, "token": _account_token_for(league, participant_id)}
+
+
+@app.put("/api/leagues/{code}/participants/{participant_id}/password")
+async def set_account_password(
+    code: str,
+    participant_id: str,
+    payload: AccountPasswordPayload,
+    x_wheesht_account_token: Optional[str] = Header(None, alias="X-Wheesht-Account-Token"),
+    x_wheesht_admin_token: Optional[str] = Header(None, alias="X-Wheesht-Admin-Token"),
+):
+    """Set, change or clear an entry's password.
+
+    Changing/clearing an EXISTING password requires proof: the current password,
+    a valid account token, or the organiser token (reset / unlock). Setting the
+    FIRST password on an open entry is allowed for whoever holds it — the same
+    open trust as today, but strictly more protection from then on.
+    """
+    async with AsyncSessionLocal() as session:
+        league = await _get_league_by_code(session, code.upper())
+        if league is None:
+            raise HTTPException(status_code=404, detail="league not found")
+        if not await _participant_in_league(session, league, participant_id):
+            raise HTTPException(status_code=404, detail="participant not found")
+
+        existing = await _account_password_hash(session, league, participant_id)
+        if existing:
+            ok = (
+                (payload.currentPassword and _verify_password(payload.currentPassword, existing))
+                or (x_wheesht_account_token and _account_token_ok(league, participant_id, x_wheesht_account_token))
+                or (x_wheesht_admin_token and _admin_token_ok(league, x_wheesht_admin_token))
+            )
+            if not ok:
+                raise HTTPException(status_code=403, detail="Enter your current password to change it")
+
+        new = payload.newPassword
+        if new:  # set / change
+            if len(new) < _MIN_ACCOUNT_PASSWORD:
+                raise HTTPException(status_code=400, detail=f"Password must be at least {_MIN_ACCOUNT_PASSWORD} characters")
+            row = await _get_or_materialise(session, league, participant_id)
+            if row is None:
+                raise HTTPException(status_code=404, detail="participant not found")
+            row.password_hash = _hash_password(new)
+            await session.commit()
+            return {"ok": True, "hasPassword": True, "token": _account_token_for(league, participant_id)}
+
+        # clear the lock
+        row = await session.get(Participant, participant_id)
+        if row is not None and row.league_id == league.id:
+            row.password_hash = None
+            await session.commit()
+        return {"ok": True, "hasPassword": False}
 
 
 # ── Admin overrides (league-scoped) ───────────────────────────────────────────

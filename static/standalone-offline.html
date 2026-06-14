@@ -33830,6 +33830,7 @@ button:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(245,200,0,.55);borde
     league: 'wheesht_league_v1', leagues: 'wheesht_leagues_v1',
     adminTokens: 'wheesht_admin_tokens_v1',
     profiles: 'wheesht_profiles_v1',
+    acctTokens: 'wheesht_acct_tokens_v1',
   };
 
   var CHARITY_SPLIT = 0.5;
@@ -33856,12 +33857,18 @@ button:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(245,200,0,.55);borde
   function api(path) { var c = leagueCode(); return '/api/leagues/' + encodeURIComponent(c || '') + path; }
   function parseJson(r) {
     return r.json().catch(function () { return {}; }).then(function (j) {
-      if (!r.ok) throw new Error(j.detail || 'Request failed');
+      if (!r.ok) { var e = new Error(j.detail || 'Request failed'); e.status = r.status; throw e; }
       return j;
     });
   }
   function toastError(e, fallback) {
     if (window.wcToast) window.wcToast((e && e.message) || fallback || 'Could not save. Try again.', 'crying');
+  }
+  // A write was rejected: if the account is password-protected and our token is
+  // missing/expired (403), drop it so the next attempt re-prompts for sign-in.
+  function onWriteErr(id, e, fallback) {
+    if (e && e.status === 403) clearAcctToken(id);
+    toastError(e, fallback);
   }
   function adminToken(code) {
     var tokens = ssGet(K.adminTokens, {});
@@ -33877,6 +33884,22 @@ button:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(245,200,0,.55);borde
     var h = Object.assign({ 'Content-Type': 'application/json' }, extra || {});
     var token = adminToken();
     if (token) h['X-Wheesht-Admin-Token'] = token;
+    return h;
+  }
+  // Per-account sign-in tokens. Persisted (not session) so a device stays signed
+  // in across browser restarts for the token's lifetime; keyed by participant id.
+  function acctTokens() { return lsGet(K.acctTokens, {}); }
+  function acctToken(id) { var t = acctTokens(); return (id && t[id]) || ''; }
+  function setAcctToken(id, token) { if (!id || !token) return; var t = acctTokens(); t[id] = token; lsSet(K.acctTokens, t); }
+  function clearAcctToken(id) { var t = acctTokens(); if (t[id]) { delete t[id]; lsSet(K.acctTokens, t); } }
+  // Headers for a write to a (possibly protected) account: account token if we
+  // hold one, plus the organiser token when present (covers admin overrides).
+  function acctHeaders(id, extra) {
+    var h = Object.assign({ 'Content-Type': 'application/json' }, extra || {});
+    var at = acctToken(id);
+    if (at) h['X-Wheesht-Account-Token'] = at;
+    var admin = adminToken();
+    if (admin) h['X-Wheesht-Admin-Token'] = admin;
     return h;
   }
 
@@ -34009,6 +34032,8 @@ button:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(245,200,0,.55);borde
     if (lp.favouriteTeam != null) out.favouriteTeam = lp.favouriteTeam;
     if (lp.avatarDataUrl) out._avatarDataUrl = lp.avatarDataUrl;
     if (lp.avatarVersion != null) out.avatarVersion = Math.max(lp.avatarVersion, p.avatarVersion || 0);
+    // In MOCK/preview there is no server flag, so a locally-set lock drives the UI.
+    if (lp.hasPassword != null && !LIVE) out.hasPassword = lp.hasPassword;
     return out;
   }
 
@@ -34276,10 +34301,10 @@ button:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(245,200,0,.55);borde
       lsSet(K.mine, mine); rebuild();
       if (LIVE && leagueCode()) {
         try {
-          fetch(api('/participants/' + id), { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(mine[idx]) })
+          fetch(api('/participants/' + id), { method: 'PUT', headers: acctHeaders(id), body: JSON.stringify(mine[idx]) })
             .then(parseJson)
-            .catch(function (e) { toastError(e, 'Could not save profile'); Store.refresh(); });
-        } catch (e) { toastError(e, 'Could not save profile'); }
+            .catch(function (e) { onWriteErr(id, e, 'Could not save profile'); Store.refresh(); });
+        } catch (e) { onWriteErr(id, e, 'Could not save profile'); }
       }
       emit();
       return mine[idx];
@@ -34294,10 +34319,10 @@ button:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(245,200,0,.55);borde
       else if (LIVE && leagueCode()) {
         // seeded roster entry not yet in `mine` — persist the pick directly
         try {
-          fetch(api('/participants/' + id + '/picks'), { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: key, value: value }) })
+          fetch(api('/participants/' + id + '/picks'), { method: 'PUT', headers: acctHeaders(id), body: JSON.stringify({ key: key, value: value }) })
             .then(parseJson)
-            .catch(function (e) { toastError(e, 'Could not save pick'); Store.refresh(); });
-        } catch (e) { toastError(e, 'Could not save pick'); }
+            .catch(function (e) { onWriteErr(id, e, 'Could not save pick'); Store.refresh(); });
+        } catch (e) { onWriteErr(id, e, 'Could not save pick'); }
         emit();
       }
       return picks;
@@ -34349,9 +34374,9 @@ button:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(245,200,0,.55);borde
         var body = {};
         if (patch.displayName != null) body.displayName = local.displayName;
         if (patch.favouriteTeam != null) body.favouriteTeam = local.favouriteTeam;
-        return fetch(api('/participants/' + id + '/profile'), { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+        return fetch(api('/participants/' + id + '/profile'), { method: 'PUT', headers: acctHeaders(id), body: JSON.stringify(body) })
           .then(parseJson).then(function (j) { return j; })
-          .catch(function (e) { toastError(e, 'Could not save profile'); });
+          .catch(function (e) { onWriteErr(id, e, 'Could not save profile'); });
       }
       return Promise.resolve({ ok: true });
     },
@@ -34363,14 +34388,14 @@ button:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(245,200,0,.55);borde
       setLocalProfile(id, { avatarDataUrl: dataUrl, avatarVersion: prev + 1 });
       rebuild(); emit();
       if (LIVE && leagueCode()) {
-        return fetch(api('/participants/' + id + '/avatar'), { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ dataUrl: dataUrl }) })
+        return fetch(api('/participants/' + id + '/avatar'), { method: 'PUT', headers: acctHeaders(id), body: JSON.stringify({ dataUrl: dataUrl }) })
           .then(parseJson)
           .then(function (j) {
             // Adopt the server's version so the cached URL lines up on refresh.
             if (j && j.avatarVersion != null) setLocalProfile(id, { avatarVersion: j.avatarVersion });
             return j;
           })
-          .catch(function (e) { toastError(e, 'Could not save photo'); });
+          .catch(function (e) { onWriteErr(id, e, 'Could not save photo'); });
       }
       return Promise.resolve({ ok: true });
     },
@@ -34381,11 +34406,50 @@ button:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(245,200,0,.55);borde
       setLocalProfile(id, { avatarVersion: 0 });
       rebuild(); emit();
       if (LIVE && leagueCode()) {
-        return fetch(api('/participants/' + id + '/avatar'), { method: 'DELETE', headers: { 'Content-Type': 'application/json' } })
-          .then(parseJson).catch(function (e) { toastError(e, 'Could not remove photo'); });
+        return fetch(api('/participants/' + id + '/avatar'), { method: 'DELETE', headers: acctHeaders(id) })
+          .then(parseJson).catch(function (e) { onWriteErr(id, e, 'Could not remove photo'); });
       }
       return Promise.resolve({ ok: true });
     },
+
+    // ===== ACCOUNT PASSWORDS (optional sign-in lock) =====
+    // Is this entry protected by a password?
+    hasPassword: function (p) { return !!(p && p.hasPassword); },
+    // Do we hold a sign-in token for this account on this device?
+    isSignedIn: function (id) { return !!acctToken(id); },
+    // Does taking over / editing this account need a password we don't hold yet?
+    needsSignIn: function (p) { return !!(p && p.hasPassword) && !acctToken(p.id); },
+    // Prove a password; on success store a reusable token for this device.
+    authAccount: function (id, password) {
+      if (!LIVE) { setAcctToken(id, 'mock'); return Promise.resolve({ ok: true }); }
+      var c = leagueCode();
+      if (!c) return Promise.reject(new Error('Join a league first'));
+      return fetch(api('/participants/' + id + '/auth'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: password || '' }) })
+        .then(parseJson).then(function (j) { if (j && j.token) setAcctToken(id, j.token); return j; });
+    },
+    // Set, change or clear a password. opts: {newPassword, currentPassword}.
+    // newPassword '' clears the lock. Stores the fresh token on success.
+    setAccountPassword: function (id, opts) {
+      opts = opts || {};
+      var clearing = !opts.newPassword;
+      if (!LIVE) {
+        setLocalProfile(id, { hasPassword: !clearing });
+        if (clearing) clearAcctToken(id); else setAcctToken(id, 'mock');
+        rebuild(); emit();
+        return Promise.resolve({ ok: true, hasPassword: !clearing });
+      }
+      var c = leagueCode();
+      if (!c) return Promise.reject(new Error('Join a league first'));
+      return fetch(api('/participants/' + id + '/password'), {
+        method: 'PUT', headers: acctHeaders(id),
+        body: JSON.stringify({ newPassword: opts.newPassword || '', currentPassword: opts.currentPassword || '' }),
+      }).then(parseJson).then(function (j) {
+        if (j && j.token) setAcctToken(id, j.token);
+        if (clearing) clearAcctToken(id);
+        return Store.refresh().then(function () { return j; });
+      });
+    },
+    signOutAccount: function (id) { clearAcctToken(id); emit(); },
 
     refresh: function () {
       if (!LIVE) return Promise.resolve();
@@ -39851,6 +39915,156 @@ function ProfileHeader(props) {
     max: 4
   })));
 }
+function PasswordSection(props) {
+  const me = props.me;
+  const has = Sd.hasPassword ? Sd.hasPassword(me) : false;
+  const [open, setOpen] = dState(false);
+  const [cur, setCur] = dState('');
+  const [pw1, setPw1] = dState('');
+  const [busy, setBusy] = dState(false);
+  const [msg, setMsg] = dState('');
+  const lbl = {
+    fontWeight: 800,
+    fontSize: 13,
+    fontFamily: 'var(--disp)'
+  };
+  const fld = {
+    width: '100%',
+    boxSizing: 'border-box',
+    border: '2.5px solid var(--ink)',
+    borderRadius: 12,
+    padding: '11px 13px',
+    fontFamily: 'var(--body)',
+    fontWeight: 600,
+    fontSize: 15,
+    outline: 'none'
+  };
+  function done(toast, mood) {
+    setBusy(false);
+    setOpen(false);
+    setCur('');
+    setPw1('');
+    setMsg('');
+    if (window.wcToast) window.wcToast(toast, mood || 'confident');
+  }
+  function save() {
+    if (busy) return;
+    if (pw1.length < 4) {
+      setMsg('Use at least 4 characters.');
+      return;
+    }
+    setBusy(true);
+    setMsg('');
+    Promise.resolve(Sd.setAccountPassword(me.id, {
+      newPassword: pw1,
+      currentPassword: cur
+    })).then(() => done(has ? 'Password updated.' : 'Password set — your entry is locked to you now.')).catch(e => {
+      setBusy(false);
+      setMsg(e && e.message || 'Could not save.');
+    });
+  }
+  function remove() {
+    if (busy) return;
+    setBusy(true);
+    setMsg('');
+    Promise.resolve(Sd.setAccountPassword(me.id, {
+      newPassword: '',
+      currentPassword: cur
+    })).then(() => done('Password removed.', 'neutral')).catch(e => {
+      setBusy(false);
+      setMsg(e && e.message || 'Could not remove.');
+    });
+  }
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      borderTop: '1.5px solid var(--line)',
+      paddingTop: 14,
+      marginTop: 4
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: 8
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1,
+      minWidth: 0
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: lbl
+  }, "Password ", has ? /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: 'var(--green)'
+    }
+  }, "\xB7 on \uD83D\uDD12") : /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: 'var(--ink2)'
+    }
+  }, "\xB7 off")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      fontWeight: 600,
+      color: 'var(--ink2)',
+      marginTop: 3,
+      lineHeight: 1.35
+    }
+  }, has ? 'Only someone with the password can claim or edit your entry on a new device.' : 'Optional — lock your entry so only you can claim or edit it elsewhere.')), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setOpen(o => !o),
+    className: "wc-btn wc-btn--sm",
+    style: {
+      boxShadow: '0 4px 0 var(--shadow)',
+      flex: '0 0 auto'
+    }
+  }, open ? 'Close' : has ? 'Change' : 'Set up')), open && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 10,
+      display: 'flex',
+      flexDirection: 'column',
+      gap: 8
+    }
+  }, has && /*#__PURE__*/React.createElement("input", {
+    type: "password",
+    style: fld,
+    value: cur,
+    onChange: e => setCur(e.target.value),
+    placeholder: "Current password"
+  }), /*#__PURE__*/React.createElement("input", {
+    type: "password",
+    style: fld,
+    value: pw1,
+    onChange: e => setPw1(e.target.value),
+    placeholder: has ? 'New password' : 'Choose a password'
+  }), msg && /*#__PURE__*/React.createElement("div", {
+    style: {
+      color: 'var(--red)',
+      fontWeight: 800,
+      fontSize: 12
+    }
+  }, msg), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: 8
+    }
+  }, /*#__PURE__*/React.createElement(Bd, {
+    variant: "ink",
+    sm: true,
+    onClick: save,
+    style: {
+      flex: 1
+    }
+  }, busy ? 'Saving…' : 'Save password'), has && /*#__PURE__*/React.createElement("button", {
+    onClick: remove,
+    disabled: busy,
+    className: "wc-btn wc-btn--sm",
+    style: {
+      background: '#fff',
+      color: 'var(--red)',
+      boxShadow: '0 4px 0 var(--shadow)'
+    }
+  }, "Remove"))));
+}
 function EditProfile(props) {
   const me = props.me;
   const [dispName, setDispName] = dState(me.displayName || '');
@@ -40080,7 +40294,9 @@ function EditProfile(props) {
   }, {
     value: true,
     label: 'Yes'
-  }]))), /*#__PURE__*/React.createElement("div", {
+  }]))), /*#__PURE__*/React.createElement(PasswordSection, {
+    me: me
+  }), /*#__PURE__*/React.createElement("div", {
     style: {
       marginTop: 18
     }
@@ -45513,6 +45729,22 @@ function PeopleAdmin() {
   function remove(p) {
     if (window.confirm('Remove ' + (p.name || 'this entrant') + ' from the sweepstake? This frees their entry and adjusts the pot.')) Sa.removeParticipant(p.id);
   }
+  function resetPw(p) {
+    if (window.confirm("Clear " + (p.name || 'this entrant') + "'s password? They'll be able to set a new one and sign in again.")) {
+      Promise.resolve(Sa.setAccountPassword(p.id, {
+        newPassword: ''
+      })).then(function () {
+        if (window.wcToast) window.wcToast('Password cleared for ' + (p.name || 'entrant') + '.', 'neutral');
+      });
+    }
+  }
+  function clearPhoto(p) {
+    if (window.confirm("Remove " + (p.name || 'this entrant') + "'s photo?")) {
+      Promise.resolve(Sa.removeAvatar(p.id)).then(function () {
+        if (window.wcToast) window.wcToast('Photo removed.', 'neutral');
+      });
+    }
+  }
   return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 12.5,
@@ -45580,20 +45812,49 @@ function PeopleAdmin() {
         overflow: 'hidden',
         textOverflow: 'ellipsis'
       }
-    }, p.name), /*#__PURE__*/React.createElement("div", {
+    }, p.name, p.hasPassword ? ' 🔒' : ''), /*#__PURE__*/React.createElement("div", {
       style: {
         fontSize: 11,
         fontWeight: 700,
         color: 'var(--ink2)'
       }
-    }, p.location || p.city || '', includeDept && p.department ? ' · ' + p.department : '', t ? ' · ' + t.name : '')), /*#__PURE__*/React.createElement("button", {
+    }, p.location || p.city || '', includeDept && p.department ? ' · ' + p.department : '', t ? ' · ' + t.name : ''), (p.hasPassword || Sa.avatarUrl && Sa.avatarUrl(p)) && /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: 'flex',
+        gap: 12,
+        marginTop: 4
+      }
+    }, p.hasPassword && /*#__PURE__*/React.createElement("button", {
+      onClick: () => resetPw(p),
+      style: {
+        border: 'none',
+        background: 'none',
+        cursor: 'pointer',
+        fontSize: 11,
+        fontWeight: 800,
+        color: 'var(--ink2)',
+        padding: 0
+      }
+    }, "Reset password"), Sa.avatarUrl && Sa.avatarUrl(p) && /*#__PURE__*/React.createElement("button", {
+      onClick: () => clearPhoto(p),
+      style: {
+        border: 'none',
+        background: 'none',
+        cursor: 'pointer',
+        fontSize: 11,
+        fontWeight: 800,
+        color: 'var(--ink2)',
+        padding: 0
+      }
+    }, "Remove photo"))), /*#__PURE__*/React.createElement("button", {
       onClick: () => remove(p),
       className: "wc-btn wc-btn--sm",
       style: {
         padding: '6px 12px',
         background: '#fff',
         color: 'var(--red)',
-        boxShadow: '0 3px 0 var(--shadow)'
+        boxShadow: '0 3px 0 var(--shadow)',
+        flex: '0 0 auto'
       }
     }, "Remove"));
   })));
@@ -47051,6 +47312,121 @@ function AccountSheet(props) {
     d: "M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1"
   })), "Organiser tools")));
 }
+
+/* ---- account sign-in prompt (for password-protected entries) ---- */
+function AccountSignIn(props) {
+  const [pw, setPw] = aState('');
+  const [busy, setBusy] = aState(false);
+  const [err, setErr] = aState('');
+  function go() {
+    if (!pw || busy) return;
+    setBusy(true);
+    setErr('');
+    Promise.resolve(A_S.authAccount(props.id, pw)).then(function () {
+      setBusy(false);
+      props.onDone();
+    }).catch(function (e) {
+      setBusy(false);
+      setErr(e && e.message || 'Wrong password');
+    });
+  }
+  const inp = {
+    width: '100%',
+    boxSizing: 'border-box',
+    border: '2.5px solid var(--ink)',
+    borderRadius: 12,
+    padding: '11px 13px',
+    fontFamily: 'var(--body)',
+    fontWeight: 600,
+    fontSize: 15,
+    marginTop: 12,
+    outline: 'none'
+  };
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: 'absolute',
+      inset: 0,
+      zIndex: 80,
+      display: 'flex',
+      flexDirection: 'column',
+      justifyContent: 'flex-end'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    onClick: props.onClose,
+    style: {
+      position: 'absolute',
+      inset: 0,
+      background: 'rgba(26,26,26,.5)'
+    }
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "rise",
+    style: {
+      position: 'relative',
+      background: 'var(--bg)',
+      borderRadius: '26px 26px 0 0',
+      padding: '18px 18px 26px',
+      boxShadow: '0 -20px 50px rgba(0,0,0,.3)'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      width: 44,
+      height: 5,
+      borderRadius: 3,
+      background: 'var(--line)',
+      margin: '0 auto 14px'
+    }
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "dh",
+    style: {
+      fontSize: 22
+    }
+  }, "Sign in"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 13,
+      fontWeight: 600,
+      color: 'var(--ink2)',
+      marginTop: 4
+    }
+  }, /*#__PURE__*/React.createElement("b", null, props.name), " is password-protected. Enter the password to continue."), /*#__PURE__*/React.createElement("input", {
+    autoFocus: true,
+    type: "password",
+    value: pw,
+    onChange: e => setPw(e.target.value),
+    onKeyDown: e => {
+      if (e.key === 'Enter') go();
+    },
+    placeholder: "Password",
+    style: inp
+  }), err && /*#__PURE__*/React.createElement("div", {
+    style: {
+      color: 'var(--red)',
+      fontWeight: 800,
+      fontSize: 12.5,
+      marginTop: 8
+    }
+  }, err), /*#__PURE__*/React.createElement("button", {
+    onClick: go,
+    disabled: !pw || busy,
+    className: "wc-btn wc-btn--block",
+    style: {
+      marginTop: 14,
+      boxShadow: '0 4px 0 var(--ink)',
+      opacity: !pw || busy ? 0.5 : 1
+    }
+  }, busy ? 'Checking…' : 'Sign in'), /*#__PURE__*/React.createElement("button", {
+    onClick: props.onClose,
+    style: {
+      width: '100%',
+      marginTop: 10,
+      border: 'none',
+      background: 'none',
+      cursor: 'pointer',
+      fontSize: 12.5,
+      fontWeight: 800,
+      color: 'var(--ink2)'
+    }
+  }, "Cancel")));
+}
 const TW_DEFAULTS = /*EDITMODE-BEGIN*/{
   "celebration": 8,
   "accent": "#E8272A",
@@ -47068,6 +47444,7 @@ function App() {
   const [dev, setDev] = aState(false); // hidden dev console overlay
   const devReturn = React.useRef(undefined); // league to restore after dev admin
   const [organiser, setOrganiser] = aState(false); // true while creating a league
+  const [signIn, setSignIn] = aState(null); // {id,name,proceed} account sign-in prompt
   const [, tick] = aState(0);
   const [t, setTweak] = window.useTweaks(TW_DEFAULTS);
 
@@ -47159,12 +47536,26 @@ function App() {
     }
   }
   function claimOI(id) {
+    // A password-protected entry must be signed into before it can be claimed
+    // on this device (cross-device takeover is the case this guards).
+    const person = A_S.getSync(id);
+    if (person && A_S.needsSignIn && A_S.needsSignIn(person)) {
+      setSignIn({
+        id: id,
+        name: A_S.shownName ? A_S.shownName(person) : person.name,
+        proceed: () => doClaimOI(id)
+      });
+      return;
+    }
+    doClaimOI(id);
+  }
+  function doClaimOI(id) {
     A_S.claimOI(id);
     A_S.refresh && A_S.refresh();
     const p = A_S.getSync(id);
     const t = p && A_WC.TEAMS[p.team];
     setFlow('app');
-    setTimeout(() => window.wcToast && window.wcToast('Welcome, ' + (p ? p.name : '') + '! Your team is ' + (t && t.flag || '') + ' ' + (t ? t.name : '') + '.', 'confident'), 400);
+    setTimeout(() => window.wcToast && window.wcToast('Welcome, ' + (p ? A_S.shownName ? A_S.shownName(p) : p.name : '') + '! Your team is ' + (t && t.flag || '') + ' ' + (t ? t.name : '') + '.', 'confident'), 400);
   }
 
   // -------- onboarding / identity flow --------
@@ -47269,6 +47660,15 @@ function App() {
   }), dev && /*#__PURE__*/React.createElement(window.DevConsole, {
     onClose: () => setDev(false),
     onAdmin: devAdmin
+  }), signIn && /*#__PURE__*/React.createElement(AccountSignIn, {
+    id: signIn.id,
+    name: signIn.name,
+    onClose: () => setSignIn(null),
+    onDone: () => {
+      const go = signIn.proceed;
+      setSignIn(null);
+      go && go();
+    }
   }), /*#__PURE__*/React.createElement(window.ToastLayer, null), /*#__PURE__*/React.createElement(window.ConfettiLayer, null), /*#__PURE__*/React.createElement(window.TweaksPanel, {
     title: "Tweaks"
   }, /*#__PURE__*/React.createElement(window.TweakSection, {

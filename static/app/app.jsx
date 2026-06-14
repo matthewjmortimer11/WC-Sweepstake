@@ -147,6 +147,33 @@ function AccountSheet(props){
   </div>;
 }
 
+/* ---- account sign-in prompt (for password-protected entries) ---- */
+function AccountSignIn(props){
+  const [pw,setPw]=aState('');
+  const [busy,setBusy]=aState(false);
+  const [err,setErr]=aState('');
+  function go(){
+    if(!pw||busy) return;
+    setBusy(true); setErr('');
+    Promise.resolve(A_S.authAccount(props.id,pw)).then(function(){
+      setBusy(false); props.onDone();
+    }).catch(function(e){ setBusy(false); setErr((e&&e.message)||'Wrong password'); });
+  }
+  const inp={width:'100%',boxSizing:'border-box',border:'2.5px solid var(--ink)',borderRadius:12,padding:'11px 13px',fontFamily:'var(--body)',fontWeight:600,fontSize:15,marginTop:12,outline:'none'};
+  return <div style={{position:'absolute',inset:0,zIndex:80,display:'flex',flexDirection:'column',justifyContent:'flex-end'}}>
+    <div onClick={props.onClose} style={{position:'absolute',inset:0,background:'rgba(26,26,26,.5)'}}/>
+    <div className="rise" style={{position:'relative',background:'var(--bg)',borderRadius:'26px 26px 0 0',padding:'18px 18px 26px',boxShadow:'0 -20px 50px rgba(0,0,0,.3)'}}>
+      <div style={{width:44,height:5,borderRadius:3,background:'var(--line)',margin:'0 auto 14px'}}/>
+      <div className="dh" style={{fontSize:22}}>Sign in</div>
+      <div style={{fontSize:13,fontWeight:600,color:'var(--ink2)',marginTop:4}}><b>{props.name}</b> is password-protected. Enter the password to continue.</div>
+      <input autoFocus type="password" value={pw} onChange={e=>setPw(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')go();}} placeholder="Password" style={inp}/>
+      {err && <div style={{color:'var(--red)',fontWeight:800,fontSize:12.5,marginTop:8}}>{err}</div>}
+      <button onClick={go} disabled={!pw||busy} className="wc-btn wc-btn--block" style={{marginTop:14,boxShadow:'0 4px 0 var(--ink)',opacity:(!pw||busy)?0.5:1}}>{busy?'Checking…':'Sign in'}</button>
+      <button onClick={props.onClose} style={{width:'100%',marginTop:10,border:'none',background:'none',cursor:'pointer',fontSize:12.5,fontWeight:800,color:'var(--ink2)'}}>Cancel</button>
+    </div>
+  </div>;
+}
+
 const TW_DEFAULTS = /*EDITMODE-BEGIN*/{
   "celebration": 8,
   "accent": "#E8272A",
@@ -165,6 +192,7 @@ function App(){
   const [dev,setDev]=aState(false);             // hidden dev console overlay
   const devReturn=React.useRef(undefined);      // league to restore after dev admin
   const [organiser,setOrganiser]=aState(false); // true while creating a league
+  const [signIn,setSignIn]=aState(null);        // {id,name,proceed} account sign-in prompt
   const [,tick]=aState(0);
   const [t,setTweak]=window.useTweaks(TW_DEFAULTS);
 
@@ -252,12 +280,22 @@ function App(){
   }
 
   function claimOI(id){
+    // A password-protected entry must be signed into before it can be claimed
+    // on this device (cross-device takeover is the case this guards).
+    const person=A_S.getSync(id);
+    if(person && A_S.needsSignIn && A_S.needsSignIn(person)){
+      setSignIn({ id:id, name:(A_S.shownName?A_S.shownName(person):person.name), proceed:()=>doClaimOI(id) });
+      return;
+    }
+    doClaimOI(id);
+  }
+  function doClaimOI(id){
     A_S.claimOI(id);
     A_S.refresh&&A_S.refresh();
     const p=A_S.getSync(id);
     const t=p&&A_WC.TEAMS[p.team];
     setFlow('app');
-    setTimeout(()=>window.wcToast&&window.wcToast('Welcome, '+(p?p.name:'')+'! Your team is '+((t&&t.flag)||'')+' '+(t?t.name:'')+'.',  'confident'),400);
+    setTimeout(()=>window.wcToast&&window.wcToast('Welcome, '+(p?(A_S.shownName?A_S.shownName(p):p.name):'')+'! Your team is '+((t&&t.flag)||'')+' '+(t?t.name:'')+'.',  'confident'),400);
   }
 
   // -------- onboarding / identity flow --------
@@ -318,6 +356,9 @@ function App(){
       onDone={()=>{ const wasReplay=draw.replay; setDraw(null); if(!wasReplay){ setTab('me'); setTimeout(()=>window.wcConfetti&&window.wcConfetti({y:.4}),200);} }}/>}
     {admin && <window.AdminGate onClose={closeAdmin}/>}
     {dev && <window.DevConsole onClose={()=>setDev(false)} onAdmin={devAdmin}/>}
+    {signIn && <AccountSignIn id={signIn.id} name={signIn.name}
+      onClose={()=>setSignIn(null)}
+      onDone={()=>{ const go=signIn.proceed; setSignIn(null); go&&go(); }}/>}
 
     <window.ToastLayer/>
     <window.ConfettiLayer/>

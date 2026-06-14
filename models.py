@@ -106,6 +106,16 @@ class Participant(Base):
     pred_score: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     joined_at: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
 
+    # Optional per-account password (salted PBKDF2 hash, never plaintext). NULL =
+    # an open account (the default "just tap who you are" behaviour). When set, it
+    # locks taking over / resuming the account on a new device and gates writes to
+    # this entry (a sign-in token, obtained once, then reused frictionlessly).
+    #
+    # NOTE: this column is added to the already-shipped `participants` table, so
+    # create_all will not add it — main._ensure_schema() runs an idempotent
+    # ALTER TABLE ... ADD COLUMN IF NOT EXISTS at startup.
+    password_hash: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+
     # Tombstone for a seeded roster entry the organiser has removed. Seeded base
     # entries come from config and have no natural DB row to delete, so removal
     # is recorded as a row with removed=True that hides the config entry.

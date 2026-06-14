@@ -497,6 +497,20 @@ function PeopleAdmin() {
    function remove(p) {
      if (window.confirm('Remove ' + (p.name || 'this entrant') + ' from the sweepstake? This frees their entry and adjusts the pot.')) Sa.removeParticipant(p.id);
    }
+   function resetPw(p) {
+     if (window.confirm("Clear " + (p.name || 'this entrant') + "'s password? They'll be able to set a new one and sign in again.")) {
+       Promise.resolve(Sa.setAccountPassword(p.id, { newPassword: '' })).then(function () {
+         if (window.wcToast) window.wcToast('Password cleared for ' + (p.name || 'entrant') + '.', 'neutral');
+       });
+     }
+   }
+   function clearPhoto(p) {
+     if (window.confirm("Remove " + (p.name || 'this entrant') + "'s photo?")) {
+       Promise.resolve(Sa.removeAvatar(p.id)).then(function () {
+         if (window.wcToast) window.wcToast('Photo removed.', 'neutral');
+       });
+     }
+   }
    return (
      <>
        <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--ink2)', marginBottom: 10 }}>Remove an entrant — say they dropped out or paid late. Frees their slot and trims the pot &amp; charity.</div>
@@ -513,10 +527,14 @@ function PeopleAdmin() {
                return <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 0', borderBottom: i < list.length - 1 ? '1.5px solid var(--line)' : 'none' }}>
                  {t && <Fa team={t} size={22} />}
                  <div style={{ flex: 1, minWidth: 0 }}>
-                   <div style={{ fontWeight: 800, fontSize: 14, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name}</div>
+                   <div style={{ fontWeight: 800, fontSize: 14, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name}{p.hasPassword ? ' 🔒' : ''}</div>
                    <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--ink2)' }}>{(p.location || p.city || '')}{includeDept && p.department ? ' · ' + p.department : ''}{t ? ' · ' + t.name : ''}</div>
+                   {(p.hasPassword || (Sa.avatarUrl && Sa.avatarUrl(p))) && <div style={{ display: 'flex', gap: 12, marginTop: 4 }}>
+                     {p.hasPassword && <button onClick={() => resetPw(p)} style={{ border: 'none', background: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 800, color: 'var(--ink2)', padding: 0 }}>Reset password</button>}
+                     {Sa.avatarUrl && Sa.avatarUrl(p) && <button onClick={() => clearPhoto(p)} style={{ border: 'none', background: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 800, color: 'var(--ink2)', padding: 0 }}>Remove photo</button>}
+                   </div>}
                  </div>
-                 <button onClick={() => remove(p)} className="wc-btn wc-btn--sm" style={{ padding: '6px 12px', background: '#fff', color: 'var(--red)', boxShadow: '0 3px 0 var(--shadow)' }}>Remove</button>
+                 <button onClick={() => remove(p)} className="wc-btn wc-btn--sm" style={{ padding: '6px 12px', background: '#fff', color: 'var(--red)', boxShadow: '0 3px 0 var(--shadow)', flex: '0 0 auto' }}>Remove</button>
                </div>;
              })}
            </Ca>}

@@ -103,6 +103,57 @@ function ProfileHeader(props) {
   );
 }
 
+function PasswordSection(props) {
+  const me = props.me;
+  const has = Sd.hasPassword ? Sd.hasPassword(me) : false;
+  const [open, setOpen] = dState(false);
+  const [cur, setCur] = dState('');
+  const [pw1, setPw1] = dState('');
+  const [busy, setBusy] = dState(false);
+  const [msg, setMsg] = dState('');
+  const lbl = { fontWeight: 800, fontSize: 13, fontFamily: 'var(--disp)' };
+  const fld = { width: '100%', boxSizing: 'border-box', border: '2.5px solid var(--ink)', borderRadius: 12, padding: '11px 13px', fontFamily: 'var(--body)', fontWeight: 600, fontSize: 15, outline: 'none' };
+  function done(toast, mood) {
+    setBusy(false); setOpen(false); setCur(''); setPw1(''); setMsg('');
+    if (window.wcToast) window.wcToast(toast, mood || 'confident');
+  }
+  function save() {
+    if (busy) return;
+    if (pw1.length < 4) { setMsg('Use at least 4 characters.'); return; }
+    setBusy(true); setMsg('');
+    Promise.resolve(Sd.setAccountPassword(me.id, { newPassword: pw1, currentPassword: cur }))
+      .then(() => done(has ? 'Password updated.' : 'Password set — your entry is locked to you now.'))
+      .catch(e => { setBusy(false); setMsg((e && e.message) || 'Could not save.'); });
+  }
+  function remove() {
+    if (busy) return;
+    setBusy(true); setMsg('');
+    Promise.resolve(Sd.setAccountPassword(me.id, { newPassword: '', currentPassword: cur }))
+      .then(() => done('Password removed.', 'neutral'))
+      .catch(e => { setBusy(false); setMsg((e && e.message) || 'Could not remove.'); });
+  }
+  return (
+    <div style={{ borderTop: '1.5px solid var(--line)', paddingTop: 14, marginTop: 4 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={lbl}>Password {has ? <span style={{ color: 'var(--green)' }}>· on 🔒</span> : <span style={{ color: 'var(--ink2)' }}>· off</span>}</div>
+          <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--ink2)', marginTop: 3, lineHeight: 1.35 }}>{has ? 'Only someone with the password can claim or edit your entry on a new device.' : 'Optional — lock your entry so only you can claim or edit it elsewhere.'}</div>
+        </div>
+        <button onClick={() => setOpen(o => !o)} className="wc-btn wc-btn--sm" style={{ boxShadow: '0 4px 0 var(--shadow)', flex: '0 0 auto' }}>{open ? 'Close' : has ? 'Change' : 'Set up'}</button>
+      </div>
+      {open && <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {has && <input type="password" style={fld} value={cur} onChange={e => setCur(e.target.value)} placeholder="Current password" />}
+        <input type="password" style={fld} value={pw1} onChange={e => setPw1(e.target.value)} placeholder={has ? 'New password' : 'Choose a password'} />
+        {msg && <div style={{ color: 'var(--red)', fontWeight: 800, fontSize: 12 }}>{msg}</div>}
+        <div style={{ display: 'flex', gap: 8 }}>
+          <Bd variant="ink" sm onClick={save} style={{ flex: 1 }}>{busy ? 'Saving…' : 'Save password'}</Bd>
+          {has && <button onClick={remove} disabled={busy} className="wc-btn wc-btn--sm" style={{ background: '#fff', color: 'var(--red)', boxShadow: '0 4px 0 var(--shadow)' }}>Remove</button>}
+        </div>
+      </div>}
+    </div>
+  );
+}
+
 function EditProfile(props) {
   const me = props.me;
   const [dispName, setDispName] = dState(me.displayName || '');
@@ -190,6 +241,7 @@ function EditProfile(props) {
           </div>}
           {includeLtMember && <div><label style={lbl}>Leadership Team?</label>{seg(lt, setLt, [{ value: false, label: 'No' }, { value: true, label: 'Yes' }])}</div>}
         </div>
+        <PasswordSection me={me} />
         <div style={{ marginTop: 18 }}>
           <Bd variant="ink" block onClick={() => {
             Sd.saveProfile(me.id, { displayName: dispName.trim(), favouriteTeam: fav });
