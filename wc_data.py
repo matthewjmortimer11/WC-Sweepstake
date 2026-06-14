@@ -161,12 +161,13 @@ def generate_wc_data(tournament: str | None = None) -> dict:
     charity_split = cfg["entry"]["charity_split"]
     pot = len(people) * fee
 
-    # Half of every entry goes to charity; the rest is a single winner-takes-all
-    # pot for whoever holds the champion.
+    # The configured charity split goes to charity; the rest is a single
+    # winner-takes-all pot for whoever holds the champion.
+    charity_label = f"{round(charity_split * 100)}% of every entry"
     payouts = [
         {"place": "Winner", "pct": 1.0 - charity_split,
          "label": "holds the champion — takes the whole pot"},
-        {"place": "Charity", "pct": charity_split, "label": "half of every entry"},
+        {"place": "Charity", "pct": charity_split, "label": charity_label},
     ]
 
     lines = dict(cfg["lines"])
@@ -200,7 +201,6 @@ def generate_wc_data(tournament: str | None = None) -> dict:
         "kickoff": m["kickoff"],
         "finalVenue": m["final_venue"],
         "finalDate": m["final_date"],
-        "adminPin": str(m.get("admin_pin", "")),
         "predictionsLocked": False,
         "includeDepartment": True,
         # Config-derived, additive — lets the UI/grader stop hardcoding the
@@ -227,12 +227,11 @@ def generate_wc_data(tournament: str | None = None) -> dict:
     }
 
 
-def get_dev_key(tournament: str | None = None) -> str:
-    """Master developer key for the hidden cross-league dev console. Server-only
-    — never placed in the client payload. The WC_DEV_KEY env var (read in
-    main.py) takes precedence over this config value."""
+def get_admin_pin(tournament: str | None = None) -> str:
+    """Organiser PIN for the pre-seeded league. Server-only — never placed in
+    the client payload."""
     cfg = load_config(tournament)
-    return str((cfg.get("meta") or {}).get("dev_key", ""))
+    return str((cfg.get("meta") or {}).get("admin_pin", ""))
 
 
 def get_league_seed(tournament: str | None = None) -> dict:

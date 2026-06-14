@@ -96,13 +96,14 @@ function AppBar(props){
 }
 
 function TabBar(props){
+  const predictionsLocked = A_S.predictionsLocked && A_S.predictionsLocked();
   const tabs=[['me','You'],['games','Games'],['players','Players'],['predictions','Predict'],['chat','Chat'],['summary','Verdict']];
   return <div className="tabbar tabbar--6">
     {tabs.map(([k,lab])=>(
       <button key={k} className={props.tab===k?'on':''} onClick={()=>props.setTab(k)}>
         <span className="ic"><Icon name={k}/></span>
         {lab}
-        {k==='predictions' && props.tab!=='predictions' && <span className="tabdot"/>}
+        {k==='predictions' && props.tab!=='predictions' && !predictionsLocked && <span className="tabdot"/>}
       </button>
     ))}
   </div>;
@@ -185,7 +186,10 @@ function App(){
     const pre = A_WC.meta.phase === 'pre';
     const myTeam = A_WC.TEAMS[me.team];
     const id=setTimeout(()=>{
-      if(pre){
+      const picksLocked = A_S.predictionsLocked && A_S.predictionsLocked();
+      if(pre && picksLocked){
+        window.wcToast&&window.wcToast('Predictions are locked. Wheesht has the receipts.','confident');
+      } else if(pre){
         const pool=[
           ['Predictions are open till kick-off. Get them in — Wheesht is taking names.','mischievous'],
           ['Your picks won\'t make themselves. Wheesht is waiting.','nervous'],
@@ -237,7 +241,6 @@ function App(){
   // into it (no password), unlock the clipboard, open admin.
   function devAdmin(league){
     devReturn.current = A_S.activeLeague() || null;
-    try{ sessionStorage.setItem('wheesht_admin_ok','1'); }catch(e){}
     Promise.resolve(A_S.devEnterLeague(league)).then(()=>{ setDev(false); setAdmin(true); });
   }
   // Closing the clipboard: if we got here via the dev console, hop back to the

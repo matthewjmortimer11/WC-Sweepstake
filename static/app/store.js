@@ -21,12 +21,15 @@
     mine: 'wheesht_mine_v2', device: 'wheesht_device_v2', active: 'wheesht_active_v2',
     admin: 'wheesht_admin_v1', removed: 'wheesht_removed_v1',
     league: 'wheesht_league_v1', leagues: 'wheesht_leagues_v1',
+    adminTokens: 'wheesht_admin_tokens_v1',
   };
 
   var CHARITY_SPLIT = 0.5;
 
   function lsGet(k, d) { try { var v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch (e) { return d; } }
   function lsSet(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+  function ssGet(k, d) { try { var v = sessionStorage.getItem(k); return v ? JSON.parse(v) : d; } catch (e) { return d; } }
+  function ssSet(k, v) { try { sessionStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
   function uid() { return 'u' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
   function initials(n) { var c = (n || '').trim().replace(/Wee |Big /g, ''); var p = c.split(/\s+/); var i = p[0] ? p[0][0] : '?'; if (p[1] && /[a-z]/i.test(p[1][0])) i += p[1][0]; return (i || '?').toUpperCase(); }
   var COLORS = ['#E8272A', '#1a7a44', '#0a3b8c', '#7A3FB0', '#E07A1A', '#0d8a8a', '#C0246B', '#3a6ea5'];
@@ -43,6 +46,31 @@
   // Build a league-scoped API path. In MOCK mode there is no server, so callers
   // guard on LIVE before fetching.
   function api(path) { var c = leagueCode(); return '/api/leagues/' + encodeURIComponent(c || '') + path; }
+  function parseJson(r) {
+    return r.json().catch(function () { return {}; }).then(function (j) {
+      if (!r.ok) throw new Error(j.detail || 'Request failed');
+      return j;
+    });
+  }
+  function toastError(e, fallback) {
+    if (window.wcToast) window.wcToast((e && e.message) || fallback || 'Could not save. Try again.', 'crying');
+  }
+  function adminToken(code) {
+    var tokens = ssGet(K.adminTokens, {});
+    return tokens[code || leagueCode()] || '';
+  }
+  function setAdminToken(code, token) {
+    if (!code || !token) return;
+    var tokens = ssGet(K.adminTokens, {});
+    tokens[code] = token;
+    ssSet(K.adminTokens, tokens);
+  }
+  function adminHeaders(extra) {
+    var h = Object.assign({ 'Content-Type': 'application/json' }, extra || {});
+    var token = adminToken();
+    if (token) h['X-Wheesht-Admin-Token'] = token;
+    return h;
+  }
 
   // ---- admin overrides ----------------------------------------------------
   // In LIVE mode the SERVER resolves overrides into the league state, so the
@@ -120,13 +148,8 @@
     if (LIVE) {
       var c = leagueCode();
       if (!c) return Promise.reject(new Error('Join a league before changing organiser settings'));
-      return fetch(api('/admin'), { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
-        .then(function (r) {
-          return r.json().catch(function () { return {}; }).then(function (j) {
-            if (!r.ok) throw new Error(j.detail || 'Could not save organiser settings');
-            return j;
-          });
-        });
+      return fetch(api('/admin'), { method: 'PUT', headers: adminHeaders(), body: JSON.stringify(payload) })
+        .then(parseJson);
     }
     lsSet(K.admin, payload);
     return Promise.resolve({ ok: true });
@@ -138,7 +161,7 @@
       return persistAdmin(nextAdmin)
         .then(function () { return Store.refresh(); })
         .catch(function (e) {
-          if (window.wcToast) window.wcToast(e.message || 'Could not save organiser settings', 'crying');
+          toastError(e, 'Could not save organiser settings');
         });
     }
     applyAdmin(); persistAdmin(nextAdmin); rebuild(); emit();
@@ -230,9 +253,9 @@
     if (!c) return;
     fetch(api('/chat/system'), {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: adminHeaders(),
       body: JSON.stringify({ text: text, mood: mood || 'confident' }),
-    }).catch(function () {});
+    }).then(parseJson).catch(function () {});
   }
 
   var Store = {
@@ -245,6 +268,22 @@
     activeLeague: activeLeague,
     leagueCode: leagueCode,
     api: api,
+    adminHeaders: adminHeaders,
+    hasAdminToken: function () { return !!adminToken(); },
+    setAdminToken: setAdminToken,
+    verifyAdminCode: function (code) {
+      if (!LIVE) return Promise.resolve({ ok: true });
+      var c = leagueCode();
+      if (!c) return Promise.reject(new Error('Join a league first'));
+      return fetch(api('/admin/auth'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: code || '' }),
+      }).then(parseJson).then(function (j) {
+        if (j && j.token) setAdminToken(c, j.token);
+        return j;
+      });
+    },
     knownLeagues: function () { return knownLeagues(); },
     // Create a league on the backend, then make it active.
     createLeague: function (name, code, password) {
@@ -308,13 +347,22 @@
     },
 
     removeParticipant: function (id) {
-      mine = mine.filter(function (p) { return p.id !== id; });
-      lsSet(K.mine, mine);
-      var rem = lsGet(K.removed, []); if (rem.indexOf(id) < 0) { rem.push(id); lsSet(K.removed, rem); }
-      var d = this.deviceIds().filter(function (x) { return x !== id; }); lsSet(K.device, d);
-      if (this.activeId() === id) lsSet(K.active, d[0] || null);
-      if (LIVE && leagueCode()) { try { fetch(api('/participants/' + id), { method: 'DELETE' }); } catch (e) {} }
-      rebuild(); emit();
+      function localRemove() {
+        mine = mine.filter(function (p) { return p.id !== id; });
+        lsSet(K.mine, mine);
+        var rem = lsGet(K.removed, []); if (rem.indexOf(id) < 0) { rem.push(id); lsSet(K.removed, rem); }
+        var d = Store.deviceIds().filter(function (x) { return x !== id; }); lsSet(K.device, d);
+        if (Store.activeId() === id) lsSet(K.active, d[0] || null);
+        rebuild(); emit();
+      }
+      if (LIVE && leagueCode()) {
+        return fetch(api('/participants/' + id), { method: 'DELETE', headers: adminHeaders({}) })
+          .then(parseJson)
+          .then(function () { localRemove(); return { ok: true }; })
+          .catch(function (e) { toastError(e, 'Could not remove entrant'); return Store.refresh(); });
+      }
+      localRemove();
+      return Promise.resolve({ ok: true });
     },
 
     // reads (sync, active-league scoped)
@@ -323,6 +371,11 @@
     rankedByPred: rankedByPred,
     predScoreOf: predScoreOf,
     maxPredPoints: function () { return (WC.PREDICTIONS || []).reduce(function (a, m) { return a + m.points; }, 0); },
+    predictionsLocked: function () {
+      var deadline = WC.meta && WC.meta.predDeadline;
+      var deadlinePassed = !!(deadline && new Date() > new Date(deadline));
+      return !!(WC.meta && WC.meta.predictionsLocked) || deadlinePassed;
+    },
 
     gross: function () { return cache.length * (WC.FEE || 0); },
     charity: function () { return cache.length * (WC.FEE || 0) * charitySplitValue(); },
@@ -352,7 +405,13 @@
       mine = mine.concat([p]); lsSet(K.mine, mine); rebuild();
       var d = this.deviceIds(); if (d.indexOf(p.id) < 0) d.push(p.id); lsSet(K.device, d);
       lsSet(K.active, p.id);
-      if (LIVE && leagueCode()) { try { fetch(api('/participants'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(p) }); } catch (e) {} }
+      if (LIVE && leagueCode()) {
+        try {
+          fetch(api('/participants'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(p) })
+            .then(parseJson)
+            .catch(function (e) { toastError(e, 'Could not save entrant'); });
+        } catch (e) { toastError(e, 'Could not save entrant'); }
+      }
       emit();
       return p;
     },
@@ -363,7 +422,13 @@
       mine[idx] = Object.assign({}, mine[idx], patch);
       if (patch.name) mine[idx].initials = initials(patch.name);
       lsSet(K.mine, mine); rebuild();
-      if (LIVE && leagueCode()) { try { fetch(api('/participants/' + id), { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(mine[idx]) }); } catch (e) {} }
+      if (LIVE && leagueCode()) {
+        try {
+          fetch(api('/participants/' + id), { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(mine[idx]) })
+            .then(parseJson)
+            .catch(function (e) { toastError(e, 'Could not save profile'); Store.refresh(); });
+        } catch (e) { toastError(e, 'Could not save profile'); }
+      }
       emit();
       return mine[idx];
     },
@@ -376,7 +441,11 @@
       if (inMine) { this.update(id, { picks: picks }); }
       else if (LIVE && leagueCode()) {
         // seeded roster entry not yet in `mine` — persist the pick directly
-        try { fetch(api('/participants/' + id + '/picks'), { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: key, value: value }) }); } catch (e) {}
+        try {
+          fetch(api('/participants/' + id + '/picks'), { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: key, value: value }) })
+            .then(parseJson)
+            .catch(function (e) { toastError(e, 'Could not save pick'); Store.refresh(); });
+        } catch (e) { toastError(e, 'Could not save pick'); }
         emit();
       }
       return picks;
@@ -422,6 +491,7 @@
     // Make any league active (no password — dev only) and pull its state.
     // Passing null clears the active league. Used to enter and to restore.
     devEnterLeague: function (L) {
+      if (L && L.code && L.adminToken) setAdminToken(L.code, L.adminToken);
       if (L && L.code) setActiveLeague({ id: L.id, code: L.code, name: L.name, seeded: !!L.seeded });
       else lsSet(K.league, null);
       return Store.refresh().then(function () { rebuild(); emit(); });

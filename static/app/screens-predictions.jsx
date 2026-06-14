@@ -170,7 +170,7 @@ function PredictionsScreen(props) {
   const made = me.picks ? Object.keys(me.picks).filter(k => me.picks[k] != null && (!Array.isArray(me.picks[k]) || me.picks[k].length)).length : 0;
   const predDeadline = WCp.meta && WCp.meta.predDeadline;
   const deadlinePassed = predDeadline && new Date() > new Date(predDeadline);
-  const locked = !!(WCp.meta && WCp.meta.predictionsLocked) || !!deadlinePassed;
+  const locked = Sp.predictionsLocked ? Sp.predictionsLocked() : (!!(WCp.meta && WCp.meta.predictionsLocked) || !!deadlinePassed);
   function onPick(key, val) { Sp.setPick(me.id, key, val); bump(x => x + 1); }
   function fmtDeadline(dt) {
     try { return new Date(dt).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' }); } catch (e) { return dt; }

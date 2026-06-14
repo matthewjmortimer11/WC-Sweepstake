@@ -280,7 +280,7 @@ function SettingsAdmin() {
          <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.06em', textTransform: 'uppercase' }}>Entry fee</div>
          <div style={{ display: 'flex', gap: 9, alignItems: 'center', marginTop: 7 }}>
            <span className="dh" style={{ fontSize: 24 }}>£</span>
-           <input type="number" min="0" step="0.5" value={fee} onChange={e => setFee(e.target.value)} onBlur={saveFee} style={fld} />
+           <input type="number" min="0" step="0.5" value={fee} onChange={e => setFee(e.target.value)} style={fld} />
            <button onClick={saveFee} className="wc-btn wc-btn--sm wc-btn--ink" style={{ flex: '0 0 auto' }}>Save</button>
          </div>
          <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--ink2)', marginTop: 9 }}>{entrants} entrants at {moneyAdmin(feeNum)} each.</div>
@@ -328,7 +328,7 @@ function SettingsAdmin() {
        <SHa>Locations</SHa>
        <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink2)', marginBottom: 8, lineHeight: 1.4 }}>List your offices or locations, separated by commas. People pick from these when signing up.</div>
        <div style={{ display: 'flex', gap: 7, alignItems: 'center', marginBottom: 8 }}>
-         <input value={locInput} onChange={e => setLocInput(e.target.value)} onBlur={saveLocations}
+         <input value={locInput} onChange={e => setLocInput(e.target.value)}
            onKeyDown={e => e.key === 'Enter' && saveLocations()}
            style={{ flex: 1, border: '2px solid var(--ink)', borderRadius: 11, padding: '9px 12px', fontFamily: 'var(--body)', fontWeight: 600, fontSize: 14, outline: 'none', background: '#fff' }}
            placeholder="e.g. Edinburgh, London, Remote" />
@@ -348,7 +348,6 @@ function SettingsAdmin() {
            type="datetime-local"
            value={predDeadlineInput}
            onChange={e => setPredDeadlineInput(e.target.value)}
-           onBlur={saveDeadline}
            style={{ flex: 1, border: '2px solid var(--ink)', borderRadius: 11, padding: '9px 12px', fontFamily: 'var(--body)', fontWeight: 600, fontSize: 14, outline: 'none', background: '#fff' }}
          />
          <button onClick={saveDeadline} className="wc-btn wc-btn--sm wc-btn--ink">Set</button>
@@ -513,7 +512,10 @@ function ChatAdmin() {
    const isLive = !!window.WC_LIVE;
 
    function load() {
-     fetch(Sa.api('/chat')).then(r => r.json()).then(d => {
+     fetch(Sa.api('/chat')).then(r => r.json().then(d => {
+       if (!r.ok) throw new Error((d && d.detail) || 'Could not load chat');
+       return d;
+     })).then(d => {
        setMsgs((d || []).slice().reverse());
        setLoading(false);
      }).catch(() => setLoading(false));
@@ -522,9 +524,10 @@ function ChatAdmin() {
 
    function del(id) {
      if (!window.confirm('Delete this message for everyone? This cannot be undone.')) return;
-     fetch(Sa.api('/chat/' + id), { method: 'DELETE' })
+     fetch(Sa.api('/chat/' + id), { method: 'DELETE', headers: Sa.adminHeaders ? Sa.adminHeaders({}) : {} })
+       .then(r => r.json().catch(() => ({})).then(j => { if (!r.ok) throw new Error(j.detail || 'Could not delete message'); return j; }))
        .then(() => setMsgs(prev => prev.filter(m => m.id !== id)))
-       .catch(() => {});
+       .catch(e => { if (window.wcToast) window.wcToast(e.message || 'Could not delete message', 'crying'); });
    }
 
    if (!isLive) {
@@ -564,26 +567,32 @@ function ChatAdmin() {
    );
 }
 
-/* ---- PIN gate --------------------------------------------------------------
-    Soft gate in front of the clipboard. Not real auth — just stops a casual tap
-    on a shared link from wiping the sweepstake. PIN comes from the tournament
-    config (meta.adminPin); empty config means no gate. Unlock lasts the session. */
+/* ---- Organiser gate ---------------------------------------------------------
+    Live mode verifies the organiser code on the server and receives a short
+    session token used for admin-only writes. Static preview stays open. */
 function AdminGate(props) {
-   const PIN = (WCa.meta && WCa.meta.adminPin) || '';
+   const serverAuth = !!(Sa.live && Sa.verifyAdminCode);
    const [ok, setOk] = aState2(() => {
-     if (!PIN) return true;
-     try { return sessionStorage.getItem('wheesht_admin_ok') === '1'; } catch (e) { return false; }
+     return serverAuth ? !!(Sa.hasAdminToken && Sa.hasAdminToken()) : true;
    });
    const [entry, setEntry] = aState2('');
    const [bad, setBad] = aState2(false);
+   const [busy, setBusy] = aState2(false);
 
    if (ok) return <AdminPanel onClose={props.onClose} />;
 
    function submit() {
-     if (entry === PIN) {
-       try { sessionStorage.setItem('wheesht_admin_ok', '1'); } catch (e) {}
+     if (!entry || busy) return;
+     if (!serverAuth) { setOk(true); return; }
+     setBusy(true); setBad(false);
+     Sa.verifyAdminCode(entry).then(() => {
+       setBusy(false);
        setOk(true);
-     } else { setBad(true); setEntry(''); }
+     }).catch(() => {
+       setBusy(false);
+       setBad(true);
+       setEntry('');
+     });
    }
 
    return (
@@ -598,14 +607,13 @@ function AdminGate(props) {
          <input
            autoFocus
            type="password"
-           inputMode="numeric"
            value={entry}
            onChange={e => { setEntry(e.target.value); setBad(false); }}
            onKeyDown={e => { if (e.key === 'Enter') submit(); }}
            placeholder="Code"
            style={{ width: '100%', border: '2.5px solid var(--ink)', borderRadius: 14, padding: '13px 16px', fontFamily: 'var(--disp)', fontWeight: 800, fontSize: 22, textAlign: 'center', letterSpacing: '.1em', marginTop: 14, outline: 'none' }}
          />
-         <button onClick={submit} disabled={!entry} className="wc-btn wc-btn--ink wc-btn--block" style={{ marginTop: 14, opacity: entry ? 1 : 0.4 }}>Unlock the clipboard</button>
+         <button onClick={submit} disabled={!entry || busy} className="wc-btn wc-btn--ink wc-btn--block" style={{ marginTop: 14, opacity: entry && !busy ? 1 : 0.4 }}>{busy ? 'Checking…' : 'Unlock the clipboard'}</button>
        </div>
      </div>
    );

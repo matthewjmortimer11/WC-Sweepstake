@@ -27,7 +27,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, Header, HTTPException
 from fastapi.responses import FileResponse, HTMLResponse
 from pydantic import BaseModel
 from sqlalchemy import func, select
@@ -37,7 +37,7 @@ import standings
 import sync
 from db import AsyncSessionLocal, engine
 from models import AdminOverride, Base, ChatMessage, League, Participant
-from wc_data import _initials, generate_wc_data, get_dev_key, get_league_seed
+from wc_data import _initials, generate_wc_data, get_admin_pin, get_league_seed
 
 log = logging.getLogger(__name__)
 
@@ -48,10 +48,19 @@ _CONFIG_LEAGUE_CODE: str = _wc_data["league"]["code"]
 
 _HTML_TEMPLATE = Path("templates/index.html").read_text(encoding="utf-8")
 
-# Master developer key for the hidden cross-league dev console. Env var wins;
-# otherwise the tournament config's meta.dev_key. Verified server-side only and
-# never shipped to the browser. Empty → the dev console is disabled (403).
-_DEV_KEY: str = os.environ.get("WC_DEV_KEY") or get_dev_key()
+# Master developer key for the hidden cross-league dev console. It must come
+# from the deployment environment; there is intentionally no committed fallback.
+_DEV_KEY: str = os.environ.get("WC_DEV_KEY", "")
+
+# Organiser PIN for the pre-seeded league. This stays server-side; clients get a
+# short-lived HMAC token after proving the code.
+_ADMIN_PIN: str = os.environ.get("WC_ADMIN_PIN") or get_admin_pin()
+_ADMIN_SECRET: str = (
+    os.environ.get("WC_ADMIN_SECRET")
+    or os.environ.get("SECRET_KEY")
+    or secrets.token_hex(32)
+)
+_ADMIN_TOKEN_TTL_SECONDS = 12 * 60 * 60
 
 # Legacy JSON store (pre-league). Read-only now, used once for migration.
 _DATA_DIR = Path("data")
@@ -86,6 +95,38 @@ def _verify_password(password: str, stored: str) -> bool:
         return hmac.compare_digest(dk.hex(), expected)
     except (ValueError, AttributeError):
         return False
+
+
+def _admin_token_for(league: League) -> str:
+    ts = str(int(time.time()))
+    msg = f"{league.id}:{league.code}:{ts}".encode("utf-8")
+    sig = hmac.new(_ADMIN_SECRET.encode("utf-8"), msg, hashlib.sha256).hexdigest()
+    return f"v1.{ts}.{sig}"
+
+
+def _admin_token_ok(league: League, token: Optional[str]) -> bool:
+    try:
+        version, ts_s, sig = (token or "").split(".", 2)
+        ts = int(ts_s)
+    except (ValueError, AttributeError):
+        return False
+    if version != "v1" or int(time.time()) - ts > _ADMIN_TOKEN_TTL_SECONDS:
+        return False
+    msg = f"{league.id}:{league.code}:{ts_s}".encode("utf-8")
+    expected = hmac.new(_ADMIN_SECRET.encode("utf-8"), msg, hashlib.sha256).hexdigest()
+    return hmac.compare_digest(sig, expected)
+
+
+def _admin_code_ok(league: League, code: str) -> bool:
+    code = code or ""
+    if league.seeded and league.code == _CONFIG_LEAGUE_CODE:
+        return bool(_ADMIN_PIN) and hmac.compare_digest(code, _ADMIN_PIN)
+    return _verify_password(code, league.password_hash)
+
+
+def _require_admin(league: League, token: Optional[str]) -> None:
+    if not _admin_token_ok(league, token):
+        raise HTTPException(status_code=403, detail="Organiser access required")
 
 
 def _slugify(name: str) -> str:
@@ -259,6 +300,7 @@ def _league_state(league: League, league_people: List[Dict[str, Any]], admin: Di
     data["adminOverrides"] = admin
 
     meta = dict(_wc_data["meta"])
+    meta.pop("adminPin", None)
     meta["phase"] = phase
     meta["stageLabel"] = (
         "Group stage" if phase == "pre" else "Tournament over" if phase == "done" else "In play"
@@ -294,6 +336,7 @@ def _base_state() -> Dict[str, Any]:
     data["people"] = []
     data["league"] = None
     meta = dict(_wc_data["meta"])
+    meta.pop("adminPin", None)
     meta["groupSize"] = 0
     meta["stillIn"] = 0
     meta["out"] = 0
@@ -459,6 +502,10 @@ class LeagueJoin(BaseModel):
     password: str
 
 
+class AdminAuthPayload(BaseModel):
+    code: str
+
+
 @app.post("/api/leagues")
 async def create_league(payload: LeagueCreate):
     code = (payload.code or "").strip().upper()
@@ -495,6 +542,17 @@ async def join_league(payload: LeagueJoin):
         if not _verify_password(payload.password or "", league.password_hash):
             raise HTTPException(status_code=401, detail="Wrong password")
         return {"league": _league_public(league)}
+
+
+@app.post("/api/leagues/{code}/admin/auth")
+async def admin_auth(code: str, payload: AdminAuthPayload):
+    async with AsyncSessionLocal() as session:
+        league = await _get_league_by_code(session, code.upper())
+        if league is None:
+            raise HTTPException(status_code=404, detail="league not found")
+        if not _admin_code_ok(league, payload.code or ""):
+            raise HTTPException(status_code=403, detail="Wrong organiser code")
+        return {"ok": True, "token": _admin_token_for(league)}
 
 
 @app.get("/api/leagues/{code}/state")
@@ -598,11 +656,16 @@ async def update_participant(code: str, participant_id: str, payload: Participan
 
 
 @app.delete("/api/leagues/{code}/participants/{participant_id}")
-async def delete_participant(code: str, participant_id: str):
+async def delete_participant(
+    code: str,
+    participant_id: str,
+    x_wheesht_admin_token: Optional[str] = Header(None, alias="X-Wheesht-Admin-Token"),
+):
     async with AsyncSessionLocal() as session:
         league = await _get_league_by_code(session, code.upper())
         if league is None:
             raise HTTPException(status_code=404, detail="league not found")
+        _require_admin(league, x_wheesht_admin_token)
         row = await session.get(Participant, participant_id)
         is_seeded_base = (
             league.seeded and league.code == _CONFIG_LEAGUE_CODE
@@ -668,11 +731,16 @@ class AdminPayload(BaseModel):
 
 
 @app.put("/api/leagues/{code}/admin")
-async def put_admin(code: str, payload: AdminPayload):
+async def put_admin(
+    code: str,
+    payload: AdminPayload,
+    x_wheesht_admin_token: Optional[str] = Header(None, alias="X-Wheesht-Admin-Token"),
+):
     async with AsyncSessionLocal() as session:
         league = await _get_league_by_code(session, code.upper())
         if league is None:
             raise HTTPException(status_code=404, detail="league not found")
+        _require_admin(league, x_wheesht_admin_token)
         row = await session.get(AdminOverride, league.id)
         if row is None:
             session.add(AdminOverride(league_id=league.id, data=payload.model_dump(), updated_at=_now()))
@@ -744,7 +812,11 @@ class SystemChatPayload(BaseModel):
 
 
 @app.post("/api/leagues/{code}/chat/system")
-async def post_system_chat(code: str, payload: SystemChatPayload):
+async def post_system_chat(
+    code: str,
+    payload: SystemChatPayload,
+    x_wheesht_admin_token: Optional[str] = Header(None, alias="X-Wheesht-Admin-Token"),
+):
     """Post a Wheesht announcement banner to the league chat.
     Triggered server-side by admin actions (deadline change, market toggle)."""
     text = payload.text.strip()[:400]
@@ -754,6 +826,7 @@ async def post_system_chat(code: str, payload: SystemChatPayload):
         league = await _get_league_by_code(session, code.upper())
         if league is None:
             raise HTTPException(status_code=404, detail="league not found")
+        _require_admin(league, x_wheesht_admin_token)
         msg = ChatMessage(
             id=uuid.uuid4().hex[:10], league_id=league.id,
             author_id="wheesht", author="Wheesht",
@@ -767,11 +840,16 @@ async def post_system_chat(code: str, payload: SystemChatPayload):
 
 
 @app.delete("/api/leagues/{code}/chat/{message_id}")
-async def delete_chat(code: str, message_id: str):
+async def delete_chat(
+    code: str,
+    message_id: str,
+    x_wheesht_admin_token: Optional[str] = Header(None, alias="X-Wheesht-Admin-Token"),
+):
     async with AsyncSessionLocal() as session:
         league = await _get_league_by_code(session, code.upper())
         if league is None:
             raise HTTPException(status_code=404, detail="league not found")
+        _require_admin(league, x_wheesht_admin_token)
         row = await session.get(ChatMessage, message_id)
         if row is None or row.league_id != league.id:
             raise HTTPException(status_code=404, detail="message not found")
@@ -810,6 +888,7 @@ async def dev_list_leagues(payload: DevAuth):
             item = _league_public(lg)
             item["entrants"] = entrants
             item["createdAt"] = lg.created_at.isoformat() if lg.created_at else None
+            item["adminToken"] = _admin_token_for(lg)
             out.append(item)
     return {"leagues": out}
 

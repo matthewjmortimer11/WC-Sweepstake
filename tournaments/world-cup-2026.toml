@@ -13,7 +13,7 @@ id = "world-cup-2026"
 competition_code = "WC"                      # Football-Data.org competition code
 sweepstake_name = "The Office Sweepstake"   # app title (meta.name)
 season = "World Cup 2026"                    # subtitle (meta.season)
-phase = "pre"                                # pre | live | done
+phase = "live"                               # pre | live | done
 
 # Ordered stage progression. Drives bracket depth and the per-stage labels below.
 # (Top-level keys must precede the first [table] header in TOML.)
@@ -55,19 +55,16 @@ qualify_per_group = 2
 best_third_qualifiers = 8
 
 [meta]
-stage_label = "Group Stage"   # label for the current phase
+stage_label = "In play"       # label for the current phase
 kickoff = "Thu 11 June"
 final_venue = "MetLife Stadium, New Jersey"
 final_date = "Sun 19 July"
-# Soft gate on the organiser tools (results, eliminations, chat moderation,
-# tournament reset). Not real auth — just stops casual taps on a shared link
-# from wiping the sweepstake. Change this before sharing.
+# Default organiser PIN for the admin clipboard in local/dev runs. In production,
+# set WC_ADMIN_PIN in Railway so the live code can be rotated without committing
+# it. Server-side only; never sent to the browser payload.
 admin_pin = "1966"
-# Master developer key — unlocks the hidden cross-league dev console (the secret
-# gesture: tap the mascot in the top bar seven times). Lets you administer ANY
-# league. Unlike admin_pin it is verified server-side and is NEVER sent to the
-# browser. Override in production with the WC_DEV_KEY environment variable.
-dev_key = "wheesht-boss-2026"
+# Master developer access is enabled only when the WC_DEV_KEY environment
+# variable is set in production. Never commit that key here.
 
 # --- Fixture schedule generation -------------------------------------------
 # The group-stage fixtures are generated as a round-robin per group. These are

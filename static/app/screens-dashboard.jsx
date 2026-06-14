@@ -173,11 +173,12 @@ function PredCard(props) {
   const rank = meR ? meR.predRank : ranked.length;
   const submitted = me.picks ? Object.keys(me.picks).length : 0;
   const totalMkts = (WCd.predictions || Sd.PREDICTIONS).length;
+  const locked = Sd.predictionsLocked ? Sd.predictionsLocked() : !!WCd.meta.predictionsLocked;
   return (
     <Cd>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
         <div className="dh" style={{ fontSize: 18 }}>Your predictions</div>
-        {WCd.meta.predictionsLocked ? <Chd tone="red">Locked</Chd> : <Chd tone="green">Open</Chd>}
+        {locked ? <Chd tone="red">Locked</Chd> : <Chd tone="green">Open</Chd>}
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 9 }}>
         {[['Score', score + ' pts'], ['Rank', '#' + rank], ['Made', submitted + '/' + totalMkts]].map((s, i) => (
@@ -188,7 +189,7 @@ function PredCard(props) {
         ))}
       </div>
       <div style={{ marginTop: 11 }}>
-        <Bd variant="primary" block sm onClick={props.onOpen}>{submitted < totalMkts && !WCd.meta.predictionsLocked ? 'Finish your predictions →' : 'See my predictions →'}</Bd>
+        <Bd variant="primary" block sm onClick={props.onOpen}>{submitted < totalMkts && !locked ? 'Finish your predictions →' : 'See my predictions →'}</Bd>
       </div>
     </Cd>
   );
@@ -198,6 +199,9 @@ function WinningsCard(props) {
   const me = props.me; const t = dashTeam(me.team);
   const pot = Sd.pot ? Sd.pot() : (WCd.POT * 0.5);
   const charity = Sd.charity ? Sd.charity() : (WCd.POT * 0.5);
+  const split = Sd.charitySplit ? Sd.charitySplit() : 0.5;
+  const splitPct = Math.round(split * 100);
+  const charityLabel = splitPct <= 0 ? 'No charity split' : 'To charity (' + splitPct + '% of every entry)';
   const ov = overallRank(me);
   const rankTaps = React.useRef({n:0,t:0});
   function rankTap(){
@@ -210,7 +214,7 @@ function WinningsCard(props) {
     <Cd bordered>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
-          <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.06em', textTransform: 'uppercase', color: 'var(--ink2)' }}>Winner takes all — if {t.name} lift the cup</div>
+          <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.06em', textTransform: 'uppercase', color: 'var(--ink2)' }}>Winner fund — if {t.name} lift the cup</div>
           <div className="dh" style={{ fontSize: 38, color: 'var(--green)', lineHeight: 1, marginTop: 2 }}>{money_d(pot)}</div>
         </div>
         <div onClick={rankTap} style={{ textAlign: 'right', background: 'var(--bg)', border: '2px solid var(--line)', borderRadius: 12, padding: '7px 11px', cursor: 'default' }}>
@@ -226,7 +230,7 @@ function WinningsCard(props) {
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 700, background: 'var(--bg)', borderRadius: 10, padding: '8px 10px', marginTop: 2 }}>
           <span style={{ fontSize: 16 }}>❤️</span>
-          <span style={{ flex: 1 }}>To charity (half of every entry)</span>
+          <span style={{ flex: 1 }}>{charityLabel}</span>
           <span className="dh" style={{ fontSize: 15, width: 64, textAlign: 'right', color: 'var(--red)' }}>{money_d(charity)}</span>
         </div>
       </div>
@@ -283,7 +287,7 @@ function MeScreen(props) {
       </Saysd>
       <SHd>Your team</SHd>
       <TeamCard me={me} onGames={props.goGames} />
-      <SHd aside={WCd.meta.predictionsLocked ? 'locked' : 'open'}>Predictions</SHd>
+      <SHd aside={(Sd.predictionsLocked && Sd.predictionsLocked()) ? 'locked' : 'open'}>Predictions</SHd>
       <PredCard me={me} onOpen={props.goPredictions} />
       <SHd>{pre ? 'Potential winnings' : 'Results & winnings'}</SHd>
       <WinningsCard me={me} />
