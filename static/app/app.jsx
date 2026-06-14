@@ -96,14 +96,12 @@ function AppBar(props){
 }
 
 function TabBar(props){
-  const predictionsLocked = A_S.predictionsLocked && A_S.predictionsLocked();
   const tabs=[['me','You'],['games','Games'],['players','Group'],['predictions','Predict'],['chat','Chat'],['summary','Verdict']];
   return <div className="tabbar tabbar--6">
     {tabs.map(([k,lab])=>(
       <button key={k} className={props.tab===k?'on':''} onClick={()=>props.setTab(k)}>
         <span className="ic"><Icon name={k}/></span>
         {lab}
-        {k==='predictions' && props.tab!=='predictions' && !predictionsLocked && <span className="tabdot"/>}
       </button>
     ))}
   </div>;
