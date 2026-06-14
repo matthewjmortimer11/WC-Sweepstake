@@ -214,12 +214,15 @@ function SettingsAdmin() {
    React.useEffect(() => setFee(String(feeNow || 0)), [feeNow]);
    const entrants = Sa.allSync().length;
    const split = Sa.charitySplit ? Sa.charitySplit() : 0.5;
+   const purpose = Sa.purpose ? Sa.purpose() : 'work';
+   const includeDept = Sa.includeDepartment ? Sa.includeDepartment() : true;
+   const includeLocation = Sa.includeLocation ? Sa.includeLocation() : true;
+   const includeLtMember = Sa.includeLtMember ? Sa.includeLtMember() : true;
    const n = Number(fee);
    const feeNum = isFinite(n) && n >= 0 ? n : feeNow;
    const gross = entrants * feeNum;
    const charity = gross * split;
    const winner = gross * (1 - split);
-   const includeDept = Sa.includeDepartment ? Sa.includeDepartment() : true;
    const fld = { width: '100%', border: '2.5px solid var(--ink)', borderRadius: 12, padding: '11px 13px', fontFamily: 'var(--disp)', fontWeight: 800, fontSize: 22, outline: 'none', background: '#fff' };
    function saveFee() {
      const val = Number(fee);
@@ -228,7 +231,7 @@ function SettingsAdmin() {
      if (window.wcToast) window.wcToast('Entry fee set to £' + val.toLocaleString('en-GB'), 'confident');
    }
    function toggleRow(onClick, on, title, text) {
-     return <button onClick={onClick} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 11, textAlign: 'left', border: '2px solid var(--line)', borderRadius: 13, background: '#fff', padding: '11px 12px', cursor: 'pointer' }}>
+     return <button onClick={onClick} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 11, textAlign: 'left', border: '2px solid var(--line)', borderRadius: 13, background: '#fff', padding: '11px 12px', cursor: 'pointer', marginBottom: 8 }}>
        <span style={{ width: 42, height: 24, borderRadius: 999, background: on ? 'var(--green)' : 'var(--line)', border: '2px solid var(--ink)', position: 'relative', flex: '0 0 auto' }}>
          <span style={{ position: 'absolute', top: 2, left: on ? 20 : 2, width: 16, height: 16, borderRadius: '50%', background: '#fff', border: '2px solid var(--ink)' }} />
        </span>
@@ -238,6 +241,7 @@ function SettingsAdmin() {
        </span>
      </button>;
    }
+   const splitPct = Math.round(split * 100);
    return (
      <>
        <Ca bordered style={{ background: 'var(--yellow)', marginBottom: 12 }}>
@@ -263,12 +267,50 @@ function SettingsAdmin() {
          ))}
        </Ca>
 
+       <SHa>Charity split</SHa>
+       <div style={{ display: 'flex', gap: 7, marginBottom: 8 }}>
+         {[0, 25, 50, 75, 100].map(pct => (
+           <button key={pct} onClick={() => Sa.setCharitySplit(pct / 100)} className="wc-btn wc-btn--sm"
+             style={{ flex: 1, background: splitPct === pct ? 'var(--yellow)' : '#fff', boxShadow: splitPct === pct ? '0 4px 0 var(--ink)' : '0 4px 0 var(--shadow)' }}>
+             {pct}%
+           </button>
+         ))}
+       </div>
+       <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink2)', marginBottom: 16, lineHeight: 1.4 }}>
+         {split < 0.01 ? 'No charity split — everything goes to the winner.' : split > 0.99 ? 'All entry fees go to charity. No winner fund.' : splitPct + '% of each entry goes to charity, the rest to the winner.'}
+       </div>
+
+       <SHa>Sweepstake type</SHa>
+       <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+         {[['work', 'Work'], ['friends', 'Friends & family']].map(([k, lab]) => (
+           <button key={k} onClick={() => Sa.setPurpose(k)} className="wc-btn wc-btn--sm"
+             style={{ flex: 1, background: purpose === k ? 'var(--yellow)' : '#fff', boxShadow: purpose === k ? '0 4px 0 var(--ink)' : '0 4px 0 var(--shadow)' }}>
+             {lab}
+           </button>
+         ))}
+       </div>
+       <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink2)', marginBottom: 16, lineHeight: 1.4 }}>
+         {purpose === 'work' ? 'Shows department, location and LT fields. You can toggle them individually below.' : 'Just names — no work details collected. Individual toggles below still apply.'}
+       </div>
+
        <SHa>Signup fields</SHa>
        {toggleRow(
          () => Sa.setIncludeDepartment(!includeDept),
          includeDept,
-         'Team / department field',
-         includeDept ? 'Shown on signup, profile editing and the directory.' : 'Hidden from signup, profile editing and directory filters.'
+         'Team / department',
+         includeDept ? 'Shown on signup, editing and directory.' : 'Hidden from signup, editing and directory.'
+       )}
+       {toggleRow(
+         () => Sa.setIncludeLocation(!includeLocation),
+         includeLocation,
+         'Location',
+         includeLocation ? 'Shown on signup and profile editing.' : 'Hidden — not collected.'
+       )}
+       {toggleRow(
+         () => Sa.setIncludeLtMember(!includeLtMember),
+         includeLtMember,
+         'Leadership Team member',
+         includeLtMember ? 'Shown on signup and profile editing.' : 'Hidden — not collected.'
        )}
      </>
    );

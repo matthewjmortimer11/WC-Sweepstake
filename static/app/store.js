@@ -55,7 +55,14 @@
   var BASE = {
     teams: {}, preds: {},
     fee: WC.FEE || 0,
-    meta: { phase: WC.meta.phase, stageLabel: WC.meta.stageLabel, includeDepartment: WC.meta.includeDepartment !== false },
+    meta: {
+      phase: WC.meta.phase, stageLabel: WC.meta.stageLabel,
+      includeDepartment: WC.meta.includeDepartment !== false,
+      includeLocation: WC.meta.includeLocation !== false,
+      includeLtMember: WC.meta.includeLtMember !== false,
+      charitySplit: WC.meta.charitySplit != null ? Number(WC.meta.charitySplit) : CHARITY_SPLIT,
+      purpose: WC.meta.purpose || 'work',
+    },
   };
   WC.TEAM_LIST.forEach(function (t) { BASE.teams[t.code] = { alive: t.alive, stage: t.stage, rounds: t.rounds }; });
   (WC.PREDICTIONS || []).forEach(function (m) { BASE.preds[m.key] = m.answer; });
@@ -85,12 +92,17 @@
       : WC.meta.phase === 'done' ? 'Tournament over' : 'In play';
     WC.meta.teamsLeft = WC.TEAM_LIST.filter(function (t) { return t.alive; }).length;
     WC.meta.includeDepartment = !admin.meta || admin.meta.includeDepartment !== false;
+    WC.meta.includeLocation = !admin.meta || admin.meta.includeLocation !== false;
+    WC.meta.includeLtMember = !admin.meta || admin.meta.includeLtMember !== false;
+    WC.meta.purpose = (admin.meta && admin.meta.purpose) || BASE.meta.purpose;
+    WC.charitySplit = (admin.meta && admin.meta.charitySplit != null) ? Number(admin.meta.charitySplit) : BASE.meta.charitySplit;
     var fee = admin.meta && admin.meta.entryFee != null ? Number(admin.meta.entryFee) : BASE.fee;
     WC.FEE = isFinite(fee) && fee >= 0 ? fee : BASE.fee;
     WC.POT = (WC.PEOPLE || []).length * WC.FEE;
   }
 
   function charitySplitValue() {
+    if (admin.meta && admin.meta.charitySplit != null) return Number(admin.meta.charitySplit);
     var v = WC.charitySplit != null ? WC.charitySplit : WC.CHARITY_SPLIT;
     return v == null ? CHARITY_SPLIT : Number(v);
   }
@@ -416,6 +428,36 @@
       admin.meta = admin.meta || {}; admin.meta.includeDepartment = !!on;
       commitAdmin();
     },
+    purpose: function () { return (admin.meta && admin.meta.purpose) || BASE.meta.purpose; },
+    setPurpose: function (p) {
+      admin.meta = admin.meta || {}; admin.meta.purpose = p;
+      if (p === 'friends') {
+        admin.meta.includeDepartment = false;
+        admin.meta.includeLocation = false;
+        admin.meta.includeLtMember = false;
+      } else {
+        admin.meta.includeDepartment = true;
+        admin.meta.includeLocation = true;
+        admin.meta.includeLtMember = true;
+      }
+      commitAdmin();
+    },
+    includeLocation: function () { return !admin.meta || admin.meta.includeLocation !== false; },
+    setIncludeLocation: function (on) {
+      admin.meta = admin.meta || {}; admin.meta.includeLocation = !!on;
+      commitAdmin();
+    },
+    includeLtMember: function () { return !admin.meta || admin.meta.includeLtMember !== false; },
+    setIncludeLtMember: function (on) {
+      admin.meta = admin.meta || {}; admin.meta.includeLtMember = !!on;
+      commitAdmin();
+    },
+    setCharitySplit: function (split) {
+      var n = Math.max(0, Math.min(1, Number(split)));
+      if (!isFinite(n)) return;
+      admin.meta = admin.meta || {}; admin.meta.charitySplit = n;
+      commitAdmin();
+    },
     setTeamOut: function (code, out) {
       admin.teams = admin.teams || {};
       if (out) admin.teams[code] = { alive: false, stage: 'out-group', rounds: 1 };
@@ -446,7 +488,14 @@
     },
     adminReset: function () {
       var keep = admin.meta || {};
-      admin = { teams: {}, fixtures: {}, predictions: {}, meta: { entryFee: keep.entryFee, includeDepartment: keep.includeDepartment } };
+      admin = { teams: {}, fixtures: {}, predictions: {}, meta: {
+        entryFee: keep.entryFee,
+        includeDepartment: keep.includeDepartment,
+        includeLocation: keep.includeLocation,
+        includeLtMember: keep.includeLtMember,
+        charitySplit: keep.charitySplit,
+        purpose: keep.purpose,
+      }};
       commitAdmin();
     }
   };

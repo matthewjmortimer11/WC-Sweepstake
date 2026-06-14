@@ -383,7 +383,7 @@ button:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(245,200,0,.55);borde
 
 <!-- Single source of truth: generated from wc_data.py by scripts/build_snapshot.py.
      No-op when the server injects window.WC_DATA above (live mode). -->
-<script type="text/babel" src="tweaks-panel.jsx?v=20260614-egg2"></script>
+<script type="text/babel" src="tweaks-panel.jsx?v=20260614-settings"></script>
 
 <script>
 /* ===========================================================================
@@ -545,7 +545,14 @@ button:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(245,200,0,.55);borde
   var BASE = {
     teams: {}, preds: {},
     fee: WC.FEE || 0,
-    meta: { phase: WC.meta.phase, stageLabel: WC.meta.stageLabel, includeDepartment: WC.meta.includeDepartment !== false },
+    meta: {
+      phase: WC.meta.phase, stageLabel: WC.meta.stageLabel,
+      includeDepartment: WC.meta.includeDepartment !== false,
+      includeLocation: WC.meta.includeLocation !== false,
+      includeLtMember: WC.meta.includeLtMember !== false,
+      charitySplit: WC.meta.charitySplit != null ? Number(WC.meta.charitySplit) : CHARITY_SPLIT,
+      purpose: WC.meta.purpose || 'work',
+    },
   };
   WC.TEAM_LIST.forEach(function (t) { BASE.teams[t.code] = { alive: t.alive, stage: t.stage, rounds: t.rounds }; });
   (WC.PREDICTIONS || []).forEach(function (m) { BASE.preds[m.key] = m.answer; });
@@ -575,12 +582,17 @@ button:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(245,200,0,.55);borde
       : WC.meta.phase === 'done' ? 'Tournament over' : 'In play';
     WC.meta.teamsLeft = WC.TEAM_LIST.filter(function (t) { return t.alive; }).length;
     WC.meta.includeDepartment = !admin.meta || admin.meta.includeDepartment !== false;
+    WC.meta.includeLocation = !admin.meta || admin.meta.includeLocation !== false;
+    WC.meta.includeLtMember = !admin.meta || admin.meta.includeLtMember !== false;
+    WC.meta.purpose = (admin.meta && admin.meta.purpose) || BASE.meta.purpose;
+    WC.charitySplit = (admin.meta && admin.meta.charitySplit != null) ? Number(admin.meta.charitySplit) : BASE.meta.charitySplit;
     var fee = admin.meta && admin.meta.entryFee != null ? Number(admin.meta.entryFee) : BASE.fee;
     WC.FEE = isFinite(fee) && fee >= 0 ? fee : BASE.fee;
     WC.POT = (WC.PEOPLE || []).length * WC.FEE;
   }
 
   function charitySplitValue() {
+    if (admin.meta && admin.meta.charitySplit != null) return Number(admin.meta.charitySplit);
     var v = WC.charitySplit != null ? WC.charitySplit : WC.CHARITY_SPLIT;
     return v == null ? CHARITY_SPLIT : Number(v);
   }
@@ -906,6 +918,36 @@ button:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(245,200,0,.55);borde
       admin.meta = admin.meta || {}; admin.meta.includeDepartment = !!on;
       commitAdmin();
     },
+    purpose: function () { return (admin.meta && admin.meta.purpose) || BASE.meta.purpose; },
+    setPurpose: function (p) {
+      admin.meta = admin.meta || {}; admin.meta.purpose = p;
+      if (p === 'friends') {
+        admin.meta.includeDepartment = false;
+        admin.meta.includeLocation = false;
+        admin.meta.includeLtMember = false;
+      } else {
+        admin.meta.includeDepartment = true;
+        admin.meta.includeLocation = true;
+        admin.meta.includeLtMember = true;
+      }
+      commitAdmin();
+    },
+    includeLocation: function () { return !admin.meta || admin.meta.includeLocation !== false; },
+    setIncludeLocation: function (on) {
+      admin.meta = admin.meta || {}; admin.meta.includeLocation = !!on;
+      commitAdmin();
+    },
+    includeLtMember: function () { return !admin.meta || admin.meta.includeLtMember !== false; },
+    setIncludeLtMember: function (on) {
+      admin.meta = admin.meta || {}; admin.meta.includeLtMember = !!on;
+      commitAdmin();
+    },
+    setCharitySplit: function (split) {
+      var n = Math.max(0, Math.min(1, Number(split)));
+      if (!isFinite(n)) return;
+      admin.meta = admin.meta || {}; admin.meta.charitySplit = n;
+      commitAdmin();
+    },
     setTeamOut: function (code, out) {
       admin.teams = admin.teams || {};
       if (out) admin.teams[code] = { alive: false, stage: 'out-group', rounds: 1 };
@@ -936,7 +978,14 @@ button:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(245,200,0,.55);borde
     },
     adminReset: function () {
       var keep = admin.meta || {};
-      admin = { teams: {}, fixtures: {}, predictions: {}, meta: { entryFee: keep.entryFee, includeDepartment: keep.includeDepartment } };
+      admin = { teams: {}, fixtures: {}, predictions: {}, meta: {
+        entryFee: keep.entryFee,
+        includeDepartment: keep.includeDepartment,
+        includeLocation: keep.includeLocation,
+        includeLtMember: keep.includeLtMember,
+        charitySplit: keep.charitySplit,
+        purpose: keep.purpose,
+      }};
       commitAdmin();
     }
   };
@@ -2950,6 +2999,8 @@ function OnboardingForm(props) {
   const [loc, setLoc] = oState('Edinburgh');
   const [lt, setLt] = oState(false);
   const includeDept = So.includeDepartment ? So.includeDepartment() : true;
+  const includeLocation = So.includeLocation ? So.includeLocation() : true;
+  const includeLtMember = So.includeLtMember ? So.includeLtMember() : true;
   const ok = name.trim().length > 0;
   const split = So.charitySplit ? So.charitySplit() : 0.5;
   const fee = WCo.FEE || 0;
@@ -2968,31 +3019,36 @@ function OnboardingForm(props) {
         <div style={{ marginTop: 22, display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div>
             <Lab>Full name</Lab>
-            <input autoFocus style={inp} value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Davie McAllister" />
+            <input autoFocus style={inp} value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Alex Johnson" />
           </div>
           {includeDept && <div>
             <Lab opt>Team / department</Lab>
             <input style={inp} value={dept} onChange={e => setDept(e.target.value)} placeholder="e.g. Engineering" list="wh-depts" />
             <datalist id="wh-depts">{DEPTS.map(d => <option key={d} value={d} />)}</datalist>
           </div>}
-          <div>
-            <Lab>Work location</Lab>
+          {includeLocation && <div>
+            <Lab opt>Location</Lab>
             <Seg value={loc} onChange={setLoc} options={[{ value: 'Edinburgh', label: 'Edinburgh' }, { value: 'London', label: 'London' }]} />
-          </div>
-          <div>
-            <Lab>Leadership Team member?</Lab>
+          </div>}
+          {includeLtMember && <div>
+            <Lab opt>Leadership Team member?</Lab>
             <Seg value={lt} onChange={setLt} options={[{ value: false, label: 'No' }, { value: true, label: 'Yes' }]} />
-          </div>
+          </div>}
         </div>
 
-        <Co bordered style={{ marginTop: 20, background: 'var(--yellow)' }}>
+        {fee > 0 && <Co bordered style={{ marginTop: 20, background: 'var(--yellow)' }}>
           <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: '.05em', textTransform: 'uppercase' }}>Your buy-in</div>
           <div className="dh" style={{ fontSize: 28, margin: '2px 0 4px' }}>You're putting in £{fee}.</div>
-          <div style={{ fontSize: 14, fontWeight: 600 }}><b>£{charityPerEntry.toFixed(2).replace(/\.00$/, '')} goes to charity</b>, the rest into a winner-takes-all fund — <b>{'£' + Math.round(winnerAfterEntry).toLocaleString('en-GB')}</b> once you're in, and growing with every sign-up.</div>
-        </Co>
+          {split < 0.01
+            ? <div style={{ fontSize: 14, fontWeight: 600 }}>The full amount goes into a winner-takes-all fund — <b>{'£' + Math.round(winnerAfterEntry).toLocaleString('en-GB')}</b> once you're in, and growing with every sign-up.</div>
+            : split > 0.99
+              ? <div style={{ fontSize: 14, fontWeight: 600 }}>The full entry goes to charity. This is a fun-only sweepstake — no winner fund.</div>
+              : <div style={{ fontSize: 14, fontWeight: 600 }}><b>£{charityPerEntry.toFixed(2).replace(/\.00$/, '')} goes to charity</b>, the rest into a winner-takes-all fund — <b>{'£' + Math.round(winnerAfterEntry).toLocaleString('en-GB')}</b> once you're in, and growing with every sign-up.</div>
+          }
+        </Co>}
 
         <div style={{ marginTop: 18 }}>
-          <Bo variant="ink" block onClick={() => ok && props.onSubmit({ name: name.trim(), department: includeDept ? dept.trim() : '', location: loc, ltMember: lt })}>
+          <Bo variant="ink" block onClick={() => ok && props.onSubmit({ name: name.trim(), department: includeDept ? dept.trim() : '', location: includeLocation ? loc : '', ltMember: includeLtMember ? lt : false })}>
             {ok ? 'To the draw →' : 'Add your name first'}
           </Bo>
         </div>
@@ -3222,17 +3278,22 @@ function overallRank(me) {
 function ProfileHeader(props) {
   const me = props.me; const t = dashTeam(me.team);
   const includeDept = Sd.includeDepartment ? Sd.includeDepartment() : true;
+  const includeLocation = Sd.includeLocation ? Sd.includeLocation() : true;
+  const includeLtMember = Sd.includeLtMember ? Sd.includeLtMember() : true;
+  const chips = [
+    includeLocation && me.location && me.location,
+    includeDept && me.department,
+    includeLtMember && me.ltMember && 'LT',
+  ].filter(Boolean);
   return (
     <Cd bordered className="pop">
       <div style={{ display: 'flex', alignItems: 'center', gap: 13 }}>
         <Ad person={Object.assign({}, me, { isYou: false })} size={56} />
         <div style={{ flex: 1, minWidth: 0 }}>
           <div className="dh" style={{ fontSize: 24, lineHeight: 1 }}>{me.name}</div>
-          <div style={{ display: 'flex', gap: 6, marginTop: 7, flexWrap: 'wrap' }}>
-            <Chd>{me.location}</Chd>
-            {includeDept && me.department && <Chd>{me.department}</Chd>}
-            {me.ltMember && <Chd tone="yellow">LT</Chd>}
-          </div>
+          {chips.length > 0 && <div style={{ display: 'flex', gap: 6, marginTop: 7, flexWrap: 'wrap' }}>
+            {chips.map((c, i) => <Chd key={i} tone={c === 'LT' ? 'yellow' : undefined}>{c}</Chd>)}
+          </div>}
         </div>
         <button onClick={props.onEdit} className="wc-btn wc-btn--sm" style={{ padding: '8px 12px', boxShadow: '0 4px 0 var(--shadow)' }}>Edit</button>
       </div>
@@ -3244,9 +3305,11 @@ function EditProfile(props) {
   const me = props.me;
   const [name, setName] = dState(me.name);
   const [dept, setDept] = dState(me.department || '');
-  const [loc, setLoc] = dState(me.location || 'London');
+  const [loc, setLoc] = dState(me.location || 'Edinburgh');
   const [lt, setLt] = dState(!!me.ltMember);
   const includeDept = Sd.includeDepartment ? Sd.includeDepartment() : true;
+  const includeLocation = Sd.includeLocation ? Sd.includeLocation() : true;
+  const includeLtMember = Sd.includeLtMember ? Sd.includeLtMember() : true;
   const fld = { width: '100%', border: '2.5px solid var(--ink)', borderRadius: 12, padding: '11px 13px', fontFamily: 'var(--body)', fontWeight: 600, fontSize: 15, marginTop: 6, outline: 'none' };
   function seg(val, set, opts) {
     return <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>{opts.map(o =>
@@ -3261,11 +3324,21 @@ function EditProfile(props) {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 13 }}>
           <div><label style={{ fontWeight: 800, fontSize: 13, fontFamily: 'var(--disp)' }}>Full name</label><input style={fld} value={name} onChange={e => setName(e.target.value)} /></div>
           {includeDept && <div><label style={{ fontWeight: 800, fontSize: 13, fontFamily: 'var(--disp)' }}>Team / department</label><input style={fld} value={dept} onChange={e => setDept(e.target.value)} placeholder="optional" /></div>}
-          <div><label style={{ fontWeight: 800, fontSize: 13, fontFamily: 'var(--disp)' }}>Work location</label>{seg(loc, setLoc, [{ value: 'Edinburgh', label: 'Edinburgh' }, { value: 'London', label: 'London' }])}</div>
-          <div><label style={{ fontWeight: 800, fontSize: 13, fontFamily: 'var(--disp)' }}>Leadership Team?</label>{seg(lt, setLt, [{ value: false, label: 'No' }, { value: true, label: 'Yes' }])}</div>
+          {includeLocation && <div><label style={{ fontWeight: 800, fontSize: 13, fontFamily: 'var(--disp)' }}>Location</label>{seg(loc, setLoc, [{ value: 'Edinburgh', label: 'Edinburgh' }, { value: 'London', label: 'London' }])}</div>}
+          {includeLtMember && <div><label style={{ fontWeight: 800, fontSize: 13, fontFamily: 'var(--disp)' }}>Leadership Team?</label>{seg(lt, setLt, [{ value: false, label: 'No' }, { value: true, label: 'Yes' }])}</div>}
         </div>
         <div style={{ marginTop: 18 }}>
-          <Bd variant="ink" block onClick={() => { Sd.update(me.id, { name: name.trim() || me.name, department: includeDept ? dept.trim() : me.department, location: loc, city: loc, ltMember: lt, leadership: lt }); props.onClose(); }}>Save</Bd>
+          <Bd variant="ink" block onClick={() => {
+            Sd.update(me.id, {
+              name: name.trim() || me.name,
+              department: includeDept ? dept.trim() : me.department,
+              location: includeLocation ? loc : me.location,
+              city: includeLocation ? loc : me.city,
+              ltMember: includeLtMember ? lt : me.ltMember,
+              leadership: includeLtMember ? lt : me.leadership,
+            });
+            props.onClose();
+          }}>Save</Bd>
         </div>
       </div>
     </div>
@@ -3982,12 +4055,15 @@ function SettingsAdmin() {
    React.useEffect(() => setFee(String(feeNow || 0)), [feeNow]);
    const entrants = Sa.allSync().length;
    const split = Sa.charitySplit ? Sa.charitySplit() : 0.5;
+   const purpose = Sa.purpose ? Sa.purpose() : 'work';
+   const includeDept = Sa.includeDepartment ? Sa.includeDepartment() : true;
+   const includeLocation = Sa.includeLocation ? Sa.includeLocation() : true;
+   const includeLtMember = Sa.includeLtMember ? Sa.includeLtMember() : true;
    const n = Number(fee);
    const feeNum = isFinite(n) && n >= 0 ? n : feeNow;
    const gross = entrants * feeNum;
    const charity = gross * split;
    const winner = gross * (1 - split);
-   const includeDept = Sa.includeDepartment ? Sa.includeDepartment() : true;
    const fld = { width: '100%', border: '2.5px solid var(--ink)', borderRadius: 12, padding: '11px 13px', fontFamily: 'var(--disp)', fontWeight: 800, fontSize: 22, outline: 'none', background: '#fff' };
    function saveFee() {
      const val = Number(fee);
@@ -3996,7 +4072,7 @@ function SettingsAdmin() {
      if (window.wcToast) window.wcToast('Entry fee set to £' + val.toLocaleString('en-GB'), 'confident');
    }
    function toggleRow(onClick, on, title, text) {
-     return <button onClick={onClick} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 11, textAlign: 'left', border: '2px solid var(--line)', borderRadius: 13, background: '#fff', padding: '11px 12px', cursor: 'pointer' }}>
+     return <button onClick={onClick} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 11, textAlign: 'left', border: '2px solid var(--line)', borderRadius: 13, background: '#fff', padding: '11px 12px', cursor: 'pointer', marginBottom: 8 }}>
        <span style={{ width: 42, height: 24, borderRadius: 999, background: on ? 'var(--green)' : 'var(--line)', border: '2px solid var(--ink)', position: 'relative', flex: '0 0 auto' }}>
          <span style={{ position: 'absolute', top: 2, left: on ? 20 : 2, width: 16, height: 16, borderRadius: '50%', background: '#fff', border: '2px solid var(--ink)' }} />
        </span>
@@ -4006,6 +4082,7 @@ function SettingsAdmin() {
        </span>
      </button>;
    }
+   const splitPct = Math.round(split * 100);
    return (
      <>
        <Ca bordered style={{ background: 'var(--yellow)', marginBottom: 12 }}>
@@ -4031,12 +4108,50 @@ function SettingsAdmin() {
          ))}
        </Ca>
 
+       <SHa>Charity split</SHa>
+       <div style={{ display: 'flex', gap: 7, marginBottom: 8 }}>
+         {[0, 25, 50, 75, 100].map(pct => (
+           <button key={pct} onClick={() => Sa.setCharitySplit(pct / 100)} className="wc-btn wc-btn--sm"
+             style={{ flex: 1, background: splitPct === pct ? 'var(--yellow)' : '#fff', boxShadow: splitPct === pct ? '0 4px 0 var(--ink)' : '0 4px 0 var(--shadow)' }}>
+             {pct}%
+           </button>
+         ))}
+       </div>
+       <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink2)', marginBottom: 16, lineHeight: 1.4 }}>
+         {split < 0.01 ? 'No charity split — everything goes to the winner.' : split > 0.99 ? 'All entry fees go to charity. No winner fund.' : splitPct + '% of each entry goes to charity, the rest to the winner.'}
+       </div>
+
+       <SHa>Sweepstake type</SHa>
+       <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+         {[['work', 'Work'], ['friends', 'Friends & family']].map(([k, lab]) => (
+           <button key={k} onClick={() => Sa.setPurpose(k)} className="wc-btn wc-btn--sm"
+             style={{ flex: 1, background: purpose === k ? 'var(--yellow)' : '#fff', boxShadow: purpose === k ? '0 4px 0 var(--ink)' : '0 4px 0 var(--shadow)' }}>
+             {lab}
+           </button>
+         ))}
+       </div>
+       <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink2)', marginBottom: 16, lineHeight: 1.4 }}>
+         {purpose === 'work' ? 'Shows department, location and LT fields. You can toggle them individually below.' : 'Just names — no work details collected. Individual toggles below still apply.'}
+       </div>
+
        <SHa>Signup fields</SHa>
        {toggleRow(
          () => Sa.setIncludeDepartment(!includeDept),
          includeDept,
-         'Team / department field',
-         includeDept ? 'Shown on signup, profile editing and the directory.' : 'Hidden from signup, profile editing and directory filters.'
+         'Team / department',
+         includeDept ? 'Shown on signup, editing and directory.' : 'Hidden from signup, editing and directory.'
+       )}
+       {toggleRow(
+         () => Sa.setIncludeLocation(!includeLocation),
+         includeLocation,
+         'Location',
+         includeLocation ? 'Shown on signup and profile editing.' : 'Hidden — not collected.'
+       )}
+       {toggleRow(
+         () => Sa.setIncludeLtMember(!includeLtMember),
+         includeLtMember,
+         'Leadership Team member',
+         includeLtMember ? 'Shown on signup and profile editing.' : 'Hidden — not collected.'
        )}
      </>
    );

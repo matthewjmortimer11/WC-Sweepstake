@@ -35,17 +35,22 @@ function overallRank(me) {
 function ProfileHeader(props) {
   const me = props.me; const t = dashTeam(me.team);
   const includeDept = Sd.includeDepartment ? Sd.includeDepartment() : true;
+  const includeLocation = Sd.includeLocation ? Sd.includeLocation() : true;
+  const includeLtMember = Sd.includeLtMember ? Sd.includeLtMember() : true;
+  const chips = [
+    includeLocation && me.location && me.location,
+    includeDept && me.department,
+    includeLtMember && me.ltMember && 'LT',
+  ].filter(Boolean);
   return (
     <Cd bordered className="pop">
       <div style={{ display: 'flex', alignItems: 'center', gap: 13 }}>
         <Ad person={Object.assign({}, me, { isYou: false })} size={56} />
         <div style={{ flex: 1, minWidth: 0 }}>
           <div className="dh" style={{ fontSize: 24, lineHeight: 1 }}>{me.name}</div>
-          <div style={{ display: 'flex', gap: 6, marginTop: 7, flexWrap: 'wrap' }}>
-            <Chd>{me.location}</Chd>
-            {includeDept && me.department && <Chd>{me.department}</Chd>}
-            {me.ltMember && <Chd tone="yellow">LT</Chd>}
-          </div>
+          {chips.length > 0 && <div style={{ display: 'flex', gap: 6, marginTop: 7, flexWrap: 'wrap' }}>
+            {chips.map((c, i) => <Chd key={i} tone={c === 'LT' ? 'yellow' : undefined}>{c}</Chd>)}
+          </div>}
         </div>
         <button onClick={props.onEdit} className="wc-btn wc-btn--sm" style={{ padding: '8px 12px', boxShadow: '0 4px 0 var(--shadow)' }}>Edit</button>
       </div>
@@ -57,9 +62,11 @@ function EditProfile(props) {
   const me = props.me;
   const [name, setName] = dState(me.name);
   const [dept, setDept] = dState(me.department || '');
-  const [loc, setLoc] = dState(me.location || 'London');
+  const [loc, setLoc] = dState(me.location || 'Edinburgh');
   const [lt, setLt] = dState(!!me.ltMember);
   const includeDept = Sd.includeDepartment ? Sd.includeDepartment() : true;
+  const includeLocation = Sd.includeLocation ? Sd.includeLocation() : true;
+  const includeLtMember = Sd.includeLtMember ? Sd.includeLtMember() : true;
   const fld = { width: '100%', border: '2.5px solid var(--ink)', borderRadius: 12, padding: '11px 13px', fontFamily: 'var(--body)', fontWeight: 600, fontSize: 15, marginTop: 6, outline: 'none' };
   function seg(val, set, opts) {
     return <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>{opts.map(o =>
@@ -74,11 +81,21 @@ function EditProfile(props) {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 13 }}>
           <div><label style={{ fontWeight: 800, fontSize: 13, fontFamily: 'var(--disp)' }}>Full name</label><input style={fld} value={name} onChange={e => setName(e.target.value)} /></div>
           {includeDept && <div><label style={{ fontWeight: 800, fontSize: 13, fontFamily: 'var(--disp)' }}>Team / department</label><input style={fld} value={dept} onChange={e => setDept(e.target.value)} placeholder="optional" /></div>}
-          <div><label style={{ fontWeight: 800, fontSize: 13, fontFamily: 'var(--disp)' }}>Work location</label>{seg(loc, setLoc, [{ value: 'Edinburgh', label: 'Edinburgh' }, { value: 'London', label: 'London' }])}</div>
-          <div><label style={{ fontWeight: 800, fontSize: 13, fontFamily: 'var(--disp)' }}>Leadership Team?</label>{seg(lt, setLt, [{ value: false, label: 'No' }, { value: true, label: 'Yes' }])}</div>
+          {includeLocation && <div><label style={{ fontWeight: 800, fontSize: 13, fontFamily: 'var(--disp)' }}>Location</label>{seg(loc, setLoc, [{ value: 'Edinburgh', label: 'Edinburgh' }, { value: 'London', label: 'London' }])}</div>}
+          {includeLtMember && <div><label style={{ fontWeight: 800, fontSize: 13, fontFamily: 'var(--disp)' }}>Leadership Team?</label>{seg(lt, setLt, [{ value: false, label: 'No' }, { value: true, label: 'Yes' }])}</div>}
         </div>
         <div style={{ marginTop: 18 }}>
-          <Bd variant="ink" block onClick={() => { Sd.update(me.id, { name: name.trim() || me.name, department: includeDept ? dept.trim() : me.department, location: loc, city: loc, ltMember: lt, leadership: lt }); props.onClose(); }}>Save</Bd>
+          <Bd variant="ink" block onClick={() => {
+            Sd.update(me.id, {
+              name: name.trim() || me.name,
+              department: includeDept ? dept.trim() : me.department,
+              location: includeLocation ? loc : me.location,
+              city: includeLocation ? loc : me.city,
+              ltMember: includeLtMember ? lt : me.ltMember,
+              leadership: includeLtMember ? lt : me.leadership,
+            });
+            props.onClose();
+          }}>Save</Bd>
         </div>
       </div>
     </div>

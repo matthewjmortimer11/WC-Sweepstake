@@ -247,6 +247,8 @@ function OnboardingForm(props) {
   const [loc, setLoc] = oState('Edinburgh');
   const [lt, setLt] = oState(false);
   const includeDept = So.includeDepartment ? So.includeDepartment() : true;
+  const includeLocation = So.includeLocation ? So.includeLocation() : true;
+  const includeLtMember = So.includeLtMember ? So.includeLtMember() : true;
   const ok = name.trim().length > 0;
   const split = So.charitySplit ? So.charitySplit() : 0.5;
   const fee = WCo.FEE || 0;
@@ -265,31 +267,36 @@ function OnboardingForm(props) {
         <div style={{ marginTop: 22, display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div>
             <Lab>Full name</Lab>
-            <input autoFocus style={inp} value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Davie McAllister" />
+            <input autoFocus style={inp} value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Alex Johnson" />
           </div>
           {includeDept && <div>
             <Lab opt>Team / department</Lab>
             <input style={inp} value={dept} onChange={e => setDept(e.target.value)} placeholder="e.g. Engineering" list="wh-depts" />
             <datalist id="wh-depts">{DEPTS.map(d => <option key={d} value={d} />)}</datalist>
           </div>}
-          <div>
-            <Lab>Work location</Lab>
+          {includeLocation && <div>
+            <Lab opt>Location</Lab>
             <Seg value={loc} onChange={setLoc} options={[{ value: 'Edinburgh', label: 'Edinburgh' }, { value: 'London', label: 'London' }]} />
-          </div>
-          <div>
-            <Lab>Leadership Team member?</Lab>
+          </div>}
+          {includeLtMember && <div>
+            <Lab opt>Leadership Team member?</Lab>
             <Seg value={lt} onChange={setLt} options={[{ value: false, label: 'No' }, { value: true, label: 'Yes' }]} />
-          </div>
+          </div>}
         </div>
 
-        <Co bordered style={{ marginTop: 20, background: 'var(--yellow)' }}>
+        {fee > 0 && <Co bordered style={{ marginTop: 20, background: 'var(--yellow)' }}>
           <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: '.05em', textTransform: 'uppercase' }}>Your buy-in</div>
           <div className="dh" style={{ fontSize: 28, margin: '2px 0 4px' }}>You're putting in £{fee}.</div>
-          <div style={{ fontSize: 14, fontWeight: 600 }}><b>£{charityPerEntry.toFixed(2).replace(/\.00$/, '')} goes to charity</b>, the rest into a winner-takes-all fund — <b>{'£' + Math.round(winnerAfterEntry).toLocaleString('en-GB')}</b> once you're in, and growing with every sign-up.</div>
-        </Co>
+          {split < 0.01
+            ? <div style={{ fontSize: 14, fontWeight: 600 }}>The full amount goes into a winner-takes-all fund — <b>{'£' + Math.round(winnerAfterEntry).toLocaleString('en-GB')}</b> once you're in, and growing with every sign-up.</div>
+            : split > 0.99
+              ? <div style={{ fontSize: 14, fontWeight: 600 }}>The full entry goes to charity. This is a fun-only sweepstake — no winner fund.</div>
+              : <div style={{ fontSize: 14, fontWeight: 600 }}><b>£{charityPerEntry.toFixed(2).replace(/\.00$/, '')} goes to charity</b>, the rest into a winner-takes-all fund — <b>{'£' + Math.round(winnerAfterEntry).toLocaleString('en-GB')}</b> once you're in, and growing with every sign-up.</div>
+          }
+        </Co>}
 
         <div style={{ marginTop: 18 }}>
-          <Bo variant="ink" block onClick={() => ok && props.onSubmit({ name: name.trim(), department: includeDept ? dept.trim() : '', location: loc, ltMember: lt })}>
+          <Bo variant="ink" block onClick={() => ok && props.onSubmit({ name: name.trim(), department: includeDept ? dept.trim() : '', location: includeLocation ? loc : '', ltMember: includeLtMember ? lt : false })}>
             {ok ? 'To the draw →' : 'Add your name first'}
           </Bo>
         </div>

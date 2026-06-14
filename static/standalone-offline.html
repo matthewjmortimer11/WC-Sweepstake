@@ -33880,7 +33880,14 @@ button:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(245,200,0,.55);borde
   var BASE = {
     teams: {}, preds: {},
     fee: WC.FEE || 0,
-    meta: { phase: WC.meta.phase, stageLabel: WC.meta.stageLabel, includeDepartment: WC.meta.includeDepartment !== false },
+    meta: {
+      phase: WC.meta.phase, stageLabel: WC.meta.stageLabel,
+      includeDepartment: WC.meta.includeDepartment !== false,
+      includeLocation: WC.meta.includeLocation !== false,
+      includeLtMember: WC.meta.includeLtMember !== false,
+      charitySplit: WC.meta.charitySplit != null ? Number(WC.meta.charitySplit) : CHARITY_SPLIT,
+      purpose: WC.meta.purpose || 'work',
+    },
   };
   WC.TEAM_LIST.forEach(function (t) { BASE.teams[t.code] = { alive: t.alive, stage: t.stage, rounds: t.rounds }; });
   (WC.PREDICTIONS || []).forEach(function (m) { BASE.preds[m.key] = m.answer; });
@@ -33910,12 +33917,17 @@ button:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(245,200,0,.55);borde
       : WC.meta.phase === 'done' ? 'Tournament over' : 'In play';
     WC.meta.teamsLeft = WC.TEAM_LIST.filter(function (t) { return t.alive; }).length;
     WC.meta.includeDepartment = !admin.meta || admin.meta.includeDepartment !== false;
+    WC.meta.includeLocation = !admin.meta || admin.meta.includeLocation !== false;
+    WC.meta.includeLtMember = !admin.meta || admin.meta.includeLtMember !== false;
+    WC.meta.purpose = (admin.meta && admin.meta.purpose) || BASE.meta.purpose;
+    WC.charitySplit = (admin.meta && admin.meta.charitySplit != null) ? Number(admin.meta.charitySplit) : BASE.meta.charitySplit;
     var fee = admin.meta && admin.meta.entryFee != null ? Number(admin.meta.entryFee) : BASE.fee;
     WC.FEE = isFinite(fee) && fee >= 0 ? fee : BASE.fee;
     WC.POT = (WC.PEOPLE || []).length * WC.FEE;
   }
 
   function charitySplitValue() {
+    if (admin.meta && admin.meta.charitySplit != null) return Number(admin.meta.charitySplit);
     var v = WC.charitySplit != null ? WC.charitySplit : WC.CHARITY_SPLIT;
     return v == null ? CHARITY_SPLIT : Number(v);
   }
@@ -34241,6 +34253,36 @@ button:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(245,200,0,.55);borde
       admin.meta = admin.meta || {}; admin.meta.includeDepartment = !!on;
       commitAdmin();
     },
+    purpose: function () { return (admin.meta && admin.meta.purpose) || BASE.meta.purpose; },
+    setPurpose: function (p) {
+      admin.meta = admin.meta || {}; admin.meta.purpose = p;
+      if (p === 'friends') {
+        admin.meta.includeDepartment = false;
+        admin.meta.includeLocation = false;
+        admin.meta.includeLtMember = false;
+      } else {
+        admin.meta.includeDepartment = true;
+        admin.meta.includeLocation = true;
+        admin.meta.includeLtMember = true;
+      }
+      commitAdmin();
+    },
+    includeLocation: function () { return !admin.meta || admin.meta.includeLocation !== false; },
+    setIncludeLocation: function (on) {
+      admin.meta = admin.meta || {}; admin.meta.includeLocation = !!on;
+      commitAdmin();
+    },
+    includeLtMember: function () { return !admin.meta || admin.meta.includeLtMember !== false; },
+    setIncludeLtMember: function (on) {
+      admin.meta = admin.meta || {}; admin.meta.includeLtMember = !!on;
+      commitAdmin();
+    },
+    setCharitySplit: function (split) {
+      var n = Math.max(0, Math.min(1, Number(split)));
+      if (!isFinite(n)) return;
+      admin.meta = admin.meta || {}; admin.meta.charitySplit = n;
+      commitAdmin();
+    },
     setTeamOut: function (code, out) {
       admin.teams = admin.teams || {};
       if (out) admin.teams[code] = { alive: false, stage: 'out-group', rounds: 1 };
@@ -34271,7 +34313,14 @@ button:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(245,200,0,.55);borde
     },
     adminReset: function () {
       var keep = admin.meta || {};
-      admin = { teams: {}, fixtures: {}, predictions: {}, meta: { entryFee: keep.entryFee, includeDepartment: keep.includeDepartment } };
+      admin = { teams: {}, fixtures: {}, predictions: {}, meta: {
+        entryFee: keep.entryFee,
+        includeDepartment: keep.includeDepartment,
+        includeLocation: keep.includeLocation,
+        includeLtMember: keep.includeLtMember,
+        charitySplit: keep.charitySplit,
+        purpose: keep.purpose,
+      }};
       commitAdmin();
     }
   };
@@ -38503,6 +38552,8 @@ function OnboardingForm(props) {
   const [loc, setLoc] = oState('Edinburgh');
   const [lt, setLt] = oState(false);
   const includeDept = So.includeDepartment ? So.includeDepartment() : true;
+  const includeLocation = So.includeLocation ? So.includeLocation() : true;
+  const includeLtMember = So.includeLtMember ? So.includeLtMember() : true;
   const ok = name.trim().length > 0;
   const split = So.charitySplit ? So.charitySplit() : 0.5;
   const fee = WCo.FEE || 0;
@@ -38567,7 +38618,7 @@ function OnboardingForm(props) {
     style: inp,
     value: name,
     onChange: e => setName(e.target.value),
-    placeholder: "e.g. Davie McAllister"
+    placeholder: "e.g. Alex Johnson"
   })), includeDept && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement(Lab, {
     opt: true
   }, "Team / department"), /*#__PURE__*/React.createElement("input", {
@@ -38581,7 +38632,9 @@ function OnboardingForm(props) {
   }, DEPTS.map(d => /*#__PURE__*/React.createElement("option", {
     key: d,
     value: d
-  })))), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement(Lab, null, "Work location"), /*#__PURE__*/React.createElement(Seg, {
+  })))), includeLocation && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement(Lab, {
+    opt: true
+  }, "Location"), /*#__PURE__*/React.createElement(Seg, {
     value: loc,
     onChange: setLoc,
     options: [{
@@ -38591,7 +38644,9 @@ function OnboardingForm(props) {
       value: 'London',
       label: 'London'
     }]
-  })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement(Lab, null, "Leadership Team member?"), /*#__PURE__*/React.createElement(Seg, {
+  })), includeLtMember && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement(Lab, {
+    opt: true
+  }, "Leadership Team member?"), /*#__PURE__*/React.createElement(Seg, {
     value: lt,
     onChange: setLt,
     options: [{
@@ -38601,7 +38656,7 @@ function OnboardingForm(props) {
       value: true,
       label: 'Yes'
     }]
-  }))), /*#__PURE__*/React.createElement(Co, {
+  }))), fee > 0 && /*#__PURE__*/React.createElement(Co, {
     bordered: true,
     style: {
       marginTop: 20,
@@ -38620,7 +38675,17 @@ function OnboardingForm(props) {
       fontSize: 28,
       margin: '2px 0 4px'
     }
-  }, "You're putting in \xA3", fee, "."), /*#__PURE__*/React.createElement("div", {
+  }, "You're putting in \xA3", fee, "."), split < 0.01 ? /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 14,
+      fontWeight: 600
+    }
+  }, "The full amount goes into a winner-takes-all fund \u2014 ", /*#__PURE__*/React.createElement("b", null, '£' + Math.round(winnerAfterEntry).toLocaleString('en-GB')), " once you're in, and growing with every sign-up.") : split > 0.99 ? /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 14,
+      fontWeight: 600
+    }
+  }, "The full entry goes to charity. This is a fun-only sweepstake \u2014 no winner fund.") : /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 14,
       fontWeight: 600
@@ -38635,8 +38700,8 @@ function OnboardingForm(props) {
     onClick: () => ok && props.onSubmit({
       name: name.trim(),
       department: includeDept ? dept.trim() : '',
-      location: loc,
-      ltMember: lt
+      location: includeLocation ? loc : '',
+      ltMember: includeLtMember ? lt : false
     })
   }, ok ? 'To the draw →' : 'Add your name first'))));
 }
@@ -39237,6 +39302,9 @@ function ProfileHeader(props) {
   const me = props.me;
   const t = dashTeam(me.team);
   const includeDept = Sd.includeDepartment ? Sd.includeDepartment() : true;
+  const includeLocation = Sd.includeLocation ? Sd.includeLocation() : true;
+  const includeLtMember = Sd.includeLtMember ? Sd.includeLtMember() : true;
+  const chips = [includeLocation && me.location && me.location, includeDept && me.department, includeLtMember && me.ltMember && 'LT'].filter(Boolean);
   return /*#__PURE__*/React.createElement(Cd, {
     bordered: true,
     className: "pop"
@@ -39262,16 +39330,17 @@ function ProfileHeader(props) {
       fontSize: 24,
       lineHeight: 1
     }
-  }, me.name), /*#__PURE__*/React.createElement("div", {
+  }, me.name), chips.length > 0 && /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
       gap: 6,
       marginTop: 7,
       flexWrap: 'wrap'
     }
-  }, /*#__PURE__*/React.createElement(Chd, null, me.location), includeDept && me.department && /*#__PURE__*/React.createElement(Chd, null, me.department), me.ltMember && /*#__PURE__*/React.createElement(Chd, {
-    tone: "yellow"
-  }, "LT"))), /*#__PURE__*/React.createElement("button", {
+  }, chips.map((c, i) => /*#__PURE__*/React.createElement(Chd, {
+    key: i,
+    tone: c === 'LT' ? 'yellow' : undefined
+  }, c)))), /*#__PURE__*/React.createElement("button", {
     onClick: props.onEdit,
     className: "wc-btn wc-btn--sm",
     style: {
@@ -39284,9 +39353,11 @@ function EditProfile(props) {
   const me = props.me;
   const [name, setName] = dState(me.name);
   const [dept, setDept] = dState(me.department || '');
-  const [loc, setLoc] = dState(me.location || 'London');
+  const [loc, setLoc] = dState(me.location || 'Edinburgh');
   const [lt, setLt] = dState(!!me.ltMember);
   const includeDept = Sd.includeDepartment ? Sd.includeDepartment() : true;
+  const includeLocation = Sd.includeLocation ? Sd.includeLocation() : true;
+  const includeLtMember = Sd.includeLtMember ? Sd.includeLtMember() : true;
   const fld = {
     width: '100%',
     border: '2.5px solid var(--ink)',
@@ -39382,19 +39453,19 @@ function EditProfile(props) {
     value: dept,
     onChange: e => setDept(e.target.value),
     placeholder: "optional"
-  })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+  })), includeLocation && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
     style: {
       fontWeight: 800,
       fontSize: 13,
       fontFamily: 'var(--disp)'
     }
-  }, "Work location"), seg(loc, setLoc, [{
+  }, "Location"), seg(loc, setLoc, [{
     value: 'Edinburgh',
     label: 'Edinburgh'
   }, {
     value: 'London',
     label: 'London'
-  }])), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+  }])), includeLtMember && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
     style: {
       fontWeight: 800,
       fontSize: 13,
@@ -39417,10 +39488,10 @@ function EditProfile(props) {
       Sd.update(me.id, {
         name: name.trim() || me.name,
         department: includeDept ? dept.trim() : me.department,
-        location: loc,
-        city: loc,
-        ltMember: lt,
-        leadership: lt
+        location: includeLocation ? loc : me.location,
+        city: includeLocation ? loc : me.city,
+        ltMember: includeLtMember ? lt : me.ltMember,
+        leadership: includeLtMember ? lt : me.leadership
       });
       props.onClose();
     }
@@ -41080,12 +41151,15 @@ function SettingsAdmin() {
   React.useEffect(() => setFee(String(feeNow || 0)), [feeNow]);
   const entrants = Sa.allSync().length;
   const split = Sa.charitySplit ? Sa.charitySplit() : 0.5;
+  const purpose = Sa.purpose ? Sa.purpose() : 'work';
+  const includeDept = Sa.includeDepartment ? Sa.includeDepartment() : true;
+  const includeLocation = Sa.includeLocation ? Sa.includeLocation() : true;
+  const includeLtMember = Sa.includeLtMember ? Sa.includeLtMember() : true;
   const n = Number(fee);
   const feeNum = isFinite(n) && n >= 0 ? n : feeNow;
   const gross = entrants * feeNum;
   const charity = gross * split;
   const winner = gross * (1 - split);
-  const includeDept = Sa.includeDepartment ? Sa.includeDepartment() : true;
   const fld = {
     width: '100%',
     border: '2.5px solid var(--ink)',
@@ -41119,7 +41193,8 @@ function SettingsAdmin() {
         borderRadius: 13,
         background: '#fff',
         padding: '11px 12px',
-        cursor: 'pointer'
+        cursor: 'pointer',
+        marginBottom: 8
       }
     }, /*#__PURE__*/React.createElement("span", {
       style: {
@@ -41164,6 +41239,7 @@ function SettingsAdmin() {
       }
     }, text)));
   }
+  const splitPct = Math.round(split * 100);
   return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(Ca, {
     bordered: true,
     style: {
@@ -41239,7 +41315,53 @@ function SettingsAdmin() {
       fontSize: 19,
       color: r[2]
     }
-  }, moneyAdmin(r[1]))))), /*#__PURE__*/React.createElement(SHa, null, "Signup fields"), toggleRow(() => Sa.setIncludeDepartment(!includeDept), includeDept, 'Team / department field', includeDept ? 'Shown on signup, profile editing and the directory.' : 'Hidden from signup, profile editing and directory filters.'));
+  }, moneyAdmin(r[1]))))), /*#__PURE__*/React.createElement(SHa, null, "Charity split"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: 7,
+      marginBottom: 8
+    }
+  }, [0, 25, 50, 75, 100].map(pct => /*#__PURE__*/React.createElement("button", {
+    key: pct,
+    onClick: () => Sa.setCharitySplit(pct / 100),
+    className: "wc-btn wc-btn--sm",
+    style: {
+      flex: 1,
+      background: splitPct === pct ? 'var(--yellow)' : '#fff',
+      boxShadow: splitPct === pct ? '0 4px 0 var(--ink)' : '0 4px 0 var(--shadow)'
+    }
+  }, pct, "%"))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      fontWeight: 600,
+      color: 'var(--ink2)',
+      marginBottom: 16,
+      lineHeight: 1.4
+    }
+  }, split < 0.01 ? 'No charity split — everything goes to the winner.' : split > 0.99 ? 'All entry fees go to charity. No winner fund.' : splitPct + '% of each entry goes to charity, the rest to the winner.'), /*#__PURE__*/React.createElement(SHa, null, "Sweepstake type"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: 8,
+      marginBottom: 8
+    }
+  }, [['work', 'Work'], ['friends', 'Friends & family']].map(([k, lab]) => /*#__PURE__*/React.createElement("button", {
+    key: k,
+    onClick: () => Sa.setPurpose(k),
+    className: "wc-btn wc-btn--sm",
+    style: {
+      flex: 1,
+      background: purpose === k ? 'var(--yellow)' : '#fff',
+      boxShadow: purpose === k ? '0 4px 0 var(--ink)' : '0 4px 0 var(--shadow)'
+    }
+  }, lab))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      fontWeight: 600,
+      color: 'var(--ink2)',
+      marginBottom: 16,
+      lineHeight: 1.4
+    }
+  }, purpose === 'work' ? 'Shows department, location and LT fields. You can toggle them individually below.' : 'Just names — no work details collected. Individual toggles below still apply.'), /*#__PURE__*/React.createElement(SHa, null, "Signup fields"), toggleRow(() => Sa.setIncludeDepartment(!includeDept), includeDept, 'Team / department', includeDept ? 'Shown on signup, editing and directory.' : 'Hidden from signup, editing and directory.'), toggleRow(() => Sa.setIncludeLocation(!includeLocation), includeLocation, 'Location', includeLocation ? 'Shown on signup and profile editing.' : 'Hidden — not collected.'), toggleRow(() => Sa.setIncludeLtMember(!includeLtMember), includeLtMember, 'Leadership Team member', includeLtMember ? 'Shown on signup and profile editing.' : 'Hidden — not collected.'));
 }
 function AdminPanel(props) {
   const [, bump] = aState2(0);
