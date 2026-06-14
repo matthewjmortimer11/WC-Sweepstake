@@ -383,7 +383,7 @@ button:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(245,200,0,.55);borde
 
 <!-- Single source of truth: generated from wc_data.py by scripts/build_snapshot.py.
      No-op when the server injects window.WC_DATA above (live mode). -->
-<script type="text/babel" src="tweaks-panel.jsx?v=20260614-deadline"></script>
+<script type="text/babel" src="tweaks-panel.jsx?v=20260614-markets"></script>
 
 <script>
 /* ===========================================================================
@@ -555,6 +555,7 @@ button:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(245,200,0,.55);borde
       locations: WC.meta.locations || ['Edinburgh', 'London'],
       locationsFreeText: !!WC.meta.locationsFreeText,
       predDeadline: WC.meta.predDeadline || null,
+      hiddenPredictions: WC.meta.hiddenPredictions || [],
     },
   };
   WC.TEAM_LIST.forEach(function (t) { BASE.teams[t.code] = { alive: t.alive, stage: t.stage, rounds: t.rounds }; });
@@ -591,6 +592,7 @@ button:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(245,200,0,.55);borde
     WC.meta.locations = (admin.meta && Array.isArray(admin.meta.locations) && admin.meta.locations.length) ? admin.meta.locations : BASE.meta.locations;
     WC.meta.locationsFreeText = admin.meta && admin.meta.locationsFreeText != null ? !!admin.meta.locationsFreeText : BASE.meta.locationsFreeText;
     WC.meta.predDeadline = (admin.meta && admin.meta.predDeadline) || BASE.meta.predDeadline || null;
+    WC.meta.hiddenPredictions = (admin.meta && Array.isArray(admin.meta.hiddenPredictions)) ? admin.meta.hiddenPredictions : BASE.meta.hiddenPredictions;
     WC.charitySplit = (admin.meta && admin.meta.charitySplit != null) ? Number(admin.meta.charitySplit) : BASE.meta.charitySplit;
     var fee = admin.meta && admin.meta.entryFee != null ? Number(admin.meta.entryFee) : BASE.fee;
     WC.FEE = isFinite(fee) && fee >= 0 ? fee : BASE.fee;
@@ -710,6 +712,17 @@ button:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(245,200,0,.55);borde
     var rows = withScores(cache).sort(function (a, b) { return b.predScore - a.predScore; });
     rows.forEach(function (r, i) { r.predRank = i + 1; });
     return rows;
+  }
+
+  function postWheeshtChat(text, mood) {
+    if (!LIVE) return;
+    var c = leagueCode();
+    if (!c) return;
+    fetch(api('/chat/system'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: text, mood: mood || 'confident' }),
+    }).catch(function () {});
   }
 
   var Store = {
@@ -967,8 +980,38 @@ button:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(245,200,0,.55);borde
     predDeadline: function () { return (admin.meta && admin.meta.predDeadline) || BASE.meta.predDeadline || null; },
     setPredDeadline: function (dt) {
       admin.meta = admin.meta || {};
-      if (dt) admin.meta.predDeadline = dt; else delete admin.meta.predDeadline;
+      var chatText;
+      if (dt) {
+        admin.meta.predDeadline = dt;
+        var dateStr = '';
+        try { dateStr = new Date(dt).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' }); } catch (e) { dateStr = dt; }
+        chatText = ['The prediction deadline has been updated. Picks lock at ' + dateStr + '. Wheesht has made a note.', 'nervous'];
+      } else {
+        delete admin.meta.predDeadline;
+        chatText = ['The prediction deadline has been cleared. Picks are open until further notice. Wheesht is watching.', 'mischievous'];
+      }
       commitAdmin();
+      if (chatText) postWheeshtChat(chatText[0], chatText[1]);
+    },
+    hiddenPredictions: function () {
+      return (admin.meta && Array.isArray(admin.meta.hiddenPredictions)) ? admin.meta.hiddenPredictions : BASE.meta.hiddenPredictions;
+    },
+    togglePredictionHidden: function (key) {
+      admin.meta = admin.meta || {};
+      var hidden = Array.isArray(admin.meta.hiddenPredictions) ? admin.meta.hiddenPredictions.slice() : [];
+      var idx = hidden.indexOf(key);
+      var nowHidden;
+      if (idx >= 0) { hidden.splice(idx, 1); nowHidden = false; }
+      else { hidden.push(key); nowHidden = true; }
+      admin.meta.hiddenPredictions = hidden;
+      commitAdmin();
+      if (!nowHidden) {
+        var deadline = admin.meta && admin.meta.predDeadline;
+        if (deadline && new Date() > new Date(deadline)) {
+          var mkt = (WC.PREDICTIONS || []).find(function (m) { return m.key === key; });
+          postWheeshtChat('"' + (mkt ? mkt.q : key) + '" is now open for picks. Wheesht has re-opened this market. The deadline has passed — make your call now.', 'mischievous');
+        }
+      }
     },
     setCharitySplit: function (split) {
       var n = Math.max(0, Math.min(1, Number(split)));
@@ -1016,6 +1059,7 @@ button:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(245,200,0,.55);borde
         locations: keep.locations,
         locationsFreeText: keep.locationsFreeText,
         predDeadline: keep.predDeadline,
+        hiddenPredictions: keep.hiddenPredictions,
       }};
       commitAdmin();
     }
@@ -3750,7 +3794,8 @@ function PredictionsScreen(props) {
   const me = Sp.active();
   const [, bump] = pState(0);
   if (!me) return null;
-  const markets = WCp.predictions || Sp.PREDICTIONS;
+  const hiddenPredictions = (WCp.meta && WCp.meta.hiddenPredictions) || [];
+  const markets = (WCp.predictions || Sp.PREDICTIONS).filter(m => hiddenPredictions.indexOf(m.key) < 0);
   const open = markets.filter(m => !isResolved(m));
   const graded = markets.filter(m => isResolved(m));
   const made = me.picks ? Object.keys(me.picks).filter(k => me.picks[k] != null && (!Array.isArray(me.picks[k]) || me.picks[k].length)).length : 0;
@@ -4141,6 +4186,8 @@ function PredAdmin(props) {
    function id(opt) { return m.kind === 'player' ? opt.id : opt; }
    const isTwo = m.kind === 'team2';
    const ans = m.answer;
+   const hiddenPreds = Sa.hiddenPredictions ? Sa.hiddenPredictions() : [];
+   const isHidden = hiddenPreds.indexOf(m.key) >= 0;
    function choose(oid) {
      if (isTwo) {
        let arr = Array.isArray(ans) ? ans.slice() : [];
@@ -4150,18 +4197,23 @@ function PredAdmin(props) {
    }
    const picked = (oid) => isTwo ? (Array.isArray(ans) && ans.indexOf(oid) >= 0) : ans === oid;
    return (
-     <Ca flat style={{ padding: '11px 13px', marginBottom: 8 }}>
-       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-         <div className="dh" style={{ fontSize: 15 }}>{m.q}</div>
+     <Ca flat style={{ padding: '11px 13px', marginBottom: 8, opacity: isHidden ? 0.55 : 1 }}>
+       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, gap: 8 }}>
+         <div className="dh" style={{ fontSize: 15, flex: 1 }}>{m.q}</div>
+         <button onClick={() => Sa.togglePredictionHidden(m.key)} className="wc-btn wc-btn--sm"
+           style={{ background: isHidden ? 'var(--ink)' : '#fff', color: isHidden ? '#fff' : 'var(--ink)', border: '2px solid var(--ink)', fontSize: 11, padding: '4px 9px', flexShrink: 0 }}>
+           {isHidden ? 'Hidden' : 'Visible'}
+         </button>
          <Cha tone={ans != null && (!isTwo || ans.length) ? 'green' : 'ghost'}>{ans != null && (!isTwo || ans.length) ? 'set' : 'open'}</Cha>
        </div>
-       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+       {!isHidden && <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
          {m.options.map((opt, i) => {
            const on = picked(id(opt));
            return <button key={i} onClick={() => choose(id(opt))}
              style={{ border: '2px solid ' + (on ? 'var(--ink)' : 'var(--line)'), background: on ? 'var(--yellow)' : '#fff', borderRadius: 10, padding: '6px 10px', fontFamily: 'var(--body)', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>{label(opt)}</button>;
          })}
-       </div>
+       </div>}
+       {isHidden && <div style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--ink2)' }}>Hidden from players. Tap Visible to re-enable.</div>}
      </Ca>
    );
 }
@@ -4688,9 +4740,27 @@ function ChatScreen() {
         )}
         {msgs.map(function(msg) {
           var isMe = me && msg.author_id === me.id;
+          var isWheesht = msg.author_id === 'wheesht';
           var t = WCch.TEAMS[msg.team];
           var d = new Date(msg.ts);
           var timeStr = d.getHours().toString().padStart(2,'0') + ':' + d.getMinutes().toString().padStart(2,'0');
+
+          if (isWheesht) {
+            var mood = msg.team || 'confident'; // team field carries the mood for system messages
+            return (
+              <div key={msg.id} style={{ display: 'flex', gap: 11, marginBottom: 16, alignItems: 'flex-start', background: 'var(--ink)', borderRadius: 18, padding: '12px 14px' }}>
+                <div style={{ flexShrink: 0 }}>
+                  <Wch mood={mood} size={42} animate />
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase', color: 'var(--yellow)', marginBottom: 4 }}>Wheesht · announcement</div>
+                  <div style={{ fontSize: 13.5, fontWeight: 600, color: '#fff', lineHeight: 1.42, wordBreak: 'break-word' }}>{msg.text}</div>
+                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,.4)', fontWeight: 600, marginTop: 4 }}>{timeStr}</div>
+                </div>
+              </div>
+            );
+          }
+
           return (
             <div key={msg.id} style={{ display: 'flex', gap: 9, marginBottom: 14, flexDirection: isMe ? 'row-reverse' : 'row', alignItems: 'flex-end' }}>
               {!isMe && (

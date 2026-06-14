@@ -177,6 +177,8 @@ function PredAdmin(props) {
    function id(opt) { return m.kind === 'player' ? opt.id : opt; }
    const isTwo = m.kind === 'team2';
    const ans = m.answer;
+   const hiddenPreds = Sa.hiddenPredictions ? Sa.hiddenPredictions() : [];
+   const isHidden = hiddenPreds.indexOf(m.key) >= 0;
    function choose(oid) {
      if (isTwo) {
        let arr = Array.isArray(ans) ? ans.slice() : [];
@@ -186,18 +188,23 @@ function PredAdmin(props) {
    }
    const picked = (oid) => isTwo ? (Array.isArray(ans) && ans.indexOf(oid) >= 0) : ans === oid;
    return (
-     <Ca flat style={{ padding: '11px 13px', marginBottom: 8 }}>
-       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-         <div className="dh" style={{ fontSize: 15 }}>{m.q}</div>
+     <Ca flat style={{ padding: '11px 13px', marginBottom: 8, opacity: isHidden ? 0.55 : 1 }}>
+       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, gap: 8 }}>
+         <div className="dh" style={{ fontSize: 15, flex: 1 }}>{m.q}</div>
+         <button onClick={() => Sa.togglePredictionHidden(m.key)} className="wc-btn wc-btn--sm"
+           style={{ background: isHidden ? 'var(--ink)' : '#fff', color: isHidden ? '#fff' : 'var(--ink)', border: '2px solid var(--ink)', fontSize: 11, padding: '4px 9px', flexShrink: 0 }}>
+           {isHidden ? 'Hidden' : 'Visible'}
+         </button>
          <Cha tone={ans != null && (!isTwo || ans.length) ? 'green' : 'ghost'}>{ans != null && (!isTwo || ans.length) ? 'set' : 'open'}</Cha>
        </div>
-       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+       {!isHidden && <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
          {m.options.map((opt, i) => {
            const on = picked(id(opt));
            return <button key={i} onClick={() => choose(id(opt))}
              style={{ border: '2px solid ' + (on ? 'var(--ink)' : 'var(--line)'), background: on ? 'var(--yellow)' : '#fff', borderRadius: 10, padding: '6px 10px', fontFamily: 'var(--body)', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>{label(opt)}</button>;
          })}
-       </div>
+       </div>}
+       {isHidden && <div style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--ink2)' }}>Hidden from players. Tap Visible to re-enable.</div>}
      </Ca>
    );
 }
