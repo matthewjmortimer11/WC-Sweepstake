@@ -171,9 +171,14 @@ function WhatIfSheet(props) {
   const koAdvance = outcome ? (outcome === 'a' ? ta : tb) : null;
   const koOut = outcome ? (outcome === 'a' ? tb : ta) : null;
 
+  // Which scenario is the user's drawn team winning? Star it so they instantly
+  // see the result that helps them.
+  const myWin = me ? (f.a === me.team ? 'a' : f.b === me.team ? 'b' : null) : null;
+  const star = (k) => (k === myWin ? '⭐ ' : '');
+
   const scenarios = isGroup
-    ? [['a', ta.flag + ' ' + ta.name + ' win'], ['draw', 'Draw'], ['b', tb.flag + ' ' + tb.name + ' win']]
-    : [['a', ta.flag + ' ' + ta.name + ' win'], ['b', tb.flag + ' ' + tb.name + ' win']];
+    ? [['a', star('a') + ta.flag + ' ' + ta.name + ' win'], ['draw', 'Draw'], ['b', star('b') + tb.flag + ' ' + tb.name + ' win']]
+    : [['a', star('a') + ta.flag + ' ' + ta.name + ' win'], ['b', star('b') + tb.flag + ' ' + tb.name + ' win']];
 
   const content = (
     <div className="moment rise" style={{ zIndex: 65, background: 'var(--bg)' }}>
@@ -198,7 +203,10 @@ function WhatIfSheet(props) {
 
           {/* scenario picker */}
           <div style={{ marginBottom: 14 }}>
-            <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: '.07em', textTransform: 'uppercase', color: 'var(--ink2)', marginBottom: 8 }}>Pick a scenario</div>
+            <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8, marginBottom: 8 }}>
+              <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: '.07em', textTransform: 'uppercase', color: 'var(--ink2)' }}>Pick a scenario</span>
+              {myWin && <span style={{ fontSize: 10, fontWeight: 800, color: 'var(--red)' }}>⭐ your team</span>}
+            </div>
             <div style={{ display: 'flex', gap: 6 }}>
               {scenarios.map(([k, lab]) => (
                 <button key={k} onClick={() => setOutcome(outcome === k ? null : k)}
