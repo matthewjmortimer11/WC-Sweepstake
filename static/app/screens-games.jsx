@@ -50,6 +50,8 @@ function FixtureRow(props) {
         </div>
         {st === 'done' && f.score
           ? <Chg tone="ink">FT {f.score[0]}–{f.score[1]}</Chg>
+          : st === 'halfTime'
+            ? <Chg tone="yellow">HT {f.score ? f.score[0] + '–' + f.score[1] : ''}</Chg>
           : st === 'live'
             ? <span style={{ fontSize: 11, fontWeight: 800, color: 'var(--red)' }}>● LIVE</span>
             : <span style={{ fontSize: 12, fontWeight: 800 }}>{f.time}</span>}

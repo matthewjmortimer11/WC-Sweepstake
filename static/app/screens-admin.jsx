@@ -146,13 +146,15 @@ function FixtureAdminRow(props) {
          </div>
          {st === 'done'
            ? <Cha tone="ink">FT</Cha>
+           : st === 'halfTime'
+             ? <Cha tone="yellow">HT</Cha>
            : st === 'live'
              ? <span style={{ fontSize: 10.5, fontWeight: 800, color: 'var(--red)' }}>● LIVE</span>
              : <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--ink2)' }}>{f.time}</span>}
        </div>
        <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginTop: 8 }}>
          <span style={{ fontSize: 10.5, fontWeight: 700, color: 'var(--ink2)', flex: 1 }}>Gp {f.group} · {f.dateLabel}</span>
-         {st !== 'done' && <button onClick={() => Sa.setFixtureLive(f.id, st !== 'live')} className="wc-btn wc-btn--sm" style={{ padding: '5px 10px', boxShadow: '0 3px 0 var(--shadow)' }}>{st === 'upcoming' ? 'Go live' : 'Go back'}</button>}
+         {st !== 'done' && <button onClick={() => Sa.setFixtureLive(f.id, st !== 'live' && st !== 'halfTime')} className="wc-btn wc-btn--sm" style={{ padding: '5px 10px', boxShadow: '0 3px 0 var(--shadow)' }}>{st === 'upcoming' ? 'Go live' : 'Go back'}</button>}
          <button onClick={() => setOpen(!open)} className="wc-btn wc-btn--sm" style={{ padding: '5px 10px', boxShadow: '0 3px 0 var(--shadow)' }}>{st === 'done' ? 'Edit score' : 'Enter score'}</button>
          {st === 'done' && <button onClick={() => Sa.clearFixture(f.id)} className="wc-btn wc-btn--sm" style={{ padding: '5px 10px', boxShadow: '0 3px 0 var(--shadow)' }}>Undo</button>}
        </div>

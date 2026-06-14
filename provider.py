@@ -25,7 +25,7 @@ class CanonicalFixture:
     away_team: str                   # three-letter code
     kickoff_utc: datetime            # timezone-aware UTC
     venue: Optional[str]
-    status: str                      # upcoming | live | done | cancelled
+    status: str                      # upcoming | live | halfTime | done | cancelled
     home_goals: Optional[int] = None
     away_goals: Optional[int] = None
     winner: Optional[str] = None     # HOME | AWAY | DRAW
@@ -50,5 +50,5 @@ class ProviderAdapter(Protocol):
         tournament_id: str,
         comp_code: str,
     ) -> bool:
-        """Return True if any fixture is currently live (IN_PLAY / PAUSED etc.)."""
+        """Return True if any fixture is currently live or paused at half-time."""
         ...

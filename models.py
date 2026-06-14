@@ -40,7 +40,7 @@ class Fixture(Base):
 
     venue: Mapped[Optional[str]] = mapped_column(String, nullable=True)
 
-    # upcoming | live | done | cancelled
+    # upcoming | live | halfTime | done | cancelled
     status: Mapped[str] = mapped_column(String, nullable=False, default="upcoming")
 
     home_goals: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)

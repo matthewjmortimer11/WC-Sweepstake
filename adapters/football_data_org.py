@@ -35,7 +35,7 @@ _STATUS_MAP: dict[str, str] = {
     "SCHEDULED": "upcoming",
     "TIMED": "upcoming",
     "IN_PLAY": "live",
-    "PAUSED": "live",
+    "PAUSED": "halfTime",
     "EXTRA_TIME": "live",
     "PENALTY_SHOOTOUT": "live",
     "FINISHED": "done",
@@ -184,4 +184,4 @@ class FootballDataOrgAdapter:
         comp_code: str,
     ) -> bool:
         fixtures = await self.get_fixtures(tournament_id, comp_code)
-        return any(f.status == "live" for f in fixtures)
+        return any(f.status in ("live", "halfTime") for f in fixtures)

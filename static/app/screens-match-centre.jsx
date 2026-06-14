@@ -1,7 +1,7 @@
 /* ===========================================================================
    MATCH CENTRE — fixtures as a live, personal, 10-second read.
 
-   Every fixture is shown with its status (upcoming / live / finished), a live
+   Every fixture is shown with its status (upcoming / live / half-time / finished), a live
    indicator + ticking kick-off countdown, the current score, the user's stake
    (their drawn team + any prediction picks riding on a team in the match),
    the match importance, and the prediction points in play. Live group games
@@ -22,8 +22,9 @@ function mcName(code) { return mcTeam(code).name; }
 function mcHasScore(f) { return !!(f && f.score && f.score[0] != null && f.score[1] != null); }
 function mcStatus(f) {
   const raw = (f && f.status) || 'upcoming';
-  if (raw === 'done' || mcHasScore(f)) return 'done';
+  if (raw === 'done') return 'done';
   if (raw === 'live') return 'live';
+  if (raw === 'halfTime') return 'halfTime';
   const ko = mcKickoffMs(f);
   if (ko == null) return raw;
   const age = Date.now() - ko;
@@ -201,7 +202,7 @@ function LiveScore(props) {
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: 64 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>{cell(a, 'a')}<span className="dh" style={{ fontSize: 18, color: 'var(--ink2)' }}>:</span>{cell(b, 'b')}</div>
       {flash ? <span style={{ fontSize: 9.5, fontWeight: 900, color: 'var(--red)', letterSpacing: '.08em', marginTop: 2 }}>⚽ GOAL!</span>
-        : <span style={{ fontSize: 9, fontWeight: 800, color: 'var(--red)', letterSpacing: '.06em', marginTop: 2 }}>LIVE</span>}
+        : <span style={{ fontSize: 9, fontWeight: 800, color: 'var(--red)', letterSpacing: '.06em', marginTop: 2 }}>{props.label || 'LIVE'}</span>}
     </div>
   );
 }
@@ -221,7 +222,7 @@ function MCTeamCol(props) {
 /* ---- the match card ----------------------------------------------------- */
 function MatchCard(props) {
   const f = props.f, me = props.me, owned = props.owned, onWhatIf = props.onWhatIf;
-  const st = mcStatus(f), live = st === 'live', done = st === 'done', needsResult = st === 'needsResult';
+  const st = mcStatus(f), live = st === 'live' || st === 'halfTime', halfTime = st === 'halfTime', done = st === 'done', needsResult = st === 'needsResult';
   const stake = mcStake(me, f);
   const imp = mcImportance(f, me, stake.pts, owned);
   const ms = mcKickoffMs(f);
@@ -246,7 +247,8 @@ function MatchCard(props) {
           <Chmc tone={impTone(imp.tier)} style={{ whiteSpace: 'nowrap' }}>{'🔥'.repeat(imp.flames) || '·'} {imp.label}</Chmc>
         </div>
         <div style={{ flex: '0 0 auto', textAlign: 'right' }}>
-          {live ? <span className="mc-livedot" style={{ fontSize: 11, fontWeight: 900, color: 'var(--red)', whiteSpace: 'nowrap' }}>● LIVE</span>
+          {halfTime ? <Chmc tone="yellow">HT</Chmc>
+            : live ? <span className="mc-livedot" style={{ fontSize: 11, fontWeight: 900, color: 'var(--red)', whiteSpace: 'nowrap' }}>● LIVE</span>
             : done ? <Chmc tone="ink">FT</Chmc>
               : needsResult ? <Chmc tone="red" style={{ whiteSpace: 'nowrap' }}>Result needed</Chmc>
               : soon ? <Chmc tone="yellow" style={{ whiteSpace: 'nowrap' }}>⏱ {mcFmt(remaining)}</Chmc>
@@ -258,7 +260,7 @@ function MatchCard(props) {
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
         <MCTeamCol code={f.a} owners={oa} lose={bw} dim={bw} />
         <div style={{ flex: '0 0 auto', textAlign: 'center', minWidth: 56 }}>
-          {live ? <LiveScore f={f} />
+          {live ? <LiveScore f={f} label={halfTime ? 'HT' : 'LIVE'} />
             : done && f.score ? <span className="dh" style={{ fontSize: 30 }}>{f.score[0]}<span style={{ color: 'var(--ink2)', fontSize: 18 }}>:</span>{f.score[1]}</span>
               : needsResult ? <div><div className="dh" style={{ fontSize: 15, color: 'var(--red)', lineHeight: 1.05 }}>Result</div><div style={{ fontSize: 10, fontWeight: 800, color: 'var(--ink2)', marginTop: 2 }}>needed</div></div>
               : <div><div className="dh" style={{ fontSize: 18, color: 'var(--ink2)' }}>v</div>{soon && <div style={{ fontSize: 10, fontWeight: 800, color: 'var(--ink2)', marginTop: 2 }}>{mcFmt(remaining)}</div>}</div>}
@@ -355,7 +357,10 @@ function MatchCentreScreen() {
   const all = (WCmc.FIXTURES || []).slice();
   const mineTeam = me ? me.team : null;
 
-  const liveList = all.filter(f => mcStatus(f) === 'live');
+  const liveList = all.filter(f => {
+    const st = mcStatus(f);
+    return st === 'live' || st === 'halfTime';
+  });
   const upcoming = all.filter(f => mcStatus(f) === 'upcoming');
   const needsResultList = all.filter(f => mcStatus(f) === 'needsResult');
   // hero: your team's next, else the most important upcoming, else the first
