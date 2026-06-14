@@ -292,7 +292,7 @@ function App(){
   // -------- main app --------
   const screens={
     me:<window.MeScreen goPredictions={()=>setTab('predictions')} goGames={()=>setTab('games')}/>,
-    games:<window.GamesScreen/>,
+    games:<window.MatchCentreScreen/>,
     players:<window.CompetitionScreen/>,
     predictions:<window.PredictionsScreen/>,
     chat:<window.ChatScreen/>,

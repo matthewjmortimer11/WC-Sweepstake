@@ -46,6 +46,7 @@ JSX = [
     ("app", "screens-competition.jsx"),
     ("app", "screens-predictions.jsx"),
     ("app", "screens-games.jsx"),
+    ("app", "screens-match-centre.jsx"),
     ("app", "screens-admin.jsx"),
     ("app", "screens-chat.jsx"),
     ("app", "screens-dev.jsx"),
