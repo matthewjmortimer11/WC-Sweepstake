@@ -186,32 +186,38 @@ function App(){
     const myTeam = A_WC.TEAMS[me.team];
     const id=setTimeout(()=>{
       if(pre){
-        const msgs=[
-          'Predictions are open till kick-off. Get them in — Wheesht is taking names.',
-          'Your picks won\'t make themselves. Wheesht is waiting.',
-          'Markets are open. Back your instincts. Wheesht backs nothing — but watches everything.',
-          'Get your predictions in before the first whistle. No extensions.',
+        const pool=[
+          ['Predictions are open till kick-off. Get them in — Wheesht is taking names.','mischievous'],
+          ['Your picks won\'t make themselves. Wheesht is waiting.','nervous'],
+          ['Markets are open. Back your instincts. Wheesht backs nothing — but watches everything.','confident'],
+          ['Get your predictions in before the first whistle. No extensions.','angry'],
+          ['Wheesht has opinions on every market. Wheesht is keeping them to itself.','mischievous'],
         ];
-        window.wcToast&&window.wcToast(msgs[(Math.random()*msgs.length)|0],'mischievous');
-      } else if(!myTeam.alive){
+        const pick=pool[(Math.random()*pool.length)|0];
+        window.wcToast&&window.wcToast(pick[0],pick[1]);
+      } else if(!myTeam||!myTeam.alive){
         window.wcToast&&window.wcToast(A_WC.LINES.eliminated,'crying');
       } else {
-        const msgs=[
-          'Your team is still in it. Wheesht is watching — with moderate approval.',
-          'Still standing. Wheesht has noted this. Nothing more to add.',
-          'Your team is in the mix. Wheesht is cautiously optimistic. Very cautiously.',
-          'In the running. Wheesht is watching. As always.',
+        const pool=[
+          ['Your team is still in it. Wheesht is watching — with moderate approval.','confident'],
+          ['Still standing. Wheesht has noted this. Nothing more to add.','neutral'],
+          ['Your team is in the mix. Wheesht is cautiously optimistic. Very cautiously.','nervous'],
+          ['In the running. The pot is watching too. Wheesht is taking no questions.','mischievous'],
+          [myTeam.name+' are alive. Wheesht acknowledges this. Barely.','happy'],
         ];
-        window.wcToast&&window.wcToast(msgs[(Math.random()*msgs.length)|0],'mischievous');
+        const pick=pool[(Math.random()*pool.length)|0];
+        window.wcToast&&window.wcToast(pick[0],pick[1]);
       }
       if(t.bias){
         const scotMsgs=[
-          'Scotland are in this tournament. Just so everyone is clear.',
-          'Scotland. Still here. Wheesht is cautiously optimistic — emphasis on cautious.',
-          'A gentle reminder that Scotland are participating. Wheesht thought you should know.',
-          'Scotland update: still in it. Wheesht is fine. Everything is fine.',
+          ['Scotland are in this tournament. Just so everyone is clear.','scottish'],
+          ['Scotland. Still here. Wheesht is cautiously optimistic — emphasis on cautious.','nervous'],
+          ['A gentle reminder that Scotland are participating. Wheesht thought you should know.','scottish'],
+          ['Scotland update: still in it. Wheesht is fine. Everything is fine.','confident'],
+          ['No one asked. Wheesht is mentioning Scotland anyway.','mischievous'],
         ];
-        setTimeout(()=>window.wcToast&&window.wcToast(scotMsgs[(Math.random()*scotMsgs.length)|0],'scottish'),1600);
+        const sp=scotMsgs[(Math.random()*scotMsgs.length)|0];
+        setTimeout(()=>window.wcToast&&window.wcToast(sp[0],sp[1]),1600);
       }
     },650);
     return ()=>clearTimeout(id);

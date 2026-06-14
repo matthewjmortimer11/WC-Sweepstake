@@ -9,6 +9,11 @@ const Sp = window.Store;
 const { Card: Cp, Btn: Bp, Flag: Fp, Avatar: Ap, Chip: Chp, WheeshtSays: Saysp, SectionHead: SHp } = window;
 const { useState: pState } = React;
 
+function isResolved(m) {
+  if (m.kind === 'team2') return Array.isArray(m.answer) && m.answer.length > 0 && m.answer.every(function (x) { return x != null; });
+  return m.answer != null;
+}
+
 function optLabel(m, opt) {
   if (m.kind === 'player') return { main: opt.name, sub: WCp.TEAMS[opt.team] ? WCp.TEAMS[opt.team].name : '', flag: WCp.TEAMS[opt.team] ? WCp.TEAMS[opt.team].flag : '', id: opt.id };
   if (m.kind === 'stage') return { main: opt, sub: '', flag: '', id: opt };
@@ -20,8 +25,8 @@ function Market(props) {
   const m = props.market, me = props.me, onPick = props.onPick;
   const isTwo = m.kind === 'team2';
   const isTeam = m.kind === 'team' || isTwo;
-  // team2 answer is an array; only resolved when it has 2 entries
-  const resolved = isTwo ? (Array.isArray(m.answer) && m.answer.length > 0) : m.answer != null;
+  const locked = !!props.locked;
+  const resolved = isResolved(m);
   const pick = me.picks ? me.picks[m.key] : null;
   const picked = (id) => isTwo ? (Array.isArray(pick) && pick.indexOf(id) >= 0) : pick === id;
   const gotIt = resolved && (isTwo
@@ -31,7 +36,7 @@ function Market(props) {
   const presetCodes = isTeam ? new Set(m.options) : new Set();
 
   function choose(id) {
-    if (resolved) return;
+    if (resolved || locked) return;
     if (isTwo) {
       let arr = Array.isArray(pick) ? pick.slice() : [];
       if (arr.indexOf(id) >= 0) arr = arr.filter(x => x !== id);
@@ -57,7 +62,7 @@ function Market(props) {
         </Chp>
       </div>
       <div style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--ink2)', marginBottom: 9 }}>
-        {resolved ? 'Result is in' : isTwo ? 'Pick the two finalists' : 'Open · tap to pick'}
+        {resolved ? 'Result is in' : locked ? 'Predictions locked' : isTwo ? 'Pick the two finalists' : 'Open · tap to pick'}
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
         {m.options.map((opt, i) => {
@@ -70,8 +75,8 @@ function Market(props) {
           else if (wrong) { bg = 'rgba(232,39,42,.08)'; bd = 'var(--red)'; }
           else if (on && !resolved) { bg = 'var(--yellow)'; bd = 'var(--ink)'; }
           return (
-            <button key={i} onClick={() => choose(o.id)} disabled={resolved} style={{
-              display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', cursor: resolved ? 'default' : 'pointer',
+            <button key={i} onClick={() => choose(o.id)} disabled={resolved || locked} style={{
+              display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', cursor: (resolved || locked) ? 'default' : 'pointer',
               textAlign: 'left', border: '2.5px solid ' + bd, borderRadius: 13, background: bg, fontFamily: 'var(--body)', transition: 'all .12s'
             }}>
               {o.flag && <span style={{ fontSize: 24 }}>{o.flag}</span>}
@@ -80,12 +85,13 @@ function Market(props) {
                 {o.sub && <div style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--ink2)' }}>{o.sub}</div>}
               </div>
               {isAnswer && <Chp tone="green" style={{ flex: '0 0 auto' }}>Correct</Chp>}
-              {!resolved && <span style={{ width: 22, height: 22, borderRadius: '50%', border: '2.5px solid var(--ink)', background: on ? 'var(--ink)' : '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 13, fontWeight: 900, flex: '0 0 auto' }}>{on ? '✓' : ''}</span>}
+              {!resolved && !locked && <span style={{ width: 22, height: 22, borderRadius: '50%', border: '2.5px solid var(--ink)', background: on ? 'var(--ink)' : '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 13, fontWeight: 900, flex: '0 0 auto' }}>{on ? '✓' : ''}</span>}
+              {!resolved && locked && on && <Chp tone="yellow" style={{ flex: '0 0 auto' }}>Your pick</Chp>}
             </button>
           );
         })}
       </div>
-      {isTeam && !resolved && (
+      {isTeam && !resolved && !locked && (
         <div style={{ marginTop: 10, borderTop: '1.5px solid var(--line)', paddingTop: 10 }}>
           <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--ink2)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '.05em' }}>Search all 48 teams</div>
           <input
@@ -158,10 +164,16 @@ function PredictionsScreen(props) {
   const [, bump] = pState(0);
   if (!me) return null;
   const markets = WCp.predictions || Sp.PREDICTIONS;
-  const open = markets.filter(m => m.answer == null);
-  const graded = markets.filter(m => m.answer != null);
+  const open = markets.filter(m => !isResolved(m));
+  const graded = markets.filter(m => isResolved(m));
   const made = me.picks ? Object.keys(me.picks).filter(k => me.picks[k] != null && (!Array.isArray(me.picks[k]) || me.picks[k].length)).length : 0;
+  const predDeadline = WCp.meta && WCp.meta.predDeadline;
+  const deadlinePassed = predDeadline && new Date() > new Date(predDeadline);
+  const locked = !!(WCp.meta && WCp.meta.predictionsLocked) || !!deadlinePassed;
   function onPick(key, val) { Sp.setPick(me.id, key, val); bump(x => x + 1); }
+  function fmtDeadline(dt) {
+    try { return new Date(dt).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' }); } catch (e) { return dt; }
+  }
   return (
     <div className="pad">
       <div className="appbar" style={{ padding: '2px 0 12px' }}>
@@ -170,12 +182,19 @@ function PredictionsScreen(props) {
           <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink2)' }}>{made} of {markets.length} made · {Sp.predScoreOf(me)} pts banked</div>
         </div>
       </div>
+      {locked && <div style={{ display: 'flex', alignItems: 'center', gap: 9, background: 'var(--ink)', color: '#fff', borderRadius: 13, padding: '10px 13px', marginBottom: 12, fontSize: 13, fontWeight: 700 }}>
+        <span style={{ fontSize: 18 }}>🔒</span>
+        <span>{deadlinePassed ? 'Predictions are locked — deadline has passed.' : 'Predictions are locked by the organiser.'}</span>
+      </div>}
+      {!locked && predDeadline && <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--ink2)', marginBottom: 10, padding: '7px 12px', background: 'rgba(245,200,0,.2)', borderRadius: 10 }}>
+        Picks lock at {fmtDeadline(predDeadline)} — get yours in.
+      </div>}
       <Saysp mood="mischievous" label="on the record" animate>{WCp.LINES.predOpen}</Saysp>
       <SHp aside="still open">Make your call</SHp>
-      {open.map(m => <Market key={m.key} market={m} me={me} onPick={onPick} />)}
+      {open.map(m => <Market key={m.key} market={m} me={me} onPick={onPick} locked={locked} />)}
       {graded.length > 0 && <>
         <SHp aside="graded">Already settled</SHp>
-        {graded.map(m => <Market key={m.key} market={m} me={me} onPick={onPick} />)}
+        {graded.map(m => <Market key={m.key} market={m} me={me} onPick={onPick} locked={locked} />)}
       </>}
       <SHp aside="org-wide">Prediction league</SHp>
       <PredLeaderboard me={me} />

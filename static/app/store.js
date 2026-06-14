@@ -64,6 +64,7 @@
       purpose: WC.meta.purpose || 'work',
       locations: WC.meta.locations || ['Edinburgh', 'London'],
       locationsFreeText: !!WC.meta.locationsFreeText,
+      predDeadline: WC.meta.predDeadline || null,
     },
   };
   WC.TEAM_LIST.forEach(function (t) { BASE.teams[t.code] = { alive: t.alive, stage: t.stage, rounds: t.rounds }; });
@@ -99,6 +100,7 @@
     WC.meta.purpose = (admin.meta && admin.meta.purpose) || BASE.meta.purpose;
     WC.meta.locations = (admin.meta && Array.isArray(admin.meta.locations) && admin.meta.locations.length) ? admin.meta.locations : BASE.meta.locations;
     WC.meta.locationsFreeText = admin.meta && admin.meta.locationsFreeText != null ? !!admin.meta.locationsFreeText : BASE.meta.locationsFreeText;
+    WC.meta.predDeadline = (admin.meta && admin.meta.predDeadline) || BASE.meta.predDeadline || null;
     WC.charitySplit = (admin.meta && admin.meta.charitySplit != null) ? Number(admin.meta.charitySplit) : BASE.meta.charitySplit;
     var fee = admin.meta && admin.meta.entryFee != null ? Number(admin.meta.entryFee) : BASE.fee;
     WC.FEE = isFinite(fee) && fee >= 0 ? fee : BASE.fee;
@@ -472,6 +474,12 @@
       admin.meta = admin.meta || {}; admin.meta.locationsFreeText = !!on;
       commitAdmin();
     },
+    predDeadline: function () { return (admin.meta && admin.meta.predDeadline) || BASE.meta.predDeadline || null; },
+    setPredDeadline: function (dt) {
+      admin.meta = admin.meta || {};
+      if (dt) admin.meta.predDeadline = dt; else delete admin.meta.predDeadline;
+      commitAdmin();
+    },
     setCharitySplit: function (split) {
       var n = Math.max(0, Math.min(1, Number(split)));
       if (!isFinite(n)) return;
@@ -517,6 +525,7 @@
         purpose: keep.purpose,
         locations: keep.locations,
         locationsFreeText: keep.locationsFreeText,
+        predDeadline: keep.predDeadline,
       }};
       commitAdmin();
     }

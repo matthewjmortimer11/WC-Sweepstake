@@ -222,6 +222,21 @@ function SettingsAdmin() {
    const includeLocation = Sa.includeLocation ? Sa.includeLocation() : true;
    const includeLtMember = Sa.includeLtMember ? Sa.includeLtMember() : true;
    const locationsFreeText = Sa.locationsFreeText ? Sa.locationsFreeText() : false;
+   const predDeadlineNow = Sa.predDeadline ? Sa.predDeadline() : null;
+   const [predDeadlineInput, setPredDeadlineInput] = aState2(predDeadlineNow ? predDeadlineNow.slice(0, 16) : '');
+   React.useEffect(() => setPredDeadlineInput(predDeadlineNow ? predDeadlineNow.slice(0, 16) : ''), [predDeadlineNow]);
+   function saveDeadline() {
+     const val = predDeadlineInput.trim();
+     if (val) {
+       const dt = new Date(val);
+       if (isNaN(dt.getTime())) return;
+       Sa.setPredDeadline(dt.toISOString());
+       if (window.wcToast) window.wcToast('Prediction deadline set.', 'confident');
+     } else {
+       Sa.setPredDeadline(null);
+       if (window.wcToast) window.wcToast('Deadline cleared.', 'neutral');
+     }
+   }
    const n = Number(fee);
    const feeNum = isFinite(n) && n >= 0 ? n : feeNow;
    const gross = entrants * feeNum;
@@ -318,6 +333,27 @@ function SettingsAdmin() {
          'Allow custom location',
          locationsFreeText ? 'People can type their own location (your list shows as suggestions).' : 'People must pick from your list above.'
        )}
+
+       <SHa>Predictions deadline</SHa>
+       <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink2)', marginBottom: 8, lineHeight: 1.4 }}>Set a cut-off date and time. Predictions lock automatically once it passes.</div>
+       <div style={{ display: 'flex', gap: 7, alignItems: 'center', marginBottom: 6 }}>
+         <input
+           type="datetime-local"
+           value={predDeadlineInput}
+           onChange={e => setPredDeadlineInput(e.target.value)}
+           onBlur={saveDeadline}
+           style={{ flex: 1, border: '2px solid var(--ink)', borderRadius: 11, padding: '9px 12px', fontFamily: 'var(--body)', fontWeight: 600, fontSize: 14, outline: 'none', background: '#fff' }}
+         />
+         <button onClick={saveDeadline} className="wc-btn wc-btn--sm wc-btn--ink">Set</button>
+         {predDeadlineNow && <button onClick={() => { setPredDeadlineInput(''); Sa.setPredDeadline(null); if (window.wcToast) window.wcToast('Deadline cleared.', 'neutral'); }} className="wc-btn wc-btn--sm">Clear</button>}
+       </div>
+       {predDeadlineNow && (() => {
+         const past = new Date() > new Date(predDeadlineNow);
+         return <div style={{ fontSize: 12, fontWeight: 700, color: past ? 'var(--red)' : 'var(--ink2)', marginBottom: 16 }}>
+           {past ? 'Locked — deadline has passed.' : 'Locks at ' + new Date(predDeadlineNow).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' }) + '.'}
+         </div>;
+       })()}
+       {!predDeadlineNow && <div style={{ height: 16 }} />}
 
        <SHa>Signup fields</SHa>
        {toggleRow(

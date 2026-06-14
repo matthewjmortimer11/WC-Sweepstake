@@ -383,7 +383,7 @@ button:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(245,200,0,.55);borde
 
 <!-- Single source of truth: generated from wc_data.py by scripts/build_snapshot.py.
      No-op when the server injects window.WC_DATA above (live mode). -->
-<script type="text/babel" src="tweaks-panel.jsx?v=20260614-locations"></script>
+<script type="text/babel" src="tweaks-panel.jsx?v=20260614-deadline"></script>
 
 <script>
 /* ===========================================================================
@@ -554,6 +554,7 @@ button:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(245,200,0,.55);borde
       purpose: WC.meta.purpose || 'work',
       locations: WC.meta.locations || ['Edinburgh', 'London'],
       locationsFreeText: !!WC.meta.locationsFreeText,
+      predDeadline: WC.meta.predDeadline || null,
     },
   };
   WC.TEAM_LIST.forEach(function (t) { BASE.teams[t.code] = { alive: t.alive, stage: t.stage, rounds: t.rounds }; });
@@ -589,6 +590,7 @@ button:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(245,200,0,.55);borde
     WC.meta.purpose = (admin.meta && admin.meta.purpose) || BASE.meta.purpose;
     WC.meta.locations = (admin.meta && Array.isArray(admin.meta.locations) && admin.meta.locations.length) ? admin.meta.locations : BASE.meta.locations;
     WC.meta.locationsFreeText = admin.meta && admin.meta.locationsFreeText != null ? !!admin.meta.locationsFreeText : BASE.meta.locationsFreeText;
+    WC.meta.predDeadline = (admin.meta && admin.meta.predDeadline) || BASE.meta.predDeadline || null;
     WC.charitySplit = (admin.meta && admin.meta.charitySplit != null) ? Number(admin.meta.charitySplit) : BASE.meta.charitySplit;
     var fee = admin.meta && admin.meta.entryFee != null ? Number(admin.meta.entryFee) : BASE.fee;
     WC.FEE = isFinite(fee) && fee >= 0 ? fee : BASE.fee;
@@ -962,6 +964,12 @@ button:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(245,200,0,.55);borde
       admin.meta = admin.meta || {}; admin.meta.locationsFreeText = !!on;
       commitAdmin();
     },
+    predDeadline: function () { return (admin.meta && admin.meta.predDeadline) || BASE.meta.predDeadline || null; },
+    setPredDeadline: function (dt) {
+      admin.meta = admin.meta || {};
+      if (dt) admin.meta.predDeadline = dt; else delete admin.meta.predDeadline;
+      commitAdmin();
+    },
     setCharitySplit: function (split) {
       var n = Math.max(0, Math.min(1, Number(split)));
       if (!isFinite(n)) return;
@@ -1007,6 +1015,7 @@ button:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(245,200,0,.55);borde
         purpose: keep.purpose,
         locations: keep.locations,
         locationsFreeText: keep.locationsFreeText,
+        predDeadline: keep.predDeadline,
       }};
       commitAdmin();
     }
@@ -3587,6 +3596,11 @@ const Sp = window.Store;
 const { Card: Cp, Btn: Bp, Flag: Fp, Avatar: Ap, Chip: Chp, WheeshtSays: Saysp, SectionHead: SHp } = window;
 const { useState: pState } = React;
 
+function isResolved(m) {
+  if (m.kind === 'team2') return Array.isArray(m.answer) && m.answer.length > 0 && m.answer.every(function (x) { return x != null; });
+  return m.answer != null;
+}
+
 function optLabel(m, opt) {
   if (m.kind === 'player') return { main: opt.name, sub: WCp.TEAMS[opt.team] ? WCp.TEAMS[opt.team].name : '', flag: WCp.TEAMS[opt.team] ? WCp.TEAMS[opt.team].flag : '', id: opt.id };
   if (m.kind === 'stage') return { main: opt, sub: '', flag: '', id: opt };
@@ -3598,8 +3612,8 @@ function Market(props) {
   const m = props.market, me = props.me, onPick = props.onPick;
   const isTwo = m.kind === 'team2';
   const isTeam = m.kind === 'team' || isTwo;
-  // team2 answer is an array; only resolved when it has 2 entries
-  const resolved = isTwo ? (Array.isArray(m.answer) && m.answer.length > 0) : m.answer != null;
+  const locked = !!props.locked;
+  const resolved = isResolved(m);
   const pick = me.picks ? me.picks[m.key] : null;
   const picked = (id) => isTwo ? (Array.isArray(pick) && pick.indexOf(id) >= 0) : pick === id;
   const gotIt = resolved && (isTwo
@@ -3609,7 +3623,7 @@ function Market(props) {
   const presetCodes = isTeam ? new Set(m.options) : new Set();
 
   function choose(id) {
-    if (resolved) return;
+    if (resolved || locked) return;
     if (isTwo) {
       let arr = Array.isArray(pick) ? pick.slice() : [];
       if (arr.indexOf(id) >= 0) arr = arr.filter(x => x !== id);
@@ -3635,7 +3649,7 @@ function Market(props) {
         </Chp>
       </div>
       <div style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--ink2)', marginBottom: 9 }}>
-        {resolved ? 'Result is in' : isTwo ? 'Pick the two finalists' : 'Open · tap to pick'}
+        {resolved ? 'Result is in' : locked ? 'Predictions locked' : isTwo ? 'Pick the two finalists' : 'Open · tap to pick'}
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
         {m.options.map((opt, i) => {
@@ -3648,8 +3662,8 @@ function Market(props) {
           else if (wrong) { bg = 'rgba(232,39,42,.08)'; bd = 'var(--red)'; }
           else if (on && !resolved) { bg = 'var(--yellow)'; bd = 'var(--ink)'; }
           return (
-            <button key={i} onClick={() => choose(o.id)} disabled={resolved} style={{
-              display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', cursor: resolved ? 'default' : 'pointer',
+            <button key={i} onClick={() => choose(o.id)} disabled={resolved || locked} style={{
+              display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', cursor: (resolved || locked) ? 'default' : 'pointer',
               textAlign: 'left', border: '2.5px solid ' + bd, borderRadius: 13, background: bg, fontFamily: 'var(--body)', transition: 'all .12s'
             }}>
               {o.flag && <span style={{ fontSize: 24 }}>{o.flag}</span>}
@@ -3658,12 +3672,13 @@ function Market(props) {
                 {o.sub && <div style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--ink2)' }}>{o.sub}</div>}
               </div>
               {isAnswer && <Chp tone="green" style={{ flex: '0 0 auto' }}>Correct</Chp>}
-              {!resolved && <span style={{ width: 22, height: 22, borderRadius: '50%', border: '2.5px solid var(--ink)', background: on ? 'var(--ink)' : '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 13, fontWeight: 900, flex: '0 0 auto' }}>{on ? '✓' : ''}</span>}
+              {!resolved && !locked && <span style={{ width: 22, height: 22, borderRadius: '50%', border: '2.5px solid var(--ink)', background: on ? 'var(--ink)' : '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 13, fontWeight: 900, flex: '0 0 auto' }}>{on ? '✓' : ''}</span>}
+              {!resolved && locked && on && <Chp tone="yellow" style={{ flex: '0 0 auto' }}>Your pick</Chp>}
             </button>
           );
         })}
       </div>
-      {isTeam && !resolved && (
+      {isTeam && !resolved && !locked && (
         <div style={{ marginTop: 10, borderTop: '1.5px solid var(--line)', paddingTop: 10 }}>
           <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--ink2)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '.05em' }}>Search all 48 teams</div>
           <input
@@ -3736,10 +3751,16 @@ function PredictionsScreen(props) {
   const [, bump] = pState(0);
   if (!me) return null;
   const markets = WCp.predictions || Sp.PREDICTIONS;
-  const open = markets.filter(m => m.answer == null);
-  const graded = markets.filter(m => m.answer != null);
+  const open = markets.filter(m => !isResolved(m));
+  const graded = markets.filter(m => isResolved(m));
   const made = me.picks ? Object.keys(me.picks).filter(k => me.picks[k] != null && (!Array.isArray(me.picks[k]) || me.picks[k].length)).length : 0;
+  const predDeadline = WCp.meta && WCp.meta.predDeadline;
+  const deadlinePassed = predDeadline && new Date() > new Date(predDeadline);
+  const locked = !!(WCp.meta && WCp.meta.predictionsLocked) || !!deadlinePassed;
   function onPick(key, val) { Sp.setPick(me.id, key, val); bump(x => x + 1); }
+  function fmtDeadline(dt) {
+    try { return new Date(dt).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' }); } catch (e) { return dt; }
+  }
   return (
     <div className="pad">
       <div className="appbar" style={{ padding: '2px 0 12px' }}>
@@ -3748,12 +3769,19 @@ function PredictionsScreen(props) {
           <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink2)' }}>{made} of {markets.length} made · {Sp.predScoreOf(me)} pts banked</div>
         </div>
       </div>
+      {locked && <div style={{ display: 'flex', alignItems: 'center', gap: 9, background: 'var(--ink)', color: '#fff', borderRadius: 13, padding: '10px 13px', marginBottom: 12, fontSize: 13, fontWeight: 700 }}>
+        <span style={{ fontSize: 18 }}>🔒</span>
+        <span>{deadlinePassed ? 'Predictions are locked — deadline has passed.' : 'Predictions are locked by the organiser.'}</span>
+      </div>}
+      {!locked && predDeadline && <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--ink2)', marginBottom: 10, padding: '7px 12px', background: 'rgba(245,200,0,.2)', borderRadius: 10 }}>
+        Picks lock at {fmtDeadline(predDeadline)} — get yours in.
+      </div>}
       <Saysp mood="mischievous" label="on the record" animate>{WCp.LINES.predOpen}</Saysp>
       <SHp aside="still open">Make your call</SHp>
-      {open.map(m => <Market key={m.key} market={m} me={me} onPick={onPick} />)}
+      {open.map(m => <Market key={m.key} market={m} me={me} onPick={onPick} locked={locked} />)}
       {graded.length > 0 && <>
         <SHp aside="graded">Already settled</SHp>
-        {graded.map(m => <Market key={m.key} market={m} me={me} onPick={onPick} />)}
+        {graded.map(m => <Market key={m.key} market={m} me={me} onPick={onPick} locked={locked} />)}
       </>}
       <SHp aside="org-wide">Prediction league</SHp>
       <PredLeaderboard me={me} />
@@ -4158,6 +4186,21 @@ function SettingsAdmin() {
    const includeLocation = Sa.includeLocation ? Sa.includeLocation() : true;
    const includeLtMember = Sa.includeLtMember ? Sa.includeLtMember() : true;
    const locationsFreeText = Sa.locationsFreeText ? Sa.locationsFreeText() : false;
+   const predDeadlineNow = Sa.predDeadline ? Sa.predDeadline() : null;
+   const [predDeadlineInput, setPredDeadlineInput] = aState2(predDeadlineNow ? predDeadlineNow.slice(0, 16) : '');
+   React.useEffect(() => setPredDeadlineInput(predDeadlineNow ? predDeadlineNow.slice(0, 16) : ''), [predDeadlineNow]);
+   function saveDeadline() {
+     const val = predDeadlineInput.trim();
+     if (val) {
+       const dt = new Date(val);
+       if (isNaN(dt.getTime())) return;
+       Sa.setPredDeadline(dt.toISOString());
+       if (window.wcToast) window.wcToast('Prediction deadline set.', 'confident');
+     } else {
+       Sa.setPredDeadline(null);
+       if (window.wcToast) window.wcToast('Deadline cleared.', 'neutral');
+     }
+   }
    const n = Number(fee);
    const feeNum = isFinite(n) && n >= 0 ? n : feeNow;
    const gross = entrants * feeNum;
@@ -4254,6 +4297,27 @@ function SettingsAdmin() {
          'Allow custom location',
          locationsFreeText ? 'People can type their own location (your list shows as suggestions).' : 'People must pick from your list above.'
        )}
+
+       <SHa>Predictions deadline</SHa>
+       <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink2)', marginBottom: 8, lineHeight: 1.4 }}>Set a cut-off date and time. Predictions lock automatically once it passes.</div>
+       <div style={{ display: 'flex', gap: 7, alignItems: 'center', marginBottom: 6 }}>
+         <input
+           type="datetime-local"
+           value={predDeadlineInput}
+           onChange={e => setPredDeadlineInput(e.target.value)}
+           onBlur={saveDeadline}
+           style={{ flex: 1, border: '2px solid var(--ink)', borderRadius: 11, padding: '9px 12px', fontFamily: 'var(--body)', fontWeight: 600, fontSize: 14, outline: 'none', background: '#fff' }}
+         />
+         <button onClick={saveDeadline} className="wc-btn wc-btn--sm wc-btn--ink">Set</button>
+         {predDeadlineNow && <button onClick={() => { setPredDeadlineInput(''); Sa.setPredDeadline(null); if (window.wcToast) window.wcToast('Deadline cleared.', 'neutral'); }} className="wc-btn wc-btn--sm">Clear</button>}
+       </div>
+       {predDeadlineNow && (() => {
+         const past = new Date() > new Date(predDeadlineNow);
+         return <div style={{ fontSize: 12, fontWeight: 700, color: past ? 'var(--red)' : 'var(--ink2)', marginBottom: 16 }}>
+           {past ? 'Locked — deadline has passed.' : 'Locks at ' + new Date(predDeadlineNow).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' }) + '.'}
+         </div>;
+       })()}
+       {!predDeadlineNow && <div style={{ height: 16 }} />}
 
        <SHa>Signup fields</SHa>
        {toggleRow(
@@ -5003,32 +5067,38 @@ function App(){
     const myTeam = A_WC.TEAMS[me.team];
     const id=setTimeout(()=>{
       if(pre){
-        const msgs=[
-          'Predictions are open till kick-off. Get them in — Wheesht is taking names.',
-          'Your picks won\'t make themselves. Wheesht is waiting.',
-          'Markets are open. Back your instincts. Wheesht backs nothing — but watches everything.',
-          'Get your predictions in before the first whistle. No extensions.',
+        const pool=[
+          ['Predictions are open till kick-off. Get them in — Wheesht is taking names.','mischievous'],
+          ['Your picks won\'t make themselves. Wheesht is waiting.','nervous'],
+          ['Markets are open. Back your instincts. Wheesht backs nothing — but watches everything.','confident'],
+          ['Get your predictions in before the first whistle. No extensions.','angry'],
+          ['Wheesht has opinions on every market. Wheesht is keeping them to itself.','mischievous'],
         ];
-        window.wcToast&&window.wcToast(msgs[(Math.random()*msgs.length)|0],'mischievous');
-      } else if(!myTeam.alive){
+        const pick=pool[(Math.random()*pool.length)|0];
+        window.wcToast&&window.wcToast(pick[0],pick[1]);
+      } else if(!myTeam||!myTeam.alive){
         window.wcToast&&window.wcToast(A_WC.LINES.eliminated,'crying');
       } else {
-        const msgs=[
-          'Your team is still in it. Wheesht is watching — with moderate approval.',
-          'Still standing. Wheesht has noted this. Nothing more to add.',
-          'Your team is in the mix. Wheesht is cautiously optimistic. Very cautiously.',
-          'In the running. Wheesht is watching. As always.',
+        const pool=[
+          ['Your team is still in it. Wheesht is watching — with moderate approval.','confident'],
+          ['Still standing. Wheesht has noted this. Nothing more to add.','neutral'],
+          ['Your team is in the mix. Wheesht is cautiously optimistic. Very cautiously.','nervous'],
+          ['In the running. The pot is watching too. Wheesht is taking no questions.','mischievous'],
+          [myTeam.name+' are alive. Wheesht acknowledges this. Barely.','happy'],
         ];
-        window.wcToast&&window.wcToast(msgs[(Math.random()*msgs.length)|0],'mischievous');
+        const pick=pool[(Math.random()*pool.length)|0];
+        window.wcToast&&window.wcToast(pick[0],pick[1]);
       }
       if(t.bias){
         const scotMsgs=[
-          'Scotland are in this tournament. Just so everyone is clear.',
-          'Scotland. Still here. Wheesht is cautiously optimistic — emphasis on cautious.',
-          'A gentle reminder that Scotland are participating. Wheesht thought you should know.',
-          'Scotland update: still in it. Wheesht is fine. Everything is fine.',
+          ['Scotland are in this tournament. Just so everyone is clear.','scottish'],
+          ['Scotland. Still here. Wheesht is cautiously optimistic — emphasis on cautious.','nervous'],
+          ['A gentle reminder that Scotland are participating. Wheesht thought you should know.','scottish'],
+          ['Scotland update: still in it. Wheesht is fine. Everything is fine.','confident'],
+          ['No one asked. Wheesht is mentioning Scotland anyway.','mischievous'],
         ];
-        setTimeout(()=>window.wcToast&&window.wcToast(scotMsgs[(Math.random()*scotMsgs.length)|0],'scottish'),1600);
+        const sp=scotMsgs[(Math.random()*scotMsgs.length)|0];
+        setTimeout(()=>window.wcToast&&window.wcToast(sp[0],sp[1]),1600);
       }
     },650);
     return ()=>clearTimeout(id);

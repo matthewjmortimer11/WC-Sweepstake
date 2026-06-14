@@ -273,6 +273,7 @@ def _league_state(league: League, league_people: List[Dict[str, Any]], admin: Di
     locs = admin_meta.get("locations")
     meta["locations"] = [str(x) for x in locs] if isinstance(locs, list) and locs else ["Edinburgh", "London"]
     meta["locationsFreeText"] = bool(admin_meta.get("locationsFreeText", False))
+    meta["predDeadline"] = admin_meta.get("predDeadline") or None
     data["meta"] = meta
     data["pot"] = len(people) * fee
     return data
