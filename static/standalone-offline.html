@@ -147,6 +147,9 @@ button{font-family:inherit;}
 .tabbar--5 button{font-size:10px;}
 .tabbar--5 .ic{width:24px;height:24px;}
 .tabbar--5 .ic svg{width:23px;height:23px;}
+.tabbar--6 button{font-size:9.5px;}
+.tabbar--6 .ic{width:22px;height:22px;}
+.tabbar--6 .ic svg{width:21px;height:21px;}
 
 /* ---------- moment overlay ---------- */
 .moment{position:absolute;inset:0;z-index:60;background:var(--bg);display:flex;flex-direction:column;overflow:hidden;}
@@ -37326,17 +37329,80 @@ function SideBetsScreen(props) {
   }, "We\u2019re the ones watching objectively now. Arguably the better position."));
 }
 
-/* =================== WEEKLY SUMMARY =================== */
-function StatStrip() {
-  const stats = [['8', 'ties played'], ['1', 'massive upset'], ['3–0', 'biggest hiding'], [WC2.meta.stillIn, 'still standing']];
-  return /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: 'grid',
-      gridTemplateColumns: '1fr 1fr',
-      gap: 9
-    }
-  }, stats.map((s, i) => /*#__PURE__*/React.createElement(Card2, {
-    key: i,
+/* =================== THE VERDICT ===================
+   Wheesht's running commentary — built ENTIRELY from what the organiser has
+   actually entered (real fixtures/scores, real eliminations, a declared
+   champion). Nothing is fabricated: if a result hasn't been logged, it isn't
+   shown. Empty states keep the page honest before the football catches up. */
+
+function vPeople() {
+  return window.Store ? window.Store.allSync() : WC2.PEOPLE || [];
+}
+function vTeam(code) {
+  return WC2.TEAMS[code] || {
+    code: code || '?',
+    name: code || 'TBD',
+    flag: '🏳️',
+    group: '?',
+    odds: '0',
+    alive: true,
+    rounds: 0
+  };
+}
+function vOwners(code) {
+  return vPeople().filter(function (p) {
+    return p.team === code;
+  });
+}
+function vDoneFixtures() {
+  return (WC2.FIXTURES || []).filter(function (f) {
+    return f.status === 'done' && f.score;
+  });
+}
+function vAnswer(key) {
+  const m = (WC2.PREDICTIONS || []).find(function (x) {
+    return x.key === key;
+  });
+  return m ? m.answer : null;
+}
+function vEliminated() {
+  return WC2.TEAM_LIST.filter(function (t) {
+    return !t.alive;
+  });
+}
+function vPot() {
+  return window.Store ? window.Store.pot() : WC2.POT * 0.5;
+}
+function vCharity() {
+  return window.Store ? window.Store.charity() : WC2.POT * 0.5;
+}
+
+/* A short, in-voice line for a logged result — homeland bias, dry on England. */
+function vResultNote(f) {
+  const a = f.score[0],
+    b = f.score[1];
+  const ta = vTeam(f.a),
+    tb = vTeam(f.b);
+  const draw = a === b,
+    aWin = a > b;
+  const wN = aWin ? ta.name : tb.name,
+    lN = aWin ? tb.name : ta.name;
+  if (f.a === 'SCO' || f.b === 'SCO') {
+    const scoWon = f.a === 'SCO' && aWin || f.b === 'SCO' && !aWin;
+    if (draw) return 'Scotland share the spoils. Wheesht calls it a moral victory.';
+    return scoWon ? 'The homeland delivers. Wheesht needs a quiet minute.' : 'Scotland fall. Wheesht is fine. Wheesht is always fine.';
+  }
+  if (f.a === 'ENG' || f.b === 'ENG') {
+    const engWon = f.a === 'ENG' && aWin || f.b === 'ENG' && !aWin;
+    if (draw) return 'England draw. Wheesht is remaining professional. Barely.';
+    return engWon ? 'England win. Wheesht is noting it down without comment.' : 'England lose. Wheesht has no comment — and a small, private smile.';
+  }
+  if (draw) return wN + ' and ' + lN + ' share the points. Wheesht has seen worse.';
+  if (Math.abs(a - b) >= 3) return wN + ' take ' + lN + ' apart. Wheesht is a wee bit frightened.';
+  return wN + ' edge ' + lN + '. Result logged. Wheesht remembers everything.';
+}
+function StatCard(props) {
+  return /*#__PURE__*/React.createElement(Card2, {
     flat: true,
     style: {
       padding: '12px 14px'
@@ -37344,44 +37410,20 @@ function StatStrip() {
   }, /*#__PURE__*/React.createElement("div", {
     className: "dh",
     style: {
-      fontSize: 30
+      fontSize: 28,
+      color: props.color || 'var(--ink)',
+      lineHeight: 1.05
     }
-  }, s[0]), /*#__PURE__*/React.createElement("div", {
+  }, props.value), /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 12,
       fontWeight: 700,
       color: 'var(--ink2)'
     }
-  }, s[1]))));
+  }, props.label));
 }
-function leagueRows() {
-  const exp = o => {
-    const v = parseInt(o.slice(1));
-    if (v <= 1000) return 4;
-    if (v <= 5000) return 3;
-    if (v <= 20000) return 2;
-    return 1;
-  };
-  const rows = WC2.PEOPLE.filter(p => !p.isYou).map(p => {
-    const t = WC2.TEAMS[p.team];
-    return {
-      p,
-      t,
-      delta: t.rounds - exp(t.odds)
-    };
-  });
-  rows.sort((a, b) => b.delta - a.delta);
-  return {
-    over: rows.slice(0, 3),
-    under: rows.slice(-3).reverse()
-  };
-}
-function PreVerdict() {
-  const P = window.Store ? window.Store.allSync() : WC2.PEOPLE;
-  const claimed = new Set(P.map(p => p.team)).size;
+function VerdictHeader(props) {
   return /*#__PURE__*/React.createElement("div", {
-    className: "pad"
-  }, /*#__PURE__*/React.createElement("div", {
     className: "appbar",
     style: {
       padding: '2px 0 12px'
@@ -37397,11 +37439,59 @@ function PreVerdict() {
       fontWeight: 600,
       color: 'var(--ink2)'
     }
-  }, "Wheesht\u2019s running commentary now the football has started."))), /*#__PURE__*/React.createElement(Says2, {
-    mood: "broadcast",
-    label: "live",
+  }, props.sub)));
+}
+function StandingsBlock() {
+  // Pot / charity / entrants / fee — always true, drawn from live numbers.
+  const P = vPeople();
+  const cells = [{
+    v: money2(vPot()),
+    l: 'winner takes all',
+    c: 'var(--green)'
+  }, {
+    v: money2(vCharity()),
+    l: 'raised for charity',
+    c: 'var(--red)'
+  }, {
+    v: P.length,
+    l: P.length === 1 ? 'entrant' : 'entrants',
+    c: 'var(--ink)'
+  }, {
+    v: '£' + (WC2.FEE || 0),
+    l: 'to enter',
+    c: 'var(--ink)'
+  }];
+  return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(SH2, null, "Where it stands"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'grid',
+      gridTemplateColumns: '1fr 1fr',
+      gap: 9
+    }
+  }, cells.map(function (s, i) {
+    return /*#__PURE__*/React.createElement(StatCard, {
+      key: i,
+      value: s.v,
+      label: s.l,
+      color: s.c
+    });
+  })));
+}
+
+/* ---- PRE: nothing has kicked off; keep it honest and inviting. ---- */
+function PreVerdict() {
+  const P = vPeople();
+  const claimed = new Set(P.map(function (p) {
+    return p.team;
+  })).size;
+  return /*#__PURE__*/React.createElement("div", {
+    className: "pad"
+  }, /*#__PURE__*/React.createElement(VerdictHeader, {
+    sub: "Wheesht\u2019s desk \u2014 open for business, awaiting the first whistle."
+  }), /*#__PURE__*/React.createElement(Says2, {
+    mood: "confident",
+    label: "not started",
     animate: true
-  }, "The first whistle has gone. No hiding now: the sweepstake is live, the notes are being taken, and Wheesht is watching every one of ye."), /*#__PURE__*/React.createElement(SH2, null, "Tournament status"), /*#__PURE__*/React.createElement(Card2, {
+  }, "Nae ball kicked yet. The slate\u2019s clean, the predictions are open, and Wheesht is sharpening the pencil. This page fills up the moment the football starts."), /*#__PURE__*/React.createElement(SH2, null, "Tournament status"), /*#__PURE__*/React.createElement(Card2, {
     bordered: true,
     style: {
       background: 'var(--ink)',
@@ -37417,47 +37507,23 @@ function PreVerdict() {
       color: 'var(--yellow)',
       textTransform: 'uppercase'
     }
-  }, "First whistle gone"), /*#__PURE__*/React.createElement("div", {
+  }, "Countdown"), /*#__PURE__*/React.createElement("div", {
     className: "dh",
     style: {
-      fontSize: 34,
+      fontSize: 32,
       margin: '4px 0 2px',
       color: '#fff'
     }
-  }, "Tournament live"), /*#__PURE__*/React.createElement("div", {
+  }, "Not yet under way"), /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 13,
       fontWeight: 600,
       opacity: .8
     }
-  }, "Group stage underway \xB7 ", WC2.meta.season)), /*#__PURE__*/React.createElement(SH2, null, "Where it stands"), /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: 'grid',
-      gridTemplateColumns: '1fr 1fr',
-      gap: 9
-    }
-  }, [[money2(window.Store ? window.Store.pot() : WC2.POT * 0.5), 'winner takes all'], [money2(window.Store ? window.Store.charity() : WC2.POT * 0.5), 'raised for charity'], [P.length, P.length === 1 ? 'entrant' : 'entrants'], ['£' + WC2.FEE, 'to enter']].map((s, i) => /*#__PURE__*/React.createElement(Card2, {
-    key: i,
-    flat: true,
-    style: {
-      padding: '12px 14px'
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "dh",
-    style: {
-      fontSize: 28,
-      color: i === 0 ? 'var(--green)' : i === 1 ? 'var(--red)' : 'var(--ink)'
-    }
-  }, s[0]), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 12,
-      fontWeight: 700,
-      color: 'var(--ink2)'
-    }
-  }, s[1])))), /*#__PURE__*/React.createElement(SH2, null, "Wheesht\u2019s notes"), [{
+  }, "Kick-off ", WC2.meta.kickoff || 'soon', " \xB7 ", WC2.meta.season)), /*#__PURE__*/React.createElement(StandingsBlock, null), /*#__PURE__*/React.createElement(SH2, null, "Before the whistle"), [{
     m: 'mischievous',
-    t: 'Predictions are closed',
-    d: 'The first whistle has gone. No takebacks now. Wheesht has a long memory.'
+    t: 'Predictions are open',
+    d: 'Get yer calls in before kick-off. Wheesht will remember every single one.'
   }, {
     m: 'scottish',
     t: 'The homeland watch',
@@ -37465,259 +37531,331 @@ function PreVerdict() {
   }, {
     m: 'confident',
     t: 'The pot grows with every sign-up',
-    d: 'Drag a colleague in. More entrants, bigger pot, more folk for Wheesht to judge.'
-  }].map((n, i) => /*#__PURE__*/React.createElement(Card2, {
-    key: i,
+    d: claimed + ' teams claimed so far. More entrants, bigger pot, more folk for Wheesht to judge.'
+  }].map(function (n, i) {
+    return /*#__PURE__*/React.createElement(Card2, {
+      key: i,
+      style: {
+        marginBottom: 9,
+        display: 'flex',
+        gap: 11,
+        alignItems: 'center'
+      }
+    }, /*#__PURE__*/React.createElement(W2, {
+      mood: n.m,
+      size: 48
+    }), /*#__PURE__*/React.createElement("div", {
+      style: {
+        flex: 1
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "dh",
+      style: {
+        fontSize: 16
+      }
+    }, n.t), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 12.5,
+        fontWeight: 600,
+        color: 'var(--ink2)',
+        lineHeight: 1.3
+      }
+    }, n.d)));
+  }));
+}
+
+/* ---- The champion card — only painted when the organiser declares a winner. ---- */
+function ChampionCard() {
+  const code = vAnswer('winner'); // set in the organiser's clipboard
+  if (!code) return null;
+  const t = vTeam(code);
+  const owners = vOwners(code);
+  const win = vPot();
+  return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(SH2, null, "Champions of the world"), /*#__PURE__*/React.createElement(Card2, {
+    bordered: true,
+    className: "pop",
     style: {
-      marginBottom: 9,
-      display: 'flex',
-      gap: 11,
-      alignItems: 'center'
-    }
-  }, /*#__PURE__*/React.createElement(W2, {
-    mood: n.m,
-    size: 48
-  }), /*#__PURE__*/React.createElement("div", {
-    style: {
-      flex: 1
+      background: 'var(--yellow)',
+      textAlign: 'center',
+      padding: '22px 18px'
     }
   }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 56,
+      lineHeight: 1
+    }
+  }, t.flag), /*#__PURE__*/React.createElement("div", {
     className: "dh",
     style: {
-      fontSize: 16
+      fontSize: 34,
+      marginTop: 6
     }
-  }, n.t), /*#__PURE__*/React.createElement("div", {
+  }, t.name), /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 12.5,
-      fontWeight: 600,
+      fontWeight: 800,
+      letterSpacing: '.05em',
+      textTransform: 'uppercase',
       color: 'var(--ink2)',
-      lineHeight: 1.3
+      marginTop: 4
     }
-  }, n.d)))));
+  }, "Lift the trophy"), owners.length > 0 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 14,
+      background: 'var(--ink)',
+      color: '#fff',
+      borderRadius: 16,
+      padding: '13px 14px'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      fontWeight: 800,
+      letterSpacing: '.05em',
+      textTransform: 'uppercase',
+      color: 'var(--yellow)'
+    }
+  }, "Your sweepstake winner", owners.length > 1 ? 's' : ''), /*#__PURE__*/React.createElement("div", {
+    className: "dh",
+    style: {
+      fontSize: 24,
+      margin: '4px 0',
+      color: '#fff'
+    }
+  }, owners.map(function (o) {
+    return o.name;
+  }).join(', ')), /*#__PURE__*/React.createElement("div", {
+    className: "dh",
+    style: {
+      fontSize: 34,
+      color: 'var(--yellow)'
+    }
+  }, money2(owners.length > 1 ? win / owners.length : win)), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      fontWeight: 700,
+      opacity: .8
+    }
+  }, "held ", t.name, " from the very first draw. Insufferable. Deserved."))));
 }
-function SummaryScreen(props) {
-  if (WC2.meta.phase === 'pre') return /*#__PURE__*/React.createElement(PreVerdict, null);
-  const lg = leagueRows();
-  const news = [{
-    m: 'outraged',
-    t: 'Norway 2–1 England',
-    d: 'Last minute. England out. Wheesht has no comment and a lot of comments.'
-  }, {
-    m: 'neutral',
-    t: 'Spain 3–0 Morocco',
-    d: 'Exactly as Wheesht predicted. Wheesht always predicts it.'
-  }, {
-    m: 'delighted',
-    t: 'Scotland’s group-stage heroics',
-    d: 'Out of the group with Brazil. Wheesht still hasn’t stopped talking about it.'
-  }];
+
+/* ---- LIVE / DONE: built from real, organiser-entered results. ---- */
+function LiveVerdict() {
+  const done = vDoneFixtures().slice().sort(function (a, b) {
+    return (b.dateISO || '').localeCompare(a.dateISO || '') || (b.time || '').localeCompare(a.time || '');
+  });
+  const recent = done.slice(0, 6);
+  const goals = done.reduce(function (s, f) {
+    return s + (f.score[0] || 0) + (f.score[1] || 0);
+  }, 0);
+  const teamsLeft = WC2.TEAM_LIST.filter(function (t) {
+    return t.alive;
+  }).length;
+  const elim = vEliminated().map(function (t) {
+    return {
+      t: t,
+      owners: vOwners(t.code)
+    };
+  }).filter(function (x) {
+    return x.owners.length > 0;
+  });
+  const phaseDone = WC2.meta.phase === 'done';
+  const hasResults = done.length > 0;
   return /*#__PURE__*/React.createElement("div", {
     className: "pad"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "appbar",
-    style: {
-      padding: '2px 0 12px'
-    }
-  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
-    className: "dh",
-    style: {
-      fontSize: 26
-    }
-  }, "Monday Verdict"), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 13,
-      fontWeight: 600,
-      color: 'var(--ink2)'
-    }
-  }, "Week 3 \xB7 the ", WC2.meta.stageLabel))), /*#__PURE__*/React.createElement(Says2, {
+  }, /*#__PURE__*/React.createElement(VerdictHeader, {
+    sub: phaseDone ? 'Full time on the whole thing — Wheesht’s last word.' : 'Wheesht’s running commentary, now the football has started.'
+  }), /*#__PURE__*/React.createElement(Says2, {
     mood: "broadcast",
-    label: "broadcast mode",
+    label: phaseDone ? 'full time' : 'live',
     animate: true
-  }, "Right. Settle down. Wheesht has watched every minute, as always, with total impartiality."), /*#__PURE__*/React.createElement(SH2, null, "The damage"), /*#__PURE__*/React.createElement(StatStrip, null), /*#__PURE__*/React.createElement(SH2, null, "What happened"), news.map((n, i) => /*#__PURE__*/React.createElement(Card2, {
-    key: i,
+  }, phaseDone ? 'That’s yer lot. Wheesht has watched every minute, taken every note, and is ready to deliver the final word.' : 'The whistle’s gone. Wheesht is watching every one of ye, logging every result, and judging — gently, professionally, constantly.'), /*#__PURE__*/React.createElement(ChampionCard, null), /*#__PURE__*/React.createElement(SH2, {
+    aside: hasResults ? done.length + ' logged' : null
+  }, "What\u2019s happened"), !hasResults ? /*#__PURE__*/React.createElement(Card2, {
+    flat: true,
     style: {
-      marginBottom: 9,
-      display: 'flex',
-      gap: 11,
-      alignItems: 'center'
+      textAlign: 'center',
+      padding: '26px 16px'
     }
   }, /*#__PURE__*/React.createElement(W2, {
-    mood: n.m,
-    size: 48
+    mood: "neutral",
+    size: 56,
+    animate: true
   }), /*#__PURE__*/React.createElement("div", {
-    style: {
-      flex: 1
-    }
-  }, /*#__PURE__*/React.createElement("div", {
     className: "dh",
     style: {
-      fontSize: 16
+      fontSize: 17,
+      marginTop: 6
     }
-  }, n.t), /*#__PURE__*/React.createElement("div", {
+  }, "No full-time results yet."), /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 12.5,
       fontWeight: 600,
       color: 'var(--ink2)',
-      lineHeight: 1.3
+      marginTop: 3
     }
-  }, n.d)))), /*#__PURE__*/React.createElement(SH2, null, "Week in two faces"), /*#__PURE__*/React.createElement("div", {
+  }, "As the organiser logs scores in the clipboard, Wheesht\u2019s verdict fills in here.")) : recent.map(function (f) {
+    const ta = vTeam(f.a),
+      tb = vTeam(f.b);
+    const aWin = f.score[0] > f.score[1],
+      bWin = f.score[1] > f.score[0];
+    return /*#__PURE__*/React.createElement(Card2, {
+      key: f.id,
+      style: {
+        marginBottom: 9,
+        padding: '12px 14px'
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: 'flex',
+        alignItems: 'center',
+        gap: 8
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 22
+      }
+    }, ta.flag), /*#__PURE__*/React.createElement("span", {
+      style: {
+        flex: 1,
+        fontWeight: 800,
+        fontSize: 14,
+        textAlign: 'right',
+        opacity: bWin ? .5 : 1,
+        textDecoration: bWin ? 'line-through' : 'none'
+      }
+    }, ta.name), /*#__PURE__*/React.createElement("span", {
+      className: "dh",
+      style: {
+        fontSize: 20,
+        padding: '0 4px'
+      }
+    }, f.score[0], "\u2013", f.score[1]), /*#__PURE__*/React.createElement("span", {
+      style: {
+        flex: 1,
+        fontWeight: 800,
+        fontSize: 14,
+        opacity: aWin ? .5 : 1,
+        textDecoration: aWin ? 'line-through' : 'none'
+      }
+    }, tb.name), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 22
+      }
+    }, tb.flag)), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: 'flex',
+        gap: 8,
+        alignItems: 'flex-start',
+        marginTop: 9,
+        paddingTop: 9,
+        borderTop: '1.5px solid var(--line)'
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 11,
+        fontWeight: 800,
+        letterSpacing: '.05em',
+        textTransform: 'uppercase',
+        color: 'var(--red)',
+        whiteSpace: 'nowrap'
+      }
+    }, "FT \xB7 Gp ", f.group), /*#__PURE__*/React.createElement("span", {
+      style: {
+        flex: 1,
+        fontSize: 12.5,
+        fontWeight: 600,
+        color: 'var(--ink2)',
+        lineHeight: 1.32
+      }
+    }, vResultNote(f))));
+  }), /*#__PURE__*/React.createElement(SH2, null, "The damage"), /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'grid',
       gridTemplateColumns: '1fr 1fr',
       gap: 9
     }
-  }, /*#__PURE__*/React.createElement(Card2, {
-    bordered: true,
-    style: {
-      background: 'rgba(26,122,68,.08)'
-    }
-  }, /*#__PURE__*/React.createElement(Chip2, {
-    tone: "green"
-  }, "Good week"), /*#__PURE__*/React.createElement("div", {
-    className: "dh",
-    style: {
-      fontSize: 18,
-      margin: '8px 0 2px'
-    }
-  }, ownerName2('NOR')), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 12,
-      fontWeight: 600,
-      color: 'var(--ink2)'
-    }
-  }, "Norway\u2019s into the last 8. Insufferable about it. Earned it.")), /*#__PURE__*/React.createElement(Card2, {
-    bordered: true,
-    style: {
-      background: 'rgba(232,39,42,.07)'
-    }
-  }, /*#__PURE__*/React.createElement(Chip2, {
-    tone: "red"
-  }, "Nightmare"), /*#__PURE__*/React.createElement("div", {
-    className: "dh",
-    style: {
-      fontSize: 18,
-      margin: '8px 0 2px'
-    }
-  }, ownerName2('ENG')), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 12,
-      fontWeight: 600,
-      color: 'var(--ink2)'
-    }
-  }, "Held England. Held them right up to the 89th minute."))), /*#__PURE__*/React.createElement(SH2, null, "Pull quote of the week"), /*#__PURE__*/React.createElement(Card2, {
-    bordered: true,
-    style: {
-      background: 'var(--ink)',
-      color: '#fff'
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: 'flex',
-      gap: 10
-    }
-  }, /*#__PURE__*/React.createElement(W2, {
-    mood: "smug",
-    size: 70
-  }), /*#__PURE__*/React.createElement("div", {
-    className: "dh",
-    style: {
-      fontSize: 21,
-      lineHeight: 1.05,
-      color: '#fff'
-    }
-  }, "\u201CEngland out in the Round of 16. Wheesht is ", /*#__PURE__*/React.createElement("span", {
-    style: {
-      color: 'var(--yellow)'
-    }
-  }, "remaining professional."), " Next question.\u201D"))), /*#__PURE__*/React.createElement(SH2, {
-    aside: "draw quality vs result"
-  }, "The league within the league"), /*#__PURE__*/React.createElement(Card2, {
+  }, /*#__PURE__*/React.createElement(StatCard, {
+    value: done.length,
+    label: done.length === 1 ? 'game played' : 'games played'
+  }), /*#__PURE__*/React.createElement(StatCard, {
+    value: goals,
+    label: goals === 1 ? 'goal scored' : 'goals scored',
+    color: "var(--green)"
+  }), /*#__PURE__*/React.createElement(StatCard, {
+    value: teamsLeft,
+    label: "teams still in"
+  }), /*#__PURE__*/React.createElement(StatCard, {
+    value: elim.length,
+    label: "entrants knocked out",
+    color: elim.length ? 'var(--red)' : 'var(--ink)'
+  })), elim.length > 0 && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(SH2, {
+    aside: "owners flip to the side game"
+  }, "Knocked out"), /*#__PURE__*/React.createElement(Card2, {
     flat: true,
     style: {
-      padding: '12px 14px'
+      padding: '4px 14px'
     }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 11,
-      fontWeight: 800,
-      letterSpacing: '.05em',
-      color: 'var(--green)',
-      textTransform: 'uppercase',
-      marginBottom: 6
-    }
-  }, "Punching above their draw"), lg.over.map(r => /*#__PURE__*/React.createElement(LeagueRow, {
-    key: r.p.id,
-    r: r
-  })), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 11,
-      fontWeight: 800,
-      letterSpacing: '.05em',
-      color: 'var(--red)',
-      textTransform: 'uppercase',
-      margin: '12px 0 6px'
-    }
-  }, "Wasted a cracking draw"), lg.under.map(r => /*#__PURE__*/React.createElement(LeagueRow, {
-    key: r.p.id,
-    r: r
-  }))), /*#__PURE__*/React.createElement("div", {
+  }, elim.map(function (x, i) {
+    return /*#__PURE__*/React.createElement("div", {
+      key: x.t.code,
+      style: {
+        display: 'flex',
+        alignItems: 'center',
+        gap: 10,
+        padding: '10px 0',
+        borderBottom: i < elim.length - 1 ? '1.5px solid var(--line)' : 'none'
+      }
+    }, /*#__PURE__*/React.createElement(Flag2, {
+      team: x.t,
+      size: 24
+    }), /*#__PURE__*/React.createElement("div", {
+      style: {
+        flex: 1,
+        minWidth: 0
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontWeight: 800,
+        fontSize: 14,
+        textDecoration: 'line-through',
+        textDecorationColor: 'var(--red)'
+      }
+    }, x.t.name), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 11.5,
+        fontWeight: 700,
+        color: 'var(--ink2)',
+        whiteSpace: 'nowrap',
+        overflow: 'hidden',
+        textOverflow: 'ellipsis'
+      }
+    }, x.owners.map(function (o) {
+      return o.name;
+    }).join(', '))), /*#__PURE__*/React.createElement(Stamp2, {
+      tone: "red",
+      rotate: -5,
+      style: {
+        fontSize: 10.5
+      }
+    }, "OUT"));
+  }))), /*#__PURE__*/React.createElement(StandingsBlock, null), /*#__PURE__*/React.createElement("div", {
     style: {
       height: 16
     }
   }), /*#__PURE__*/React.createElement(Btn2, {
     variant: "ink",
     block: true,
-    onClick: () => {
+    onClick: function () {
       window.wcConfetti && window.wcConfetti({
         y: .5
       });
-      window.wcToast && window.wcToast('Share card saved. Show the group chat who’s boss.', 'delighted');
+      window.wcToast && window.wcToast('Share card saved. Show the group chat who’s boss.', 'celebrating');
     }
   }, "Make my share card \uD83D\uDCF8"));
-  function LeagueRow(p) {
-    const {
-      r
-    } = p;
-    const up = r.delta >= 0;
-    return /*#__PURE__*/React.createElement("div", {
-      style: {
-        display: 'flex',
-        alignItems: 'center',
-        gap: 10,
-        padding: '7px 0'
-      }
-    }, /*#__PURE__*/React.createElement(Avatar2, {
-      person: r.p,
-      size: 30
-    }), /*#__PURE__*/React.createElement("div", {
-      style: {
-        flex: 1,
-        fontWeight: 700,
-        fontSize: 13.5,
-        whiteSpace: 'nowrap',
-        overflow: 'hidden',
-        textOverflow: 'ellipsis'
-      }
-    }, r.p.name), /*#__PURE__*/React.createElement(Flag2, {
-      team: r.t,
-      size: 20
-    }), /*#__PURE__*/React.createElement("span", {
-      style: {
-        fontSize: 12,
-        fontWeight: 700,
-        color: 'var(--ink2)',
-        width: 30
-      }
-    }, r.t.code), /*#__PURE__*/React.createElement("span", {
-      className: "dh",
-      style: {
-        fontSize: 15,
-        color: up ? 'var(--green)' : 'var(--red)',
-        width: 30,
-        textAlign: 'right'
-      }
-    }, up ? '+' : '', r.delta));
-  }
+}
+function SummaryScreen(props) {
+  return WC2.meta.phase === 'pre' ? /*#__PURE__*/React.createElement(PreVerdict, null) : /*#__PURE__*/React.createElement(LiveVerdict, null);
 }
 window.SideBetsScreen = SideBetsScreen;
 window.SummaryScreen = SummaryScreen;
@@ -42242,6 +42380,23 @@ const {
   useEffect: aEffect
 } = React;
 
+/* ---- Easter egg (basic — built to extend later) ----------------------------
+   A wee hidden treat: tap the league title five times quickly. For now it just
+   pops some confetti and a hidden Wheesht line. Richer rewards (badges, secret
+   stats, a mini-game) can hang off window.__wheeshtEgg without touching the UI. */
+const EGG_LINES = ['Wheesht kent ye’d go poking. Away ye go, ya nosy beggar.', 'A hidden whistle! Dinnae tell the others. Wheesht certainly won’t.', 'Five taps. Wheesht respects a curious mind. Reluctantly.', 'Ye found the secret. There’s nae prize. Yet. Wheesht is working on it.'];
+window.__wheeshtEgg = function () {
+  try {
+    window.wcConfetti && window.wcConfetti({
+      y: .32,
+      count: 90
+    });
+  } catch (e) {}
+  try {
+    window.wcToast && window.wcToast(EGG_LINES[Math.random() * EGG_LINES.length | 0], 'mischievous');
+  } catch (e) {}
+};
+
 /* ---- tab icons ---- */
 function Icon(props) {
   const sw = 2.4;
@@ -42318,6 +42473,13 @@ function Icon(props) {
   }, /*#__PURE__*/React.createElement("path", _extends({
     d: "M4 4h16a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H8l-4 4V6a2 2 0 0 1 2-2z"
   }, common)));
+  if (props.name === 'summary') return /*#__PURE__*/React.createElement("svg", {
+    width: "26",
+    height: "26",
+    viewBox: "0 0 24 24"
+  }, /*#__PURE__*/React.createElement("path", _extends({
+    d: "M5.5 3h13l-1.5 8a5 5 0 0 1-10 0zM5.5 5.5H3a1.5 1.5 0 0 0 0 3h2.5M18.5 5.5H21a1.5 1.5 0 0 0 0 3h-2.5M12 11v6M9 21h6"
+  }, common)));
   return /*#__PURE__*/React.createElement("svg", {
     width: "26",
     height: "26",
@@ -42346,9 +42508,20 @@ function Icon(props) {
   }, common)));
 }
 function StatusBar() {
+  const [time, setTime] = React.useState(() => {
+    const d = new Date();
+    return d.getHours().toString().padStart(2, '0') + ':' + d.getMinutes().toString().padStart(2, '0');
+  });
+  React.useEffect(() => {
+    const iv = setInterval(() => {
+      const d = new Date();
+      setTime(d.getHours().toString().padStart(2, '0') + ':' + d.getMinutes().toString().padStart(2, '0'));
+    }, 10000);
+    return () => clearInterval(iv);
+  }, []);
   return /*#__PURE__*/React.createElement("div", {
     className: "statusbar"
-  }, /*#__PURE__*/React.createElement("span", null, "20:06"), /*#__PURE__*/React.createElement("span", {
+  }, /*#__PURE__*/React.createElement("span", null, time), /*#__PURE__*/React.createElement("span", {
     className: "dots"
   }, /*#__PURE__*/React.createElement("svg", {
     width: "18",
@@ -42400,6 +42573,10 @@ function AppBar(props) {
     n: 0,
     t: 0
   });
+  const eggTaps = React.useRef({
+    n: 0,
+    t: 0
+  });
   React.useEffect(() => {
     const bar = ref.current;
     if (!bar) return;
@@ -42424,6 +42601,16 @@ function AppBar(props) {
       props.onDev && props.onDev();
     }
   }
+  // Easter egg: tap the league title 5 times within ~1.8s.
+  function eggTap() {
+    const now = Date.now();
+    eggTaps.current.n = now - eggTaps.current.t < 1800 ? eggTaps.current.n + 1 : 1;
+    eggTaps.current.t = now;
+    if (eggTaps.current.n >= 5) {
+      eggTaps.current.n = 0;
+      window.__wheeshtEgg && window.__wheeshtEgg();
+    }
+  }
   return /*#__PURE__*/React.createElement("div", {
     className: "appbar",
     ref: ref
@@ -42441,7 +42628,12 @@ function AppBar(props) {
       flex: 1,
       minWidth: 0
     }
-  }, /*#__PURE__*/React.createElement("h1", null, A_WC.league && A_WC.league.name || A_WC.meta.name), /*#__PURE__*/React.createElement("p", null, A_WC.meta.season, " \xB7 ", A_WC.meta.stageLabel)), me && /*#__PURE__*/React.createElement("button", {
+  }, /*#__PURE__*/React.createElement("h1", {
+    onClick: eggTap,
+    style: {
+      cursor: 'default'
+    }
+  }, A_WC.league && A_WC.league.name || A_WC.meta.name), /*#__PURE__*/React.createElement("p", null, A_WC.meta.season, " \xB7 ", A_WC.meta.stageLabel)), me && /*#__PURE__*/React.createElement("button", {
     onClick: props.onAccount,
     style: {
       border: 'none',
