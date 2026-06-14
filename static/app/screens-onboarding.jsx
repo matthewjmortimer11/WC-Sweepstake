@@ -41,7 +41,7 @@ function AccountGate(props) {
           <div className="dh" style={{ fontSize: 30, marginTop: 8, lineHeight: 1 }}>{WCo.meta.name}</div>
           <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink2)', marginTop: 6 }}>{WCo.meta.season} · {WCo.meta.stageLabel}</div>
           <div style={{ display: 'inline-flex', marginTop: 14, background: 'var(--ink)', color: '#fff', borderRadius: '16px 16px 16px 5px', padding: '11px 15px', maxWidth: 320, textAlign: 'left' }}>
-            <div style={{ fontSize: 14, fontWeight: 600, lineHeight: 1.35 }}><span style={{ color: 'var(--yellow)', fontWeight: 800 }}>Wheesht here.</span> Officially impartial. Constitutionally Scottish. Join a league or start yer own.</div>
+            <div style={{ fontSize: 14, fontWeight: 600, lineHeight: 1.35 }}><span style={{ color: 'var(--yellow)', fontWeight: 800 }}>Wheesht here.</span> Officially impartial. Constitutionally Scottish. Join a league or start your own.</div>
           </div>
         </div>
 
@@ -102,7 +102,7 @@ function JoinLeague(props) {
           <Wo mood="mischievous" size={72} animate />
           <div>
             <div className="dh" style={{ fontSize: 24, lineHeight: 1 }}>Join a league</div>
-            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink2)', marginTop: 4 }}>Pop in the league code and password the organiser gave ye.</div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink2)', marginTop: 4 }}>Enter the league code and password your organiser gave you.</div>
           </div>
         </div>
         <div style={{ marginTop: 20 }}>
@@ -167,7 +167,7 @@ function CreateLeague(props) {
           <Wo mood="confident" size={72} animate />
           <div>
             <div className="dh" style={{ fontSize: 24, lineHeight: 1 }}>Create a league</div>
-            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink2)', marginTop: 4 }}>Ye'll be the organiser. Share the code + password with yer crew.</div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink2)', marginTop: 4 }}>You'll be the organiser. Share the code and password with your group.</div>
           </div>
         </div>
         <div style={{ marginTop: 20, display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -207,7 +207,7 @@ function FindMyEntry(props) {
           <Wo mood="mischievous" size={72} animate />
           <div>
             <div className="dh" style={{ fontSize: 24, lineHeight: 1 }}>Find my entry</div>
-            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink2)', marginTop: 4 }}>No password needed. Just yer name — Wheesht never forgets a face.</div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink2)', marginTop: 4 }}>No password needed. Just your name — Wheesht never forgets a face.</div>
           </div>
         </div>
         <div style={{ marginTop: 18 }}>
@@ -218,7 +218,7 @@ function FindMyEntry(props) {
           {q.trim() && results.length === 0 &&
             <Co flat style={{ textAlign: 'center', padding: '22px 14px' }}>
               <Wo mood="nervous" size={64} animate />
-              <div className="dh" style={{ fontSize: 17, marginTop: 6 }}>Nae sign of ye.</div>
+              <div className="dh" style={{ fontSize: 17, marginTop: 6 }}>No sign of you.</div>
               <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink2)', marginTop: 3 }}>Different spelling? Or maybe you've not entered yet.</div>
               <div style={{ marginTop: 12 }}><Bo variant="primary" sm onClick={props.onNew}>Enter as someone new →</Bo></div>
             </Co>}
@@ -244,9 +244,13 @@ function FindMyEntry(props) {
 function OnboardingForm(props) {
   const [name, setName] = oState('');
   const [dept, setDept] = oState('');
-  const [loc, setLoc] = oState('Edinburgh');
-  const [lt, setLt] = oState(false);
   const includeDept = So.includeDepartment ? So.includeDepartment() : true;
+  const includeLocation = So.includeLocation ? So.includeLocation() : true;
+  const includeLtMember = So.includeLtMember ? So.includeLtMember() : true;
+  const locationOpts = So.locations ? So.locations() : ['Edinburgh', 'London'];
+  const locationsFreeText = So.locationsFreeText ? So.locationsFreeText() : false;
+  const [loc, setLoc] = oState(locationOpts[0] || 'Edinburgh');
+  const [lt, setLt] = oState(false);
   const ok = name.trim().length > 0;
   const split = So.charitySplit ? So.charitySplit() : 0.5;
   const fee = WCo.FEE || 0;
@@ -258,39 +262,54 @@ function OnboardingForm(props) {
         <button onClick={props.onBack} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, fontWeight: 800, color: 'var(--ink2)', padding: 0, marginBottom: 10 }}>← Back</button>
         <div style={{ textAlign: 'center' }}>
           <div style={{ display: 'inline-block' }} className="pop"><Wo mood="confident" size={120} animate track /></div>
-          <div className="dh" style={{ fontSize: 28, marginTop: 4, lineHeight: 1 }}>Let's get ye signed up.</div>
-          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink2)', marginTop: 6 }}>Takes ten seconds. The only bit Wheesht actually needs is yer name.</div>
+          <div className="dh" style={{ fontSize: 28, marginTop: 4, lineHeight: 1 }}>Let's get you signed up.</div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink2)', marginTop: 6 }}>Takes ten seconds. The only thing Wheesht actually needs is your name.</div>
         </div>
 
         <div style={{ marginTop: 22, display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div>
             <Lab>Full name</Lab>
-            <input autoFocus style={inp} value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Davie McAllister" />
+            <input autoFocus style={inp} value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Alex Johnson" />
           </div>
           {includeDept && <div>
             <Lab opt>Team / department</Lab>
             <input style={inp} value={dept} onChange={e => setDept(e.target.value)} placeholder="e.g. Engineering" list="wh-depts" />
             <datalist id="wh-depts">{DEPTS.map(d => <option key={d} value={d} />)}</datalist>
           </div>}
-          <div>
-            <Lab>Work location</Lab>
-            <Seg value={loc} onChange={setLoc} options={[{ value: 'Edinburgh', label: 'Edinburgh' }, { value: 'London', label: 'London' }]} />
-          </div>
-          <div>
-            <Lab>Leadership Team member?</Lab>
+          {includeLocation && <div>
+            <Lab opt>Location</Lab>
+            {locationsFreeText
+              ? <>
+                  <input style={inp} value={loc} onChange={e => setLoc(e.target.value)} placeholder="Your office or location" list="wh-locs" />
+                  <datalist id="wh-locs">{locationOpts.map(l => <option key={l} value={l} />)}</datalist>
+                </>
+              : locationOpts.length <= 3
+                ? <Seg value={loc} onChange={setLoc} options={locationOpts.map(l => ({ value: l, label: l }))} />
+                : <select style={inp} value={loc} onChange={e => setLoc(e.target.value)}>
+                    {locationOpts.map(l => <option key={l} value={l}>{l}</option>)}
+                  </select>
+            }
+          </div>}
+          {includeLtMember && <div>
+            <Lab opt>Leadership Team member?</Lab>
             <Seg value={lt} onChange={setLt} options={[{ value: false, label: 'No' }, { value: true, label: 'Yes' }]} />
-          </div>
+          </div>}
         </div>
 
-        <Co bordered style={{ marginTop: 20, background: 'var(--yellow)' }}>
+        {fee > 0 && <Co bordered style={{ marginTop: 20, background: 'var(--yellow)' }}>
           <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: '.05em', textTransform: 'uppercase' }}>Your buy-in</div>
           <div className="dh" style={{ fontSize: 28, margin: '2px 0 4px' }}>You're putting in £{fee}.</div>
-          <div style={{ fontSize: 14, fontWeight: 600 }}><b>£{charityPerEntry.toFixed(2).replace(/\.00$/, '')} goes to charity</b>, the rest into a winner-takes-all fund — <b>{'£' + Math.round(winnerAfterEntry).toLocaleString('en-GB')}</b> once you're in, and growing with every sign-up.</div>
-        </Co>
+          {split < 0.01
+            ? <div style={{ fontSize: 14, fontWeight: 600 }}>The full amount goes into a winner-takes-all fund — <b>{'£' + Math.round(winnerAfterEntry).toLocaleString('en-GB')}</b> once you're in, and growing with every sign-up.</div>
+            : split > 0.99
+              ? <div style={{ fontSize: 14, fontWeight: 600 }}>The full entry goes to charity. This is a fun-only sweepstake — no winner fund.</div>
+              : <div style={{ fontSize: 14, fontWeight: 600 }}><b>£{charityPerEntry.toFixed(2).replace(/\.00$/, '')} goes to charity</b>, the rest into a winner-takes-all fund — <b>{'£' + Math.round(winnerAfterEntry).toLocaleString('en-GB')}</b> once you're in, and growing with every sign-up.</div>
+          }
+        </Co>}
 
         <div style={{ marginTop: 18 }}>
-          <Bo variant="ink" block onClick={() => ok && props.onSubmit({ name: name.trim(), department: includeDept ? dept.trim() : '', location: loc, ltMember: lt })}>
-            {ok ? 'To the draw →' : 'Pop yer name in first'}
+          <Bo variant="ink" block onClick={() => ok && props.onSubmit({ name: name.trim(), department: includeDept ? dept.trim() : '', location: includeLocation ? loc : '', ltMember: includeLtMember ? lt : false })}>
+            {ok ? 'To the draw →' : 'Add your name first'}
           </Bo>
         </div>
       </div>
@@ -358,7 +377,7 @@ function DrawMoment(props) {
         </>}
 
         {phase === 'revealed' && <div className="pop" style={{ width: '100%' }}>
-          <div className="dh" style={{ fontSize: 14, letterSpacing: '.16em', color: 'var(--yellow)' }}>YE'VE DRAWN</div>
+          <div className="dh" style={{ fontSize: 14, letterSpacing: '.16em', color: 'var(--yellow)' }}>YOU DREW</div>
           <div style={{ fontSize: 116, lineHeight: 1, margin: '8px 0' }}>{t.flag}</div>
           <div className="dh" style={{ fontSize: 44 }}>{t.name}</div>
           <div style={{ display: 'flex', gap: 8, justifyContent: 'center', margin: '12px 0 4px' }}>
@@ -374,7 +393,7 @@ function DrawMoment(props) {
             </div>
           </div>
           <div style={{ marginTop: 18, display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <Bo variant="primary" block onClick={() => window.wcToast && window.wcToast('Draw shared to the group. The slagging begins.', 'mischievous')}>Share your draw</Bo>
+            <Bo variant="primary" block onClick={() => window.wcToast && window.wcToast('Draw shared. The banter starts now.', 'mischievous')}>Share your draw</Bo>
             <Bo variant="ghost" block onClick={props.onDone} style={{ background: 'transparent', color: '#fff', boxShadow: '0 4px 0 rgba(255,255,255,.25)' }}>Into my dashboard →</Bo>
           </div>
         </div>}
@@ -438,8 +457,8 @@ function OIRosterPicker(props) {
         <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 16 }}>
           <Wo mood="confident" size={64} animate />
           <div>
-            <div className="dh" style={{ fontSize: 24, lineHeight: 1 }}>Who are ye?</div>
-            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink2)', marginTop: 4 }}>{league ? league.name + ' — y' : 'Y'}our team's already been drawn. Find yer name and tap it.</div>
+            <div className="dh" style={{ fontSize: 24, lineHeight: 1 }}>Who are you?</div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink2)', marginTop: 4 }}>{league ? league.name + ' — y' : 'Y'}our team has already been drawn. Find your name and tap it.</div>
           </div>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>

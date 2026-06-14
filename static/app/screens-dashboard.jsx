@@ -35,17 +35,22 @@ function overallRank(me) {
 function ProfileHeader(props) {
   const me = props.me; const t = dashTeam(me.team);
   const includeDept = Sd.includeDepartment ? Sd.includeDepartment() : true;
+  const includeLocation = Sd.includeLocation ? Sd.includeLocation() : true;
+  const includeLtMember = Sd.includeLtMember ? Sd.includeLtMember() : true;
+  const chips = [
+    includeLocation && me.location && me.location,
+    includeDept && me.department,
+    includeLtMember && me.ltMember && 'LT',
+  ].filter(Boolean);
   return (
     <Cd bordered className="pop">
       <div style={{ display: 'flex', alignItems: 'center', gap: 13 }}>
         <Ad person={Object.assign({}, me, { isYou: false })} size={56} />
         <div style={{ flex: 1, minWidth: 0 }}>
           <div className="dh" style={{ fontSize: 24, lineHeight: 1 }}>{me.name}</div>
-          <div style={{ display: 'flex', gap: 6, marginTop: 7, flexWrap: 'wrap' }}>
-            <Chd>{me.location}</Chd>
-            {includeDept && me.department && <Chd>{me.department}</Chd>}
-            {me.ltMember && <Chd tone="yellow">LT</Chd>}
-          </div>
+          {chips.length > 0 && <div style={{ display: 'flex', gap: 6, marginTop: 7, flexWrap: 'wrap' }}>
+            {chips.map((c, i) => <Chd key={i} tone={c === 'LT' ? 'yellow' : undefined}>{c}</Chd>)}
+          </div>}
         </div>
         <button onClick={props.onEdit} className="wc-btn wc-btn--sm" style={{ padding: '8px 12px', boxShadow: '0 4px 0 var(--shadow)' }}>Edit</button>
       </div>
@@ -57,9 +62,13 @@ function EditProfile(props) {
   const me = props.me;
   const [name, setName] = dState(me.name);
   const [dept, setDept] = dState(me.department || '');
-  const [loc, setLoc] = dState(me.location || 'London');
   const [lt, setLt] = dState(!!me.ltMember);
   const includeDept = Sd.includeDepartment ? Sd.includeDepartment() : true;
+  const includeLocation = Sd.includeLocation ? Sd.includeLocation() : true;
+  const includeLtMember = Sd.includeLtMember ? Sd.includeLtMember() : true;
+  const locationOpts = Sd.locations ? Sd.locations() : ['Edinburgh', 'London'];
+  const locationsFreeText = Sd.locationsFreeText ? Sd.locationsFreeText() : false;
+  const [loc, setLoc] = dState(me.location || locationOpts[0] || 'Edinburgh');
   const fld = { width: '100%', border: '2.5px solid var(--ink)', borderRadius: 12, padding: '11px 13px', fontFamily: 'var(--body)', fontWeight: 600, fontSize: 15, marginTop: 6, outline: 'none' };
   function seg(val, set, opts) {
     return <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>{opts.map(o =>
@@ -74,11 +83,34 @@ function EditProfile(props) {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 13 }}>
           <div><label style={{ fontWeight: 800, fontSize: 13, fontFamily: 'var(--disp)' }}>Full name</label><input style={fld} value={name} onChange={e => setName(e.target.value)} /></div>
           {includeDept && <div><label style={{ fontWeight: 800, fontSize: 13, fontFamily: 'var(--disp)' }}>Team / department</label><input style={fld} value={dept} onChange={e => setDept(e.target.value)} placeholder="optional" /></div>}
-          <div><label style={{ fontWeight: 800, fontSize: 13, fontFamily: 'var(--disp)' }}>Work location</label>{seg(loc, setLoc, [{ value: 'Edinburgh', label: 'Edinburgh' }, { value: 'London', label: 'London' }])}</div>
-          <div><label style={{ fontWeight: 800, fontSize: 13, fontFamily: 'var(--disp)' }}>Leadership Team?</label>{seg(lt, setLt, [{ value: false, label: 'No' }, { value: true, label: 'Yes' }])}</div>
+          {includeLocation && <div>
+            <label style={{ fontWeight: 800, fontSize: 13, fontFamily: 'var(--disp)' }}>Location</label>
+            {locationsFreeText
+              ? <>
+                  <input style={fld} value={loc} onChange={e => setLoc(e.target.value)} placeholder="Your office or location" list="wh-locs-edit" />
+                  <datalist id="wh-locs-edit">{locationOpts.map(l => <option key={l} value={l} />)}</datalist>
+                </>
+              : locationOpts.length <= 3
+                ? seg(loc, setLoc, locationOpts.map(l => ({ value: l, label: l })))
+                : <select style={fld} value={loc} onChange={e => setLoc(e.target.value)}>
+                    {locationOpts.map(l => <option key={l} value={l}>{l}</option>)}
+                  </select>
+            }
+          </div>}
+          {includeLtMember && <div><label style={{ fontWeight: 800, fontSize: 13, fontFamily: 'var(--disp)' }}>Leadership Team?</label>{seg(lt, setLt, [{ value: false, label: 'No' }, { value: true, label: 'Yes' }])}</div>}
         </div>
         <div style={{ marginTop: 18 }}>
-          <Bd variant="ink" block onClick={() => { Sd.update(me.id, { name: name.trim() || me.name, department: includeDept ? dept.trim() : me.department, location: loc, city: loc, ltMember: lt, leadership: lt }); props.onClose(); }}>Save</Bd>
+          <Bd variant="ink" block onClick={() => {
+            Sd.update(me.id, {
+              name: name.trim() || me.name,
+              department: includeDept ? dept.trim() : me.department,
+              location: includeLocation ? loc : me.location,
+              city: includeLocation ? loc : me.city,
+              ltMember: includeLtMember ? lt : me.ltMember,
+              leadership: includeLtMember ? lt : me.leadership,
+            });
+            props.onClose();
+          }}>Save</Bd>
         </div>
       </div>
     </div>
@@ -167,6 +199,13 @@ function WinningsCard(props) {
   const pot = Sd.pot ? Sd.pot() : (WCd.POT * 0.5);
   const charity = Sd.charity ? Sd.charity() : (WCd.POT * 0.5);
   const ov = overallRank(me);
+  const rankTaps = React.useRef({n:0,t:0});
+  function rankTap(){
+    const now = Date.now();
+    rankTaps.current.n = (now - rankTaps.current.t < 1200) ? rankTaps.current.n + 1 : 1;
+    rankTaps.current.t = now;
+    if(rankTaps.current.n >= 3){ rankTaps.current.n = 0; window.__wheeshtEgg2 && window.__wheeshtEgg2(); }
+  }
   return (
     <Cd bordered>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -174,7 +213,7 @@ function WinningsCard(props) {
           <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.06em', textTransform: 'uppercase', color: 'var(--ink2)' }}>Winner takes all — if {t.name} lift the cup</div>
           <div className="dh" style={{ fontSize: 38, color: 'var(--green)', lineHeight: 1, marginTop: 2 }}>{money_d(pot)}</div>
         </div>
-        <div style={{ textAlign: 'right', background: 'var(--bg)', border: '2px solid var(--line)', borderRadius: 12, padding: '7px 11px' }}>
+        <div onClick={rankTap} style={{ textAlign: 'right', background: 'var(--bg)', border: '2px solid var(--line)', borderRadius: 12, padding: '7px 11px', cursor: 'default' }}>
           <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: '.04em', color: 'var(--ink2)' }}>OVERALL</div>
           <div className="dh" style={{ fontSize: 22 }}>#{ov.rank}<span style={{ fontSize: 13, color: 'var(--ink2)' }}>/{ov.total}</span></div>
         </div>
@@ -239,8 +278,8 @@ function MeScreen(props) {
     <div className="pad">
       <ProfileHeader me={me} onEdit={() => setEdit(true)} />
       <div style={{ height: 12 }} />
-      <Saysd mood={greetMood} label={'hiya ' + me.name.split(' ')[0]} animate>
-        {pre ? <>Ye've drawn {t.name}. Nae games yet — so get yer predictions in while the slate's clean.</> : (t.alive ? <>Yer {t.name} are still in it. Keep yer predictions sharp and the pot's in play.</> : <>Yer team's away, but the predictions league is wide open. Wheesht's no done wi' ye yet.</>)}
+      <Saysd mood={greetMood} label={'hey ' + me.name.split(' ')[0]} animate>
+        {pre ? <>You've drawn {t.name}. No games yet — get your predictions in while the slate's clean.</> : (t.alive ? <>{t.name} are still standing. Keep your predictions sharp — the pot's in play.</> : <>Your team is out, but the predictions league is still live. Wheesht isn't done with you yet.</>)}
       </Saysd>
       <SHd>Your team</SHd>
       <TeamCard me={me} onGames={props.goGames} />

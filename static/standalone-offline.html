@@ -160,9 +160,9 @@ button{font-family:inherit;}
 /* ---------- confetti + toasts ---------- */
 .wc-confetti{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:80;}
 .wc-toasts{position:absolute;left:12px;right:12px;top:54px;z-index:75;display:flex;flex-direction:column;gap:8px;pointer-events:none;}
-.wc-toast{display:flex;align-items:center;gap:10px;background:var(--ink);color:#fff;border-radius:16px;padding:8px 14px 8px 8px;
-  box-shadow:0 10px 24px rgba(0,0,0,.3);animation:toastIn .4s cubic-bezier(.2,1.2,.4,1) both;}
-.wc-toast__txt{font-size:13px;font-weight:600;line-height:1.25;}
+.wc-toast{display:flex;align-items:center;gap:10px;background:var(--ink);color:#fff;border-radius:16px;padding:8px 10px 8px 8px;
+  box-shadow:0 10px 24px rgba(0,0,0,.3);animation:toastIn .4s cubic-bezier(.2,1.2,.4,1) both;pointer-events:auto;}
+.wc-toast__txt{font-size:13px;font-weight:600;line-height:1.25;flex:1;}
 @keyframes toastIn{from{transform:translateY(-16px) scale(.9);opacity:0}to{transform:none;opacity:1}}
 
 /* ---------- animations ---------- */
@@ -33880,7 +33880,17 @@ button:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(245,200,0,.55);borde
   var BASE = {
     teams: {}, preds: {},
     fee: WC.FEE || 0,
-    meta: { phase: WC.meta.phase, stageLabel: WC.meta.stageLabel, includeDepartment: WC.meta.includeDepartment !== false },
+    meta: {
+      phase: WC.meta.phase, stageLabel: WC.meta.stageLabel,
+      includeDepartment: WC.meta.includeDepartment !== false,
+      includeLocation: WC.meta.includeLocation !== false,
+      includeLtMember: WC.meta.includeLtMember !== false,
+      charitySplit: WC.meta.charitySplit != null ? Number(WC.meta.charitySplit) : CHARITY_SPLIT,
+      purpose: WC.meta.purpose || 'work',
+      locations: WC.meta.locations || ['Edinburgh', 'London'],
+      locationsFreeText: !!WC.meta.locationsFreeText,
+      predDeadline: WC.meta.predDeadline || null,
+    },
   };
   WC.TEAM_LIST.forEach(function (t) { BASE.teams[t.code] = { alive: t.alive, stage: t.stage, rounds: t.rounds }; });
   (WC.PREDICTIONS || []).forEach(function (m) { BASE.preds[m.key] = m.answer; });
@@ -33910,12 +33920,20 @@ button:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(245,200,0,.55);borde
       : WC.meta.phase === 'done' ? 'Tournament over' : 'In play';
     WC.meta.teamsLeft = WC.TEAM_LIST.filter(function (t) { return t.alive; }).length;
     WC.meta.includeDepartment = !admin.meta || admin.meta.includeDepartment !== false;
+    WC.meta.includeLocation = !admin.meta || admin.meta.includeLocation !== false;
+    WC.meta.includeLtMember = !admin.meta || admin.meta.includeLtMember !== false;
+    WC.meta.purpose = (admin.meta && admin.meta.purpose) || BASE.meta.purpose;
+    WC.meta.locations = (admin.meta && Array.isArray(admin.meta.locations) && admin.meta.locations.length) ? admin.meta.locations : BASE.meta.locations;
+    WC.meta.locationsFreeText = admin.meta && admin.meta.locationsFreeText != null ? !!admin.meta.locationsFreeText : BASE.meta.locationsFreeText;
+    WC.meta.predDeadline = (admin.meta && admin.meta.predDeadline) || BASE.meta.predDeadline || null;
+    WC.charitySplit = (admin.meta && admin.meta.charitySplit != null) ? Number(admin.meta.charitySplit) : BASE.meta.charitySplit;
     var fee = admin.meta && admin.meta.entryFee != null ? Number(admin.meta.entryFee) : BASE.fee;
     WC.FEE = isFinite(fee) && fee >= 0 ? fee : BASE.fee;
     WC.POT = (WC.PEOPLE || []).length * WC.FEE;
   }
 
   function charitySplitValue() {
+    if (admin.meta && admin.meta.charitySplit != null) return Number(admin.meta.charitySplit);
     var v = WC.charitySplit != null ? WC.charitySplit : WC.CHARITY_SPLIT;
     return v == null ? CHARITY_SPLIT : Number(v);
   }
@@ -34241,6 +34259,58 @@ button:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(245,200,0,.55);borde
       admin.meta = admin.meta || {}; admin.meta.includeDepartment = !!on;
       commitAdmin();
     },
+    purpose: function () { return (admin.meta && admin.meta.purpose) || BASE.meta.purpose; },
+    setPurpose: function (p) {
+      admin.meta = admin.meta || {}; admin.meta.purpose = p;
+      if (p === 'friends') {
+        admin.meta.includeDepartment = false;
+        admin.meta.includeLocation = false;
+        admin.meta.includeLtMember = false;
+      } else {
+        admin.meta.includeDepartment = true;
+        admin.meta.includeLocation = true;
+        admin.meta.includeLtMember = true;
+      }
+      commitAdmin();
+    },
+    includeLocation: function () { return !admin.meta || admin.meta.includeLocation !== false; },
+    setIncludeLocation: function (on) {
+      admin.meta = admin.meta || {}; admin.meta.includeLocation = !!on;
+      commitAdmin();
+    },
+    includeLtMember: function () { return !admin.meta || admin.meta.includeLtMember !== false; },
+    setIncludeLtMember: function (on) {
+      admin.meta = admin.meta || {}; admin.meta.includeLtMember = !!on;
+      commitAdmin();
+    },
+    locations: function () {
+      var v = admin.meta && admin.meta.locations;
+      return (Array.isArray(v) && v.length) ? v : BASE.meta.locations;
+    },
+    setLocations: function (arr) {
+      admin.meta = admin.meta || {}; admin.meta.locations = arr;
+      commitAdmin();
+    },
+    locationsFreeText: function () {
+      if (admin.meta && admin.meta.locationsFreeText != null) return !!admin.meta.locationsFreeText;
+      return BASE.meta.locationsFreeText;
+    },
+    setLocationsFreeText: function (on) {
+      admin.meta = admin.meta || {}; admin.meta.locationsFreeText = !!on;
+      commitAdmin();
+    },
+    predDeadline: function () { return (admin.meta && admin.meta.predDeadline) || BASE.meta.predDeadline || null; },
+    setPredDeadline: function (dt) {
+      admin.meta = admin.meta || {};
+      if (dt) admin.meta.predDeadline = dt; else delete admin.meta.predDeadline;
+      commitAdmin();
+    },
+    setCharitySplit: function (split) {
+      var n = Math.max(0, Math.min(1, Number(split)));
+      if (!isFinite(n)) return;
+      admin.meta = admin.meta || {}; admin.meta.charitySplit = n;
+      commitAdmin();
+    },
     setTeamOut: function (code, out) {
       admin.teams = admin.teams || {};
       if (out) admin.teams[code] = { alive: false, stage: 'out-group', rounds: 1 };
@@ -34271,7 +34341,17 @@ button:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(245,200,0,.55);borde
     },
     adminReset: function () {
       var keep = admin.meta || {};
-      admin = { teams: {}, fixtures: {}, predictions: {}, meta: { entryFee: keep.entryFee, includeDepartment: keep.includeDepartment } };
+      admin = { teams: {}, fixtures: {}, predictions: {}, meta: {
+        entryFee: keep.entryFee,
+        includeDepartment: keep.includeDepartment,
+        includeLocation: keep.includeLocation,
+        includeLtMember: keep.includeLtMember,
+        charitySplit: keep.charitySplit,
+        purpose: keep.purpose,
+        locations: keep.locations,
+        locationsFreeText: keep.locationsFreeText,
+        predDeadline: keep.predDeadline,
+      }};
       commitAdmin();
     }
   };
@@ -35304,6 +35384,13 @@ function SectionHead(props) {
 /* ---- Toast layer (imperative: window.wcToast(msg, mood)) ----------------- */
 function ToastLayer() {
   const [items, setItems] = useState([]);
+  function dismiss(id) {
+    setItems(function (xs) {
+      return xs.filter(function (x) {
+        return x.id !== id;
+      });
+    });
+  }
   useEffect(function () {
     window.wcToast = function (text, mood) {
       const id = Date.now() + Math.random();
@@ -35320,7 +35407,7 @@ function ToastLayer() {
             return x.id !== id;
           });
         });
-      }, 4200);
+      }, 4800);
     };
   }, []);
   return /*#__PURE__*/React.createElement("div", {
@@ -35333,8 +35420,27 @@ function ToastLayer() {
       mood: t.mood,
       size: 40
     }), /*#__PURE__*/React.createElement("div", {
-      className: "wc-toast__txt"
-    }, t.text));
+      className: "wc-toast__txt",
+      style: {
+        flex: 1
+      }
+    }, t.text), /*#__PURE__*/React.createElement("button", {
+      onClick: function () {
+        dismiss(t.id);
+      },
+      style: {
+        background: 'none',
+        border: 'none',
+        color: 'rgba(255,255,255,.55)',
+        cursor: 'pointer',
+        fontSize: 22,
+        fontWeight: 300,
+        lineHeight: 1,
+        padding: '0 0 0 8px',
+        flexShrink: 0,
+        fontFamily: 'sans-serif'
+      }
+    }, "\xD7"));
   }));
 }
 
@@ -37993,7 +38099,7 @@ function AccountGate(props) {
       color: 'var(--yellow)',
       fontWeight: 800
     }
-  }, "Wheesht here."), " Officially impartial. Constitutionally Scottish. Join a league or start yer own."))), accounts.length > 0 && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+  }, "Wheesht here."), " Officially impartial. Constitutionally Scottish. Join a league or start your own."))), accounts.length > 0 && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     className: "wc-sec",
     style: {
       margin: '26px 4px 11px'
@@ -38133,7 +38239,7 @@ function JoinLeague(props) {
       color: 'var(--ink2)',
       marginTop: 4
     }
-  }, "Pop in the league code and password the organiser gave ye."))), /*#__PURE__*/React.createElement("div", {
+  }, "Enter the league code and password your organiser gave you."))), /*#__PURE__*/React.createElement("div", {
     style: {
       marginTop: 20
     }
@@ -38262,7 +38368,7 @@ function CreateLeague(props) {
       color: 'var(--ink2)',
       marginTop: 4
     }
-  }, "Ye'll be the organiser. Share the code + password with yer crew."))), /*#__PURE__*/React.createElement("div", {
+  }, "You'll be the organiser. Share the code and password with your group."))), /*#__PURE__*/React.createElement("div", {
     style: {
       marginTop: 20,
       display: 'flex',
@@ -38374,7 +38480,7 @@ function FindMyEntry(props) {
       color: 'var(--ink2)',
       marginTop: 4
     }
-  }, "No password needed. Just yer name \u2014 Wheesht never forgets a face."))), /*#__PURE__*/React.createElement("div", {
+  }, "No password needed. Just your name \u2014 Wheesht never forgets a face."))), /*#__PURE__*/React.createElement("div", {
     style: {
       marginTop: 18
     }
@@ -38407,7 +38513,7 @@ function FindMyEntry(props) {
       fontSize: 17,
       marginTop: 6
     }
-  }, "Nae sign of ye."), /*#__PURE__*/React.createElement("div", {
+  }, "No sign of you."), /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 13,
       fontWeight: 600,
@@ -38474,9 +38580,13 @@ function FindMyEntry(props) {
 function OnboardingForm(props) {
   const [name, setName] = oState('');
   const [dept, setDept] = oState('');
-  const [loc, setLoc] = oState('Edinburgh');
-  const [lt, setLt] = oState(false);
   const includeDept = So.includeDepartment ? So.includeDepartment() : true;
+  const includeLocation = So.includeLocation ? So.includeLocation() : true;
+  const includeLtMember = So.includeLtMember ? So.includeLtMember() : true;
+  const locationOpts = So.locations ? So.locations() : ['Edinburgh', 'London'];
+  const locationsFreeText = So.locationsFreeText ? So.locationsFreeText() : false;
+  const [loc, setLoc] = oState(locationOpts[0] || 'Edinburgh');
+  const [lt, setLt] = oState(false);
   const ok = name.trim().length > 0;
   const split = So.charitySplit ? So.charitySplit() : 0.5;
   const fee = WCo.FEE || 0;
@@ -38522,14 +38632,14 @@ function OnboardingForm(props) {
       marginTop: 4,
       lineHeight: 1
     }
-  }, "Let's get ye signed up."), /*#__PURE__*/React.createElement("div", {
+  }, "Let's get you signed up."), /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 13,
       fontWeight: 600,
       color: 'var(--ink2)',
       marginTop: 6
     }
-  }, "Takes ten seconds. The only bit Wheesht actually needs is yer name.")), /*#__PURE__*/React.createElement("div", {
+  }, "Takes ten seconds. The only thing Wheesht actually needs is your name.")), /*#__PURE__*/React.createElement("div", {
     style: {
       marginTop: 22,
       display: 'flex',
@@ -38541,7 +38651,7 @@ function OnboardingForm(props) {
     style: inp,
     value: name,
     onChange: e => setName(e.target.value),
-    placeholder: "e.g. Davie McAllister"
+    placeholder: "e.g. Alex Johnson"
   })), includeDept && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement(Lab, {
     opt: true
   }, "Team / department"), /*#__PURE__*/React.createElement("input", {
@@ -38555,17 +38665,36 @@ function OnboardingForm(props) {
   }, DEPTS.map(d => /*#__PURE__*/React.createElement("option", {
     key: d,
     value: d
-  })))), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement(Lab, null, "Work location"), /*#__PURE__*/React.createElement(Seg, {
+  })))), includeLocation && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement(Lab, {
+    opt: true
+  }, "Location"), locationsFreeText ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("input", {
+    style: inp,
+    value: loc,
+    onChange: e => setLoc(e.target.value),
+    placeholder: "Your office or location",
+    list: "wh-locs"
+  }), /*#__PURE__*/React.createElement("datalist", {
+    id: "wh-locs"
+  }, locationOpts.map(l => /*#__PURE__*/React.createElement("option", {
+    key: l,
+    value: l
+  })))) : locationOpts.length <= 3 ? /*#__PURE__*/React.createElement(Seg, {
     value: loc,
     onChange: setLoc,
-    options: [{
-      value: 'Edinburgh',
-      label: 'Edinburgh'
-    }, {
-      value: 'London',
-      label: 'London'
-    }]
-  })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement(Lab, null, "Leadership Team member?"), /*#__PURE__*/React.createElement(Seg, {
+    options: locationOpts.map(l => ({
+      value: l,
+      label: l
+    }))
+  }) : /*#__PURE__*/React.createElement("select", {
+    style: inp,
+    value: loc,
+    onChange: e => setLoc(e.target.value)
+  }, locationOpts.map(l => /*#__PURE__*/React.createElement("option", {
+    key: l,
+    value: l
+  }, l)))), includeLtMember && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement(Lab, {
+    opt: true
+  }, "Leadership Team member?"), /*#__PURE__*/React.createElement(Seg, {
     value: lt,
     onChange: setLt,
     options: [{
@@ -38575,7 +38704,7 @@ function OnboardingForm(props) {
       value: true,
       label: 'Yes'
     }]
-  }))), /*#__PURE__*/React.createElement(Co, {
+  }))), fee > 0 && /*#__PURE__*/React.createElement(Co, {
     bordered: true,
     style: {
       marginTop: 20,
@@ -38594,7 +38723,17 @@ function OnboardingForm(props) {
       fontSize: 28,
       margin: '2px 0 4px'
     }
-  }, "You're putting in \xA3", fee, "."), /*#__PURE__*/React.createElement("div", {
+  }, "You're putting in \xA3", fee, "."), split < 0.01 ? /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 14,
+      fontWeight: 600
+    }
+  }, "The full amount goes into a winner-takes-all fund \u2014 ", /*#__PURE__*/React.createElement("b", null, '£' + Math.round(winnerAfterEntry).toLocaleString('en-GB')), " once you're in, and growing with every sign-up.") : split > 0.99 ? /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 14,
+      fontWeight: 600
+    }
+  }, "The full entry goes to charity. This is a fun-only sweepstake \u2014 no winner fund.") : /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 14,
       fontWeight: 600
@@ -38609,10 +38748,10 @@ function OnboardingForm(props) {
     onClick: () => ok && props.onSubmit({
       name: name.trim(),
       department: includeDept ? dept.trim() : '',
-      location: loc,
-      ltMember: lt
+      location: includeLocation ? loc : '',
+      ltMember: includeLtMember ? lt : false
     })
-  }, ok ? 'To the draw →' : 'Pop yer name in first'))));
+  }, ok ? 'To the draw →' : 'Add your name first'))));
 }
 
 /* =================== THE DRAW (with special events) =================== */
@@ -38741,7 +38880,7 @@ function DrawMoment(props) {
       letterSpacing: '.16em',
       color: 'var(--yellow)'
     }
-  }, "YE'VE DRAWN"), /*#__PURE__*/React.createElement("div", {
+  }, "YOU DREW"), /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 116,
       lineHeight: 1,
@@ -38809,7 +38948,7 @@ function DrawMoment(props) {
   }, /*#__PURE__*/React.createElement(Bo, {
     variant: "primary",
     block: true,
-    onClick: () => window.wcToast && window.wcToast('Draw shared to the group. The slagging begins.', 'mischievous')
+    onClick: () => window.wcToast && window.wcToast('Draw shared. The banter starts now.', 'mischievous')
   }, "Share your draw"), /*#__PURE__*/React.createElement(Bo, {
     variant: "ghost",
     block: true,
@@ -39068,14 +39207,14 @@ function OIRosterPicker(props) {
       fontSize: 24,
       lineHeight: 1
     }
-  }, "Who are ye?"), /*#__PURE__*/React.createElement("div", {
+  }, "Who are you?"), /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 13,
       fontWeight: 600,
       color: 'var(--ink2)',
       marginTop: 4
     }
-  }, league ? league.name + ' — y' : 'Y', "our team's already been drawn. Find yer name and tap it."))), /*#__PURE__*/React.createElement("div", {
+  }, league ? league.name + ' — y' : 'Y', "our team has already been drawn. Find your name and tap it."))), /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
       flexDirection: 'column',
@@ -39211,6 +39350,9 @@ function ProfileHeader(props) {
   const me = props.me;
   const t = dashTeam(me.team);
   const includeDept = Sd.includeDepartment ? Sd.includeDepartment() : true;
+  const includeLocation = Sd.includeLocation ? Sd.includeLocation() : true;
+  const includeLtMember = Sd.includeLtMember ? Sd.includeLtMember() : true;
+  const chips = [includeLocation && me.location && me.location, includeDept && me.department, includeLtMember && me.ltMember && 'LT'].filter(Boolean);
   return /*#__PURE__*/React.createElement(Cd, {
     bordered: true,
     className: "pop"
@@ -39236,16 +39378,17 @@ function ProfileHeader(props) {
       fontSize: 24,
       lineHeight: 1
     }
-  }, me.name), /*#__PURE__*/React.createElement("div", {
+  }, me.name), chips.length > 0 && /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
       gap: 6,
       marginTop: 7,
       flexWrap: 'wrap'
     }
-  }, /*#__PURE__*/React.createElement(Chd, null, me.location), includeDept && me.department && /*#__PURE__*/React.createElement(Chd, null, me.department), me.ltMember && /*#__PURE__*/React.createElement(Chd, {
-    tone: "yellow"
-  }, "LT"))), /*#__PURE__*/React.createElement("button", {
+  }, chips.map((c, i) => /*#__PURE__*/React.createElement(Chd, {
+    key: i,
+    tone: c === 'LT' ? 'yellow' : undefined
+  }, c)))), /*#__PURE__*/React.createElement("button", {
     onClick: props.onEdit,
     className: "wc-btn wc-btn--sm",
     style: {
@@ -39258,9 +39401,13 @@ function EditProfile(props) {
   const me = props.me;
   const [name, setName] = dState(me.name);
   const [dept, setDept] = dState(me.department || '');
-  const [loc, setLoc] = dState(me.location || 'London');
   const [lt, setLt] = dState(!!me.ltMember);
   const includeDept = Sd.includeDepartment ? Sd.includeDepartment() : true;
+  const includeLocation = Sd.includeLocation ? Sd.includeLocation() : true;
+  const includeLtMember = Sd.includeLtMember ? Sd.includeLtMember() : true;
+  const locationOpts = Sd.locations ? Sd.locations() : ['Edinburgh', 'London'];
+  const locationsFreeText = Sd.locationsFreeText ? Sd.locationsFreeText() : false;
+  const [loc, setLoc] = dState(me.location || locationOpts[0] || 'Edinburgh');
   const fld = {
     width: '100%',
     border: '2.5px solid var(--ink)',
@@ -39356,19 +39503,34 @@ function EditProfile(props) {
     value: dept,
     onChange: e => setDept(e.target.value),
     placeholder: "optional"
-  })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+  })), includeLocation && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
     style: {
       fontWeight: 800,
       fontSize: 13,
       fontFamily: 'var(--disp)'
     }
-  }, "Work location"), seg(loc, setLoc, [{
-    value: 'Edinburgh',
-    label: 'Edinburgh'
-  }, {
-    value: 'London',
-    label: 'London'
-  }])), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+  }, "Location"), locationsFreeText ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("input", {
+    style: fld,
+    value: loc,
+    onChange: e => setLoc(e.target.value),
+    placeholder: "Your office or location",
+    list: "wh-locs-edit"
+  }), /*#__PURE__*/React.createElement("datalist", {
+    id: "wh-locs-edit"
+  }, locationOpts.map(l => /*#__PURE__*/React.createElement("option", {
+    key: l,
+    value: l
+  })))) : locationOpts.length <= 3 ? seg(loc, setLoc, locationOpts.map(l => ({
+    value: l,
+    label: l
+  }))) : /*#__PURE__*/React.createElement("select", {
+    style: fld,
+    value: loc,
+    onChange: e => setLoc(e.target.value)
+  }, locationOpts.map(l => /*#__PURE__*/React.createElement("option", {
+    key: l,
+    value: l
+  }, l)))), includeLtMember && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
     style: {
       fontWeight: 800,
       fontSize: 13,
@@ -39391,10 +39553,10 @@ function EditProfile(props) {
       Sd.update(me.id, {
         name: name.trim() || me.name,
         department: includeDept ? dept.trim() : me.department,
-        location: loc,
-        city: loc,
-        ltMember: lt,
-        leadership: lt
+        location: includeLocation ? loc : me.location,
+        city: includeLocation ? loc : me.city,
+        ltMember: includeLtMember ? lt : me.ltMember,
+        leadership: includeLtMember ? lt : me.leadership
       });
       props.onClose();
     }
@@ -39655,6 +39817,19 @@ function WinningsCard(props) {
   const pot = Sd.pot ? Sd.pot() : WCd.POT * 0.5;
   const charity = Sd.charity ? Sd.charity() : WCd.POT * 0.5;
   const ov = overallRank(me);
+  const rankTaps = React.useRef({
+    n: 0,
+    t: 0
+  });
+  function rankTap() {
+    const now = Date.now();
+    rankTaps.current.n = now - rankTaps.current.t < 1200 ? rankTaps.current.n + 1 : 1;
+    rankTaps.current.t = now;
+    if (rankTaps.current.n >= 3) {
+      rankTaps.current.n = 0;
+      window.__wheeshtEgg2 && window.__wheeshtEgg2();
+    }
+  }
   return /*#__PURE__*/React.createElement(Cd, {
     bordered: true
   }, /*#__PURE__*/React.createElement("div", {
@@ -39680,12 +39855,14 @@ function WinningsCard(props) {
       marginTop: 2
     }
   }, money_d(pot))), /*#__PURE__*/React.createElement("div", {
+    onClick: rankTap,
     style: {
       textAlign: 'right',
       background: 'var(--bg)',
       border: '2px solid var(--line)',
       borderRadius: 12,
-      padding: '7px 11px'
+      padding: '7px 11px',
+      cursor: 'default'
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
@@ -39888,9 +40065,9 @@ function MeScreen(props) {
     }
   }), /*#__PURE__*/React.createElement(Saysd, {
     mood: greetMood,
-    label: 'hiya ' + me.name.split(' ')[0],
+    label: 'hey ' + me.name.split(' ')[0],
     animate: true
-  }, pre ? /*#__PURE__*/React.createElement(React.Fragment, null, "Ye've drawn ", t.name, ". Nae games yet \u2014 so get yer predictions in while the slate's clean.") : t.alive ? /*#__PURE__*/React.createElement(React.Fragment, null, "Yer ", t.name, " are still in it. Keep yer predictions sharp and the pot's in play.") : /*#__PURE__*/React.createElement(React.Fragment, null, "Yer team's away, but the predictions league is wide open. Wheesht's no done wi' ye yet.")), /*#__PURE__*/React.createElement(SHd, null, "Your team"), /*#__PURE__*/React.createElement(TeamCard, {
+  }, pre ? /*#__PURE__*/React.createElement(React.Fragment, null, "You've drawn ", t.name, ". No games yet \u2014 get your predictions in while the slate's clean.") : t.alive ? /*#__PURE__*/React.createElement(React.Fragment, null, t.name, " are still standing. Keep your predictions sharp \u2014 the pot's in play.") : /*#__PURE__*/React.createElement(React.Fragment, null, "Your team is out, but the predictions league is still live. Wheesht isn't done with you yet.")), /*#__PURE__*/React.createElement(SHd, null, "Your team"), /*#__PURE__*/React.createElement(TeamCard, {
     me: me,
     onGames: props.goGames
   }), /*#__PURE__*/React.createElement(SHd, {
@@ -39933,6 +40110,12 @@ const {
 const {
   useState: pState
 } = React;
+function isResolved(m) {
+  if (m.kind === 'team2') return Array.isArray(m.answer) && m.answer.length > 0 && m.answer.every(function (x) {
+    return x != null;
+  });
+  return m.answer != null;
+}
 function optLabel(m, opt) {
   if (m.kind === 'player') return {
     main: opt.name,
@@ -39958,14 +40141,17 @@ function Market(props) {
   const m = props.market,
     me = props.me,
     onPick = props.onPick;
-  const resolved = m.answer != null;
-  const pick = me.picks ? me.picks[m.key] : null;
   const isTwo = m.kind === 'team2';
+  const isTeam = m.kind === 'team' || isTwo;
+  const locked = !!props.locked;
+  const resolved = isResolved(m);
+  const pick = me.picks ? me.picks[m.key] : null;
   const picked = id => isTwo ? Array.isArray(pick) && pick.indexOf(id) >= 0 : pick === id;
-  const correctVal = resolved ? isTwo ? null : m.answer : null;
-  const gotIt = resolved && (isTwo ? false : pick === m.answer);
+  const gotIt = resolved && (isTwo ? Array.isArray(pick) && Array.isArray(m.answer) && pick.length === m.answer.length && pick.every(id => m.answer.indexOf(id) >= 0) : pick === m.answer);
+  const [teamQ, setTeamQ] = pState('');
+  const presetCodes = isTeam ? new Set(m.options) : new Set();
   function choose(id) {
-    if (resolved) return;
+    if (resolved || locked) return;
     if (isTwo) {
       let arr = Array.isArray(pick) ? pick.slice() : [];
       if (arr.indexOf(id) >= 0) arr = arr.filter(x => x !== id);else {
@@ -39974,7 +40160,11 @@ function Market(props) {
       }
       onPick(m.key, arr);
     } else onPick(m.key, picked(id) ? null : id);
+    setTeamQ('');
   }
+  const teamResults = isTeam && !resolved && teamQ.trim() ? WCp.TEAM_LIST.filter(t => !presetCodes.has(t.code) && (t.name.toLowerCase().indexOf(teamQ.toLowerCase()) >= 0 || t.code.toLowerCase().indexOf(teamQ.toLowerCase()) >= 0)).slice(0, 6) : [];
+  const hasPick = pick != null && (!isTwo || Array.isArray(pick) && pick.length > 0);
+  const hasFullPick = pick != null && (!isTwo || Array.isArray(pick) && pick.length === 2);
   return /*#__PURE__*/React.createElement(Cp, {
     style: {
       marginBottom: 12
@@ -39994,7 +40184,7 @@ function Market(props) {
       lineHeight: 1.05
     }
   }, m.q), /*#__PURE__*/React.createElement(Chp, {
-    tone: resolved ? gotIt ? 'green' : 'red' : pick != null && (!isTwo || pick.length === 2) ? 'yellow' : 'ghost',
+    tone: resolved ? gotIt ? 'green' : 'red' : hasFullPick ? 'yellow' : 'ghost',
     style: {
       whiteSpace: 'nowrap',
       flex: '0 0 auto'
@@ -40006,7 +40196,7 @@ function Market(props) {
       color: 'var(--ink2)',
       marginBottom: 9
     }
-  }, resolved ? 'Result is in' : isTwo ? 'Pick the two finalists' : 'Open · tap to pick'), /*#__PURE__*/React.createElement("div", {
+  }, resolved ? 'Result is in' : locked ? 'Predictions locked' : isTwo ? 'Pick the two finalists' : 'Open · tap to pick'), /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
       flexDirection: 'column',
@@ -40015,7 +40205,7 @@ function Market(props) {
   }, m.options.map((opt, i) => {
     const o = optLabel(m, opt);
     const on = picked(o.id);
-    const isAnswer = resolved && (isTwo ? false : o.id === m.answer);
+    const isAnswer = resolved && (isTwo ? Array.isArray(m.answer) && m.answer.indexOf(o.id) >= 0 : o.id === m.answer);
     const wrong = resolved && on && !isAnswer;
     let bg = '#fff',
       bd = 'var(--line)';
@@ -40032,13 +40222,13 @@ function Market(props) {
     return /*#__PURE__*/React.createElement("button", {
       key: i,
       onClick: () => choose(o.id),
-      disabled: resolved,
+      disabled: resolved || locked,
       style: {
         display: 'flex',
         alignItems: 'center',
         gap: 10,
         padding: '10px 12px',
-        cursor: resolved ? 'default' : 'pointer',
+        cursor: resolved || locked ? 'default' : 'pointer',
         textAlign: 'left',
         border: '2.5px solid ' + bd,
         borderRadius: 13,
@@ -40071,7 +40261,7 @@ function Market(props) {
       style: {
         flex: '0 0 auto'
       }
-    }, "Correct"), !resolved && /*#__PURE__*/React.createElement("span", {
+    }, "Correct"), !resolved && !locked && /*#__PURE__*/React.createElement("span", {
       style: {
         width: 22,
         height: 22,
@@ -40086,8 +40276,103 @@ function Market(props) {
         fontWeight: 900,
         flex: '0 0 auto'
       }
+    }, on ? '✓' : ''), !resolved && locked && on && /*#__PURE__*/React.createElement(Chp, {
+      tone: "yellow",
+      style: {
+        flex: '0 0 auto'
+      }
+    }, "Your pick"));
+  })), isTeam && !resolved && !locked && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 10,
+      borderTop: '1.5px solid var(--line)',
+      paddingTop: 10
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      fontWeight: 800,
+      color: 'var(--ink2)',
+      marginBottom: 6,
+      textTransform: 'uppercase',
+      letterSpacing: '.05em'
+    }
+  }, "Search all 48 teams"), /*#__PURE__*/React.createElement("input", {
+    value: teamQ,
+    onChange: e => setTeamQ(e.target.value),
+    placeholder: "Type a team name\u2026",
+    style: {
+      width: '100%',
+      boxSizing: 'border-box',
+      border: '2px solid var(--line)',
+      borderRadius: 10,
+      padding: '8px 11px',
+      fontFamily: 'var(--body)',
+      fontWeight: 600,
+      fontSize: 14,
+      outline: 'none'
+    }
+  }), teamResults.length > 0 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      flexDirection: 'column',
+      gap: 5,
+      marginTop: 6
+    }
+  }, teamResults.map(t => {
+    const on = picked(t.code);
+    return /*#__PURE__*/React.createElement("button", {
+      key: t.code,
+      onClick: () => choose(t.code),
+      style: {
+        display: 'flex',
+        alignItems: 'center',
+        gap: 10,
+        padding: '8px 11px',
+        border: '2px solid ' + (on ? 'var(--ink)' : 'var(--line)'),
+        borderRadius: 11,
+        background: on ? 'var(--yellow)' : '#fff',
+        cursor: 'pointer',
+        fontFamily: 'var(--body)',
+        textAlign: 'left'
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 22
+      }
+    }, t.flag), /*#__PURE__*/React.createElement("div", {
+      style: {
+        flex: 1,
+        minWidth: 0
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontWeight: 800,
+        fontSize: 13.5
+      }
+    }, t.name), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 11,
+        fontWeight: 600,
+        color: 'var(--ink2)'
+      }
+    }, "Group ", t.group, " \xB7 ", t.odds)), /*#__PURE__*/React.createElement("span", {
+      style: {
+        width: 20,
+        height: 20,
+        borderRadius: '50%',
+        border: '2px solid var(--ink)',
+        background: on ? 'var(--ink)' : '#fff',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        color: '#fff',
+        fontSize: 12,
+        fontWeight: 900,
+        flex: '0 0 auto'
+      }
     }, on ? '✓' : ''));
-  })));
+  }))));
 }
 function PredLeaderboard(props) {
   const me = props.me;
@@ -40176,12 +40461,25 @@ function PredictionsScreen(props) {
   const [, bump] = pState(0);
   if (!me) return null;
   const markets = WCp.predictions || Sp.PREDICTIONS;
-  const open = markets.filter(m => m.answer == null);
-  const graded = markets.filter(m => m.answer != null);
+  const open = markets.filter(m => !isResolved(m));
+  const graded = markets.filter(m => isResolved(m));
   const made = me.picks ? Object.keys(me.picks).filter(k => me.picks[k] != null && (!Array.isArray(me.picks[k]) || me.picks[k].length)).length : 0;
+  const predDeadline = WCp.meta && WCp.meta.predDeadline;
+  const deadlinePassed = predDeadline && new Date() > new Date(predDeadline);
+  const locked = !!(WCp.meta && WCp.meta.predictionsLocked) || !!deadlinePassed;
   function onPick(key, val) {
     Sp.setPick(me.id, key, val);
     bump(x => x + 1);
+  }
+  function fmtDeadline(dt) {
+    try {
+      return new Date(dt).toLocaleString('en-GB', {
+        dateStyle: 'medium',
+        timeStyle: 'short'
+      });
+    } catch (e) {
+      return dt;
+    }
   }
   return /*#__PURE__*/React.createElement("div", {
     className: "pad"
@@ -40201,7 +40499,34 @@ function PredictionsScreen(props) {
       fontWeight: 600,
       color: 'var(--ink2)'
     }
-  }, made, " of ", markets.length, " made \xB7 ", Sp.predScoreOf(me), " pts banked"))), /*#__PURE__*/React.createElement(Saysp, {
+  }, made, " of ", markets.length, " made \xB7 ", Sp.predScoreOf(me), " pts banked"))), locked && /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: 9,
+      background: 'var(--ink)',
+      color: '#fff',
+      borderRadius: 13,
+      padding: '10px 13px',
+      marginBottom: 12,
+      fontSize: 13,
+      fontWeight: 700
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 18
+    }
+  }, "\uD83D\uDD12"), /*#__PURE__*/React.createElement("span", null, deadlinePassed ? 'Predictions are locked — deadline has passed.' : 'Predictions are locked by the organiser.')), !locked && predDeadline && /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      fontWeight: 700,
+      color: 'var(--ink2)',
+      marginBottom: 10,
+      padding: '7px 12px',
+      background: 'rgba(245,200,0,.2)',
+      borderRadius: 10
+    }
+  }, "Picks lock at ", fmtDeadline(predDeadline), " \u2014 get yours in."), /*#__PURE__*/React.createElement(Saysp, {
     mood: "mischievous",
     label: "on the record",
     animate: true
@@ -40211,14 +40536,16 @@ function PredictionsScreen(props) {
     key: m.key,
     market: m,
     me: me,
-    onPick: onPick
+    onPick: onPick,
+    locked: locked
   })), graded.length > 0 && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(SHp, {
     aside: "graded"
   }, "Already settled"), graded.map(m => /*#__PURE__*/React.createElement(Market, {
     key: m.key,
     market: m,
     me: me,
-    onPick: onPick
+    onPick: onPick,
+    locked: locked
   }))), /*#__PURE__*/React.createElement(SHp, {
     aside: "org-wide"
   }, "Prediction league"), /*#__PURE__*/React.createElement(PredLeaderboard, {
@@ -41037,14 +41364,36 @@ function SettingsAdmin() {
   const feeNow = Sa.entryFee ? Sa.entryFee() : WCa.FEE;
   const [fee, setFee] = aState2(String(feeNow || 0));
   React.useEffect(() => setFee(String(feeNow || 0)), [feeNow]);
+  const locationsNow = Sa.locations ? Sa.locations() : ['Edinburgh', 'London'];
+  const [locInput, setLocInput] = aState2(locationsNow.join(', '));
+  React.useEffect(() => setLocInput(locationsNow.join(', ')), [locationsNow.join(',')]);
   const entrants = Sa.allSync().length;
   const split = Sa.charitySplit ? Sa.charitySplit() : 0.5;
+  const purpose = Sa.purpose ? Sa.purpose() : 'work';
+  const includeDept = Sa.includeDepartment ? Sa.includeDepartment() : true;
+  const includeLocation = Sa.includeLocation ? Sa.includeLocation() : true;
+  const includeLtMember = Sa.includeLtMember ? Sa.includeLtMember() : true;
+  const locationsFreeText = Sa.locationsFreeText ? Sa.locationsFreeText() : false;
+  const predDeadlineNow = Sa.predDeadline ? Sa.predDeadline() : null;
+  const [predDeadlineInput, setPredDeadlineInput] = aState2(predDeadlineNow ? predDeadlineNow.slice(0, 16) : '');
+  React.useEffect(() => setPredDeadlineInput(predDeadlineNow ? predDeadlineNow.slice(0, 16) : ''), [predDeadlineNow]);
+  function saveDeadline() {
+    const val = predDeadlineInput.trim();
+    if (val) {
+      const dt = new Date(val);
+      if (isNaN(dt.getTime())) return;
+      Sa.setPredDeadline(dt.toISOString());
+      if (window.wcToast) window.wcToast('Prediction deadline set.', 'confident');
+    } else {
+      Sa.setPredDeadline(null);
+      if (window.wcToast) window.wcToast('Deadline cleared.', 'neutral');
+    }
+  }
   const n = Number(fee);
   const feeNum = isFinite(n) && n >= 0 ? n : feeNow;
   const gross = entrants * feeNum;
   const charity = gross * split;
   const winner = gross * (1 - split);
-  const includeDept = Sa.includeDepartment ? Sa.includeDepartment() : true;
   const fld = {
     width: '100%',
     border: '2.5px solid var(--ink)',
@@ -41065,6 +41414,12 @@ function SettingsAdmin() {
     Sa.setEntryFee(val);
     if (window.wcToast) window.wcToast('Entry fee set to £' + val.toLocaleString('en-GB'), 'confident');
   }
+  function saveLocations() {
+    const arr = locInput.split(',').map(s => s.trim()).filter(Boolean);
+    if (!arr.length) return;
+    Sa.setLocations(arr);
+    if (window.wcToast) window.wcToast(arr.length + ' location' + (arr.length > 1 ? 's' : '') + ' saved.', 'confident');
+  }
   function toggleRow(onClick, on, title, text) {
     return /*#__PURE__*/React.createElement("button", {
       onClick: onClick,
@@ -41078,7 +41433,8 @@ function SettingsAdmin() {
         borderRadius: 13,
         background: '#fff',
         padding: '11px 12px',
-        cursor: 'pointer'
+        cursor: 'pointer',
+        marginBottom: 8
       }
     }, /*#__PURE__*/React.createElement("span", {
       style: {
@@ -41123,6 +41479,7 @@ function SettingsAdmin() {
       }
     }, text)));
   }
+  const splitPct = Math.round(split * 100);
   return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(Ca, {
     bordered: true,
     style: {
@@ -41198,7 +41555,146 @@ function SettingsAdmin() {
       fontSize: 19,
       color: r[2]
     }
-  }, moneyAdmin(r[1]))))), /*#__PURE__*/React.createElement(SHa, null, "Signup fields"), toggleRow(() => Sa.setIncludeDepartment(!includeDept), includeDept, 'Team / department field', includeDept ? 'Shown on signup, profile editing and the directory.' : 'Hidden from signup, profile editing and directory filters.'));
+  }, moneyAdmin(r[1]))))), /*#__PURE__*/React.createElement(SHa, null, "Charity split"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: 7,
+      marginBottom: 8
+    }
+  }, [0, 25, 50, 75, 100].map(pct => /*#__PURE__*/React.createElement("button", {
+    key: pct,
+    onClick: () => Sa.setCharitySplit(pct / 100),
+    className: "wc-btn wc-btn--sm",
+    style: {
+      flex: 1,
+      background: splitPct === pct ? 'var(--yellow)' : '#fff',
+      boxShadow: splitPct === pct ? '0 4px 0 var(--ink)' : '0 4px 0 var(--shadow)'
+    }
+  }, pct, "%"))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      fontWeight: 600,
+      color: 'var(--ink2)',
+      marginBottom: 16,
+      lineHeight: 1.4
+    }
+  }, split < 0.01 ? 'No charity split — everything goes to the winner.' : split > 0.99 ? 'All entry fees go to charity. No winner fund.' : splitPct + '% of each entry goes to charity, the rest to the winner.'), /*#__PURE__*/React.createElement(SHa, null, "Sweepstake type"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: 8,
+      marginBottom: 8
+    }
+  }, [['work', 'Work'], ['friends', 'Friends & family']].map(([k, lab]) => /*#__PURE__*/React.createElement("button", {
+    key: k,
+    onClick: () => Sa.setPurpose(k),
+    className: "wc-btn wc-btn--sm",
+    style: {
+      flex: 1,
+      background: purpose === k ? 'var(--yellow)' : '#fff',
+      boxShadow: purpose === k ? '0 4px 0 var(--ink)' : '0 4px 0 var(--shadow)'
+    }
+  }, lab))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      fontWeight: 600,
+      color: 'var(--ink2)',
+      marginBottom: 16,
+      lineHeight: 1.4
+    }
+  }, purpose === 'work' ? 'Shows department, location and LT fields. You can toggle them individually below.' : 'Just names — no work details collected. Individual toggles below still apply.'), /*#__PURE__*/React.createElement(SHa, null, "Locations"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      fontWeight: 600,
+      color: 'var(--ink2)',
+      marginBottom: 8,
+      lineHeight: 1.4
+    }
+  }, "List your offices or locations, separated by commas. People pick from these when signing up."), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: 7,
+      alignItems: 'center',
+      marginBottom: 8
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    value: locInput,
+    onChange: e => setLocInput(e.target.value),
+    onBlur: saveLocations,
+    onKeyDown: e => e.key === 'Enter' && saveLocations(),
+    style: {
+      flex: 1,
+      border: '2px solid var(--ink)',
+      borderRadius: 11,
+      padding: '9px 12px',
+      fontFamily: 'var(--body)',
+      fontWeight: 600,
+      fontSize: 14,
+      outline: 'none',
+      background: '#fff'
+    },
+    placeholder: "e.g. Edinburgh, London, Remote"
+  }), /*#__PURE__*/React.createElement("button", {
+    onClick: saveLocations,
+    className: "wc-btn wc-btn--sm wc-btn--ink"
+  }, "Save")), toggleRow(() => Sa.setLocationsFreeText(!locationsFreeText), locationsFreeText, 'Allow custom location', locationsFreeText ? 'People can type their own location (your list shows as suggestions).' : 'People must pick from your list above.'), /*#__PURE__*/React.createElement(SHa, null, "Predictions deadline"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      fontWeight: 600,
+      color: 'var(--ink2)',
+      marginBottom: 8,
+      lineHeight: 1.4
+    }
+  }, "Set a cut-off date and time. Predictions lock automatically once it passes."), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: 7,
+      alignItems: 'center',
+      marginBottom: 6
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "datetime-local",
+    value: predDeadlineInput,
+    onChange: e => setPredDeadlineInput(e.target.value),
+    onBlur: saveDeadline,
+    style: {
+      flex: 1,
+      border: '2px solid var(--ink)',
+      borderRadius: 11,
+      padding: '9px 12px',
+      fontFamily: 'var(--body)',
+      fontWeight: 600,
+      fontSize: 14,
+      outline: 'none',
+      background: '#fff'
+    }
+  }), /*#__PURE__*/React.createElement("button", {
+    onClick: saveDeadline,
+    className: "wc-btn wc-btn--sm wc-btn--ink"
+  }, "Set"), predDeadlineNow && /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      setPredDeadlineInput('');
+      Sa.setPredDeadline(null);
+      if (window.wcToast) window.wcToast('Deadline cleared.', 'neutral');
+    },
+    className: "wc-btn wc-btn--sm"
+  }, "Clear")), predDeadlineNow && (() => {
+    const past = new Date() > new Date(predDeadlineNow);
+    return /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 12,
+        fontWeight: 700,
+        color: past ? 'var(--red)' : 'var(--ink2)',
+        marginBottom: 16
+      }
+    }, past ? 'Locked — deadline has passed.' : 'Locks at ' + new Date(predDeadlineNow).toLocaleString('en-GB', {
+      dateStyle: 'medium',
+      timeStyle: 'short'
+    }) + '.');
+  })(), !predDeadlineNow && /*#__PURE__*/React.createElement("div", {
+    style: {
+      height: 16
+    }
+  }), /*#__PURE__*/React.createElement(SHa, null, "Signup fields"), toggleRow(() => Sa.setIncludeDepartment(!includeDept), includeDept, 'Team / department', includeDept ? 'Shown on signup, editing and directory.' : 'Hidden from signup, editing and directory.'), toggleRow(() => Sa.setIncludeLocation(!includeLocation), includeLocation, 'Location', includeLocation ? 'Shown on signup and profile editing.' : 'Hidden — not collected.'), toggleRow(() => Sa.setIncludeLtMember(!includeLtMember), includeLtMember, 'Leadership Team member', includeLtMember ? 'Shown on signup and profile editing.' : 'Hidden — not collected.'));
 }
 function AdminPanel(props) {
   const [, bump] = aState2(0);
@@ -42380,11 +42876,8 @@ const {
   useEffect: aEffect
 } = React;
 
-/* ---- Easter egg (basic — built to extend later) ----------------------------
-   A wee hidden treat: tap the league title five times quickly. For now it just
-   pops some confetti and a hidden Wheesht line. Richer rewards (badges, secret
-   stats, a mini-game) can hang off window.__wheeshtEgg without touching the UI. */
-const EGG_LINES = ['Wheesht kent ye’d go poking. Away ye go, ya nosy beggar.', 'A hidden whistle! Dinnae tell the others. Wheesht certainly won’t.', 'Five taps. Wheesht respects a curious mind. Reluctantly.', 'Ye found the secret. There’s nae prize. Yet. Wheesht is working on it.'];
+/* ---- Easter eggs (tap the league title 5× for egg 1; tap rank badge 3× for egg 2) --- */
+const EGG_LINES = ['Persistent. Wheesht respects that. Grudgingly.', 'A hidden feature, not a bug. Wheesht planned this all along.', 'Five taps. Impressive commitment. There is no prize. Wheesht is working on it.', 'You found it. Well done. Wheesht is neither confirming nor denying there are others.'];
 window.__wheeshtEgg = function () {
   try {
     window.wcConfetti && window.wcConfetti({
@@ -42394,6 +42887,19 @@ window.__wheeshtEgg = function () {
   } catch (e) {}
   try {
     window.wcToast && window.wcToast(EGG_LINES[Math.random() * EGG_LINES.length | 0], 'mischievous');
+  } catch (e) {}
+};
+const EGG2_LINES = ['Ranking noted. The pot does not care. Wheesht does, slightly.', 'You tapped the rank. Wheesht was watching. Wheesht is always watching.', 'Three taps on the rank badge and Wheesht appears. Almost as if planned.', 'Position logged. Wheesht neither confirms nor denies this changes anything.'];
+window.__wheeshtEgg2 = function () {
+  try {
+    window.wcConfetti && window.wcConfetti({
+      y: .5,
+      count: 55,
+      colors: ['#F5C800', '#E8272A', '#fff', '#1A1A1A']
+    });
+  } catch (e) {}
+  try {
+    window.wcToast && window.wcToast(EGG2_LINES[Math.random() * EGG2_LINES.length | 0], 'confident');
   } catch (e) {}
 };
 
@@ -42903,9 +43409,24 @@ function App() {
   aEffect(() => {
     if (flow !== 'app' || !me) return;
     const pre = A_WC.meta.phase === 'pre';
+    const myTeam = A_WC.TEAMS[me.team];
     const id = setTimeout(() => {
-      if (pre) window.wcToast && window.wcToast('Predictions are open till kick-off. Get them in — Wheesht is taking names.', 'mischievous');else if (!A_WC.TEAMS[me.team].alive) window.wcToast && window.wcToast(A_WC.LINES.eliminated, 'crying');else window.wcToast && window.wcToast('Yer team’s in the hat. Wheesht will be watching. Closely.', 'mischievous');
-      if (t.bias) setTimeout(() => window.wcToast && window.wcToast('Reminder: Scotland are in this tournament. Just so we’re all clear.', 'scottish'), 1500);
+      if (pre) {
+        const pool = [['Predictions are open till kick-off. Get them in — Wheesht is taking names.', 'mischievous'], ['Your picks won\'t make themselves. Wheesht is waiting.', 'nervous'], ['Markets are open. Back your instincts. Wheesht backs nothing — but watches everything.', 'confident'], ['Get your predictions in before the first whistle. No extensions.', 'angry'], ['Wheesht has opinions on every market. Wheesht is keeping them to itself.', 'mischievous']];
+        const pick = pool[Math.random() * pool.length | 0];
+        window.wcToast && window.wcToast(pick[0], pick[1]);
+      } else if (!myTeam || !myTeam.alive) {
+        window.wcToast && window.wcToast(A_WC.LINES.eliminated, 'crying');
+      } else {
+        const pool = [['Your team is still in it. Wheesht is watching — with moderate approval.', 'confident'], ['Still standing. Wheesht has noted this. Nothing more to add.', 'neutral'], ['Your team is in the mix. Wheesht is cautiously optimistic. Very cautiously.', 'nervous'], ['In the running. The pot is watching too. Wheesht is taking no questions.', 'mischievous'], [myTeam.name + ' are alive. Wheesht acknowledges this. Barely.', 'happy']];
+        const pick = pool[Math.random() * pool.length | 0];
+        window.wcToast && window.wcToast(pick[0], pick[1]);
+      }
+      if (t.bias) {
+        const scotMsgs = [['Scotland are in this tournament. Just so everyone is clear.', 'scottish'], ['Scotland. Still here. Wheesht is cautiously optimistic — emphasis on cautious.', 'nervous'], ['A gentle reminder that Scotland are participating. Wheesht thought you should know.', 'scottish'], ['Scotland update: still in it. Wheesht is fine. Everything is fine.', 'confident'], ['No one asked. Wheesht is mentioning Scotland anyway.', 'mischievous']];
+        const sp = scotMsgs[Math.random() * scotMsgs.length | 0];
+        setTimeout(() => window.wcToast && window.wcToast(sp[0], sp[1]), 1600);
+      }
     }, 650);
     return () => clearTimeout(id);
   }, [flow, me && me.id]); // eslint-disable-line
@@ -42956,7 +43477,7 @@ function App() {
     const p = A_S.getSync(id);
     const t = p && A_WC.TEAMS[p.team];
     setFlow('app');
-    setTimeout(() => window.wcToast && window.wcToast('Welcome, ' + (p ? p.name : '') + '! Yer team is ' + (t && t.flag || '') + ' ' + (t ? t.name : '') + '.', 'confident'), 400);
+    setTimeout(() => window.wcToast && window.wcToast('Welcome, ' + (p ? p.name : '') + '! Your team is ' + (t && t.flag || '') + ' ' + (t ? t.name : '') + '.', 'confident'), 400);
   }
 
   // -------- onboarding / identity flow --------
@@ -43073,7 +43594,7 @@ function App() {
     step: 1,
     onChange: v => setTweak('celebration', v)
   }), /*#__PURE__*/React.createElement(window.TweakToggle, {
-    label: "Wheesht\u2019s Scottish bias",
+    label: "Wheesht's Scottish bias",
     value: t.bias,
     onChange: v => setTweak('bias', v)
   }), /*#__PURE__*/React.createElement(window.TweakToggle, {
@@ -43101,7 +43622,7 @@ function App() {
       cursor: 'pointer',
       boxShadow: '0 4px 0 #000'
     }
-  }, "Open Wheesht\u2019s clipboard \u2192"), /*#__PURE__*/React.createElement("div", {
+  }, "Open Wheesht's clipboard \u2192"), /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 11,
       fontWeight: 600,

@@ -163,9 +163,9 @@ button{font-family:inherit;}
 /* ---------- confetti + toasts ---------- */
 .wc-confetti{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:80;}
 .wc-toasts{position:absolute;left:12px;right:12px;top:54px;z-index:75;display:flex;flex-direction:column;gap:8px;pointer-events:none;}
-.wc-toast{display:flex;align-items:center;gap:10px;background:var(--ink);color:#fff;border-radius:16px;padding:8px 14px 8px 8px;
-  box-shadow:0 10px 24px rgba(0,0,0,.3);animation:toastIn .4s cubic-bezier(.2,1.2,.4,1) both;}
-.wc-toast__txt{font-size:13px;font-weight:600;line-height:1.25;}
+.wc-toast{display:flex;align-items:center;gap:10px;background:var(--ink);color:#fff;border-radius:16px;padding:8px 10px 8px 8px;
+  box-shadow:0 10px 24px rgba(0,0,0,.3);animation:toastIn .4s cubic-bezier(.2,1.2,.4,1) both;pointer-events:auto;}
+.wc-toast__txt{font-size:13px;font-weight:600;line-height:1.25;flex:1;}
 @keyframes toastIn{from{transform:translateY(-16px) scale(.9);opacity:0}to{transform:none;opacity:1}}
 
 /* ---------- animations ---------- */
@@ -383,7 +383,7 @@ button:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(245,200,0,.55);borde
 
 <!-- Single source of truth: generated from wc_data.py by scripts/build_snapshot.py.
      No-op when the server injects window.WC_DATA above (live mode). -->
-<script type="text/babel" src="tweaks-panel.jsx?v=20260614-verdict"></script>
+<script type="text/babel" src="tweaks-panel.jsx?v=20260614-deadline"></script>
 
 <script>
 /* ===========================================================================
@@ -545,7 +545,17 @@ button:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(245,200,0,.55);borde
   var BASE = {
     teams: {}, preds: {},
     fee: WC.FEE || 0,
-    meta: { phase: WC.meta.phase, stageLabel: WC.meta.stageLabel, includeDepartment: WC.meta.includeDepartment !== false },
+    meta: {
+      phase: WC.meta.phase, stageLabel: WC.meta.stageLabel,
+      includeDepartment: WC.meta.includeDepartment !== false,
+      includeLocation: WC.meta.includeLocation !== false,
+      includeLtMember: WC.meta.includeLtMember !== false,
+      charitySplit: WC.meta.charitySplit != null ? Number(WC.meta.charitySplit) : CHARITY_SPLIT,
+      purpose: WC.meta.purpose || 'work',
+      locations: WC.meta.locations || ['Edinburgh', 'London'],
+      locationsFreeText: !!WC.meta.locationsFreeText,
+      predDeadline: WC.meta.predDeadline || null,
+    },
   };
   WC.TEAM_LIST.forEach(function (t) { BASE.teams[t.code] = { alive: t.alive, stage: t.stage, rounds: t.rounds }; });
   (WC.PREDICTIONS || []).forEach(function (m) { BASE.preds[m.key] = m.answer; });
@@ -575,12 +585,20 @@ button:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(245,200,0,.55);borde
       : WC.meta.phase === 'done' ? 'Tournament over' : 'In play';
     WC.meta.teamsLeft = WC.TEAM_LIST.filter(function (t) { return t.alive; }).length;
     WC.meta.includeDepartment = !admin.meta || admin.meta.includeDepartment !== false;
+    WC.meta.includeLocation = !admin.meta || admin.meta.includeLocation !== false;
+    WC.meta.includeLtMember = !admin.meta || admin.meta.includeLtMember !== false;
+    WC.meta.purpose = (admin.meta && admin.meta.purpose) || BASE.meta.purpose;
+    WC.meta.locations = (admin.meta && Array.isArray(admin.meta.locations) && admin.meta.locations.length) ? admin.meta.locations : BASE.meta.locations;
+    WC.meta.locationsFreeText = admin.meta && admin.meta.locationsFreeText != null ? !!admin.meta.locationsFreeText : BASE.meta.locationsFreeText;
+    WC.meta.predDeadline = (admin.meta && admin.meta.predDeadline) || BASE.meta.predDeadline || null;
+    WC.charitySplit = (admin.meta && admin.meta.charitySplit != null) ? Number(admin.meta.charitySplit) : BASE.meta.charitySplit;
     var fee = admin.meta && admin.meta.entryFee != null ? Number(admin.meta.entryFee) : BASE.fee;
     WC.FEE = isFinite(fee) && fee >= 0 ? fee : BASE.fee;
     WC.POT = (WC.PEOPLE || []).length * WC.FEE;
   }
 
   function charitySplitValue() {
+    if (admin.meta && admin.meta.charitySplit != null) return Number(admin.meta.charitySplit);
     var v = WC.charitySplit != null ? WC.charitySplit : WC.CHARITY_SPLIT;
     return v == null ? CHARITY_SPLIT : Number(v);
   }
@@ -906,6 +924,58 @@ button:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(245,200,0,.55);borde
       admin.meta = admin.meta || {}; admin.meta.includeDepartment = !!on;
       commitAdmin();
     },
+    purpose: function () { return (admin.meta && admin.meta.purpose) || BASE.meta.purpose; },
+    setPurpose: function (p) {
+      admin.meta = admin.meta || {}; admin.meta.purpose = p;
+      if (p === 'friends') {
+        admin.meta.includeDepartment = false;
+        admin.meta.includeLocation = false;
+        admin.meta.includeLtMember = false;
+      } else {
+        admin.meta.includeDepartment = true;
+        admin.meta.includeLocation = true;
+        admin.meta.includeLtMember = true;
+      }
+      commitAdmin();
+    },
+    includeLocation: function () { return !admin.meta || admin.meta.includeLocation !== false; },
+    setIncludeLocation: function (on) {
+      admin.meta = admin.meta || {}; admin.meta.includeLocation = !!on;
+      commitAdmin();
+    },
+    includeLtMember: function () { return !admin.meta || admin.meta.includeLtMember !== false; },
+    setIncludeLtMember: function (on) {
+      admin.meta = admin.meta || {}; admin.meta.includeLtMember = !!on;
+      commitAdmin();
+    },
+    locations: function () {
+      var v = admin.meta && admin.meta.locations;
+      return (Array.isArray(v) && v.length) ? v : BASE.meta.locations;
+    },
+    setLocations: function (arr) {
+      admin.meta = admin.meta || {}; admin.meta.locations = arr;
+      commitAdmin();
+    },
+    locationsFreeText: function () {
+      if (admin.meta && admin.meta.locationsFreeText != null) return !!admin.meta.locationsFreeText;
+      return BASE.meta.locationsFreeText;
+    },
+    setLocationsFreeText: function (on) {
+      admin.meta = admin.meta || {}; admin.meta.locationsFreeText = !!on;
+      commitAdmin();
+    },
+    predDeadline: function () { return (admin.meta && admin.meta.predDeadline) || BASE.meta.predDeadline || null; },
+    setPredDeadline: function (dt) {
+      admin.meta = admin.meta || {};
+      if (dt) admin.meta.predDeadline = dt; else delete admin.meta.predDeadline;
+      commitAdmin();
+    },
+    setCharitySplit: function (split) {
+      var n = Math.max(0, Math.min(1, Number(split)));
+      if (!isFinite(n)) return;
+      admin.meta = admin.meta || {}; admin.meta.charitySplit = n;
+      commitAdmin();
+    },
     setTeamOut: function (code, out) {
       admin.teams = admin.teams || {};
       if (out) admin.teams[code] = { alive: false, stage: 'out-group', rounds: 1 };
@@ -936,7 +1006,17 @@ button:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(245,200,0,.55);borde
     },
     adminReset: function () {
       var keep = admin.meta || {};
-      admin = { teams: {}, fixtures: {}, predictions: {}, meta: { entryFee: keep.entryFee, includeDepartment: keep.includeDepartment } };
+      admin = { teams: {}, fixtures: {}, predictions: {}, meta: {
+        entryFee: keep.entryFee,
+        includeDepartment: keep.includeDepartment,
+        includeLocation: keep.includeLocation,
+        includeLtMember: keep.includeLtMember,
+        charitySplit: keep.charitySplit,
+        purpose: keep.purpose,
+        locations: keep.locations,
+        locationsFreeText: keep.locationsFreeText,
+        predDeadline: keep.predDeadline,
+      }};
       commitAdmin();
     }
   };
@@ -1386,11 +1466,12 @@ function SectionHead(props) {
 /* ---- Toast layer (imperative: window.wcToast(msg, mood)) ----------------- */
 function ToastLayer() {
   const [items, setItems] = useState([]);
+  function dismiss(id) { setItems(function (xs) { return xs.filter(function (x) { return x.id !== id; }); }); }
   useEffect(function () {
     window.wcToast = function (text, mood) {
       const id = Date.now() + Math.random();
       setItems(function (xs) { return xs.concat([{ id: id, text: text, mood: mood || 'neutral' }]); });
-      setTimeout(function () { setItems(function (xs) { return xs.filter(function (x) { return x.id !== id; }); }); }, 4200);
+      setTimeout(function () { setItems(function (xs) { return xs.filter(function (x) { return x.id !== id; }); }); }, 4800);
     };
   }, []);
   return (
@@ -1398,7 +1479,8 @@ function ToastLayer() {
       {items.map(function (t) {
         return <div key={t.id} className="wc-toast">
           <window.Wheesht mood={t.mood} size={40} />
-          <div className="wc-toast__txt">{t.text}</div>
+          <div className="wc-toast__txt" style={{flex:1}}>{t.text}</div>
+          <button onClick={function(){ dismiss(t.id); }} style={{background:'none',border:'none',color:'rgba(255,255,255,.55)',cursor:'pointer',fontSize:22,fontWeight:300,lineHeight:1,padding:'0 0 0 8px',flexShrink:0,fontFamily:'sans-serif'}}>×</button>
         </div>;
       })}
     </div>
@@ -2742,7 +2824,7 @@ function AccountGate(props) {
           <div className="dh" style={{ fontSize: 30, marginTop: 8, lineHeight: 1 }}>{WCo.meta.name}</div>
           <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink2)', marginTop: 6 }}>{WCo.meta.season} · {WCo.meta.stageLabel}</div>
           <div style={{ display: 'inline-flex', marginTop: 14, background: 'var(--ink)', color: '#fff', borderRadius: '16px 16px 16px 5px', padding: '11px 15px', maxWidth: 320, textAlign: 'left' }}>
-            <div style={{ fontSize: 14, fontWeight: 600, lineHeight: 1.35 }}><span style={{ color: 'var(--yellow)', fontWeight: 800 }}>Wheesht here.</span> Officially impartial. Constitutionally Scottish. Join a league or start yer own.</div>
+            <div style={{ fontSize: 14, fontWeight: 600, lineHeight: 1.35 }}><span style={{ color: 'var(--yellow)', fontWeight: 800 }}>Wheesht here.</span> Officially impartial. Constitutionally Scottish. Join a league or start your own.</div>
           </div>
         </div>
 
@@ -2803,7 +2885,7 @@ function JoinLeague(props) {
           <Wo mood="mischievous" size={72} animate />
           <div>
             <div className="dh" style={{ fontSize: 24, lineHeight: 1 }}>Join a league</div>
-            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink2)', marginTop: 4 }}>Pop in the league code and password the organiser gave ye.</div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink2)', marginTop: 4 }}>Enter the league code and password your organiser gave you.</div>
           </div>
         </div>
         <div style={{ marginTop: 20 }}>
@@ -2868,7 +2950,7 @@ function CreateLeague(props) {
           <Wo mood="confident" size={72} animate />
           <div>
             <div className="dh" style={{ fontSize: 24, lineHeight: 1 }}>Create a league</div>
-            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink2)', marginTop: 4 }}>Ye'll be the organiser. Share the code + password with yer crew.</div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink2)', marginTop: 4 }}>You'll be the organiser. Share the code and password with your group.</div>
           </div>
         </div>
         <div style={{ marginTop: 20, display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -2908,7 +2990,7 @@ function FindMyEntry(props) {
           <Wo mood="mischievous" size={72} animate />
           <div>
             <div className="dh" style={{ fontSize: 24, lineHeight: 1 }}>Find my entry</div>
-            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink2)', marginTop: 4 }}>No password needed. Just yer name — Wheesht never forgets a face.</div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink2)', marginTop: 4 }}>No password needed. Just your name — Wheesht never forgets a face.</div>
           </div>
         </div>
         <div style={{ marginTop: 18 }}>
@@ -2919,7 +3001,7 @@ function FindMyEntry(props) {
           {q.trim() && results.length === 0 &&
             <Co flat style={{ textAlign: 'center', padding: '22px 14px' }}>
               <Wo mood="nervous" size={64} animate />
-              <div className="dh" style={{ fontSize: 17, marginTop: 6 }}>Nae sign of ye.</div>
+              <div className="dh" style={{ fontSize: 17, marginTop: 6 }}>No sign of you.</div>
               <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink2)', marginTop: 3 }}>Different spelling? Or maybe you've not entered yet.</div>
               <div style={{ marginTop: 12 }}><Bo variant="primary" sm onClick={props.onNew}>Enter as someone new →</Bo></div>
             </Co>}
@@ -2945,9 +3027,13 @@ function FindMyEntry(props) {
 function OnboardingForm(props) {
   const [name, setName] = oState('');
   const [dept, setDept] = oState('');
-  const [loc, setLoc] = oState('Edinburgh');
-  const [lt, setLt] = oState(false);
   const includeDept = So.includeDepartment ? So.includeDepartment() : true;
+  const includeLocation = So.includeLocation ? So.includeLocation() : true;
+  const includeLtMember = So.includeLtMember ? So.includeLtMember() : true;
+  const locationOpts = So.locations ? So.locations() : ['Edinburgh', 'London'];
+  const locationsFreeText = So.locationsFreeText ? So.locationsFreeText() : false;
+  const [loc, setLoc] = oState(locationOpts[0] || 'Edinburgh');
+  const [lt, setLt] = oState(false);
   const ok = name.trim().length > 0;
   const split = So.charitySplit ? So.charitySplit() : 0.5;
   const fee = WCo.FEE || 0;
@@ -2959,39 +3045,54 @@ function OnboardingForm(props) {
         <button onClick={props.onBack} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, fontWeight: 800, color: 'var(--ink2)', padding: 0, marginBottom: 10 }}>← Back</button>
         <div style={{ textAlign: 'center' }}>
           <div style={{ display: 'inline-block' }} className="pop"><Wo mood="confident" size={120} animate track /></div>
-          <div className="dh" style={{ fontSize: 28, marginTop: 4, lineHeight: 1 }}>Let's get ye signed up.</div>
-          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink2)', marginTop: 6 }}>Takes ten seconds. The only bit Wheesht actually needs is yer name.</div>
+          <div className="dh" style={{ fontSize: 28, marginTop: 4, lineHeight: 1 }}>Let's get you signed up.</div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink2)', marginTop: 6 }}>Takes ten seconds. The only thing Wheesht actually needs is your name.</div>
         </div>
 
         <div style={{ marginTop: 22, display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div>
             <Lab>Full name</Lab>
-            <input autoFocus style={inp} value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Davie McAllister" />
+            <input autoFocus style={inp} value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Alex Johnson" />
           </div>
           {includeDept && <div>
             <Lab opt>Team / department</Lab>
             <input style={inp} value={dept} onChange={e => setDept(e.target.value)} placeholder="e.g. Engineering" list="wh-depts" />
             <datalist id="wh-depts">{DEPTS.map(d => <option key={d} value={d} />)}</datalist>
           </div>}
-          <div>
-            <Lab>Work location</Lab>
-            <Seg value={loc} onChange={setLoc} options={[{ value: 'Edinburgh', label: 'Edinburgh' }, { value: 'London', label: 'London' }]} />
-          </div>
-          <div>
-            <Lab>Leadership Team member?</Lab>
+          {includeLocation && <div>
+            <Lab opt>Location</Lab>
+            {locationsFreeText
+              ? <>
+                  <input style={inp} value={loc} onChange={e => setLoc(e.target.value)} placeholder="Your office or location" list="wh-locs" />
+                  <datalist id="wh-locs">{locationOpts.map(l => <option key={l} value={l} />)}</datalist>
+                </>
+              : locationOpts.length <= 3
+                ? <Seg value={loc} onChange={setLoc} options={locationOpts.map(l => ({ value: l, label: l }))} />
+                : <select style={inp} value={loc} onChange={e => setLoc(e.target.value)}>
+                    {locationOpts.map(l => <option key={l} value={l}>{l}</option>)}
+                  </select>
+            }
+          </div>}
+          {includeLtMember && <div>
+            <Lab opt>Leadership Team member?</Lab>
             <Seg value={lt} onChange={setLt} options={[{ value: false, label: 'No' }, { value: true, label: 'Yes' }]} />
-          </div>
+          </div>}
         </div>
 
-        <Co bordered style={{ marginTop: 20, background: 'var(--yellow)' }}>
+        {fee > 0 && <Co bordered style={{ marginTop: 20, background: 'var(--yellow)' }}>
           <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: '.05em', textTransform: 'uppercase' }}>Your buy-in</div>
           <div className="dh" style={{ fontSize: 28, margin: '2px 0 4px' }}>You're putting in £{fee}.</div>
-          <div style={{ fontSize: 14, fontWeight: 600 }}><b>£{charityPerEntry.toFixed(2).replace(/\.00$/, '')} goes to charity</b>, the rest into a winner-takes-all fund — <b>{'£' + Math.round(winnerAfterEntry).toLocaleString('en-GB')}</b> once you're in, and growing with every sign-up.</div>
-        </Co>
+          {split < 0.01
+            ? <div style={{ fontSize: 14, fontWeight: 600 }}>The full amount goes into a winner-takes-all fund — <b>{'£' + Math.round(winnerAfterEntry).toLocaleString('en-GB')}</b> once you're in, and growing with every sign-up.</div>
+            : split > 0.99
+              ? <div style={{ fontSize: 14, fontWeight: 600 }}>The full entry goes to charity. This is a fun-only sweepstake — no winner fund.</div>
+              : <div style={{ fontSize: 14, fontWeight: 600 }}><b>£{charityPerEntry.toFixed(2).replace(/\.00$/, '')} goes to charity</b>, the rest into a winner-takes-all fund — <b>{'£' + Math.round(winnerAfterEntry).toLocaleString('en-GB')}</b> once you're in, and growing with every sign-up.</div>
+          }
+        </Co>}
 
         <div style={{ marginTop: 18 }}>
-          <Bo variant="ink" block onClick={() => ok && props.onSubmit({ name: name.trim(), department: includeDept ? dept.trim() : '', location: loc, ltMember: lt })}>
-            {ok ? 'To the draw →' : 'Pop yer name in first'}
+          <Bo variant="ink" block onClick={() => ok && props.onSubmit({ name: name.trim(), department: includeDept ? dept.trim() : '', location: includeLocation ? loc : '', ltMember: includeLtMember ? lt : false })}>
+            {ok ? 'To the draw →' : 'Add your name first'}
           </Bo>
         </div>
       </div>
@@ -3059,7 +3160,7 @@ function DrawMoment(props) {
         </>}
 
         {phase === 'revealed' && <div className="pop" style={{ width: '100%' }}>
-          <div className="dh" style={{ fontSize: 14, letterSpacing: '.16em', color: 'var(--yellow)' }}>YE'VE DRAWN</div>
+          <div className="dh" style={{ fontSize: 14, letterSpacing: '.16em', color: 'var(--yellow)' }}>YOU DREW</div>
           <div style={{ fontSize: 116, lineHeight: 1, margin: '8px 0' }}>{t.flag}</div>
           <div className="dh" style={{ fontSize: 44 }}>{t.name}</div>
           <div style={{ display: 'flex', gap: 8, justifyContent: 'center', margin: '12px 0 4px' }}>
@@ -3075,7 +3176,7 @@ function DrawMoment(props) {
             </div>
           </div>
           <div style={{ marginTop: 18, display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <Bo variant="primary" block onClick={() => window.wcToast && window.wcToast('Draw shared to the group. The slagging begins.', 'mischievous')}>Share your draw</Bo>
+            <Bo variant="primary" block onClick={() => window.wcToast && window.wcToast('Draw shared. The banter starts now.', 'mischievous')}>Share your draw</Bo>
             <Bo variant="ghost" block onClick={props.onDone} style={{ background: 'transparent', color: '#fff', boxShadow: '0 4px 0 rgba(255,255,255,.25)' }}>Into my dashboard →</Bo>
           </div>
         </div>}
@@ -3139,8 +3240,8 @@ function OIRosterPicker(props) {
         <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 16 }}>
           <Wo mood="confident" size={64} animate />
           <div>
-            <div className="dh" style={{ fontSize: 24, lineHeight: 1 }}>Who are ye?</div>
-            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink2)', marginTop: 4 }}>{league ? league.name + ' — y' : 'Y'}our team's already been drawn. Find yer name and tap it.</div>
+            <div className="dh" style={{ fontSize: 24, lineHeight: 1 }}>Who are you?</div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink2)', marginTop: 4 }}>{league ? league.name + ' — y' : 'Y'}our team has already been drawn. Find your name and tap it.</div>
           </div>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -3220,17 +3321,22 @@ function overallRank(me) {
 function ProfileHeader(props) {
   const me = props.me; const t = dashTeam(me.team);
   const includeDept = Sd.includeDepartment ? Sd.includeDepartment() : true;
+  const includeLocation = Sd.includeLocation ? Sd.includeLocation() : true;
+  const includeLtMember = Sd.includeLtMember ? Sd.includeLtMember() : true;
+  const chips = [
+    includeLocation && me.location && me.location,
+    includeDept && me.department,
+    includeLtMember && me.ltMember && 'LT',
+  ].filter(Boolean);
   return (
     <Cd bordered className="pop">
       <div style={{ display: 'flex', alignItems: 'center', gap: 13 }}>
         <Ad person={Object.assign({}, me, { isYou: false })} size={56} />
         <div style={{ flex: 1, minWidth: 0 }}>
           <div className="dh" style={{ fontSize: 24, lineHeight: 1 }}>{me.name}</div>
-          <div style={{ display: 'flex', gap: 6, marginTop: 7, flexWrap: 'wrap' }}>
-            <Chd>{me.location}</Chd>
-            {includeDept && me.department && <Chd>{me.department}</Chd>}
-            {me.ltMember && <Chd tone="yellow">LT</Chd>}
-          </div>
+          {chips.length > 0 && <div style={{ display: 'flex', gap: 6, marginTop: 7, flexWrap: 'wrap' }}>
+            {chips.map((c, i) => <Chd key={i} tone={c === 'LT' ? 'yellow' : undefined}>{c}</Chd>)}
+          </div>}
         </div>
         <button onClick={props.onEdit} className="wc-btn wc-btn--sm" style={{ padding: '8px 12px', boxShadow: '0 4px 0 var(--shadow)' }}>Edit</button>
       </div>
@@ -3242,9 +3348,13 @@ function EditProfile(props) {
   const me = props.me;
   const [name, setName] = dState(me.name);
   const [dept, setDept] = dState(me.department || '');
-  const [loc, setLoc] = dState(me.location || 'London');
   const [lt, setLt] = dState(!!me.ltMember);
   const includeDept = Sd.includeDepartment ? Sd.includeDepartment() : true;
+  const includeLocation = Sd.includeLocation ? Sd.includeLocation() : true;
+  const includeLtMember = Sd.includeLtMember ? Sd.includeLtMember() : true;
+  const locationOpts = Sd.locations ? Sd.locations() : ['Edinburgh', 'London'];
+  const locationsFreeText = Sd.locationsFreeText ? Sd.locationsFreeText() : false;
+  const [loc, setLoc] = dState(me.location || locationOpts[0] || 'Edinburgh');
   const fld = { width: '100%', border: '2.5px solid var(--ink)', borderRadius: 12, padding: '11px 13px', fontFamily: 'var(--body)', fontWeight: 600, fontSize: 15, marginTop: 6, outline: 'none' };
   function seg(val, set, opts) {
     return <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>{opts.map(o =>
@@ -3259,11 +3369,34 @@ function EditProfile(props) {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 13 }}>
           <div><label style={{ fontWeight: 800, fontSize: 13, fontFamily: 'var(--disp)' }}>Full name</label><input style={fld} value={name} onChange={e => setName(e.target.value)} /></div>
           {includeDept && <div><label style={{ fontWeight: 800, fontSize: 13, fontFamily: 'var(--disp)' }}>Team / department</label><input style={fld} value={dept} onChange={e => setDept(e.target.value)} placeholder="optional" /></div>}
-          <div><label style={{ fontWeight: 800, fontSize: 13, fontFamily: 'var(--disp)' }}>Work location</label>{seg(loc, setLoc, [{ value: 'Edinburgh', label: 'Edinburgh' }, { value: 'London', label: 'London' }])}</div>
-          <div><label style={{ fontWeight: 800, fontSize: 13, fontFamily: 'var(--disp)' }}>Leadership Team?</label>{seg(lt, setLt, [{ value: false, label: 'No' }, { value: true, label: 'Yes' }])}</div>
+          {includeLocation && <div>
+            <label style={{ fontWeight: 800, fontSize: 13, fontFamily: 'var(--disp)' }}>Location</label>
+            {locationsFreeText
+              ? <>
+                  <input style={fld} value={loc} onChange={e => setLoc(e.target.value)} placeholder="Your office or location" list="wh-locs-edit" />
+                  <datalist id="wh-locs-edit">{locationOpts.map(l => <option key={l} value={l} />)}</datalist>
+                </>
+              : locationOpts.length <= 3
+                ? seg(loc, setLoc, locationOpts.map(l => ({ value: l, label: l })))
+                : <select style={fld} value={loc} onChange={e => setLoc(e.target.value)}>
+                    {locationOpts.map(l => <option key={l} value={l}>{l}</option>)}
+                  </select>
+            }
+          </div>}
+          {includeLtMember && <div><label style={{ fontWeight: 800, fontSize: 13, fontFamily: 'var(--disp)' }}>Leadership Team?</label>{seg(lt, setLt, [{ value: false, label: 'No' }, { value: true, label: 'Yes' }])}</div>}
         </div>
         <div style={{ marginTop: 18 }}>
-          <Bd variant="ink" block onClick={() => { Sd.update(me.id, { name: name.trim() || me.name, department: includeDept ? dept.trim() : me.department, location: loc, city: loc, ltMember: lt, leadership: lt }); props.onClose(); }}>Save</Bd>
+          <Bd variant="ink" block onClick={() => {
+            Sd.update(me.id, {
+              name: name.trim() || me.name,
+              department: includeDept ? dept.trim() : me.department,
+              location: includeLocation ? loc : me.location,
+              city: includeLocation ? loc : me.city,
+              ltMember: includeLtMember ? lt : me.ltMember,
+              leadership: includeLtMember ? lt : me.leadership,
+            });
+            props.onClose();
+          }}>Save</Bd>
         </div>
       </div>
     </div>
@@ -3352,6 +3485,13 @@ function WinningsCard(props) {
   const pot = Sd.pot ? Sd.pot() : (WCd.POT * 0.5);
   const charity = Sd.charity ? Sd.charity() : (WCd.POT * 0.5);
   const ov = overallRank(me);
+  const rankTaps = React.useRef({n:0,t:0});
+  function rankTap(){
+    const now = Date.now();
+    rankTaps.current.n = (now - rankTaps.current.t < 1200) ? rankTaps.current.n + 1 : 1;
+    rankTaps.current.t = now;
+    if(rankTaps.current.n >= 3){ rankTaps.current.n = 0; window.__wheeshtEgg2 && window.__wheeshtEgg2(); }
+  }
   return (
     <Cd bordered>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -3359,7 +3499,7 @@ function WinningsCard(props) {
           <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.06em', textTransform: 'uppercase', color: 'var(--ink2)' }}>Winner takes all — if {t.name} lift the cup</div>
           <div className="dh" style={{ fontSize: 38, color: 'var(--green)', lineHeight: 1, marginTop: 2 }}>{money_d(pot)}</div>
         </div>
-        <div style={{ textAlign: 'right', background: 'var(--bg)', border: '2px solid var(--line)', borderRadius: 12, padding: '7px 11px' }}>
+        <div onClick={rankTap} style={{ textAlign: 'right', background: 'var(--bg)', border: '2px solid var(--line)', borderRadius: 12, padding: '7px 11px', cursor: 'default' }}>
           <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: '.04em', color: 'var(--ink2)' }}>OVERALL</div>
           <div className="dh" style={{ fontSize: 22 }}>#{ov.rank}<span style={{ fontSize: 13, color: 'var(--ink2)' }}>/{ov.total}</span></div>
         </div>
@@ -3424,8 +3564,8 @@ function MeScreen(props) {
     <div className="pad">
       <ProfileHeader me={me} onEdit={() => setEdit(true)} />
       <div style={{ height: 12 }} />
-      <Saysd mood={greetMood} label={'hiya ' + me.name.split(' ')[0]} animate>
-        {pre ? <>Ye've drawn {t.name}. Nae games yet — so get yer predictions in while the slate's clean.</> : (t.alive ? <>Yer {t.name} are still in it. Keep yer predictions sharp and the pot's in play.</> : <>Yer team's away, but the predictions league is wide open. Wheesht's no done wi' ye yet.</>)}
+      <Saysd mood={greetMood} label={'hey ' + me.name.split(' ')[0]} animate>
+        {pre ? <>You've drawn {t.name}. No games yet — get your predictions in while the slate's clean.</> : (t.alive ? <>{t.name} are still standing. Keep your predictions sharp — the pot's in play.</> : <>Your team is out, but the predictions league is still live. Wheesht isn't done with you yet.</>)}
       </Saysd>
       <SHd>Your team</SHd>
       <TeamCard me={me} onGames={props.goGames} />
@@ -3456,6 +3596,11 @@ const Sp = window.Store;
 const { Card: Cp, Btn: Bp, Flag: Fp, Avatar: Ap, Chip: Chp, WheeshtSays: Saysp, SectionHead: SHp } = window;
 const { useState: pState } = React;
 
+function isResolved(m) {
+  if (m.kind === 'team2') return Array.isArray(m.answer) && m.answer.length > 0 && m.answer.every(function (x) { return x != null; });
+  return m.answer != null;
+}
+
 function optLabel(m, opt) {
   if (m.kind === 'player') return { main: opt.name, sub: WCp.TEAMS[opt.team] ? WCp.TEAMS[opt.team].name : '', flag: WCp.TEAMS[opt.team] ? WCp.TEAMS[opt.team].flag : '', id: opt.id };
   if (m.kind === 'stage') return { main: opt, sub: '', flag: '', id: opt };
@@ -3465,47 +3610,60 @@ function optLabel(m, opt) {
 
 function Market(props) {
   const m = props.market, me = props.me, onPick = props.onPick;
-  const resolved = m.answer != null;
-  const pick = me.picks ? me.picks[m.key] : null;
   const isTwo = m.kind === 'team2';
+  const isTeam = m.kind === 'team' || isTwo;
+  const locked = !!props.locked;
+  const resolved = isResolved(m);
+  const pick = me.picks ? me.picks[m.key] : null;
   const picked = (id) => isTwo ? (Array.isArray(pick) && pick.indexOf(id) >= 0) : pick === id;
-  const correctVal = resolved ? (isTwo ? null : m.answer) : null;
-  const gotIt = resolved && (isTwo ? false : pick === m.answer);
+  const gotIt = resolved && (isTwo
+    ? (Array.isArray(pick) && Array.isArray(m.answer) && pick.length === m.answer.length && pick.every(id => m.answer.indexOf(id) >= 0))
+    : pick === m.answer);
+  const [teamQ, setTeamQ] = pState('');
+  const presetCodes = isTeam ? new Set(m.options) : new Set();
 
   function choose(id) {
-    if (resolved) return;
+    if (resolved || locked) return;
     if (isTwo) {
       let arr = Array.isArray(pick) ? pick.slice() : [];
       if (arr.indexOf(id) >= 0) arr = arr.filter(x => x !== id);
       else { arr.push(id); if (arr.length > 2) arr.shift(); }
       onPick(m.key, arr);
     } else onPick(m.key, picked(id) ? null : id);
+    setTeamQ('');
   }
+
+  const teamResults = isTeam && !resolved && teamQ.trim()
+    ? WCp.TEAM_LIST.filter(t => !presetCodes.has(t.code) && (t.name.toLowerCase().indexOf(teamQ.toLowerCase()) >= 0 || t.code.toLowerCase().indexOf(teamQ.toLowerCase()) >= 0)).slice(0, 6)
+    : [];
+
+  const hasPick = pick != null && (!isTwo || (Array.isArray(pick) && pick.length > 0));
+  const hasFullPick = pick != null && (!isTwo || (Array.isArray(pick) && pick.length === 2));
 
   return (
     <Cp style={{ marginBottom: 12 }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4, gap: 8 }}>
         <div className="dh" style={{ fontSize: 17, lineHeight: 1.05 }}>{m.q}</div>
-        <Chp tone={resolved ? (gotIt ? 'green' : 'red') : (pick != null && (!isTwo || pick.length === 2) ? 'yellow' : 'ghost')} style={{ whiteSpace: 'nowrap', flex: '0 0 auto' }}>
+        <Chp tone={resolved ? (gotIt ? 'green' : 'red') : (hasFullPick ? 'yellow' : 'ghost')} style={{ whiteSpace: 'nowrap', flex: '0 0 auto' }}>
           {resolved ? (gotIt ? '+' + m.points + ' pts' : 'Missed') : '+' + m.points + ' pts'}
         </Chp>
       </div>
       <div style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--ink2)', marginBottom: 9 }}>
-        {resolved ? 'Result is in' : isTwo ? 'Pick the two finalists' : 'Open · tap to pick'}
+        {resolved ? 'Result is in' : locked ? 'Predictions locked' : isTwo ? 'Pick the two finalists' : 'Open · tap to pick'}
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
         {m.options.map((opt, i) => {
           const o = optLabel(m, opt);
           const on = picked(o.id);
-          const isAnswer = resolved && (isTwo ? false : o.id === m.answer);
+          const isAnswer = resolved && (isTwo ? (Array.isArray(m.answer) && m.answer.indexOf(o.id) >= 0) : o.id === m.answer);
           const wrong = resolved && on && !isAnswer;
           let bg = '#fff', bd = 'var(--line)';
           if (isAnswer) { bg = 'rgba(26,122,68,.12)'; bd = 'var(--green)'; }
           else if (wrong) { bg = 'rgba(232,39,42,.08)'; bd = 'var(--red)'; }
           else if (on && !resolved) { bg = 'var(--yellow)'; bd = 'var(--ink)'; }
           return (
-            <button key={i} onClick={() => choose(o.id)} disabled={resolved} style={{
-              display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', cursor: resolved ? 'default' : 'pointer',
+            <button key={i} onClick={() => choose(o.id)} disabled={resolved || locked} style={{
+              display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', cursor: (resolved || locked) ? 'default' : 'pointer',
               textAlign: 'left', border: '2.5px solid ' + bd, borderRadius: 13, background: bg, fontFamily: 'var(--body)', transition: 'all .12s'
             }}>
               {o.flag && <span style={{ fontSize: 24 }}>{o.flag}</span>}
@@ -3514,11 +3672,45 @@ function Market(props) {
                 {o.sub && <div style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--ink2)' }}>{o.sub}</div>}
               </div>
               {isAnswer && <Chp tone="green" style={{ flex: '0 0 auto' }}>Correct</Chp>}
-              {!resolved && <span style={{ width: 22, height: 22, borderRadius: '50%', border: '2.5px solid var(--ink)', background: on ? 'var(--ink)' : '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 13, fontWeight: 900, flex: '0 0 auto' }}>{on ? '✓' : ''}</span>}
+              {!resolved && !locked && <span style={{ width: 22, height: 22, borderRadius: '50%', border: '2.5px solid var(--ink)', background: on ? 'var(--ink)' : '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 13, fontWeight: 900, flex: '0 0 auto' }}>{on ? '✓' : ''}</span>}
+              {!resolved && locked && on && <Chp tone="yellow" style={{ flex: '0 0 auto' }}>Your pick</Chp>}
             </button>
           );
         })}
       </div>
+      {isTeam && !resolved && !locked && (
+        <div style={{ marginTop: 10, borderTop: '1.5px solid var(--line)', paddingTop: 10 }}>
+          <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--ink2)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '.05em' }}>Search all 48 teams</div>
+          <input
+            value={teamQ}
+            onChange={e => setTeamQ(e.target.value)}
+            placeholder="Type a team name…"
+            style={{ width: '100%', boxSizing: 'border-box', border: '2px solid var(--line)', borderRadius: 10, padding: '8px 11px', fontFamily: 'var(--body)', fontWeight: 600, fontSize: 14, outline: 'none' }}
+          />
+          {teamResults.length > 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 5, marginTop: 6 }}>
+              {teamResults.map(t => {
+                const on = picked(t.code);
+                return (
+                  <button key={t.code} onClick={() => choose(t.code)} style={{
+                    display: 'flex', alignItems: 'center', gap: 10, padding: '8px 11px',
+                    border: '2px solid ' + (on ? 'var(--ink)' : 'var(--line)'),
+                    borderRadius: 11, background: on ? 'var(--yellow)' : '#fff',
+                    cursor: 'pointer', fontFamily: 'var(--body)', textAlign: 'left'
+                  }}>
+                    <span style={{ fontSize: 22 }}>{t.flag}</span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: 800, fontSize: 13.5 }}>{t.name}</div>
+                      <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--ink2)' }}>Group {t.group} · {t.odds}</div>
+                    </div>
+                    <span style={{ width: 20, height: 20, borderRadius: '50%', border: '2px solid var(--ink)', background: on ? 'var(--ink)' : '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 12, fontWeight: 900, flex: '0 0 auto' }}>{on ? '✓' : ''}</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
     </Cp>
   );
 }
@@ -3559,10 +3751,16 @@ function PredictionsScreen(props) {
   const [, bump] = pState(0);
   if (!me) return null;
   const markets = WCp.predictions || Sp.PREDICTIONS;
-  const open = markets.filter(m => m.answer == null);
-  const graded = markets.filter(m => m.answer != null);
+  const open = markets.filter(m => !isResolved(m));
+  const graded = markets.filter(m => isResolved(m));
   const made = me.picks ? Object.keys(me.picks).filter(k => me.picks[k] != null && (!Array.isArray(me.picks[k]) || me.picks[k].length)).length : 0;
+  const predDeadline = WCp.meta && WCp.meta.predDeadline;
+  const deadlinePassed = predDeadline && new Date() > new Date(predDeadline);
+  const locked = !!(WCp.meta && WCp.meta.predictionsLocked) || !!deadlinePassed;
   function onPick(key, val) { Sp.setPick(me.id, key, val); bump(x => x + 1); }
+  function fmtDeadline(dt) {
+    try { return new Date(dt).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' }); } catch (e) { return dt; }
+  }
   return (
     <div className="pad">
       <div className="appbar" style={{ padding: '2px 0 12px' }}>
@@ -3571,12 +3769,19 @@ function PredictionsScreen(props) {
           <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink2)' }}>{made} of {markets.length} made · {Sp.predScoreOf(me)} pts banked</div>
         </div>
       </div>
+      {locked && <div style={{ display: 'flex', alignItems: 'center', gap: 9, background: 'var(--ink)', color: '#fff', borderRadius: 13, padding: '10px 13px', marginBottom: 12, fontSize: 13, fontWeight: 700 }}>
+        <span style={{ fontSize: 18 }}>🔒</span>
+        <span>{deadlinePassed ? 'Predictions are locked — deadline has passed.' : 'Predictions are locked by the organiser.'}</span>
+      </div>}
+      {!locked && predDeadline && <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--ink2)', marginBottom: 10, padding: '7px 12px', background: 'rgba(245,200,0,.2)', borderRadius: 10 }}>
+        Picks lock at {fmtDeadline(predDeadline)} — get yours in.
+      </div>}
       <Saysp mood="mischievous" label="on the record" animate>{WCp.LINES.predOpen}</Saysp>
       <SHp aside="still open">Make your call</SHp>
-      {open.map(m => <Market key={m.key} market={m} me={me} onPick={onPick} />)}
+      {open.map(m => <Market key={m.key} market={m} me={me} onPick={onPick} locked={locked} />)}
       {graded.length > 0 && <>
         <SHp aside="graded">Already settled</SHp>
-        {graded.map(m => <Market key={m.key} market={m} me={me} onPick={onPick} />)}
+        {graded.map(m => <Market key={m.key} market={m} me={me} onPick={onPick} locked={locked} />)}
       </>}
       <SHp aside="org-wide">Prediction league</SHp>
       <PredLeaderboard me={me} />
@@ -3971,14 +4176,36 @@ function SettingsAdmin() {
    const feeNow = Sa.entryFee ? Sa.entryFee() : WCa.FEE;
    const [fee, setFee] = aState2(String(feeNow || 0));
    React.useEffect(() => setFee(String(feeNow || 0)), [feeNow]);
+   const locationsNow = Sa.locations ? Sa.locations() : ['Edinburgh', 'London'];
+   const [locInput, setLocInput] = aState2(locationsNow.join(', '));
+   React.useEffect(() => setLocInput(locationsNow.join(', ')), [locationsNow.join(',')]);
    const entrants = Sa.allSync().length;
    const split = Sa.charitySplit ? Sa.charitySplit() : 0.5;
+   const purpose = Sa.purpose ? Sa.purpose() : 'work';
+   const includeDept = Sa.includeDepartment ? Sa.includeDepartment() : true;
+   const includeLocation = Sa.includeLocation ? Sa.includeLocation() : true;
+   const includeLtMember = Sa.includeLtMember ? Sa.includeLtMember() : true;
+   const locationsFreeText = Sa.locationsFreeText ? Sa.locationsFreeText() : false;
+   const predDeadlineNow = Sa.predDeadline ? Sa.predDeadline() : null;
+   const [predDeadlineInput, setPredDeadlineInput] = aState2(predDeadlineNow ? predDeadlineNow.slice(0, 16) : '');
+   React.useEffect(() => setPredDeadlineInput(predDeadlineNow ? predDeadlineNow.slice(0, 16) : ''), [predDeadlineNow]);
+   function saveDeadline() {
+     const val = predDeadlineInput.trim();
+     if (val) {
+       const dt = new Date(val);
+       if (isNaN(dt.getTime())) return;
+       Sa.setPredDeadline(dt.toISOString());
+       if (window.wcToast) window.wcToast('Prediction deadline set.', 'confident');
+     } else {
+       Sa.setPredDeadline(null);
+       if (window.wcToast) window.wcToast('Deadline cleared.', 'neutral');
+     }
+   }
    const n = Number(fee);
    const feeNum = isFinite(n) && n >= 0 ? n : feeNow;
    const gross = entrants * feeNum;
    const charity = gross * split;
    const winner = gross * (1 - split);
-   const includeDept = Sa.includeDepartment ? Sa.includeDepartment() : true;
    const fld = { width: '100%', border: '2.5px solid var(--ink)', borderRadius: 12, padding: '11px 13px', fontFamily: 'var(--disp)', fontWeight: 800, fontSize: 22, outline: 'none', background: '#fff' };
    function saveFee() {
      const val = Number(fee);
@@ -3986,8 +4213,14 @@ function SettingsAdmin() {
      Sa.setEntryFee(val);
      if (window.wcToast) window.wcToast('Entry fee set to £' + val.toLocaleString('en-GB'), 'confident');
    }
+   function saveLocations() {
+     const arr = locInput.split(',').map(s => s.trim()).filter(Boolean);
+     if (!arr.length) return;
+     Sa.setLocations(arr);
+     if (window.wcToast) window.wcToast(arr.length + ' location' + (arr.length > 1 ? 's' : '') + ' saved.', 'confident');
+   }
    function toggleRow(onClick, on, title, text) {
-     return <button onClick={onClick} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 11, textAlign: 'left', border: '2px solid var(--line)', borderRadius: 13, background: '#fff', padding: '11px 12px', cursor: 'pointer' }}>
+     return <button onClick={onClick} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 11, textAlign: 'left', border: '2px solid var(--line)', borderRadius: 13, background: '#fff', padding: '11px 12px', cursor: 'pointer', marginBottom: 8 }}>
        <span style={{ width: 42, height: 24, borderRadius: 999, background: on ? 'var(--green)' : 'var(--line)', border: '2px solid var(--ink)', position: 'relative', flex: '0 0 auto' }}>
          <span style={{ position: 'absolute', top: 2, left: on ? 20 : 2, width: 16, height: 16, borderRadius: '50%', background: '#fff', border: '2px solid var(--ink)' }} />
        </span>
@@ -3997,6 +4230,7 @@ function SettingsAdmin() {
        </span>
      </button>;
    }
+   const splitPct = Math.round(split * 100);
    return (
      <>
        <Ca bordered style={{ background: 'var(--yellow)', marginBottom: 12 }}>
@@ -4022,12 +4256,87 @@ function SettingsAdmin() {
          ))}
        </Ca>
 
+       <SHa>Charity split</SHa>
+       <div style={{ display: 'flex', gap: 7, marginBottom: 8 }}>
+         {[0, 25, 50, 75, 100].map(pct => (
+           <button key={pct} onClick={() => Sa.setCharitySplit(pct / 100)} className="wc-btn wc-btn--sm"
+             style={{ flex: 1, background: splitPct === pct ? 'var(--yellow)' : '#fff', boxShadow: splitPct === pct ? '0 4px 0 var(--ink)' : '0 4px 0 var(--shadow)' }}>
+             {pct}%
+           </button>
+         ))}
+       </div>
+       <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink2)', marginBottom: 16, lineHeight: 1.4 }}>
+         {split < 0.01 ? 'No charity split — everything goes to the winner.' : split > 0.99 ? 'All entry fees go to charity. No winner fund.' : splitPct + '% of each entry goes to charity, the rest to the winner.'}
+       </div>
+
+       <SHa>Sweepstake type</SHa>
+       <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+         {[['work', 'Work'], ['friends', 'Friends & family']].map(([k, lab]) => (
+           <button key={k} onClick={() => Sa.setPurpose(k)} className="wc-btn wc-btn--sm"
+             style={{ flex: 1, background: purpose === k ? 'var(--yellow)' : '#fff', boxShadow: purpose === k ? '0 4px 0 var(--ink)' : '0 4px 0 var(--shadow)' }}>
+             {lab}
+           </button>
+         ))}
+       </div>
+       <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink2)', marginBottom: 16, lineHeight: 1.4 }}>
+         {purpose === 'work' ? 'Shows department, location and LT fields. You can toggle them individually below.' : 'Just names — no work details collected. Individual toggles below still apply.'}
+       </div>
+
+       <SHa>Locations</SHa>
+       <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink2)', marginBottom: 8, lineHeight: 1.4 }}>List your offices or locations, separated by commas. People pick from these when signing up.</div>
+       <div style={{ display: 'flex', gap: 7, alignItems: 'center', marginBottom: 8 }}>
+         <input value={locInput} onChange={e => setLocInput(e.target.value)} onBlur={saveLocations}
+           onKeyDown={e => e.key === 'Enter' && saveLocations()}
+           style={{ flex: 1, border: '2px solid var(--ink)', borderRadius: 11, padding: '9px 12px', fontFamily: 'var(--body)', fontWeight: 600, fontSize: 14, outline: 'none', background: '#fff' }}
+           placeholder="e.g. Edinburgh, London, Remote" />
+         <button onClick={saveLocations} className="wc-btn wc-btn--sm wc-btn--ink">Save</button>
+       </div>
+       {toggleRow(
+         () => Sa.setLocationsFreeText(!locationsFreeText),
+         locationsFreeText,
+         'Allow custom location',
+         locationsFreeText ? 'People can type their own location (your list shows as suggestions).' : 'People must pick from your list above.'
+       )}
+
+       <SHa>Predictions deadline</SHa>
+       <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink2)', marginBottom: 8, lineHeight: 1.4 }}>Set a cut-off date and time. Predictions lock automatically once it passes.</div>
+       <div style={{ display: 'flex', gap: 7, alignItems: 'center', marginBottom: 6 }}>
+         <input
+           type="datetime-local"
+           value={predDeadlineInput}
+           onChange={e => setPredDeadlineInput(e.target.value)}
+           onBlur={saveDeadline}
+           style={{ flex: 1, border: '2px solid var(--ink)', borderRadius: 11, padding: '9px 12px', fontFamily: 'var(--body)', fontWeight: 600, fontSize: 14, outline: 'none', background: '#fff' }}
+         />
+         <button onClick={saveDeadline} className="wc-btn wc-btn--sm wc-btn--ink">Set</button>
+         {predDeadlineNow && <button onClick={() => { setPredDeadlineInput(''); Sa.setPredDeadline(null); if (window.wcToast) window.wcToast('Deadline cleared.', 'neutral'); }} className="wc-btn wc-btn--sm">Clear</button>}
+       </div>
+       {predDeadlineNow && (() => {
+         const past = new Date() > new Date(predDeadlineNow);
+         return <div style={{ fontSize: 12, fontWeight: 700, color: past ? 'var(--red)' : 'var(--ink2)', marginBottom: 16 }}>
+           {past ? 'Locked — deadline has passed.' : 'Locks at ' + new Date(predDeadlineNow).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' }) + '.'}
+         </div>;
+       })()}
+       {!predDeadlineNow && <div style={{ height: 16 }} />}
+
        <SHa>Signup fields</SHa>
        {toggleRow(
          () => Sa.setIncludeDepartment(!includeDept),
          includeDept,
-         'Team / department field',
-         includeDept ? 'Shown on signup, profile editing and the directory.' : 'Hidden from signup, profile editing and directory filters.'
+         'Team / department',
+         includeDept ? 'Shown on signup, editing and directory.' : 'Hidden from signup, editing and directory.'
+       )}
+       {toggleRow(
+         () => Sa.setIncludeLocation(!includeLocation),
+         includeLocation,
+         'Location',
+         includeLocation ? 'Shown on signup and profile editing.' : 'Hidden — not collected.'
+       )}
+       {toggleRow(
+         () => Sa.setIncludeLtMember(!includeLtMember),
+         includeLtMember,
+         'Leadership Team member',
+         includeLtMember ? 'Shown on signup and profile editing.' : 'Hidden — not collected.'
        )}
      </>
    );
@@ -4579,19 +4888,27 @@ const A_W = window.Wheesht;
 const A_S = window.Store;
 const { useState: aState, useEffect: aEffect } = React;
 
-/* ---- Easter egg (basic — built to extend later) ----------------------------
-   A wee hidden treat: tap the league title five times quickly. For now it just
-   pops some confetti and a hidden Wheesht line. Richer rewards (badges, secret
-   stats, a mini-game) can hang off window.__wheeshtEgg without touching the UI. */
+/* ---- Easter eggs (tap the league title 5× for egg 1; tap rank badge 3× for egg 2) --- */
 const EGG_LINES = [
-  'Wheesht kent ye’d go poking. Away ye go, ya nosy beggar.',
-  'A hidden whistle! Dinnae tell the others. Wheesht certainly won’t.',
-  'Five taps. Wheesht respects a curious mind. Reluctantly.',
-  'Ye found the secret. There’s nae prize. Yet. Wheesht is working on it.',
+  'Persistent. Wheesht respects that. Grudgingly.',
+  'A hidden feature, not a bug. Wheesht planned this all along.',
+  'Five taps. Impressive commitment. There is no prize. Wheesht is working on it.',
+  'You found it. Well done. Wheesht is neither confirming nor denying there are others.',
 ];
 window.__wheeshtEgg = function(){
   try{ window.wcConfetti && window.wcConfetti({ y:.32, count:90 }); }catch(e){}
   try{ window.wcToast && window.wcToast(EGG_LINES[(Math.random()*EGG_LINES.length)|0], 'mischievous'); }catch(e){}
+};
+
+const EGG2_LINES = [
+  'Ranking noted. The pot does not care. Wheesht does, slightly.',
+  'You tapped the rank. Wheesht was watching. Wheesht is always watching.',
+  'Three taps on the rank badge and Wheesht appears. Almost as if planned.',
+  'Position logged. Wheesht neither confirms nor denies this changes anything.',
+];
+window.__wheeshtEgg2 = function(){
+  try{ window.wcConfetti && window.wcConfetti({ y:.5, count:55, colors:['#F5C800','#E8272A','#fff','#1A1A1A'] }); }catch(e){}
+  try{ window.wcToast && window.wcToast(EGG2_LINES[(Math.random()*EGG2_LINES.length)|0], 'confident'); }catch(e){}
 };
 
 /* ---- tab icons ---- */
@@ -4747,11 +5064,42 @@ function App(){
   aEffect(()=>{
     if(flow!=='app'||!me) return;
     const pre = A_WC.meta.phase === 'pre';
+    const myTeam = A_WC.TEAMS[me.team];
     const id=setTimeout(()=>{
-      if(pre) window.wcToast&&window.wcToast('Predictions are open till kick-off. Get them in — Wheesht is taking names.','mischievous');
-      else if(!A_WC.TEAMS[me.team].alive) window.wcToast&&window.wcToast(A_WC.LINES.eliminated,'crying');
-      else window.wcToast&&window.wcToast('Yer team’s in the hat. Wheesht will be watching. Closely.','mischievous');
-      if(t.bias) setTimeout(()=>window.wcToast&&window.wcToast('Reminder: Scotland are in this tournament. Just so we’re all clear.','scottish'),1500);
+      if(pre){
+        const pool=[
+          ['Predictions are open till kick-off. Get them in — Wheesht is taking names.','mischievous'],
+          ['Your picks won\'t make themselves. Wheesht is waiting.','nervous'],
+          ['Markets are open. Back your instincts. Wheesht backs nothing — but watches everything.','confident'],
+          ['Get your predictions in before the first whistle. No extensions.','angry'],
+          ['Wheesht has opinions on every market. Wheesht is keeping them to itself.','mischievous'],
+        ];
+        const pick=pool[(Math.random()*pool.length)|0];
+        window.wcToast&&window.wcToast(pick[0],pick[1]);
+      } else if(!myTeam||!myTeam.alive){
+        window.wcToast&&window.wcToast(A_WC.LINES.eliminated,'crying');
+      } else {
+        const pool=[
+          ['Your team is still in it. Wheesht is watching — with moderate approval.','confident'],
+          ['Still standing. Wheesht has noted this. Nothing more to add.','neutral'],
+          ['Your team is in the mix. Wheesht is cautiously optimistic. Very cautiously.','nervous'],
+          ['In the running. The pot is watching too. Wheesht is taking no questions.','mischievous'],
+          [myTeam.name+' are alive. Wheesht acknowledges this. Barely.','happy'],
+        ];
+        const pick=pool[(Math.random()*pool.length)|0];
+        window.wcToast&&window.wcToast(pick[0],pick[1]);
+      }
+      if(t.bias){
+        const scotMsgs=[
+          ['Scotland are in this tournament. Just so everyone is clear.','scottish'],
+          ['Scotland. Still here. Wheesht is cautiously optimistic — emphasis on cautious.','nervous'],
+          ['A gentle reminder that Scotland are participating. Wheesht thought you should know.','scottish'],
+          ['Scotland update: still in it. Wheesht is fine. Everything is fine.','confident'],
+          ['No one asked. Wheesht is mentioning Scotland anyway.','mischievous'],
+        ];
+        const sp=scotMsgs[(Math.random()*scotMsgs.length)|0];
+        setTimeout(()=>window.wcToast&&window.wcToast(sp[0],sp[1]),1600);
+      }
     },650);
     return ()=>clearTimeout(id);
   },[flow,me&&me.id]); // eslint-disable-line
@@ -4789,7 +5137,7 @@ function App(){
     const p=A_S.getSync(id);
     const t=p&&A_WC.TEAMS[p.team];
     setFlow('app');
-    setTimeout(()=>window.wcToast&&window.wcToast('Welcome, '+(p?p.name:'')+'! Yer team is '+((t&&t.flag)||'')+' '+(t?t.name:'')+'.',  'confident'),400);
+    setTimeout(()=>window.wcToast&&window.wcToast('Welcome, '+(p?p.name:'')+'! Your team is '+((t&&t.flag)||'')+' '+(t?t.name:'')+'.',  'confident'),400);
   }
 
   // -------- onboarding / identity flow --------
@@ -4857,11 +5205,11 @@ function App(){
     <window.TweaksPanel title="Tweaks">
       <window.TweakSection label="Atmosphere"/>
       <window.TweakSlider label="Celebration" value={t.celebration} min={0} max={10} step={1} onChange={v=>setTweak('celebration',v)}/>
-      <window.TweakToggle label="Wheesht’s Scottish bias" value={t.bias} onChange={v=>setTweak('bias',v)}/>
+      <window.TweakToggle label="Wheesht's Scottish bias" value={t.bias} onChange={v=>setTweak('bias',v)}/>
       <window.TweakToggle label="Match-programme texture" value={t.texture} onChange={v=>setTweak('texture',v)}/>
       <window.TweakSection label="Admin"/>
       <div style={{padding:'4px 14px 8px'}}>
-        <button onClick={()=>setAdmin(true)} style={{width:'100%',border:'none',borderRadius:11,background:'var(--ink)',color:'#fff',fontFamily:'var(--disp)',fontWeight:800,fontSize:13.5,padding:'12px',cursor:'pointer',boxShadow:'0 4px 0 #000'}}>Open Wheesht’s clipboard →</button>
+        <button onClick={()=>setAdmin(true)} style={{width:'100%',border:'none',borderRadius:11,background:'var(--ink)',color:'#fff',fontFamily:'var(--disp)',fontWeight:800,fontSize:13.5,padding:'12px',cursor:'pointer',boxShadow:'0 4px 0 #000'}}>Open Wheesht's clipboard →</button>
         <div style={{fontSize:11,fontWeight:600,color:'var(--ink2)',marginTop:6,lineHeight:1.35}}>Set results, knock teams out, grade predictions.</div>
       </div>
       <window.TweakToggle label="Lock predictions" value={t.locked} onChange={v=>setTweak('locked',v)}/>

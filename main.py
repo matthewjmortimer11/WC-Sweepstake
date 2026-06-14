@@ -262,6 +262,18 @@ def _league_state(league: League, league_people: List[Dict[str, Any]], admin: Di
     meta["out"] = sum(1 for p in people if not p.get("alive"))
     meta["teamsLeft"] = sum(1 for t in teams if t.get("alive"))
     meta["includeDepartment"] = bool(admin_meta.get("includeDepartment", True))
+    meta["includeLocation"] = bool(admin_meta.get("includeLocation", True))
+    meta["includeLtMember"] = bool(admin_meta.get("includeLtMember", True))
+    meta["purpose"] = str(admin_meta.get("purpose", "work"))
+    try:
+        cs = admin_meta.get("charitySplit")
+        meta["charitySplit"] = max(0.0, min(1.0, float(cs))) if cs is not None else 0.5
+    except (TypeError, ValueError):
+        meta["charitySplit"] = 0.5
+    locs = admin_meta.get("locations")
+    meta["locations"] = [str(x) for x in locs] if isinstance(locs, list) and locs else ["Edinburgh", "London"]
+    meta["locationsFreeText"] = bool(admin_meta.get("locationsFreeText", False))
+    meta["predDeadline"] = admin_meta.get("predDeadline") or None
     data["meta"] = meta
     data["pot"] = len(people) * fee
     return data

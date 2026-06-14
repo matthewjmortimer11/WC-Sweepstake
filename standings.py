@@ -212,7 +212,9 @@ def grade_predictions(
         if key == "winner":
             ans = champion
         elif key == "final" and final_fx:
-            ans = [final_fx.get("a"), final_fx.get("b")]
+            a, b = final_fx.get("a"), final_fx.get("b")
+            if a and b:  # only grade once both finalists are known
+                ans = [a, b]
         elif key in special_stage_keys:
             t = by_code.get(special_stage_keys[key])
             # Only settle once they can't progress further.
