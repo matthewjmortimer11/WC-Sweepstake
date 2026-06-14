@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'wheesht-pwa-20260614-1';
+const CACHE_VERSION = 'wheesht-pwa-20260614-launch-1';
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const PAGE_CACHE = `${CACHE_VERSION}-pages`;
 
@@ -65,6 +65,13 @@ function isStaticRequest(url) {
   );
 }
 
+function isCodeRequest(url) {
+  return url.origin === self.location.origin && (
+    url.pathname.startsWith('/app/') ||
+    url.pathname === '/tweaks-panel.jsx'
+  );
+}
+
 async function networkFirst(request) {
   const cache = await caches.open(PAGE_CACHE);
   try {
@@ -73,6 +80,17 @@ async function networkFirst(request) {
     return fresh;
   } catch (err) {
     return (await cache.match(request)) || (await cache.match('/')) || new Response('Offline', { status: 503 });
+  }
+}
+
+async function networkFirstStatic(request) {
+  const cache = await caches.open(STATIC_CACHE);
+  try {
+    const fresh = await fetch(request, { cache: 'no-cache' });
+    if (fresh && fresh.ok) await cache.put(request, fresh.clone());
+    return fresh;
+  } catch (err) {
+    return (await cache.match(request)) || (await cache.match(new URL(request.url).pathname)) || new Response('Offline', { status: 503 });
   }
 }
 
@@ -108,6 +126,11 @@ self.addEventListener('fetch', (event) => {
 
   if (request.mode === 'navigate' && url.origin === self.location.origin) {
     event.respondWith(networkFirst(request));
+    return;
+  }
+
+  if (isCodeRequest(url)) {
+    event.respondWith(networkFirstStatic(request));
     return;
   }
 

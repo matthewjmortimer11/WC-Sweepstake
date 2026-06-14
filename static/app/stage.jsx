@@ -37,6 +37,36 @@
     });
   }
 
+  /* ---- ambient overhead-kick scene -------------------------------------- */
+  var fx = document.getElementById('stage-fx');
+  if (fx && !fx.innerHTML) {
+    fx.innerHTML = [
+      '<svg viewBox="0 0 520 260" role="img" aria-label="Animated overhead kick" style="display:block;width:100%;height:auto;overflow:visible">',
+      '<defs>',
+      '<linearGradient id="kickPitch" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#1a7a44" stop-opacity=".12"/><stop offset="1" stop-color="#f5c800" stop-opacity=".18"/></linearGradient>',
+      '</defs>',
+      '<path d="M20 210C132 244 308 246 496 198" fill="none" stroke="#f5c800" stroke-opacity=".18" stroke-width="3"/>',
+      '<path class="kick-arc" d="M178 149C254 64 345 70 438 136" fill="none" stroke="#f5c800" stroke-width="3" stroke-dasharray="7 9" stroke-linecap="round"/>',
+      '<g class="kick-net" fill="none" stroke="#e9e2d2" stroke-opacity=".38" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">',
+      '<path d="M392 78h78v96h-78z"/>',
+      '<path d="M392 78l-26 26v96l26-26M470 78l-26 26v96l26-26"/>',
+      '<path d="M392 104h78M392 130h78M392 156h78M418 78v96M444 78v96"/>',
+      '</g>',
+      '<text class="kick-goal" x="346" y="66" fill="#f5c800" font-family="Bricolage Grotesque, sans-serif" font-size="38" font-weight="800" letter-spacing="2">GOAL</text>',
+      '<circle class="kick-ball" cx="178" cy="149" r="13" fill="#fff" stroke="#1a1a1a" stroke-width="4"/>',
+      '<g class="kick-player" fill="none" stroke-linecap="round" stroke-linejoin="round">',
+      '<circle cx="138" cy="112" r="17" fill="#f5c800" stroke="#1a1a1a" stroke-width="5"/>',
+      '<path d="M148 132l30 31" stroke="#f5c800" stroke-width="12"/>',
+      '<path d="M148 132l30 31" stroke="#1a1a1a" stroke-width="5"/>',
+      '<path d="M158 144l-42 3M168 154l-18 45" stroke="#e9e2d2" stroke-width="9"/>',
+      '<path class="kick-leg" d="M176 160l-50-58" stroke="#e8272a" stroke-width="12"/>',
+      '<path class="kick-leg" d="M176 160l-50-58" stroke="#1a1a1a" stroke-width="5"/>',
+      '</g>',
+      '<ellipse cx="158" cy="220" rx="78" ry="15" fill="url(#kickPitch)"/>',
+      '</svg>'
+    ].join('');
+  }
+
   /* ---- live panels ------------------------------------------------------ */
   function money(n) { return '£' + (n || 0).toLocaleString('en-GB'); }
 

@@ -252,7 +252,7 @@ button{font-family:inherit;}
   .blob,.phone,#scaler,.stage-note{animation:none !important;}
 }
 
-/* ---------- live side panels ---------- */
+/* ---------- live side panels + overhead-kick flourish ---------- */
 @media (min-width:561px){
   .stage-panel{position:fixed;z-index:2;pointer-events:none;width:236px;color:#e9e2d2;
     opacity:0;animation:noteIn 1.1s .7s ease both;top:0;bottom:0;
@@ -279,6 +279,10 @@ button{font-family:inherit;}
   .sp-empty{font-size:12.5px;font-weight:600;color:#9a917f;}
   @media (max-width:1120px){ .stage-panel{display:none;} }
 
+  .kick-scene{position:fixed;left:28px;bottom:14px;width:min(420px,30vw);
+    z-index:1;pointer-events:none;opacity:.96;}
+  @media (max-width:1120px){ .kick-scene{left:50%;transform:translateX(-50%);width:min(420px,52vw);opacity:.5;} }
+
   .stage-toggle{position:fixed;right:24px;bottom:20px;z-index:5;
     pointer-events:auto;cursor:pointer;border:2px solid rgba(255,255,255,.18);
     background:rgba(20,18,14,.7);color:#e9e2d2;font-family:var(--body);font-weight:700;
@@ -289,15 +293,32 @@ button{font-family:inherit;}
 .stage-toggle{display:none;}
 @media (min-width:561px){ .stage-toggle{display:inline-block;} }
 
+/* kick animation keyframes (gated by .kick-scene visibility) */
+.kick-player{transform-origin:150px 150px;animation:kbPlayer 13s ease-in-out infinite;}
+.kick-leg{transform-origin:150px 150px;animation:kbLeg 13s ease-in-out infinite;}
+.kick-ball{animation:kbBall 13s ease-in infinite;}
+.kick-net{transform-origin:430px 130px;animation:kbNet 13s ease-out infinite;}
+.kick-goal{transform-origin:250px 40px;animation:kbGoal 13s ease-out infinite;}
+.kick-arc{animation:kbArc 13s ease-out infinite;}
+@keyframes kbPlayer{0%{opacity:0;transform:translateY(22px) rotate(-16deg)}4%{opacity:1;transform:translateY(0) rotate(-20deg)}8%{transform:rotate(10deg)}12%{transform:rotate(-4deg)}24%{opacity:1;transform:rotate(-6deg)}30%{opacity:0;transform:translateY(-12px) rotate(-22deg)}100%{opacity:0}}
+@keyframes kbLeg{0%,4%{transform:rotate(-62deg)}8%{transform:rotate(72deg)}12%{transform:rotate(44deg)}24%{transform:rotate(48deg)}30%,100%{transform:rotate(-62deg)}}
+@keyframes kbBall{0%,7%{transform:translate(0,0);opacity:1}11%{transform:translate(150px,-58px)}15%{transform:translate(214px,-22px)}16%{transform:translate(230px,-8px)}18%{transform:translate(230px,-2px)}28%{transform:translate(230px,-2px);opacity:1}31%{opacity:0}100%{opacity:0;transform:translate(0,0)}}
+@keyframes kbNet{0%,15%{transform:scaleX(1)}16%{transform:scaleX(1.05) skewX(-3deg)}19%{transform:scaleX(.99)}22%{transform:scaleX(1)}100%{transform:scaleX(1)}}
+@keyframes kbGoal{0%,15%{opacity:0;transform:scale(.6)}17%{opacity:1;transform:scale(1.12)}20%{transform:scale(1)}28%{opacity:1}32%{opacity:0}100%{opacity:0}}
+@keyframes kbArc{0%,7%{opacity:0}9%{opacity:.5}16%{opacity:.5}26%{opacity:.4}32%{opacity:0}100%{opacity:0}}
+
 /* per-screen entrance (replays on each tab switch via React key remount) */
 .scroll{animation:screenIn .42s cubic-bezier(.2,.8,.25,1) both;}
 @keyframes screenIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
 
 /* user motion toggle — kills the showy ambient motion, keeps UI subtle */
+body.motion-off .kick-scene{display:none;}
 body.motion-off .blob{animation:none;}
 body.motion-off .phone{animation:none;}
 
 @media (prefers-reduced-motion:reduce){
+  .kick-player,.kick-leg,.kick-ball,.kick-net,.kick-goal,.kick-arc{animation:none !important;}
+  .kick-scene{display:none;}
   .scroll{animation:none !important;}
 }
 
@@ -349,6 +370,7 @@ button:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(245,200,0,.55);borde
 <div class="stage-word" aria-hidden="true"><b>WHEESHT</b></div>
 <div id="stage-left" class="stage-panel stage-panel--l"></div>
 <div id="stage-right" class="stage-panel stage-panel--r"></div>
+<div id="stage-fx" class="kick-scene" aria-hidden="true"></div>
 <button id="stage-toggle" class="stage-toggle" type="button">⚽  Animation on</button>
 <div id="scaler">
   <div class="phone">
@@ -380,26 +402,26 @@ button:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(245,200,0,.55);borde
 
 <!-- Single source of truth: generated from wc_data.py by scripts/build_snapshot.py.
      No-op when the server injects window.WC_DATA above (live mode). -->
-<script src="app/wc-snapshot.js?v=20260614-admincode"></script>
-<script src="app/data.js?v=20260614-admincode"></script>
-<script src="app/store.js?v=20260614-admincode"></script>
-<script type="text/babel" src="app/wheesht-mascot.jsx?v=20260614-admincode"></script>
-<script type="text/babel" src="app/ui.jsx?v=20260614-admincode"></script>
-<script type="text/babel" src="tweaks-panel.jsx?v=20260614-admincode"></script>
-<script type="text/babel" src="app/screens-hub.jsx?v=20260614-admincode"></script>
-<script type="text/babel" src="app/screens-hub2.jsx?v=20260614-admincode"></script>
-<script type="text/babel" src="app/screens-onboarding.jsx?v=20260614-admincode"></script>
-<script type="text/babel" src="app/screens-dashboard.jsx?v=20260614-admincode"></script>
-<script type="text/babel" src="app/screens-competition.jsx?v=20260614-admincode"></script>
-<script type="text/babel" src="app/screens-predictions.jsx?v=20260614-admincode"></script>
-<script type="text/babel" src="app/screens-games.jsx?v=20260614-admincode"></script>
-<script type="text/babel" src="app/screens-match-centre.jsx?v=20260614-admincode"></script>
-<script type="text/babel" src="app/screens-what-if.jsx?v=20260614-admincode"></script>
-<script type="text/babel" src="app/screens-admin.jsx?v=20260614-admincode"></script>
-<script type="text/babel" src="app/screens-chat.jsx?v=20260614-admincode"></script>
-<script type="text/babel" src="app/screens-dev.jsx?v=20260614-admincode"></script>
-<script type="text/babel" src="app/app.jsx?v=20260614-admincode"></script>
-<script type="text/babel" src="app/stage.jsx?v=20260614-admincode"></script>
+<script src="app/wc-snapshot.js?v=20260614-launch"></script>
+<script src="app/data.js?v=20260614-launch"></script>
+<script src="app/store.js?v=20260614-launch"></script>
+<script type="text/babel" src="app/wheesht-mascot.jsx?v=20260614-launch"></script>
+<script type="text/babel" src="app/ui.jsx?v=20260614-launch"></script>
+<script type="text/babel" src="tweaks-panel.jsx?v=20260614-launch"></script>
+<script type="text/babel" src="app/screens-hub.jsx?v=20260614-launch"></script>
+<script type="text/babel" src="app/screens-hub2.jsx?v=20260614-launch"></script>
+<script type="text/babel" src="app/screens-onboarding.jsx?v=20260614-launch"></script>
+<script type="text/babel" src="app/screens-dashboard.jsx?v=20260614-launch"></script>
+<script type="text/babel" src="app/screens-competition.jsx?v=20260614-launch"></script>
+<script type="text/babel" src="app/screens-predictions.jsx?v=20260614-launch"></script>
+<script type="text/babel" src="app/screens-games.jsx?v=20260614-launch"></script>
+<script type="text/babel" src="app/screens-match-centre.jsx?v=20260614-launch"></script>
+<script type="text/babel" src="app/screens-what-if.jsx?v=20260614-launch"></script>
+<script type="text/babel" src="app/screens-admin.jsx?v=20260614-launch"></script>
+<script type="text/babel" src="app/screens-chat.jsx?v=20260614-launch"></script>
+<script type="text/babel" src="app/screens-dev.jsx?v=20260614-launch"></script>
+<script type="text/babel" src="app/app.jsx?v=20260614-launch"></script>
+<script type="text/babel" src="app/stage.jsx?v=20260614-launch"></script>
 <script>
 (function(){
   var secure = location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1';
