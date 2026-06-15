@@ -387,14 +387,14 @@ function App(){
   // landing flourish
   aEffect(()=>{
     if(flow!=='app'||!me) return;
-    const pre = A_WC.meta.phase === 'pre';
     const myTeam = A_WC.TEAMS[me.team];
     const nm = A_S.shownName ? A_S.shownName(me) : me.name;
     const fl = myTeam ? myTeam.flag : '';
     const tn = myTeam ? myTeam.name : '';
     const id=setTimeout(()=>{
       const picksLocked = A_S.predictionsLocked && A_S.predictionsLocked();
-      if(pre && picksLocked){
+      const hasMarkets = A_WC.PREDICTIONS && A_WC.PREDICTIONS.length > 0;
+      if(hasMarkets && picksLocked){
         const pool=[
           ['Predictions are locked. Wheesht has the receipts. All of them.','confident'],
           ['The markets are closed, '+nm+'. Wheesht is judging your choices as we speak.','mischievous'],
@@ -403,15 +403,14 @@ function App(){
         ];
         const pick=pool[(Math.random()*pool.length)|0];
         window.wcToast&&window.wcToast(pick[0],pick[1]);
-      } else if(pre){
+      } else if(hasMarkets && !picksLocked){
         const pool=[
-          ['Predictions are open till kick-off. Get them in — Wheesht is taking names.','mischievous'],
+          ['Predictions are still open. Get them in — Wheesht is taking names.','mischievous'],
           ['Your picks won\'t make themselves, '+nm+'. Wheesht is waiting.','nervous'],
           ['Markets are open. Back your instincts. Wheesht backs nothing — but watches everything.','confident'],
-          ['Get your predictions in before the first whistle. No extensions. Wheesht does not negotiate.','angry'],
+          ['Predictions are open. No extensions once the deadline hits. Wheesht does not negotiate.','angry'],
           ['Wheesht has opinions on every market. Wheesht is keeping them to itself. For now.','mischievous'],
-          [fl+' '+tn+' are ready. Are you? Predictions close at kick-off.','nervous'],
-          ['The draw is done. The teams are set. The only thing missing is your predictions.','confident'],
+          [fl+' '+tn+' are in it. Are your predictions in? The deadline is coming.','nervous'],
           ['Every prediction you don\'t make is a prediction Wheesht makes for you. You don\'t want that.','mischievous'],
         ];
         const pick=pool[(Math.random()*pool.length)|0];
