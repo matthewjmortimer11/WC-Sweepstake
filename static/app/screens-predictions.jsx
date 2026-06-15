@@ -170,7 +170,7 @@ function Market(props) {
         })}
       </div>
       </>}
-      {isTeam && !resolved && !locked && (
+      {isTeam && !resolved && !locked && !m.key.startsWith('dm_') && (
         <div style={{ marginTop: 10, borderTop: '1.5px solid var(--line)', paddingTop: 10 }}>
           <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--ink2)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '.05em' }}>Search all 48 teams</div>
           <input
@@ -204,7 +204,7 @@ function Market(props) {
         </div>
       )}
       {/* % breakdown — show for dynamic markets always, static markets once resolved */}
-      {(m.key.startsWith('dm_') || resolved) && m.kind !== 'number' && !isTwo && (function(){
+      {(m.key.startsWith('dm_') || resolved) && m.kind !== 'number' && m.kind !== 'scoreline' && !isTwo && (function(){
         const all = Sp.allSync ? Sp.allSync() : [];
         const withPick = all.filter(function(p){ return p.picks && p.picks[m.key] != null; });
         if (withPick.length === 0) return null;
