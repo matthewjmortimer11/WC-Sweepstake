@@ -34,7 +34,7 @@ from typing import Any, Dict, List, Optional
 from fastapi import FastAPI, Header, HTTPException
 from fastapi.responses import FileResponse, HTMLResponse, Response
 from pydantic import BaseModel, Field
-from sqlalchemy import func, select, text
+from sqlalchemy import delete, func, select, text
 from sqlalchemy.exc import IntegrityError
 
 import standings
@@ -1721,6 +1721,12 @@ class DevAuth(BaseModel):
     key: str
 
 
+class DevDeleteLeaguePayload(BaseModel):
+    key: str
+    confirmCode: str
+    confirmName: str
+
+
 def _dev_key_ok(key: str) -> bool:
     if not _DEV_KEY:
         return False
@@ -1745,6 +1751,29 @@ async def dev_list_leagues(payload: DevAuth):
             item["adminToken"] = _admin_token_for(lg)
             out.append(item)
     return {"leagues": out}
+
+
+@app.delete("/api/dev/leagues/{code}")
+async def dev_delete_league(code: str, payload: DevDeleteLeaguePayload):
+    if not _dev_key_ok(payload.key):
+        raise HTTPException(status_code=403, detail="Developer access denied")
+    async with AsyncSessionLocal() as session:
+        league = await _get_league_by_code(session, code.upper())
+        if league is None:
+            raise HTTPException(status_code=404, detail="League not found")
+        if (payload.confirmCode or "").strip().upper() != league.code:
+            raise HTTPException(status_code=400, detail="Type the league code exactly to delete it")
+        if (payload.confirmName or "").strip() != league.name:
+            raise HTTPException(status_code=400, detail="Type the league name exactly to delete it")
+
+        await session.execute(delete(ChatMessage).where(ChatMessage.league_id == league.id))
+        await session.execute(delete(ProfileAsset).where(ProfileAsset.league_id == league.id))
+        await session.execute(delete(Profile).where(Profile.league_id == league.id))
+        await session.execute(delete(Participant).where(Participant.league_id == league.id))
+        await session.execute(delete(AdminOverride).where(AdminOverride.league_id == league.id))
+        await session.delete(league)
+        await session.commit()
+        return {"ok": True, "deleted": {"code": league.code, "name": league.name}}
 
 
 # ── Static file serving ───────────────────────────────────────────────────────

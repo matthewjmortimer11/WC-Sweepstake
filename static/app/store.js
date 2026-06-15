@@ -795,6 +795,27 @@
       return fetch('/api/dev/leagues', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: key }) })
         .then(function (r) { return r.json().then(function (j) { if (!r.ok) throw new Error(j.detail || 'Developer access denied'); return j; }); });
     },
+    devDeleteLeague: function (key, league, confirmCode, confirmName) {
+      if (!LIVE) return Promise.reject(new Error('League deletion only works on the server'));
+      var code = league && league.code;
+      if (!code) return Promise.reject(new Error('Pick a league first'));
+      return fetch('/api/dev/leagues/' + encodeURIComponent(code), {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key: key, confirmCode: confirmCode, confirmName: confirmName })
+      }).then(function (r) {
+        return r.json().then(function (j) {
+          if (!r.ok) throw new Error(j.detail || 'Could not delete league');
+          var active = activeLeague();
+          if (active && active.code === code) {
+            lsSet(K.league, null);
+            lsSet(K.active, null);
+            rebuild(); emit();
+          }
+          return j;
+        });
+      });
+    },
     // Make any league active (no password — dev only) and pull its state.
     // Passing null clears the active league. Used to enter and to restore.
     devEnterLeague: function (L) {
