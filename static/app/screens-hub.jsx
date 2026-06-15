@@ -328,7 +328,18 @@ function TrackerScreen(){
       <div style={{height:12}}/>
       {pre
         ? <WheeshtSays mood="confident" label="broadcast mode" animate>Not a ball kicked yet — all {WC.meta.teamsLeft} still in. Wheesht is watching every single one of ye.</WheeshtSays>
-        : <WheeshtSays mood="confident" label="broadcast mode" animate>The field’s thinning. <b>England</b> just went. Wheesht is, of course, saying nothing.</WheeshtSays>}
+        : (function(){
+            const n = WC.meta.teamsLeft || 0;
+            const lines =
+              n >= 40 ? [‘Still a big field. ‘+n+’ nations in it. Wheesht has made no predictions and stands by that.’,’confident’]
+            : n >= 28 ? [‘Field thinning — ‘+n+’ teams remain. Wheesht is increasingly invested in this.’,’neutral’]
+            : n >= 16 ? [n+’ left standing. The tournament is properly serious now. Wheesht concurs.’,’confident’]
+            : n >= 8  ? [n+’ nations remain. Every game counts. Wheesht is paying very close attention.’,’mischievous’]
+            : n >= 4  ? [‘Last ‘+n+’ in it. Wheesht has opinions. They are staying internal for now.’,’nervous’]
+            : n === 2  ? [‘Two teams left. The final is decided. Wheesht is prepared. Mostly.’,’nervous’]
+            : [‘The tournament has a winner. Wheesht saw the whole thing. Every minute.’,’celebrating’];
+            return <WheeshtSays mood={lines[1]} label="broadcast mode" animate>{lines[0]}</WheeshtSays>;
+          })()}
       <div style={{display:'flex',gap:7,overflowX:'auto',padding:'16px 0 10px',margin:'0 -2px'}}>
         {filtersShown.map(([k,lab])=>(
           <button key={k} onClick={()=>setFilter(k)} className={'wc-chip'+(filter===k?' wc-chip--yellow':'')} style={{whiteSpace:'nowrap',cursor:'pointer',flex:'0 0 auto'}}>{lab}</button>
