@@ -429,7 +429,7 @@ function AdminPanel(props) {
            <div className="dh" style={{ fontSize: 20, color: '#fff', lineHeight: 1 }}>Wheesht's clipboard</div>
            <div style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--yellow)' }}>{(Sa.activeLeague && Sa.activeLeague()) ? Sa.activeLeague().name : 'Admin'} · {allPeople.length} entrants</div>
          </div>
-         <button onClick={props.onClose} style={{ border: 'none', background: 'rgba(255,255,255,.16)', color: '#fff', width: 34, height: 34, borderRadius: 10, fontSize: 18, fontWeight: 900, cursor: 'pointer', padding: 0, marginRight: 48 }}>✕</button>
+         <button onClick={props.onClose} style={{ border: 'none', background: 'rgba(255,255,255,.16)', color: '#fff', width: 34, height: 34, borderRadius: 10, fontSize: 18, fontWeight: 900, cursor: 'pointer', padding: 0 }}>✕</button>
        </div>
 
        <div className="mscroll" style={{ padding: '16px 18px 30px' }}>

@@ -338,6 +338,56 @@ function DrawMoment(props) {
   function verdict() {
     if (isSCO) return WCo.LINES.scotland;
     if (isENG) return WCo.LINES.england;
+    const code = t.code;
+    const bespoke = {
+      BRA: 'Brazil. The five-time champions. Dangerous, flamboyant, and absolutely in this. Wheesht considers this a very good pull.',
+      ARG: 'The defending world champions. Dangerous, experienced, and absolutely up for this. Wheesht rates this draw highly.',
+      FRA: 'France. Squad depth, flair, and a ruthless edge. One of the outright favourites. Wheesht is, quietly, very impressed.',
+      ESP: 'Spain. They\'ll control the ball, control the tempo, and probably control your nerves too. A top draw. Wheesht approves.',
+      POR: 'Portugal. Individual quality all over the pitch. Could go all the way — or could implode spectacularly. Wheesht watches with great interest.',
+      GER: 'Germany. They always find a way. Efficient, relentless, and deeply irritating to play against. Wheesht tips the hat.',
+      NED: 'The Netherlands. Pedigree, pace, and usually at least one genuinely stunning goal. Not a bad hand at all.',
+      BEL: 'Belgium. Experienced, well-organised, and capable of beating anyone. Wheesht considers this a solid draw.',
+      NOR: 'Norway. The goals have been flying in all qualifying campaign. If the form carries, this is a very exciting pick.',
+      URU: 'Uruguay. Punching above their weight for over a century. Small squad, enormous heart. Wheesht deeply respects this team.',
+      COL: 'Colombia. Athletic, quick, and completely unpredictable. The best draws are the ones that could go either way. This is one of those.',
+      MAR: 'Morocco. They reached a World Cup semi-final last time. Wheesht has not forgotten. This is a very live pick.',
+      USA: 'USA. Playing at home, in front of massive crowds, with everything to prove. Do not sleep on this. Wheesht isn\'t.',
+      CAN: 'Canada. Co-hosts, rising squad, playing in front of their own fans. There\'s something in this. Wheesht has a feeling.',
+      MEX: 'Mexico. Co-hosts with a passionate fanbase and tournament experience. The crowd could carry them far. Wheesht is watching.',
+      JPN: 'Japan. Disciplined, organised, and genuinely loves a big upset. Wheesht has stopped writing Japan off.',
+      KOR: 'South Korea. Fast, fit, and capable of brilliant football on the big stage. A pick with real potential.',
+      SEN: 'Senegal. Physical, technical, and genuinely dangerous. The African champions know how to tournament. Wheesht is intrigued.',
+      AUS: 'Australia. Gritty, well-coached, and capable of the unexpected. Wheesht has a quiet feeling about this one.',
+      CRO: 'Croatia. Experienced, stubborn, and never know when they\'re beaten. They always seem to find a way. Wheesht approves.',
+      ECU: 'Ecuador. Solid South American outfit. Capable of results when you least expect them. Wheesht is cautiously optimistic.',
+      SWE: 'Sweden. Structured, disciplined, dangerous at set pieces, and fiendishly hard to beat. Not a glamour pick — but Wheesht respects it.',
+      SUI: 'Switzerland. The draw specialists. Organised, solid, and somehow always there at the knockouts. Wheesht knows this type.',
+      CZE: 'Czech Republic. A proper footballing nation. They\'ve pulled off upsets before. Wheesht isn\'t writing them off.',
+      AUT: 'Austria. Better than people give them credit for. Wheesht notes they\'ve been decent of late.',
+      TUR: 'Turkey. Capable of brilliance and equally capable of chaos. Could be spectacular. Wheesht is braced.',
+      GHA: 'Ghana. Energetic, unpredictable, and always entertaining. Every tournament needs a team like this.',
+      EGY: 'Egypt. The African giants. A team with history and quality. They could make this interesting.',
+      RSA: 'South Africa. Hosting the continent of Africa in spirit. The passion will carry them somewhere.',
+      ALG: 'Algeria. A dark horse in every sense. Wheesht wouldn\'t rule them out.',
+      IRN: 'Iran. Defensively solid and hard to break down. Don\'t expect entertainment — expect difficulty.',
+      PAR: 'Paraguay. South American football pedigree. Capable of causing problems for anyone.',
+      QAT: 'Qatar. The last hosts. Wheesht notes the history — and reserves further comment.',
+      KSA: 'Saudi Arabia. They beat Argentina last time. Wheesht will not pretend that hasn\'t been noted.',
+      JOR: 'Jordan. The tournament debutants deserve their moment. Wheesht will be watching.',
+      IRQ: 'Iraq. Tournament football at this level is extraordinary. Wheesht acknowledges the journey.',
+      CPV: 'Cape Verde. The plucky underdogs. Every sweepstake needs one and you\'ve got them. Wheesht wishes you luck — genuinely.',
+      HAI: 'Haiti. Football against the odds. Wheesht respects the spirit. You might surprise everyone.',
+      CUW: 'Curaçao. A debut at this stage. Wheesht admires the ambition. Stranger things have happened.',
+      COD: 'DR Congo. Talented, unpredictable, and occasionally extraordinary. The African game has depth.',
+      UZB: 'Uzbekistan. Central Asian football on the world stage. Wheesht notes the moment with respect.',
+      CIV: 'Ivory Coast. The Elephants. AFCON champions, serious talent pool. This could be a very interesting pick.',
+      NZL: 'New Zealand. Pacific footballers on the grandest stage. Wheesht says: why not?',
+      TUN: 'Tunisia. A stalwart of African football at World Cups. Organised, experienced, capable.',
+      BIH: 'Bosnia & Herzegovina. The Balkans know how to produce footballers. Capable of surprising people.',
+      PAN: 'Panama. The joy of being here matters as much as the result. Wheesht acknowledges that fully.',
+    };
+    if (bespoke[code]) return bespoke[code];
     const odds = parseInt(t.odds.slice(1), 10);
     return odds <= 2500 ? WCo.LINES.drawGood : odds <= 20000 ? WCo.LINES.drawMid : WCo.LINES.drawBad;
   }
