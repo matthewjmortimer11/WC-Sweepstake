@@ -803,14 +803,22 @@ async def create_league(payload: LeagueCreate):
             id=uuid.uuid4().hex, code=code, slug=_slugify(name), name=name,
             password_hash=_hash_password(payload.password), seeded=False, created_at=_now(),
         )
-        session.add(league)
+        try:
+            session.add(league)
+            # Flush only the league row first. If this fails, it is the unique
+            # league-code race and the duplicate-code message is accurate.
+            await session.flush()
+        except IntegrityError:
+            await session.rollback()
+            raise HTTPException(status_code=409, detail="That code is already taken")
+
         session.add(AdminOverride(league_id=league.id, data={"teams": {}, "fixtures": {}, "predictions": {}, "meta": meta}, updated_at=_now()))
         try:
             await session.commit()
         except IntegrityError:
-            # Another request claimed this code between our check and commit.
             await session.rollback()
-            raise HTTPException(status_code=409, detail="That code is already taken")
+            log.exception("Could not initialise admin overrides for new league %s", code)
+            raise HTTPException(status_code=500, detail="Could not initialise league settings. Try again.")
         return {"league": _league_public(league)}
 
 
