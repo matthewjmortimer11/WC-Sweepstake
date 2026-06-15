@@ -259,11 +259,21 @@
     var code = leagueCode();
     var seen = {};
     var removed = lsGet(K.removed, []);
+    var seededNames = {};
+    var seededIds = {};
+    var L = activeLeague();
+    if (L && L.seeded) {
+      (WC.PEOPLE || []).forEach(function (p) {
+        seededIds[p.id] = 1;
+        seededNames[(p.name || '').trim().toLowerCase()] = 1;
+      });
+    }
     cache = [];
     // device-created entries: only those for the active league (or untagged)
     mine.forEach(function (p) {
       if (seen[p.id] || removed.indexOf(p.id) >= 0) return;
       if (code && p.leagueCode && p.leagueCode !== code) return;
+      if (seededNames[(p.name || '').trim().toLowerCase()] && !seededIds[p.id]) return;
       seen[p.id] = 1; cache.push(overlayProfile(liveStatus(p)));
     });
     // server/seed people are already league-scoped by the backend
