@@ -28,6 +28,35 @@ function Seg(p) {
   </div>;
 }
 
+function CustomFieldSetup(p) {
+  const fields = p.fields || [];
+  function change(i, label) {
+    p.onChange(fields.map((f, idx) => idx === i ? { ...f, label: label } : f));
+  }
+  function remove(i) {
+    p.onChange(fields.filter((_, idx) => idx !== i));
+  }
+  function add() {
+    if (fields.length >= 6) return;
+    p.onChange(fields.concat([{ key: '', label: '' }]));
+  }
+  return (
+    <div>
+      <Lab opt>Custom signup questions</Lab>
+      <div style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--ink2)', marginTop: 4 }}>Add anything else you want people to fill in, like relationship, nickname or team name.</div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
+        {fields.map((f, i) => (
+          <div key={i} style={{ display: 'flex', gap: 7, alignItems: 'center' }}>
+            <input style={{ ...inp, marginTop: 0, padding: '10px 12px', fontSize: 14 }} value={f.label || ''} onChange={e => change(i, e.target.value)} placeholder="Question label" maxLength={40} />
+            <button onClick={() => remove(i)} className="wc-btn wc-btn--sm" style={{ flex: '0 0 auto', background: '#fff' }}>Remove</button>
+          </div>
+        ))}
+        {fields.length < 6 && <button onClick={add} className="wc-btn wc-btn--sm wc-btn--ghost" style={{ width: '100%' }}>Add custom field</button>}
+      </div>
+    </div>
+  );
+}
+
 /* =================== ACCOUNT / LEAGUE GATE =================== */
 function AccountGate(props) {
   // All device accounts across every league, so people can hop back in.
@@ -142,15 +171,41 @@ function CreateLeague(props) {
   const [name, setName] = oState('');
   const [code, setCode] = oState('');
   const [pw, setPw] = oState('');
+  const [purpose, setPurpose] = oState('work');
+  const [includeDept, setIncludeDept] = oState(true);
+  const [includeLocation, setIncludeLocation] = oState(true);
+  const [includeLtMember, setIncludeLtMember] = oState(true);
+  const [locInput, setLocInput] = oState('Edinburgh, London');
+  const [locationsFreeText, setLocationsFreeText] = oState(false);
+  const [customFields, setCustomFields] = oState([]);
   const [err, setErr] = oState('');
   const [busy, setBusy] = oState(false);
   const cleanCode = code.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
   const ok = name.trim().length > 0 && cleanCode.length >= 2 && pw.length >= 4;
+  const toggleRow = (onClick, on, title, text) => <button onClick={onClick} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 11, textAlign: 'left', border: '2px solid var(--line)', borderRadius: 13, background: '#fff', padding: '11px 12px', cursor: 'pointer' }}>
+    <span style={{ width: 42, height: 24, borderRadius: 999, background: on ? 'var(--green)' : 'var(--line)', border: '2px solid var(--ink)', position: 'relative', flex: '0 0 auto' }}>
+      <span style={{ position: 'absolute', top: 2, left: on ? 20 : 2, width: 16, height: 16, borderRadius: '50%', background: '#fff', border: '2px solid var(--ink)' }} />
+    </span>
+    <span style={{ flex: 1, minWidth: 0 }}>
+      <span className="dh" style={{ display: 'block', fontSize: 15 }}>{title}</span>
+      <span style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--ink2)', marginTop: 2, lineHeight: 1.3 }}>{text}</span>
+    </span>
+  </button>;
 
   function submit() {
     if (!ok || busy) return;
     setBusy(true); setErr('');
-    So.createLeague(name.trim(), cleanCode, pw).then(function (res) {
+    const locations = locInput.split(',').map(s => s.trim()).filter(Boolean);
+    const opts = {
+      purpose: purpose,
+      includeDepartment: purpose === 'work' && includeDept,
+      includeLocation: purpose === 'work' && includeLocation,
+      includeLtMember: purpose === 'work' && includeLtMember,
+      locations: locations.length ? locations : ['Edinburgh', 'London'],
+      locationsFreeText: locationsFreeText,
+      customFields: customFields.filter(f => (f.label || '').trim()),
+    };
+    So.createLeague(name.trim(), cleanCode, pw, opts).then(function (res) {
       setBusy(false);
       props.onCreated(res.league);
     }).catch(function (e) {
@@ -184,6 +239,25 @@ function CreateLeague(props) {
             <Lab>Password</Lab>
             <input type="password" style={inp} value={pw} onChange={e => { setPw(e.target.value); setErr(''); }} onKeyDown={e => e.key === 'Enter' && submit()} placeholder="At least 4 characters" />
           </div>
+          <div>
+            <Lab>Who is this for?</Lab>
+            <Seg value={purpose} onChange={setPurpose} options={[{ value: 'work', label: 'Work' }, { value: 'friends', label: 'Friends & family' }]} />
+            <div style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--ink2)', marginTop: 6 }}>
+              {purpose === 'work' ? 'Collect work details during signup. You can fine-tune them now.' : 'Keeps signup simple: names only, plus any custom questions you add.'}
+            </div>
+          </div>
+          {purpose === 'work' && <>
+            {toggleRow(() => setIncludeDept(!includeDept), includeDept, 'Team / department', includeDept ? 'Ask people for their team or department.' : 'Hide the department field.')}
+            {toggleRow(() => setIncludeLocation(!includeLocation), includeLocation, 'Location', includeLocation ? 'Ask people to pick a location.' : 'Hide the location field.')}
+            {toggleRow(() => setIncludeLtMember(!includeLtMember), includeLtMember, 'Leadership Team member', includeLtMember ? 'Ask whether someone is in LT.' : 'Hide the LT question.')}
+            {includeLocation && <div>
+              <Lab>Locations</Lab>
+              <input style={inp} value={locInput} onChange={e => setLocInput(e.target.value)} placeholder="e.g. Edinburgh, London, Remote" />
+              <div style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--ink2)', marginTop: 4 }}>Separate locations with commas.</div>
+            </div>}
+            {includeLocation && toggleRow(() => setLocationsFreeText(!locationsFreeText), locationsFreeText, 'Allow custom location', locationsFreeText ? 'People can type their own location.' : 'People must pick from your list.')}
+          </>}
+          <CustomFieldSetup fields={customFields} onChange={setCustomFields} />
         </div>
         {err && <div style={{ marginTop: 10, fontSize: 13, fontWeight: 700, color: 'var(--red)' }}>{err}</div>}
         <div style={{ marginTop: 18 }}>
@@ -253,6 +327,8 @@ function OnboardingForm(props) {
   const includeDept = So.includeDepartment ? So.includeDepartment() : true;
   const includeLocation = So.includeLocation ? So.includeLocation() : true;
   const includeLtMember = So.includeLtMember ? So.includeLtMember() : true;
+  const customDefs = So.customFields ? So.customFields() : [];
+  const [customFields, setCustomFields] = oState({});
   const locationOpts = So.locations ? So.locations() : ['Edinburgh', 'London'];
   const locationsFreeText = So.locationsFreeText ? So.locationsFreeText() : false;
   const [loc, setLoc] = oState(locationOpts[0] || 'Edinburgh');
@@ -300,6 +376,10 @@ function OnboardingForm(props) {
             <Lab opt>Leadership Team member?</Lab>
             <Seg value={lt} onChange={setLt} options={[{ value: false, label: 'No' }, { value: true, label: 'Yes' }]} />
           </div>}
+          {customDefs.map(f => <div key={f.key}>
+            <Lab opt>{f.label}</Lab>
+            <input style={inp} value={customFields[f.key] || ''} onChange={e => setCustomFields({ ...customFields, [f.key]: e.target.value })} placeholder="Your answer" maxLength={80} />
+          </div>)}
         </div>
 
         {fee > 0 && <Co bordered style={{ marginTop: 20, background: 'var(--yellow)' }}>
@@ -314,7 +394,7 @@ function OnboardingForm(props) {
         </Co>}
 
         <div style={{ marginTop: 18 }}>
-          <Bo variant="ink" block onClick={() => ok && props.onSubmit({ name: name.trim(), department: includeDept ? dept.trim() : '', location: includeLocation ? loc : '', ltMember: includeLtMember ? lt : false })}>
+          <Bo variant="ink" block onClick={() => ok && props.onSubmit({ name: name.trim(), department: includeDept ? dept.trim() : '', location: includeLocation ? loc : '', ltMember: includeLtMember ? lt : false, customFields: customFields })}>
             {ok ? 'To the draw →' : 'Add your name first'}
           </Bo>
         </div>

@@ -116,6 +116,7 @@
       purpose: WC.meta.purpose || 'work',
       locations: WC.meta.locations || ['Edinburgh', 'London'],
       locationsFreeText: !!WC.meta.locationsFreeText,
+      customFields: WC.meta.customFields || [],
       predDeadline: WC.meta.predDeadline || null,
       hiddenPredictions: WC.meta.hiddenPredictions || [],
     },
@@ -153,6 +154,7 @@
     WC.meta.purpose = (admin.meta && admin.meta.purpose) || BASE.meta.purpose;
     WC.meta.locations = (admin.meta && Array.isArray(admin.meta.locations) && admin.meta.locations.length) ? admin.meta.locations : BASE.meta.locations;
     WC.meta.locationsFreeText = admin.meta && admin.meta.locationsFreeText != null ? !!admin.meta.locationsFreeText : BASE.meta.locationsFreeText;
+    WC.meta.customFields = (admin.meta && Array.isArray(admin.meta.customFields)) ? admin.meta.customFields : BASE.meta.customFields;
     WC.meta.predDeadline = (admin.meta && admin.meta.predDeadline) || BASE.meta.predDeadline || null;
     WC.meta.hiddenPredictions = (admin.meta && Array.isArray(admin.meta.hiddenPredictions)) ? admin.meta.hiddenPredictions : BASE.meta.hiddenPredictions;
     WC.charitySplit = (admin.meta && admin.meta.charitySplit != null) ? Number(admin.meta.charitySplit) : BASE.meta.charitySplit;
@@ -390,16 +392,24 @@
     },
     knownLeagues: function () { return knownLeagues(); },
     // Create a league on the backend, then make it active.
-    createLeague: function (name, code, password) {
-      var body = { name: name, code: code, password: password };
+    createLeague: function (name, code, password, options) {
+      options = options || {};
+      var body = Object.assign({ name: name, code: code, password: password }, options);
       if (!LIVE) {
         var L = { id: 'mock-' + code, code: (code || '').toUpperCase(), name: name || 'Sweepstake', seeded: false };
+        admin.meta = Object.assign({}, admin.meta || {}, options);
+        applyAdmin(); persistAdmin(admin);
         setActiveLeague(L); rebuild(); emit();
         return Promise.resolve({ league: L });
       }
       return fetch('/api/leagues', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
         .then(function (r) { return r.json().then(function (j) { if (!r.ok) throw new Error(j.detail || 'Could not create league'); return j; }); })
-        .then(function (j) { setActiveLeague(j.league); rebuild(); emit(); return j; });
+        .then(function (j) {
+          admin = { teams: {}, fixtures: {}, predictions: {}, meta: Object.assign({}, options) };
+          applyAdmin();
+          setActiveLeague(j.league); rebuild(); emit();
+          return j;
+        });
     },
     // Validate code+password; on success make the league active. Resolves with
     // the league (incl. seeded flag so onboarding picks roster vs draw).
@@ -506,7 +516,7 @@
         gender: '—', team: team, color: COLORS[(Math.random() * COLORS.length) | 0],
         stage: t.stage, alive: t.alive, isYou: false, isDemo: false,
         leagueCode: leagueCode(), isOrganiser: !!opts.organiser,
-        picks: {}, predScore: 0, joinedAt: Date.now()
+        picks: {}, customFields: profile.customFields || {}, predScore: 0, joinedAt: Date.now()
       };
       mine = mine.concat([p]); lsSet(K.mine, mine); rebuild();
       var d = this.deviceIds(); if (d.indexOf(p.id) < 0) d.push(p.id); lsSet(K.device, d);
@@ -854,6 +864,24 @@
       admin.meta = admin.meta || {}; admin.meta.locationsFreeText = !!on;
       commitAdmin();
     },
+    customFields: function () {
+      var v = admin.meta && admin.meta.customFields;
+      return Array.isArray(v) ? v : BASE.meta.customFields;
+    },
+    setCustomFields: function (fields) {
+      admin.meta = admin.meta || {};
+      var seen = {};
+      admin.meta.customFields = (fields || []).map(function (f, i) {
+        var label = String((f && f.label) || '').trim().slice(0, 40);
+        if (!label) return null;
+        var key = String((f && f.key) || label.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || ('field_' + (i + 1))).slice(0, 32);
+        var base = key, n = 2;
+        while (seen[key]) { key = (base + '_' + n).slice(0, 32); n++; }
+        seen[key] = 1;
+        return { key: key, label: label, type: 'text' };
+      }).filter(Boolean).slice(0, 6);
+      commitAdmin();
+    },
     predDeadline: function () { return (admin.meta && admin.meta.predDeadline) || BASE.meta.predDeadline || null; },
     setPredDeadline: function (dt) {
       admin.meta = admin.meta || {};
@@ -937,6 +965,7 @@
         purpose: keep.purpose,
         locations: keep.locations,
         locationsFreeText: keep.locationsFreeText,
+        customFields: keep.customFields,
         predDeadline: keep.predDeadline,
         hiddenPredictions: keep.hiddenPredictions,
       }};

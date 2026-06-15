@@ -33,7 +33,7 @@ from typing import Any, Dict, List, Optional
 
 from fastapi import FastAPI, Header, HTTPException
 from fastapi.responses import FileResponse, HTMLResponse, Response
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import func, select, text
 from sqlalchemy.exc import IntegrityError
 
@@ -255,6 +255,7 @@ def _participant_to_dict(p: Participant, league_code: str) -> Dict[str, Any]:
         "isOrganiser": p.is_organiser,
         "leagueCode": league_code,
         "picks": p.picks or {},
+        "customFields": p.custom_fields or {},
         "predScore": p.pred_score,
         "joinedAt": p.joined_at,
         # Whether this entry is locked with a password (the hash itself never
@@ -533,6 +534,7 @@ def _league_state(league: League, league_people: List[Dict[str, Any]], admin: Di
     locs = admin_meta.get("locations")
     meta["locations"] = [str(x) for x in locs] if isinstance(locs, list) and locs else ["Edinburgh", "London"]
     meta["locationsFreeText"] = bool(admin_meta.get("locationsFreeText", False))
+    meta["customFields"] = _clean_custom_fields(list(admin_meta.get("customFields") or []))
     meta["predDeadline"] = admin_meta.get("predDeadline") or None
     meta["hiddenPredictions"] = list(admin_meta.get("hiddenPredictions") or [])
     data["meta"] = meta
@@ -668,6 +670,7 @@ async def _ensure_schema() -> None:
         "ALTER TABLE profiles ADD COLUMN IF NOT EXISTS display_name VARCHAR NOT NULL DEFAULT ''",
         "ALTER TABLE participants ADD COLUMN IF NOT EXISTS password_hash VARCHAR",
         "ALTER TABLE profiles ADD COLUMN IF NOT EXISTS google_id VARCHAR",
+        "ALTER TABLE participants ADD COLUMN IF NOT EXISTS custom_fields JSON NOT NULL DEFAULT '{}'::json",
         "CREATE INDEX IF NOT EXISTS ix_profiles_google_id ON profiles (google_id) WHERE google_id IS NOT NULL",
     ]
     async with engine.begin() as conn:
@@ -734,6 +737,13 @@ class LeagueCreate(BaseModel):
     name: str
     code: str
     password: str
+    purpose: str = "work"
+    includeDepartment: bool = True
+    includeLocation: bool = True
+    includeLtMember: bool = True
+    locations: List[str] = Field(default_factory=list)
+    locationsFreeText: bool = False
+    customFields: List[Dict[str, Any]] = Field(default_factory=list)
 
 
 class LeagueJoin(BaseModel):
@@ -745,6 +755,26 @@ class AdminAuthPayload(BaseModel):
     code: str
 
 
+def _clean_custom_fields(items: List[Dict[str, Any]]) -> List[Dict[str, str]]:
+    out: List[Dict[str, str]] = []
+    seen = set()
+    for raw in items or []:
+        label = str((raw or {}).get("label") or "").strip()[:40]
+        if not label:
+            continue
+        key = re.sub(r"[^a-z0-9]+", "_", label.lower()).strip("_")[:32] or f"field_{len(out) + 1}"
+        base = key
+        n = 2
+        while key in seen:
+            key = f"{base}_{n}"[:32]
+            n += 1
+        seen.add(key)
+        out.append({"key": key, "label": label, "type": "text"})
+        if len(out) >= 6:
+            break
+    return out
+
+
 @app.post("/api/leagues")
 async def create_league(payload: LeagueCreate):
     code = (payload.code or "").strip().upper()
@@ -753,6 +783,18 @@ async def create_league(payload: LeagueCreate):
     name = (payload.name or "").strip()[:60] or "Sweepstake"
     if len(payload.password or "") < 4:
         raise HTTPException(status_code=400, detail="Password must be at least 4 characters")
+    purpose = "friends" if payload.purpose == "friends" else "work"
+    meta = {
+        "purpose": purpose,
+        "includeDepartment": bool(payload.includeDepartment) if purpose == "work" else False,
+        "includeLocation": bool(payload.includeLocation) if purpose == "work" else False,
+        "includeLtMember": bool(payload.includeLtMember) if purpose == "work" else False,
+        "locations": [str(x).strip()[:40] for x in (payload.locations or []) if str(x).strip()][:12],
+        "locationsFreeText": bool(payload.locationsFreeText),
+        "customFields": _clean_custom_fields(payload.customFields),
+    }
+    if not meta["locations"]:
+        meta["locations"] = ["Edinburgh", "London"]
 
     async with AsyncSessionLocal() as session:
         if await _get_league_by_code(session, code) is not None:
@@ -762,6 +804,7 @@ async def create_league(payload: LeagueCreate):
             password_hash=_hash_password(payload.password), seeded=False, created_at=_now(),
         )
         session.add(league)
+        session.add(AdminOverride(league_id=league.id, data={"teams": {}, "fixtures": {}, "predictions": {}, "meta": meta}, updated_at=_now()))
         try:
             await session.commit()
         except IntegrityError:
@@ -827,7 +870,8 @@ class ParticipantPayload(BaseModel):
     isOI: bool = False
     isOrganiser: bool = False
     leagueCode: str = ""
-    picks: Dict[str, Any] = {}
+    picks: Dict[str, Any] = Field(default_factory=dict)
+    customFields: Dict[str, Any] = Field(default_factory=dict)
     predScore: int = 0
     joinedAt: Optional[int] = None
 
@@ -848,6 +892,7 @@ def _apply_payload(row: Participant, p: ParticipantPayload, league: League) -> N
     row.alive = bool(p.alive)
     row.is_oi = bool(p.isOI) or str(p.id).startswith("oi-")
     row.picks = p.picks or {}
+    row.custom_fields = p.customFields or {}
     row.pred_score = int(p.predScore or 0)
     row.joined_at = int(p.joinedAt or 0)
     row.removed = False

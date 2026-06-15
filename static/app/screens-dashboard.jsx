@@ -211,6 +211,8 @@ function EditProfile(props) {
   const includeLtMember = Sd.includeLtMember ? Sd.includeLtMember() : true;
   const locationOpts = Sd.locations ? Sd.locations() : ['Edinburgh', 'London'];
   const locationsFreeText = Sd.locationsFreeText ? Sd.locationsFreeText() : false;
+  const customDefs = Sd.customFields ? Sd.customFields() : [];
+  const [customFields, setCustomFields] = dState(me.customFields || {});
   const [loc, setLoc] = dState(me.location || locationOpts[0] || 'Edinburgh');
   const hasPhoto = !!(Sd.avatarUrl && Sd.avatarUrl(me));
   const fld = { width: '100%', boxSizing: 'border-box', border: '2.5px solid var(--ink)', borderRadius: 12, padding: '11px 13px', fontFamily: 'var(--body)', fontWeight: 600, fontSize: 15, marginTop: 6, outline: 'none' };
@@ -285,6 +287,10 @@ function EditProfile(props) {
             }
           </div>}
           {includeLtMember && <div><label style={lbl}>Leadership Team?</label>{seg(lt, setLt, [{ value: false, label: 'No' }, { value: true, label: 'Yes' }])}</div>}
+          {customDefs.map(f => <div key={f.key}>
+            <label style={lbl}>{f.label}</label>
+            <input style={fld} value={customFields[f.key] || ''} onChange={e => setCustomFields(Object.assign({}, customFields, { [f.key]: e.target.value }))} placeholder="optional" maxLength={80} />
+          </div>)}
         </div>
         <PasswordSection me={me} />
         <GoogleSection me={me} />
@@ -299,6 +305,7 @@ function EditProfile(props) {
               city: includeLocation ? loc : me.city,
               ltMember: includeLtMember ? lt : me.ltMember,
               leadership: includeLtMember ? lt : me.leadership,
+              customFields: customFields,
             });
             props.onClose();
           }}>Save</Bd>

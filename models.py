@@ -103,6 +103,7 @@ class Participant(Base):
     is_organiser: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
     picks: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False, default=dict)
+    custom_fields: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False, default=dict)
     pred_score: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     joined_at: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
 

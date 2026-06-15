@@ -234,6 +234,33 @@ function moneyAdmin(n) {
    return '£' + (Math.round(Number(n || 0) * 100) / 100).toLocaleString('en-GB', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 }
 
+function CustomFieldsAdmin(props) {
+   const fields = props.fields || [];
+   function change(i, label) {
+      props.onChange(fields.map((f, idx) => idx === i ? Object.assign({}, f, { label: label }) : f));
+   }
+   function remove(i) {
+      props.onChange(fields.filter((_, idx) => idx !== i));
+   }
+   function add() {
+      if (fields.length >= 6) return;
+      props.onChange(fields.concat([{ key: '', label: '' }]));
+   }
+   return <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
+      <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink2)', lineHeight: 1.4 }}>Optional extra questions on signup. Existing answers stay attached to each entrant.</div>
+      {fields.map((f, i) => (
+         <div key={i} style={{ display: 'flex', gap: 7, alignItems: 'center' }}>
+            <input value={f.label || ''} onChange={e => change(i, e.target.value)}
+              style={{ flex: 1, border: '2px solid var(--ink)', borderRadius: 11, padding: '9px 12px', fontFamily: 'var(--body)', fontWeight: 600, fontSize: 14, outline: 'none', background: '#fff' }}
+              placeholder="Question label" maxLength={40} />
+            <button onClick={() => remove(i)} className="wc-btn wc-btn--sm" style={{ flex: '0 0 auto', background: '#fff' }}>Remove</button>
+         </div>
+      ))}
+      {fields.length < 6 && <button onClick={add} className="wc-btn wc-btn--sm wc-btn--ghost" style={{ width: '100%' }}>Add custom field</button>}
+      <button onClick={() => { Sa.setCustomFields(fields); if (window.wcToast) window.wcToast('Custom fields saved.', 'confident'); }} className="wc-btn wc-btn--sm wc-btn--ink" style={{ width: '100%' }}>Save custom fields</button>
+   </div>;
+}
+
 function SettingsAdmin() {
    const [, bump] = aState2(0);
    React.useEffect(() => Sa.subscribe(() => bump(x => x + 1)), []);
@@ -249,6 +276,9 @@ function SettingsAdmin() {
    const includeDept = Sa.includeDepartment ? Sa.includeDepartment() : true;
    const includeLocation = Sa.includeLocation ? Sa.includeLocation() : true;
    const includeLtMember = Sa.includeLtMember ? Sa.includeLtMember() : true;
+   const customFieldsNow = Sa.customFields ? Sa.customFields() : [];
+   const [customFields, setCustomFields] = aState2(customFieldsNow);
+   React.useEffect(() => setCustomFields(customFieldsNow), [JSON.stringify(customFieldsNow)]);
    const locationsFreeText = Sa.locationsFreeText ? Sa.locationsFreeText() : false;
    const predDeadlineNow = Sa.predDeadline ? Sa.predDeadline() : null;
    const [predDeadlineInput, setPredDeadlineInput] = aState2(predDeadlineNow ? predDeadlineNow.slice(0, 16) : '');
@@ -401,6 +431,9 @@ function SettingsAdmin() {
          'Leadership Team member',
          includeLtMember ? 'Shown on signup and profile editing.' : 'Hidden — not collected.'
        )}
+
+       <SHa>Custom fields</SHa>
+       <CustomFieldsAdmin fields={customFields} onChange={setCustomFields} />
      </>
    );
 }
