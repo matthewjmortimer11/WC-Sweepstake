@@ -235,11 +235,12 @@ function EditProfile(props) {
     });
   }
   const teamOpts = (WCd.TEAM_LIST || []).slice().sort((a, b) => a.name.localeCompare(b.name));
+  const chrome = window.wcSheetChrome(70);
   return (
-    <div style={{ position: 'absolute', inset: 0, zIndex: 70, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
-      <div onClick={props.onClose} style={{ position: 'absolute', inset: 0, background: 'rgba(26,26,26,.45)' }} />
-      <div className="rise" style={{ position: 'relative', background: 'var(--bg)', borderRadius: '26px 26px 0 0', padding: '18px 18px 26px', boxShadow: '0 -20px 50px rgba(0,0,0,.3)', maxHeight: '88dvh', overflowY: 'auto', WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain' }}>
-        <div style={{ width: 44, height: 5, borderRadius: 3, background: 'var(--line)', margin: '0 auto 14px' }} />
+    <div style={chrome.wrap}>
+      <div onClick={props.onClose} style={chrome.backdrop} />
+      <div className={chrome.cls} style={chrome.sheet}>
+        {!chrome.deck && <div style={{ width: 44, height: 5, borderRadius: 3, background: 'var(--line)', margin: '0 auto 14px' }} />}
         <div className="dh" style={{ fontSize: 22, marginBottom: 14 }}>Edit your profile</div>
 
         {/* ---- avatar ---- */}
