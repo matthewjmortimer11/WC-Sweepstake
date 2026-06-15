@@ -432,6 +432,16 @@ function App(){
   },[flow,me&&me.id]); // eslint-disable-line
 
   function onboardSubmit(profile){
+    const nm=(profile.name||'').trim().toLowerCase();
+    const lg=A_S.activeLeague&&A_S.activeLeague();
+    // In a seeded league everyone is already on the fixed roster. If this name
+    // matches an existing entry, claim that one (which enforces sign-in when the
+    // entry is protected) instead of minting a duplicate account.
+    if(nm && lg && lg.seeded && A_S.allSync){
+      const dups=A_S.allSync().filter(p=>(p.name||'').trim().toLowerCase()===nm);
+      const existing=dups.find(p=>(A_S.deviceIds?A_S.deviceIds():[]).indexOf(p.id)<0)||dups[0];
+      if(existing){ setOrganiser(false); claimOI(existing.id); return; }
+    }
     const p=A_S.create(profile,{organiser:organiser});
     setOrganiser(false);
     A_S.refresh&&A_S.refresh();

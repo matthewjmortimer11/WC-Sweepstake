@@ -504,7 +504,18 @@
         try {
           fetch(api('/participants'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(p) })
             .then(parseJson)
-            .catch(function (e) { toastError(e, 'Could not save entrant'); });
+            .catch(function (e) {
+              // Server rejected a duplicate-name signup — undo the local entry so
+              // the device isn't left with a ghost account, then resync.
+              if (e && e.status === 409) {
+                mine = mine.filter(function (m) { return m.id !== p.id; });
+                lsSet(K.mine, mine);
+                lsSet(K.device, Store.deviceIds().filter(function (x) { return x !== p.id; }));
+                if (lsGet(K.active, null) === p.id) lsSet(K.active, null);
+                Store.refresh().then(function () { rebuild(); emit(); });
+              }
+              toastError(e, 'Could not save entrant');
+            });
         } catch (e) { toastError(e, 'Could not save entrant'); }
       }
       emit();

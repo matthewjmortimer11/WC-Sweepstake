@@ -304,6 +304,27 @@ async def _profiles_for(session, league: League) -> Dict[str, Profile]:
     return {p.participant_id: p for p in res.scalars().all()}
 
 
+async def _active_names(session, league: League) -> set:
+    """Lower-cased names of every active entry — seeded roster (minus tombstoned
+    ids) overlaid with non-removed DB rows. Used to reject duplicate signups."""
+    res = await session.execute(select(Participant).where(Participant.league_id == league.id))
+    removed_ids: set = set()
+    names: set = set()
+    for r in res.scalars().all():
+        if r.removed:
+            removed_ids.add(r.id)
+        elif (r.name or "").strip():
+            names.add((r.name or "").strip().lower())
+    if league.seeded and league.code == _CONFIG_LEAGUE_CODE:
+        for rp in _ROSTER:
+            if rp["id"] in removed_ids:
+                continue
+            nm = (rp.get("name") or "").strip().lower()
+            if nm:
+                names.add(nm)
+    return names
+
+
 async def _participant_in_league(session, league: League, participant_id: str) -> bool:
     """True when this id is a real entrant of the league: a (non-removed) DB row,
     or a seeded base roster id for the config league. Used to gate profile writes
@@ -828,6 +849,17 @@ async def create_participant(
         if league is None:
             raise HTTPException(status_code=404, detail="league not found")
         await _guard_account_write(session, league, payload.id, x_wheesht_account_token, x_wheesht_admin_token)
+        # Guard against duplicate signups in the fixed seeded roster: if this is a
+        # brand-new id whose name already belongs to an active entry, the user
+        # should claim that entry, not create a second "Matthew Mortimer".
+        existing_row = await session.get(Participant, payload.id)
+        if existing_row is None and league.seeded and league.code == _CONFIG_LEAGUE_CODE:
+            target = (payload.name or "").strip().lower()
+            if target and target in await _active_names(session, league):
+                raise HTTPException(
+                    status_code=409,
+                    detail="An entry already exists for that name — find it and sign in instead of creating a new one.",
+                )
         row = await _upsert_participant(session, league, payload)
         return {"ok": True, "participant": _participant_to_dict(row, league.code)}
 
