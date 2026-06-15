@@ -169,6 +169,30 @@
     return v == null ? CHARITY_SPLIT : Number(v);
   }
 
+  function cleanCustomFields(fields) {
+    var seen = {};
+    return (fields || []).map(function (f, i) {
+      var label = String((f && f.label) || '').trim().slice(0, 40);
+      if (!label) return null;
+      var type = String((f && f.type) || 'text');
+      if (['text', 'select', 'suggest'].indexOf(type) < 0) type = 'text';
+      var options = Array.isArray(f && f.options) ? f.options.map(function (x) { return String(x || '').trim().slice(0, 40); }).filter(Boolean).slice(0, 20) : [];
+      if ((type === 'select' || type === 'suggest') && !options.length) type = 'text';
+      var rawKey = String((f && f.key) || '').toLowerCase().replace(/[^a-z0-9_]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 32);
+      var key = rawKey || label.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 32) || ('field_' + (i + 1));
+      var base = key, n = 2;
+      while (seen[key]) {
+        var suffix = '_' + n;
+        key = base.slice(0, Math.max(1, 32 - suffix.length)) + suffix;
+        n++;
+      }
+      seen[key] = 1;
+      var out = { key: key, label: label, type: type, required: !!(f && f.required) };
+      if (options.length) out.options = options;
+      return out;
+    }).filter(Boolean).slice(0, 6);
+  }
+
   function persistAdmin(nextAdmin) {
     var payload = nextAdmin || admin;
     if (LIVE) {
@@ -393,7 +417,8 @@
     knownLeagues: function () { return knownLeagues(); },
     // Create a league on the backend, then make it active.
     createLeague: function (name, code, password, options) {
-      options = options || {};
+      options = Object.assign({}, options || {});
+      options.customFields = cleanCustomFields(options.customFields || []);
       var body = Object.assign({ name: name, code: code, password: password }, options);
       if (!LIVE) {
         var L = { id: 'mock-' + code, code: (code || '').toUpperCase(), name: name || 'Sweepstake', seeded: false };
@@ -891,22 +916,7 @@
     },
     setCustomFields: function (fields) {
       admin.meta = admin.meta || {};
-      var seen = {};
-      admin.meta.customFields = (fields || []).map(function (f, i) {
-        var label = String((f && f.label) || '').trim().slice(0, 40);
-        if (!label) return null;
-        var type = String((f && f.type) || 'text');
-        if (['text', 'select', 'suggest'].indexOf(type) < 0) type = 'text';
-        var options = Array.isArray(f && f.options) ? f.options.map(function (x) { return String(x || '').trim().slice(0, 40); }).filter(Boolean).slice(0, 20) : [];
-        if ((type === 'select' || type === 'suggest') && !options.length) type = 'text';
-        var key = String((f && f.key) || label.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || ('field_' + (i + 1))).slice(0, 32);
-        var base = key, n = 2;
-        while (seen[key]) { key = (base + '_' + n).slice(0, 32); n++; }
-        seen[key] = 1;
-        var out = { key: key, label: label, type: type, required: !!(f && f.required) };
-        if (options.length) out.options = options;
-        return out;
-      }).filter(Boolean).slice(0, 6);
+      admin.meta.customFields = cleanCustomFields(fields);
       commitAdmin();
     },
     predDeadline: function () { return (admin.meta && admin.meta.predDeadline) || BASE.meta.predDeadline || null; },

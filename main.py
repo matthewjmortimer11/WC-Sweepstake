@@ -780,7 +780,8 @@ def _clean_custom_fields(items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         base = key
         n = 2
         while key in seen:
-            key = f"{base}_{n}"[:32]
+            suffix = f"_{n}"
+            key = f"{base[:max(1, 32 - len(suffix))]}{suffix}"
             n += 1
         seen.add(key)
         item: Dict[str, Any] = {
