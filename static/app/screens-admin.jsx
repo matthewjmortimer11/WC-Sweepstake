@@ -254,9 +254,9 @@ function CustomFieldsAdmin(props) {
          </button>
       ))}</div>;
    }
-   const typeOpts = [{ value: 'text', label: 'Text' }, { value: 'select', label: 'Dropdown' }, { value: 'suggest', label: 'List + other' }];
+   const typeOpts = [{ value: 'text', label: 'Text' }, { value: 'select', label: 'Dropdown' }, { value: 'suggest', label: 'List + other' }, { value: 'tags', label: 'Tags' }];
    return <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
-      <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink2)', lineHeight: 1.4 }}>Optional extra questions on signup. Dropdowns only allow listed answers; suggested lists still allow custom text.</div>
+      <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink2)', lineHeight: 1.4 }}>Optional extra signup fields. Use Tags when people can pick several labels, or when organisers want to tag entrants later.</div>
       {fields.map((f, i) => (
          <div key={i} style={{ border: '2px solid var(--line)', borderRadius: 14, padding: 10, background: '#fff' }}>
             <div style={{ display: 'flex', gap: 7, alignItems: 'center' }}>
@@ -266,11 +266,11 @@ function CustomFieldsAdmin(props) {
                <button onClick={() => remove(i)} className="wc-btn wc-btn--sm" style={{ flex: '0 0 auto', background: '#fff' }}>Remove</button>
             </div>
             {seg(f.type || 'text', v => patch(i, { type: v }), typeOpts)}
-            {(f.type === 'select' || f.type === 'suggest') && <div>
+            {(f.type === 'select' || f.type === 'suggest' || f.type === 'tags') && <div>
                <input value={(f.options || []).join(', ')} onChange={e => patch(i, { options: e.target.value.split(',').map(x => x.trim()).filter(Boolean) })}
                  style={{ width: '100%', border: '2px solid var(--ink)', borderRadius: 11, padding: '9px 12px', fontFamily: 'var(--body)', fontWeight: 600, fontSize: 14, outline: 'none', background: '#fff', marginTop: 8 }}
                  placeholder="Options, separated by commas" />
-               <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--ink2)', marginTop: 4 }}>{f.type === 'select' ? 'Only these answers can be saved.' : 'Suggestions only; other answers are allowed.'}</div>
+               <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--ink2)', marginTop: 4 }}>{f.type === 'select' ? 'Only these answers can be saved.' : f.type === 'tags' ? 'People or organisers can pick multiple tags from this list.' : 'Suggestions only; other answers are allowed.'}</div>
             </div>}
             <button onClick={() => patch(i, { required: !f.required })} style={{ marginTop: 8, border: 'none', background: 'none', padding: 0, cursor: 'pointer', fontSize: 12, fontWeight: 800, color: f.required ? 'var(--green)' : 'var(--ink2)' }}>
                {f.required ? 'Required' : 'Optional'}
@@ -641,6 +641,7 @@ function AdminPanel(props) {
 function PeopleAdmin() {
    const [q, setQ] = aState2('');
    const includeDept = Sa.includeDepartment ? Sa.includeDepartment() : true;
+   const tagFields = (Sa.customFields ? Sa.customFields() : []).filter(f => f.type === 'tags' && Array.isArray(f.options) && f.options.length);
    const all = Sa.allSync().slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''));
    const list = q.trim() ? all.filter(p => (p.name || '').toLowerCase().indexOf(q.toLowerCase()) >= 0) : all;
    const fld = { width: '100%', border: '2.5px solid var(--ink)', borderRadius: 12, padding: '10px 13px', fontFamily: 'var(--body)', fontWeight: 600, fontSize: 15, outline: 'none', marginBottom: 12 };
@@ -661,9 +662,19 @@ function PeopleAdmin() {
        });
      }
    }
+   function toggleTag(p, f, opt) {
+     const current = Object.assign({}, p.customFields || {});
+     const selected = Array.isArray(current[f.key]) ? current[f.key] : [];
+     const on = selected.indexOf(opt) >= 0;
+     const nextTags = on ? selected.filter(x => x !== opt) : selected.concat([opt]);
+     if (nextTags.length) current[f.key] = nextTags;
+     else delete current[f.key];
+     Promise.resolve(Sa.adminUpdateParticipant ? Sa.adminUpdateParticipant(p.id, { customFields: current }) : Sa.update(p.id, { customFields: current }))
+       .then(function () { if (window.wcToast) window.wcToast('Tags updated.', 'neutral'); });
+   }
    return (
      <>
-       <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--ink2)', marginBottom: 10 }}>Remove an entrant — say they dropped out or paid late. Frees their slot and trims the pot &amp; charity.</div>
+       <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--ink2)', marginBottom: 10 }}>Remove entrants, reset passwords, or add organiser tags. Tags are optional unless you mark the field as required in Settings.</div>
        <input style={fld} placeholder="Search entrants…" value={q} onChange={e => setQ(e.target.value)} />
        {list.length === 0
          ? <Ca flat style={{ textAlign: 'center', padding: '24px 14px' }}>
@@ -674,11 +685,26 @@ function PeopleAdmin() {
          : <Ca flat style={{ padding: '2px 13px' }}>
              {list.map((p, i) => {
                const t = WCa.TEAMS[p.team];
-               return <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 0', borderBottom: i < list.length - 1 ? '1.5px solid var(--line)' : 'none' }}>
+               return <div key={p.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '9px 0', borderBottom: i < list.length - 1 ? '1.5px solid var(--line)' : 'none' }}>
                  {t && <Fa team={t} size={22} />}
                  <div style={{ flex: 1, minWidth: 0 }}>
                    <div style={{ fontWeight: 800, fontSize: 14, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name}{p.hasPassword ? ' 🔒' : ''}</div>
                    <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--ink2)' }}>{(p.location || p.city || '')}{includeDept && p.department ? ' · ' + p.department : ''}{t ? ' · ' + t.name : ''}</div>
+                   {tagFields.map(f => {
+                     const selected = Array.isArray(p.customFields && p.customFields[f.key]) ? p.customFields[f.key] : [];
+                     return <div key={f.key} style={{ marginTop: 7 }}>
+                       <div style={{ fontSize: 10.5, fontWeight: 900, color: 'var(--ink2)', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 4 }}>{f.label}</div>
+                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+                         {f.options.map(opt => {
+                           const on = selected.indexOf(opt) >= 0;
+                           return <button key={opt} onClick={() => toggleTag(p, f, opt)} className="wc-btn wc-btn--sm"
+                             style={{ padding: '4px 8px', fontSize: 11, background: on ? 'var(--yellow)' : '#fff', boxShadow: on ? '0 3px 0 var(--ink)' : '0 3px 0 var(--shadow)' }}>
+                             {opt}
+                           </button>;
+                         })}
+                       </div>
+                     </div>;
+                   })}
                    {(p.hasPassword || (Sa.avatarUrl && Sa.avatarUrl(p))) && <div style={{ display: 'flex', gap: 12, marginTop: 4 }}>
                      {p.hasPassword && <button onClick={() => resetPw(p)} style={{ border: 'none', background: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 800, color: 'var(--ink2)', padding: 0 }}>Reset password</button>}
                      {Sa.avatarUrl && Sa.avatarUrl(p) && <button onClick={() => clearPhoto(p)} style={{ border: 'none', background: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 800, color: 'var(--ink2)', padding: 0 }}>Remove photo</button>}

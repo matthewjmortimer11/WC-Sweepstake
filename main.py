@@ -765,14 +765,14 @@ def _clean_custom_fields(items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         if not label:
             continue
         kind = str((raw or {}).get("type") or "text").strip()
-        if kind not in {"text", "select", "suggest"}:
+        if kind not in {"text", "select", "suggest", "tags"}:
             kind = "text"
         options = [
             str(x).strip()[:40]
             for x in ((raw or {}).get("options") or [])
             if str(x).strip()
         ][:20]
-        if kind in {"select", "suggest"} and not options:
+        if kind in {"select", "suggest", "tags"} and not options:
             kind = "text"
         raw_key = str((raw or {}).get("key") or "").strip().lower()
         raw_key = re.sub(r"[^a-z0-9_]+", "_", raw_key).strip("_")[:32]
@@ -798,12 +798,29 @@ def _clean_custom_fields(items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     return out
 
 
-def _clean_custom_answers(values: Dict[str, Any], fields: List[Dict[str, Any]]) -> Dict[str, str]:
+def _clean_custom_answers(values: Dict[str, Any], fields: List[Dict[str, Any]]) -> Dict[str, Any]:
     values = values or {}
-    out: Dict[str, str] = {}
+    out: Dict[str, Any] = {}
     for f in fields or []:
         key = str(f.get("key") or "")
         if not key:
+            continue
+        if f.get("type") == "tags":
+            raw = values.get(key) or []
+            if isinstance(raw, str):
+                raw_values = [x.strip() for x in raw.split(",")]
+            elif isinstance(raw, list):
+                raw_values = raw
+            else:
+                raw_values = []
+            allowed = [str(x) for x in (f.get("options") or [])]
+            tags: List[str] = []
+            for item in raw_values:
+                tag = str(item or "").strip()[:40]
+                if tag and tag in allowed and tag not in tags:
+                    tags.append(tag)
+            if tags:
+                out[key] = tags[:20]
             continue
         val = str(values.get(key) or "").strip()[:80]
         if f.get("type") == "select":

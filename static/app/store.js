@@ -175,9 +175,9 @@
       var label = String((f && f.label) || '').trim().slice(0, 40);
       if (!label) return null;
       var type = String((f && f.type) || 'text');
-      if (['text', 'select', 'suggest'].indexOf(type) < 0) type = 'text';
+      if (['text', 'select', 'suggest', 'tags'].indexOf(type) < 0) type = 'text';
       var options = Array.isArray(f && f.options) ? f.options.map(function (x) { return String(x || '').trim().slice(0, 40); }).filter(Boolean).slice(0, 20) : [];
-      if ((type === 'select' || type === 'suggest') && !options.length) type = 'text';
+      if ((type === 'select' || type === 'suggest' || type === 'tags') && !options.length) type = 'text';
       var rawKey = String((f && f.key) || '').toLowerCase().replace(/[^a-z0-9_]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 32);
       var key = rawKey || label.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 32) || ('field_' + (i + 1));
       var base = key, n = 2;
@@ -583,6 +583,34 @@
       }
       emit();
       return mine[idx];
+    },
+
+    adminUpdateParticipant: function (id, patch) {
+      var current = Store.getSync(id);
+      if (!current) return Promise.resolve(null);
+      var next = Object.assign({}, current, patch || {});
+      if (patch && patch.name) next.initials = initials(patch.name);
+      var idx = -1; mine.forEach(function (p, i) { if (p.id === id) idx = i; });
+      if (idx >= 0) {
+        mine[idx] = Object.assign({}, mine[idx], patch || {});
+        if (patch && patch.name) mine[idx].initials = initials(patch.name);
+        lsSet(K.mine, mine);
+      }
+      if (LIVE && leagueCode()) {
+        return fetch(api('/participants/' + id), { method: 'PUT', headers: acctHeaders(id), body: JSON.stringify(next) })
+          .then(parseJson)
+          .then(function () { return Store.refresh().then(function () { return next; }); })
+          .catch(function (e) { onWriteErr(id, e, 'Could not save entrant'); return Store.refresh(); });
+      }
+      var replaced = false;
+      cache = cache.map(function (p) {
+        if (p.id !== id) return p;
+        replaced = true;
+        return liveStatus(Object.assign({}, p, patch || {}));
+      });
+      if (!replaced) cache.push(liveStatus(next));
+      emit();
+      return Promise.resolve(next);
     },
 
     setPick: function (id, key, value) {

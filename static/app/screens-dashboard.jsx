@@ -238,6 +238,22 @@ function EditProfile(props) {
         <datalist id={id}>{options.map(o => <option key={o} value={o} />)}</datalist>
       </>;
     }
+    if (f.type === 'tags') {
+      const selected = Array.isArray(customFields[f.key]) ? customFields[f.key] : [];
+      const toggle = o => {
+        const on = selected.indexOf(o) >= 0;
+        set(on ? selected.filter(x => x !== o) : selected.concat([o]));
+      };
+      return <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
+        {options.map(o => {
+          const on = selected.indexOf(o) >= 0;
+          return <button key={o} onClick={() => toggle(o)} className="wc-btn wc-btn--sm"
+            style={{ background: on ? 'var(--yellow)' : '#fff', boxShadow: on ? '0 4px 0 var(--ink)' : '0 4px 0 var(--shadow)' }}>
+            {o}
+          </button>;
+        })}
+      </div>;
+    }
     return <input style={fld} value={val} onChange={e => set(e.target.value)} placeholder="optional" maxLength={80} />;
   }
   function onFile(e) {

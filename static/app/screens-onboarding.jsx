@@ -44,11 +44,12 @@ function CustomFieldSetup(p) {
     { value: 'text', label: 'Text' },
     { value: 'select', label: 'Dropdown' },
     { value: 'suggest', label: 'List + other' },
+    { value: 'tags', label: 'Tags' },
   ];
   return (
     <div>
       <Lab opt>Custom signup questions</Lab>
-      <div style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--ink2)', marginTop: 4 }}>Add text fields, locked dropdowns, or suggested lists where people can still type their own answer.</div>
+      <div style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--ink2)', marginTop: 4 }}>Add text fields, locked dropdowns, suggested lists, or multi-pick tags.</div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
         {fields.map((f, i) => (
           <div key={i} style={{ border: '2px solid var(--line)', borderRadius: 14, padding: 10, background: '#fff' }}>
@@ -57,9 +58,9 @@ function CustomFieldSetup(p) {
               <button onClick={() => remove(i)} className="wc-btn wc-btn--sm" style={{ flex: '0 0 auto', background: '#fff' }}>Remove</button>
             </div>
             <Seg value={f.type || 'text'} onChange={v => patch(i, { type: v })} options={typeOpts} />
-            {(f.type === 'select' || f.type === 'suggest') && <div>
+            {(f.type === 'select' || f.type === 'suggest' || f.type === 'tags') && <div>
               <input style={{ ...inp, padding: '10px 12px', fontSize: 14 }} value={(f.options || []).join(', ')} onChange={e => patch(i, { options: e.target.value.split(',').map(x => x.trim()).filter(Boolean) })} placeholder="Options, separated by commas" />
-              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--ink2)', marginTop: 4 }}>{f.type === 'select' ? 'Only these answers can be saved.' : 'These show as suggestions, but other answers are allowed.'}</div>
+              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--ink2)', marginTop: 4 }}>{f.type === 'select' ? 'Only these answers can be saved.' : f.type === 'tags' ? 'People can pick any number of these tags.' : 'These show as suggestions, but other answers are allowed.'}</div>
             </div>}
             <button onClick={() => patch(i, { required: !f.required })} style={{ marginTop: 8, border: 'none', background: 'none', padding: 0, cursor: 'pointer', fontSize: 12, fontWeight: 800, color: f.required ? 'var(--green)' : 'var(--ink2)' }}>
               {f.required ? 'Required' : 'Optional'}
@@ -90,7 +91,27 @@ function CustomAnswerField(p) {
       <datalist id={id}>{options.map(o => <option key={o} value={o} />)}</datalist>
     </>;
   }
+  if (f.type === 'tags') {
+    const selected = Array.isArray(p.value) ? p.value : [];
+    const toggle = o => {
+      const on = selected.indexOf(o) >= 0;
+      set(on ? selected.filter(x => x !== o) : selected.concat([o]));
+    };
+    return <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
+      {options.map(o => {
+        const on = selected.indexOf(o) >= 0;
+        return <button key={o} onClick={() => toggle(o)} className="wc-btn wc-btn--sm"
+          style={{ background: on ? 'var(--yellow)' : '#fff', boxShadow: on ? '0 4px 0 var(--ink)' : '0 4px 0 var(--shadow)' }}>
+          {o}
+        </button>;
+      })}
+    </div>;
+  }
   return <input style={inp} value={val} onChange={e => set(e.target.value)} placeholder="Your answer" maxLength={80} />;
+}
+
+function customValuePresent(v) {
+  return Array.isArray(v) ? v.length > 0 : !!String(v || '').trim();
 }
 
 /* =================== ACCOUNT / LEAGUE GATE =================== */
@@ -388,7 +409,7 @@ function OnboardingForm(props) {
   const [loc, setLoc] = oState(locationOpts[0] || 'Edinburgh');
   const [lt, setLt] = oState(false);
   const setCustom = (key, value) => setCustomFields({ ...customFields, [key]: value });
-  const requiredMissing = customDefs.some(f => f.required && !String(customFields[f.key] || '').trim());
+  const requiredMissing = customDefs.some(f => f.required && !customValuePresent(customFields[f.key]));
   const ok = name.trim().length > 0 && !requiredMissing;
   const split = So.charitySplit ? So.charitySplit() : 0.5;
   const fee = WCo.FEE || 0;
