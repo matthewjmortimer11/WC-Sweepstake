@@ -460,7 +460,7 @@ body.deck .deck-canvas{animation:screenIn .42s cubic-bezier(.2,.8,.25,1) both;}
 
 <!-- Single source of truth: generated from wc_data.py by scripts/build_snapshot.py.
      No-op when the server injects window.WC_DATA above (live mode). -->
-<script type="text/babel" src="tweaks-panel.jsx?v=20260615-signinfix"></script>
+<script type="text/babel" src="tweaks-panel.jsx?v=20260615-signinguard"></script>
 <script>
 (function(){
   var secure = location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1';
@@ -3622,6 +3622,7 @@ function FindMyEntry(props) {
             </Co>}
           {results.map(p => {
             const t = WCo.TEAMS[p.team];
+            const locked = So.needsSignIn && So.needsSignIn(p);
             return <button key={p.id} onClick={() => props.onPicked(p.id)} style={{ display: 'flex', alignItems: 'center', gap: 11, background: '#fff', border: '2px solid var(--line)', borderRadius: 14, padding: '10px 12px', cursor: 'pointer', textAlign: 'left' }}>
               <Ao person={p} size={38} />
               <div style={{ flex: 1, minWidth: 0 }}>
@@ -3629,7 +3630,12 @@ function FindMyEntry(props) {
                 <div style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--ink2)' }}>{p.location}{includeDept && p.department ? ' · ' + p.department : ''}</div>
               </div>
               {t && <Fo team={t} size={22} />}
-              <span className="dh" style={{ fontSize: 16, color: 'var(--red)' }}>This is me →</span>
+              {locked
+                ? <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 13, fontWeight: 800, color: 'var(--ink2)' }}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4"><rect x="4" y="11" width="16" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
+                    Sign in
+                  </span>
+                : <span className="dh" style={{ fontSize: 16, color: 'var(--red)' }}>This is me →</span>}
             </button>;
           })}
         </div>
@@ -7256,10 +7262,6 @@ function AccountSheet(props){
         <button onClick={props.onAdd} className="wc-btn wc-btn--sm" style={{flex:1,boxShadow:'0 4px 0 var(--shadow)'}}>+ Add someone</button>
         <button onClick={props.onFind} className="wc-btn wc-btn--sm" style={{flex:1,boxShadow:'0 4px 0 var(--shadow)'}}>Find my entry</button>
       </div>
-      {showGoogle && <div style={{marginTop:10}}>
-        <div style={{fontSize:11.5,fontWeight:700,color:'var(--ink2)',textAlign:'center',marginBottom:2}}>Or find your entry with Google</div>
-        <window.GoogleSignInButton onToken={onGoogleLoginToken} opts={{text:'signin_with',size:'large',theme:'outline'}}/>
-      </div>}
       <button onClick={props.onSwitch} className="wc-btn wc-btn--sm wc-btn--block" style={{marginTop:9,boxShadow:'0 4px 0 var(--shadow)'}}>Join / switch league →</button>
       <button onClick={props.onAdmin} style={{width:'100%',marginTop:11,border:'none',background:'none',cursor:'pointer',fontSize:12.5,fontWeight:800,color:'var(--ink2)',padding:'6px 0',display:'flex',alignItems:'center',justifyContent:'center',gap:6}}>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><circle cx="12" cy="12" r="3.2"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1"/></svg>
