@@ -7,15 +7,26 @@ const Sch = window.Store;
 const Wch = window.Wheesht;
 const { useState: cState, useEffect: cEffect, useRef: cRef } = React;
 
+const WHEESHT_MOODS = [
+  { key: 'confident', label: '😤 Confident' },
+  { key: 'celebrating', label: '🎉 Celebrating' },
+  { key: 'shocked', label: '😱 Shocked' },
+  { key: 'mischievous', label: '😏 Mischievous' },
+  { key: 'neutral', label: '😐 Neutral' },
+];
+
 function ChatScreen() {
   const me = Sch.active();
   const [msgs, setMsgs] = cState([]);
   const [text, setText] = cState('');
   const [busy, setBusy] = cState(false);
   const [err, setErr] = cState(false);
+  const [asWheesht, setAsWheesht] = cState(false);
+  const [mood, setMood] = cState('confident');
   const listRef = cRef(null);
   const isLive = !!window.WC_LIVE;
   const leagueCode = Sch.leagueCode && Sch.leagueCode();
+  const isOrganiser = Sch.hasAdminToken && Sch.hasAdminToken();
 
   function scrollBottom() {
     setTimeout(function() {
@@ -51,24 +62,27 @@ function ChatScreen() {
   cEffect(function() { scrollBottom(); }, [msgs.length]);
 
   function send() {
-    if (!text.trim() || !me || busy || !leagueCode) return;
+    if (!text.trim() || busy || !leagueCode) return;
+    if (!asWheesht && !me) return;
     setBusy(true);
-    fetch(Sch.api('/chat'), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ author_id: me.id, text: text.trim() }),
-    }).then(function(r) {
-      return r.json().then(function(msg) {
-        if (!r.ok) throw new Error((msg && msg.detail) || 'Message failed');
-        return msg;
-      });
-    }).then(function(msg) {
-      if (msg && msg.id) setMsgs(function(prev) { return prev.concat([msg]); });
-      setText('');
-      setBusy(false);
-      setErr(false);
-      window.wcHaptic && window.wcHaptic('light');
-    }).catch(function() { setBusy(false); setErr(true); });
+    var url = asWheesht ? Sch.api('/chat/system') : Sch.api('/chat');
+    var body = asWheesht
+      ? JSON.stringify({ text: text.trim(), mood: mood })
+      : JSON.stringify({ author_id: me.id, text: text.trim() });
+    var headers = asWheesht ? Sch.adminHeaders() : { 'Content-Type': 'application/json' };
+    fetch(url, { method: 'POST', headers: headers, body: body })
+      .then(function(r) {
+        return r.json().then(function(msg) {
+          if (!r.ok) throw new Error((msg && msg.detail) || 'Message failed');
+          return msg;
+        });
+      }).then(function(msg) {
+        if (msg && msg.id) setMsgs(function(prev) { return prev.concat([msg]); });
+        setText('');
+        setBusy(false);
+        setErr(false);
+        window.wcHaptic && window.wcHaptic('light');
+      }).catch(function() { setBusy(false); setErr(true); });
   }
 
   if (!isLive) {
@@ -168,23 +182,51 @@ function ChatScreen() {
       </div>
 
       {/* input bar */}
-      {me ? (
-        <div style={{ display: 'flex', gap: 9, padding: '9px 12px 12px', borderTop: '1.5px solid var(--line)', background: 'var(--bg)', flexShrink: 0 }}>
-          <input
-            style={{ flex: 1, border: '2.5px solid var(--ink)', borderRadius: 22, padding: '10px 14px', fontFamily: 'var(--body)', fontSize: 14, fontWeight: 500, background: '#fff', outline: 'none', color: 'var(--ink)' }}
-            value={text}
-            onChange={function(e) { setText(e.target.value); }}
-            onKeyDown={function(e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }}
-            placeholder="Say something…"
-            maxLength={280}
-          />
-          <button
-            onClick={send}
-            disabled={!text.trim() || busy}
-            style={{ background: 'var(--ink)', color: '#fff', border: 'none', borderRadius: 22, padding: '10px 16px', fontFamily: 'var(--disp)', fontWeight: 800, fontSize: 14, cursor: text.trim() && !busy ? 'pointer' : 'default', opacity: text.trim() && !busy ? 1 : 0.35, flexShrink: 0, boxShadow: '0 4px 0 rgba(0,0,0,.35)' }}
-          >
-            Send
-          </button>
+      {(me || isOrganiser) ? (
+        <div style={{ borderTop: '1.5px solid var(--line)', background: asWheesht ? 'var(--ink)' : 'var(--bg)', flexShrink: 0 }}>
+          {isOrganiser && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 12px 0' }}>
+              <button
+                onClick={function() { setAsWheesht(function(v) { return !v; }); }}
+                style={{ background: asWheesht ? 'var(--yellow)' : 'rgba(0,0,0,.07)', border: 'none', borderRadius: 999, padding: '4px 11px', fontFamily: 'var(--disp)', fontWeight: 800, fontSize: 11.5, cursor: 'pointer', color: asWheesht ? 'var(--ink)' : 'var(--ink2)', letterSpacing: '-.01em', flexShrink: 0, transition: 'background .15s' }}
+              >
+                {asWheesht ? '🐦 Wheesht mode ON' : 'Send as Wheesht'}
+              </button>
+              {asWheesht && (
+                <select
+                  value={mood}
+                  onChange={function(e) { setMood(e.target.value); }}
+                  style={{ border: 'none', background: 'rgba(255,255,255,.15)', color: '#fff', borderRadius: 8, padding: '4px 8px', fontFamily: 'var(--body)', fontWeight: 700, fontSize: 12, cursor: 'pointer', flex: 1, minWidth: 0 }}
+                >
+                  {WHEESHT_MOODS.map(function(m) { return <option key={m.key} value={m.key} style={{ background: '#222', color: '#fff' }}>{m.label}</option>; })}
+                </select>
+              )}
+            </div>
+          )}
+          {(me || asWheesht) && (
+            <div style={{ display: 'flex', gap: 9, padding: '7px 12px 12px' }}>
+              <input
+                style={{ flex: 1, border: asWheesht ? '2.5px solid var(--yellow)' : '2.5px solid var(--ink)', borderRadius: 22, padding: '10px 14px', fontFamily: 'var(--body)', fontSize: 14, fontWeight: 500, background: asWheesht ? 'rgba(255,255,255,.1)' : '#fff', outline: 'none', color: asWheesht ? '#fff' : 'var(--ink)' }}
+                value={text}
+                onChange={function(e) { setText(e.target.value); }}
+                onKeyDown={function(e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }}
+                placeholder={asWheesht ? 'Wheesht says…' : 'Say something…'}
+                maxLength={asWheesht ? 400 : 280}
+              />
+              <button
+                onClick={send}
+                disabled={!text.trim() || busy}
+                style={{ background: asWheesht ? 'var(--yellow)' : 'var(--ink)', color: asWheesht ? 'var(--ink)' : '#fff', border: 'none', borderRadius: 22, padding: '10px 16px', fontFamily: 'var(--disp)', fontWeight: 800, fontSize: 14, cursor: text.trim() && !busy ? 'pointer' : 'default', opacity: text.trim() && !busy ? 1 : 0.35, flexShrink: 0, boxShadow: '0 4px 0 rgba(0,0,0,.35)' }}
+              >
+                Send
+              </button>
+            </div>
+          )}
+          {!me && !asWheesht && (
+            <div style={{ padding: '10px 16px 12px', textAlign: 'center', fontSize: 13, color: asWheesht ? 'rgba(255,255,255,.5)' : 'var(--ink2)', fontWeight: 600 }}>
+              Pick who you are to join the chat — or send as Wheesht above.
+            </div>
+          )}
         </div>
       ) : (
         <div style={{ padding: '12px 16px', textAlign: 'center', fontSize: 13, color: 'var(--ink2)', fontWeight: 600, borderTop: '1.5px solid var(--line)' }}>

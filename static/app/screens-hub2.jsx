@@ -325,9 +325,6 @@ function LiveVerdict(){
       </>}
 
       <StandingsBlock/>
-
-      <div style={{height:16}}/>
-      <Btn2 variant="ink" block onClick={function(){ window.wcConfetti&&window.wcConfetti({y:.5}); window.wcToast&&window.wcToast('Share card saved. Show the group chat who’s boss.','celebrating'); }}>Make my share card 📸</Btn2>
     </div>
   );
 }
