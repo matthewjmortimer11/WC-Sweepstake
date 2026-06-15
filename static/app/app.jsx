@@ -116,7 +116,11 @@ function AccountSheet(props){
   function onGoogleLoginToken(token){
     Promise.resolve(A_S.loginWithGoogle(token)).then(function(r){
       props.onClose();
-      setTimeout(function(){ window.wcToast && window.wcToast('Welcome back, '+(r.name||'')+'. Wheesht spotted you.','confident'); },300);
+      setTimeout(function(){
+        const gn=r.name||'';
+        const glines=['Welcome back, '+gn+'. Wheesht spotted you.','There you are, '+gn+'. Wheesht was watching.','Welcome back, '+gn+'. Account verified. Wheesht approves.','Right then, '+gn+'. Back in the fold. Wheesht has kept your seat warm.'];
+        window.wcToast&&window.wcToast(glines[(Math.random()*glines.length)|0],'confident');
+      },300);
     }).catch(function(e){
       window.wcToast && window.wcToast((e&&e.message)||'No entry found for that Google account','crying');
     });
@@ -385,29 +389,54 @@ function App(){
     if(flow!=='app'||!me) return;
     const pre = A_WC.meta.phase === 'pre';
     const myTeam = A_WC.TEAMS[me.team];
+    const nm = A_S.shownName ? A_S.shownName(me) : me.name;
+    const fl = myTeam ? myTeam.flag : '';
+    const tn = myTeam ? myTeam.name : '';
     const id=setTimeout(()=>{
       const picksLocked = A_S.predictionsLocked && A_S.predictionsLocked();
       if(pre && picksLocked){
-        window.wcToast&&window.wcToast('Predictions are locked. Wheesht has the receipts.','confident');
+        const pool=[
+          ['Predictions are locked. Wheesht has the receipts. All of them.','confident'],
+          ['The markets are closed, '+nm+'. Wheesht is judging your choices as we speak.','mischievous'],
+          ['Deadline passed. No extensions. Wheesht does not do extensions.','angry'],
+          ['Your predictions are locked in. Wheesht has them filed under "evidence".','confident'],
+        ];
+        const pick=pool[(Math.random()*pool.length)|0];
+        window.wcToast&&window.wcToast(pick[0],pick[1]);
       } else if(pre){
         const pool=[
           ['Predictions are open till kick-off. Get them in — Wheesht is taking names.','mischievous'],
-          ['Your picks won\'t make themselves. Wheesht is waiting.','nervous'],
+          ['Your picks won\'t make themselves, '+nm+'. Wheesht is waiting.','nervous'],
           ['Markets are open. Back your instincts. Wheesht backs nothing — but watches everything.','confident'],
-          ['Get your predictions in before the first whistle. No extensions.','angry'],
-          ['Wheesht has opinions on every market. Wheesht is keeping them to itself.','mischievous'],
+          ['Get your predictions in before the first whistle. No extensions. Wheesht does not negotiate.','angry'],
+          ['Wheesht has opinions on every market. Wheesht is keeping them to itself. For now.','mischievous'],
+          [fl+' '+tn+' are ready. Are you? Predictions close at kick-off.','nervous'],
+          ['The draw is done. The teams are set. The only thing missing is your predictions.','confident'],
+          ['Every prediction you don\'t make is a prediction Wheesht makes for you. You don\'t want that.','mischievous'],
         ];
         const pick=pool[(Math.random()*pool.length)|0];
         window.wcToast&&window.wcToast(pick[0],pick[1]);
       } else if(!myTeam||!myTeam.alive){
-        window.wcToast&&window.wcToast(A_WC.LINES.eliminated,'crying');
+        const pool=[
+          [A_WC.LINES.eliminated,'crying'],
+          [tn+' are out. The journey ends here. Wheesht is not gloating. (A little.)','crying'],
+          ['Your team has been eliminated. Wheesht sees the side bets tab has your name on it.','crying'],
+          ['Out. But Wheesht will remember '+tn+'\'s run. Probably.','neutral'],
+        ];
+        const pick=pool[(Math.random()*pool.length)|0];
+        window.wcToast&&window.wcToast(pick[0],pick[1]);
       } else {
         const pool=[
           ['Your team is still in it. Wheesht is watching — with moderate approval.','confident'],
           ['Still standing. Wheesht has noted this. Nothing more to add.','neutral'],
-          ['Your team is in the mix. Wheesht is cautiously optimistic. Very cautiously.','nervous'],
-          ['In the running. The pot is watching too. Wheesht is taking no questions.','mischievous'],
-          [myTeam.name+' are alive. Wheesht acknowledges this. Barely.','happy'],
+          [fl+' '+tn+' are in the mix. Wheesht is cautiously optimistic. Very cautiously.','nervous'],
+          ['In the running. The pot is watching. Wheesht is watching. Everyone is watching.','mischievous'],
+          [tn+' are alive. Wheesht acknowledges this. Barely.','happy'],
+          ['Welcome back, '+nm+'. '+fl+' '+tn+' are still in this. As far as Wheesht can tell.','confident'],
+          [tn+' still in the tournament. You should look at the Verdict tab. Just saying.','neutral'],
+          ['The pot\'s still on the table, '+nm+'. '+tn+' haven\'t thrown it away yet.','mischievous'],
+          ['Good. You\'re back. Wheesht was beginning to wonder. '+fl+' '+tn+' need the support.','nervous'],
+          [tn+' standing. You standing. Wheesht standing. Everything, broadly, standing.','neutral'],
         ];
         const pick=pool[(Math.random()*pool.length)|0];
         window.wcToast&&window.wcToast(pick[0],pick[1]);
@@ -419,12 +448,63 @@ function App(){
           ['A gentle reminder that Scotland are participating. Wheesht thought you should know.','scottish'],
           ['Scotland update: still in it. Wheesht is fine. Everything is fine.','confident'],
           ['No one asked. Wheesht is mentioning Scotland anyway.','mischievous'],
+          ['Scotland are out there competing. Wheesht has feelings about this. Mixed feelings.','nervous'],
+          ['The homeland watch continues. Scotland. Present and accounted for.','scottish'],
         ];
         const sp=scotMsgs[(Math.random()*scotMsgs.length)|0];
         setTimeout(()=>window.wcToast&&window.wcToast(sp[0],sp[1]),1600);
       }
     },650);
     return ()=>clearTimeout(id);
+  },[flow,me&&me.id]); // eslint-disable-line
+
+  /* ---- Toast + confetti when the user's team gets a new result ---- */
+  aEffect(()=>{
+    if(flow!=='app'||!me||!me.team) return;
+    const myCode=me.team;
+    const seen=new Set((A_WC.FIXTURES||[]).filter(function(f){ return f.status==='done'; }).map(function(f){ return f.id; }));
+    const unsub=A_S.subscribe(function(){
+      const newDone=(A_WC.FIXTURES||[]).filter(function(f){
+        return f.status==='done' && !seen.has(f.id) && (f.a===myCode||f.b===myCode);
+      });
+      newDone.forEach(function(f){
+        seen.add(f.id);
+        const aWin=f.score[0]>f.score[1], draw=f.score[0]===f.score[1];
+        const won=(f.a===myCode&&aWin)||(f.b===myCode&&!aWin&&!draw);
+        const drew=draw;
+        const t2=A_WC.TEAMS[myCode];
+        const tflag=t2?t2.flag:'', tname=t2?t2.name:myCode;
+        const oCode=f.a===myCode?f.b:f.a, oTeam=A_WC.TEAMS[oCode];
+        const oname=oTeam?oTeam.name:oCode;
+        if(won){
+          const lines=[
+            [tflag+' '+tname+' win! Get in. Wheesht is noting your quiet celebration.','celebrating'],
+            [tname+' take three points. Your day just got better. Wheesht acknowledges this.','confident'],
+            [tname+' beat '+oname+'. The pot gets a little closer. Wheesht is watching.','confident'],
+            ['Three points for '+tname+'! Wheesht approves. Quietly. Very quietly.','happy'],
+          ];
+          const pick=lines[(Math.random()*lines.length)|0];
+          window.wcToast&&window.wcToast(pick[0],pick[1]);
+          window.wcConfetti&&window.wcConfetti({y:.4,count:70});
+        } else if(drew){
+          const lines=[
+            [tname+' draw with '+oname+'. A point each. Wheesht has seen it work out from here.','neutral'],
+            [tname+' share the spoils. Not a win — but not a loss either. Wheesht notes this.','neutral'],
+          ];
+          const pick=lines[(Math.random()*lines.length)|0];
+          window.wcToast&&window.wcToast(pick[0],pick[1]);
+        } else {
+          const lines=[
+            [tname+' lose to '+oname+'. Wheesht is sorry. (Wheesht is not sorry.)','crying'],
+            [tflag+' '+tname+' beaten. There\'s still time. Maybe. Wheesht thinks.','crying'],
+            [tname+' go down. Wheesht watched every minute. Result noted.','crying'],
+          ];
+          const pick=lines[(Math.random()*lines.length)|0];
+          window.wcToast&&window.wcToast(pick[0],pick[1]);
+        }
+      });
+    });
+    return unsub;
   },[flow,me&&me.id]); // eslint-disable-line
 
   function onboardSubmit(profile){
@@ -479,7 +559,19 @@ function App(){
     const p=A_S.getSync(id);
     const t=p&&A_WC.TEAMS[p.team];
     setFlow('app');
-    setTimeout(()=>window.wcToast&&window.wcToast('Welcome, '+(p?(A_S.shownName?A_S.shownName(p):p.name):'')+'! Your team is '+((t&&t.flag)||'')+' '+(t?t.name:'')+'.',  'confident'),400);
+    setTimeout(()=>{
+      const pnm=p?(A_S.shownName?A_S.shownName(p):p.name):'';
+      const tflag=(t&&t.flag)||''; const tname=t?t.name:'';
+      const lines=[
+        ['Welcome, '+pnm+'! Your team is '+tflag+' '+tname+'. Wheesht wishes you luck. Cautiously.','confident'],
+        [pnm+' is in the building. '+tflag+' '+tname+' — a fine pick. Wheesht reserves all judgement.','mischievous'],
+        ['There you are, '+pnm+'. '+tflag+' '+tname+' are your lot. Wheesht is watching.','confident'],
+        [tflag+' '+tname+'. Could be worse. Could be better. Welcome, '+pnm+'.','neutral'],
+        ['Right then, '+pnm+'. '+tflag+' '+tname+'. Wheesht has seen the odds. Let\'s see what happens.','nervous'],
+      ];
+      const pick=lines[(Math.random()*lines.length)|0];
+      window.wcToast&&window.wcToast(pick[0],pick[1]);
+    },400);
   }
 
   // The account sign-in prompt can be triggered from the onboarding flows
