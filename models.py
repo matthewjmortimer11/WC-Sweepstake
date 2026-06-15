@@ -170,6 +170,10 @@ class Profile(Base):
     favourite_team: Mapped[str] = mapped_column(String, nullable=False, default="")
     # upload | google | generated   (generated = initials fallback, no asset row)
     avatar_source: Mapped[str] = mapped_column(String, nullable=False, default="")
+    # Google Identity subject ID — set when the entry is linked to a Google account.
+    # Indexed for the cross-device login lookup (one per participant per league).
+    # NOTE: added after `profiles` table shipped; migrated via _ensure_schema().
+    google_id: Mapped[Optional[str]] = mapped_column(String, nullable=True, index=True)
     avatar_version: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 

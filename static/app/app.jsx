@@ -112,6 +112,15 @@ function AccountSheet(props){
   const accounts = A_S.deviceAccounts();
   const activeId = A_S.activeId();
   const includeDept = A_S.includeDepartment ? A_S.includeDepartment() : true;
+  const showGoogle = !!window.WC_GOOGLE_CLIENT_ID && !!A_S.loginWithGoogle;
+  function onGoogleLoginToken(token){
+    Promise.resolve(A_S.loginWithGoogle(token)).then(function(r){
+      props.onClose();
+      setTimeout(function(){ window.wcToast && window.wcToast('Welcome back, '+(r.name||'')+'. Wheesht spotted you.','confident'); },300);
+    }).catch(function(e){
+      window.wcToast && window.wcToast((e&&e.message)||'No entry found for that Google account','crying');
+    });
+  }
   return <div style={{position:'absolute',inset:0,zIndex:70,display:'flex',flexDirection:'column',justifyContent:'flex-end'}}>
     <div onClick={props.onClose} style={{position:'absolute',inset:0,background:'rgba(26,26,26,.45)'}}/>
     <div className="rise" style={{position:'relative',background:'var(--bg)',borderRadius:'26px 26px 0 0',padding:'18px 18px 26px',boxShadow:'0 -20px 50px rgba(0,0,0,.3)'}}>
@@ -138,6 +147,10 @@ function AccountSheet(props){
         <button onClick={props.onAdd} className="wc-btn wc-btn--sm" style={{flex:1,boxShadow:'0 4px 0 var(--shadow)'}}>+ Add someone</button>
         <button onClick={props.onFind} className="wc-btn wc-btn--sm" style={{flex:1,boxShadow:'0 4px 0 var(--shadow)'}}>Find my entry</button>
       </div>
+      {showGoogle && <div style={{marginTop:10}}>
+        <div style={{fontSize:11.5,fontWeight:700,color:'var(--ink2)',textAlign:'center',marginBottom:2}}>Or find your entry with Google</div>
+        <window.GoogleSignInButton onToken={onGoogleLoginToken} opts={{text:'signin_with',size:'large',theme:'outline'}}/>
+      </div>}
       <button onClick={props.onSwitch} className="wc-btn wc-btn--sm wc-btn--block" style={{marginTop:9,boxShadow:'0 4px 0 var(--shadow)'}}>Join / switch league →</button>
       <button onClick={props.onAdmin} style={{width:'100%',marginTop:11,border:'none',background:'none',cursor:'pointer',fontSize:12.5,fontWeight:800,color:'var(--ink2)',padding:'6px 0',display:'flex',alignItems:'center',justifyContent:'center',gap:6}}>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><circle cx="12" cy="12" r="3.2"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1"/></svg>
@@ -152,6 +165,8 @@ function AccountSignIn(props){
   const [pw,setPw]=aState('');
   const [busy,setBusy]=aState(false);
   const [err,setErr]=aState('');
+  const person = A_S.getSync ? A_S.getSync(props.id) : null;
+  const hasGoogle = !!(person && person.hasGoogleLink) && !!window.WC_GOOGLE_CLIENT_ID;
   function go(){
     if(!pw||busy) return;
     setBusy(true); setErr('');
@@ -159,13 +174,26 @@ function AccountSignIn(props){
       setBusy(false); props.onDone();
     }).catch(function(e){ setBusy(false); setErr((e&&e.message)||'Wrong password'); });
   }
+  function onGoogleToken(token){
+    setBusy(true); setErr('');
+    // Re-auth via Google: the endpoint recognises the matching google_id and returns a token.
+    Promise.resolve(A_S.googleLink(props.id, token)).then(function(){
+      setBusy(false); props.onDone();
+    }).catch(function(e){ setBusy(false); setErr((e&&e.message)||'Google sign-in failed'); });
+  }
   const inp={width:'100%',boxSizing:'border-box',border:'2.5px solid var(--ink)',borderRadius:12,padding:'11px 13px',fontFamily:'var(--body)',fontWeight:600,fontSize:15,marginTop:12,outline:'none'};
+  const div={display:'flex',alignItems:'center',gap:8,margin:'12px 0 2px'};
+  const line={flex:1,height:1,background:'var(--line)'};
   return <div style={{position:'absolute',inset:0,zIndex:80,display:'flex',flexDirection:'column',justifyContent:'flex-end'}}>
     <div onClick={props.onClose} style={{position:'absolute',inset:0,background:'rgba(26,26,26,.5)'}}/>
     <div className="rise" style={{position:'relative',background:'var(--bg)',borderRadius:'26px 26px 0 0',padding:'18px 18px 26px',boxShadow:'0 -20px 50px rgba(0,0,0,.3)'}}>
       <div style={{width:44,height:5,borderRadius:3,background:'var(--line)',margin:'0 auto 14px'}}/>
       <div className="dh" style={{fontSize:22}}>Sign in</div>
       <div style={{fontSize:13,fontWeight:600,color:'var(--ink2)',marginTop:4}}><b>{props.name}</b> is password-protected. Enter the password to continue.</div>
+      {hasGoogle && <>
+        <window.GoogleSignInButton onToken={onGoogleToken} opts={{text:'signin_with',size:'large',theme:'outline'}}/>
+        <div style={div}><div style={line}/><span style={{fontSize:11.5,fontWeight:700,color:'var(--ink2)'}}>or use password</span><div style={line}/></div>
+      </>}
       <input autoFocus type="password" value={pw} onChange={e=>setPw(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')go();}} placeholder="Password" style={inp}/>
       {err && <div style={{color:'var(--red)',fontWeight:800,fontSize:12.5,marginTop:8}}>{err}</div>}
       <button onClick={go} disabled={!pw||busy} className="wc-btn wc-btn--block" style={{marginTop:14,boxShadow:'0 4px 0 var(--ink)',opacity:(!pw||busy)?0.5:1}}>{busy?'Checking…':'Sign in'}</button>
