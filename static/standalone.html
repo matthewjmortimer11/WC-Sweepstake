@@ -313,6 +313,108 @@ button:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(245,200,0,.55);borde
     background:linear-gradient(180deg,rgba(244,238,227,0) 0%,var(--bg) 22%);}
   .wc-toasts{top:calc(12px + env(safe-area-inset-top));}
 }
+
+/* ======================================================================
+   DESKTOP DECK — full-screen "matchday desk" (toggle, not the phone mockup)
+   Active only when <body> has .deck (the app sets it on wide screens).
+   ====================================================================== */
+.view-toggle{display:none;}
+@media (min-width:561px){
+  .view-toggle{display:inline-flex;position:fixed;top:16px;right:18px;z-index:9000;
+    align-items:center;gap:7px;cursor:pointer;background:rgba(21,19,14,.86);color:#fff;border:none;
+    border-radius:999px;padding:9px 15px 9px 12px;font-family:var(--disp);font-weight:800;font-size:12.5px;
+    letter-spacing:-.01em;-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);
+    box-shadow:0 10px 26px rgba(0,0,0,.30);transition:transform .12s ease,background .2s ease;}
+  .view-toggle:hover{transform:translateY(-1px);background:#15130e;}
+  .view-toggle:active{transform:translateY(1px);}
+  .view-toggle svg{display:block;}
+}
+
+body.deck{background:var(--bg);display:block;overflow:hidden;}
+body.deck .stage-bg,body.deck .stage-word,body.deck .stage-note,body.deck .stage-panel,body.deck .notch{display:none !important;}
+body.deck #scaler{position:fixed;inset:0;transform:none !important;z-index:2;width:100%;height:100%;animation:none;}
+body.deck .phone{width:100%;height:100vh;height:100dvh;border-radius:0;padding:0;background:var(--bg);box-shadow:none;animation:none;}
+body.deck .screen{border-radius:0;height:100%;background:var(--bg);}
+
+.deck-shell{display:grid;grid-template-columns:252px minmax(0,1fr) 326px;height:100%;width:100%;background:var(--bg);}
+@media (max-width:1180px){ .deck-shell{grid-template-columns:236px minmax(0,1fr);} .deck-wire{display:none;} }
+@media (max-width:860px){ .deck-shell{grid-template-columns:74px minmax(0,1fr);} }
+
+/* ---- left rail: ink masthead ---- */
+.deck-rail{background:#15130e;color:#ece5d6;display:flex;flex-direction:column;padding:24px 18px;position:relative;overflow:hidden;}
+.deck-rail::after{content:'';position:absolute;inset:0;pointer-events:none;background:radial-gradient(120% 55% at 0% 0%, rgba(245,200,0,.10), transparent 62%);}
+.deck-brand{display:flex;align-items:center;gap:12px;z-index:1;}
+.deck-brand .rd{width:48px;height:48px;border-radius:50%;background:var(--yellow);border:2.5px solid #000;display:flex;align-items:center;justify-content:center;flex:0 0 auto;box-shadow:0 3px 0 #000;overflow:hidden;cursor:default;}
+.deck-brand .lk{display:flex;flex-direction:column;min-width:0;}
+.deck-brand .wm{font-family:var(--disp);font-weight:800;font-size:22px;letter-spacing:-.03em;color:#fff;line-height:1;}
+.deck-brand .kk{font-size:9.5px;font-weight:800;letter-spacing:.18em;text-transform:uppercase;color:var(--yellow);margin-top:4px;}
+.deck-nav{display:flex;flex-direction:column;gap:3px;margin-top:30px;z-index:1;}
+.deck-nav button{display:flex;align-items:center;gap:13px;border:none;background:none;cursor:pointer;color:#b7ad99;font-family:var(--disp);font-weight:800;font-size:15.5px;letter-spacing:-.01em;padding:11px 13px;border-radius:13px;text-align:left;transition:background .18s,color .18s,transform .1s;}
+.deck-nav button .ic{width:24px;height:24px;display:flex;align-items:center;justify-content:center;flex:0 0 auto;}
+.deck-nav button .ic svg{width:23px;height:23px;}
+.deck-nav button:hover{color:#fff;background:rgba(255,255,255,.05);}
+.deck-nav button.on{background:var(--yellow);color:var(--ink);box-shadow:0 3px 0 #000;}
+.deck-nav button:active{transform:translateY(1px);}
+.deck-rail .spacer{flex:1 1 auto;}
+.deck-foot{display:flex;flex-direction:column;gap:9px;z-index:1;}
+.deck-acct{display:flex;align-items:center;gap:11px;background:rgba(255,255,255,.05);border:2px solid rgba(255,255,255,.10);border-radius:15px;padding:9px 11px;cursor:pointer;transition:background .18s,transform .1s;width:100%;text-align:left;color:inherit;}
+.deck-acct:hover{background:rgba(255,255,255,.10);}
+.deck-acct:active{transform:translateY(1px);}
+.deck-acct .meta{display:flex;flex-direction:column;min-width:0;flex:1;}
+.deck-acct .nm{font-family:var(--disp);font-weight:800;font-size:14px;color:#fff;line-height:1.05;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.deck-acct .sub{font-size:10.5px;font-weight:700;color:#9a917f;margin-top:2px;}
+.deck-cog{display:flex;align-items:center;justify-content:center;gap:8px;border:none;cursor:pointer;background:none;color:#9a917f;font-family:var(--body);font-weight:800;font-size:12px;padding:6px;border-radius:10px;transition:color .18s;}
+.deck-cog:hover{color:#ece5d6;}
+@media (max-width:860px){
+  .deck-rail{padding:20px 8px;align-items:center;}
+  .deck-brand .lk,.deck-nav button .lb,.deck-acct .meta,.deck-cog span{display:none;}
+  .deck-nav button{justify-content:center;padding:12px 0;}
+  .deck-acct{justify-content:center;padding:9px;}
+}
+
+/* ---- center canvas: the page ---- */
+.deck-main{overflow-y:auto;position:relative;}
+.deck-main::-webkit-scrollbar{width:11px;}
+.deck-main::-webkit-scrollbar-thumb{background:var(--line);border-radius:999px;border:3px solid var(--bg);}
+.deck-canvas{max-width:720px;margin:0 auto;padding:44px 44px 84px;}
+.deck-head{margin-bottom:8px;}
+.deck-head .kk{font-family:var(--disp);font-weight:800;font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--ink2);}
+.deck-head h1{font-family:var(--disp);font-weight:800;font-size:clamp(34px,3.6vw,50px);letter-spacing:-.035em;line-height:.94;margin:10px 0 0;}
+.deck-head .dek{font-size:14.5px;font-weight:600;color:var(--ink2);margin-top:12px;max-width:56ch;line-height:1.5;}
+.deck-head .rule{height:2.5px;background:var(--ink);margin:20px 0 6px;}
+.deck-canvas .pad{padding:0 !important;}
+.deck-canvas .pad > .wc-sec:first-child{margin-top:4px;}
+.deck-canvas--chat{max-width:780px;padding:18px 36px 0;}
+body.deck .chat-wrap{height:calc(100dvh - 84px) !important;}
+body.deck .wc-toasts{left:272px;right:24px;top:60px;align-items:center;}
+@media (max-width:860px){ body.deck .wc-toasts{left:90px;} }
+
+/* ---- right rail: the wire ---- */
+.deck-wire{border-left:2px solid var(--line);overflow-y:auto;padding:60px 22px 60px;background:var(--bg2);}
+.deck-wire::-webkit-scrollbar{width:8px;}
+.deck-wire::-webkit-scrollbar-thumb{background:var(--line);border-radius:999px;}
+.wire-kk{font-family:var(--disp);font-weight:800;font-size:10.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--ink2);}
+.wire-card{background:var(--surface);border:2.5px solid var(--ink);border-radius:18px;padding:16px;box-shadow:0 5px 0 var(--ink);margin-top:12px;}
+.wire-pot{font-family:var(--disp);font-weight:800;font-size:42px;letter-spacing:-.03em;line-height:1;}
+.wire-pot__l{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--ink2);margin-top:4px;}
+.wire-stats{display:flex;gap:16px;margin-top:18px;}
+.wire-stat__n{font-family:var(--disp);font-weight:800;font-size:25px;line-height:1;}
+.wire-stat__l{font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--ink2);margin-top:4px;}
+.wire-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-top:1.5px solid var(--line);}
+.wire-row:first-of-type{border-top:none;}
+.wire-rank{font-family:var(--disp);font-weight:800;font-size:14px;width:16px;text-align:center;color:var(--ink2);}
+.wire-av{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-family:var(--disp);font-weight:800;font-size:12px;flex:0 0 auto;border:2px solid var(--ink);}
+.wire-nm{flex:1;min-width:0;font-weight:700;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.wire-pts{font-family:var(--disp);font-weight:800;font-size:12.5px;color:var(--ink2);}
+
+/* onboarding / overlays centered when in deck */
+body.deck .deck-solo{position:fixed;inset:0;display:flex;justify-content:center;background:var(--bg);}
+body.deck .deck-solo > *{width:100%;max-width:460px;position:relative;background:var(--bg);box-shadow:0 0 60px -10px rgba(0,0,0,.12);}
+
+/* deck entrances */
+body.deck .deck-rail{animation:rise .5s cubic-bezier(.2,.9,.3,1) both;}
+body.deck .deck-canvas{animation:screenIn .42s cubic-bezier(.2,.8,.25,1) both;}
+@media (prefers-reduced-motion:reduce){ body.deck .deck-rail,body.deck .deck-canvas{animation:none !important;} }
 </style>
 </head>
 <body>
@@ -356,7 +458,7 @@ button:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(245,200,0,.55);borde
 
 <!-- Single source of truth: generated from wc_data.py by scripts/build_snapshot.py.
      No-op when the server injects window.WC_DATA above (live mode). -->
-<script type="text/babel" src="tweaks-panel.jsx?v=20260614-accounts"></script>
+<script type="text/babel" src="tweaks-panel.jsx?v=20260615-desktop"></script>
 <script>
 (function(){
   var secure = location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1';
@@ -699,7 +801,32 @@ button:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(245,200,0,.55);borde
     if (lp.avatarVersion != null) out.avatarVersion = Math.max(lp.avatarVersion, p.avatarVersion || 0);
     // In MOCK/preview there is no server flag, so a locally-set lock drives the UI.
     if (lp.hasPassword != null && !LIVE) out.hasPassword = lp.hasPassword;
+    if (lp.hasGoogleLink != null) out.hasGoogleLink = lp.hasGoogleLink;
     return out;
+  }
+
+  // ---- Google Identity Services ------------------------------------------
+  // A single credential callback, replaced before each GIS interaction so
+  // different UI flows (link vs cross-device login) each get their own handler.
+  var _googleCb = null;
+  var _googleInitDone = false;
+
+  function _googleGISCallback(response) {
+    var cb = _googleCb; _googleCb = null;
+    if (cb && response && response.credential) cb(response.credential);
+  }
+
+  function _initGoogleOnce() {
+    if (_googleInitDone) return true;
+    if (!window.google || !window.google.accounts || !window.WC_GOOGLE_CLIENT_ID) return false;
+    window.google.accounts.id.initialize({
+      client_id: window.WC_GOOGLE_CLIENT_ID,
+      callback: _googleGISCallback,
+      auto_select: false,
+      cancel_on_tap_outside: true,
+    });
+    _googleInitDone = true;
+    return true;
   }
 
   function rebuild() {
@@ -1115,6 +1242,67 @@ button:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(245,200,0,.55);borde
       });
     },
     signOutAccount: function (id) { clearAcctToken(id); emit(); },
+
+    // ===== GOOGLE SIGN-IN =====
+    hasGoogleLink: function(p) { return !!(p && p.hasGoogleLink); },
+    // Set/clear the credential callback consumed by the GIS handler.
+    setGoogleCallback: function(fn) { _googleCb = fn; },
+    clearGoogleCallback: function() { _googleCb = null; },
+    // Initialize GIS (idempotent). Returns false if the library isn't ready yet.
+    initGoogle: _initGoogleOnce,
+    // Render a Google Sign-In button into `el`. Returns false if GIS isn't loaded.
+    renderGoogleButton: function(el, opts) {
+      if (!el || !_initGoogleOnce()) return false;
+      window.google.accounts.id.renderButton(el, Object.assign({
+        size: 'large', theme: 'outline', text: 'signin_with', shape: 'rectangular',
+      }, opts || {}));
+      return true;
+    },
+    // Link or re-authenticate with Google. Stores account token on success.
+    googleLink: function(id, idToken) {
+      if (!LIVE || !leagueCode()) return Promise.reject(new Error('Not in a league'));
+      return fetch(api('/participants/' + encodeURIComponent(id) + '/google-auth'), {
+        method: 'POST', headers: acctHeaders(id),
+        body: JSON.stringify({ idToken: idToken }),
+      }).then(parseJson).then(function(r) {
+        if (r.token) setAcctToken(id, r.token);
+        if (r.avatarVersion != null) setLocalProfile(id, { avatarVersion: r.avatarVersion });
+        setLocalProfile(id, { hasGoogleLink: true });
+        rebuild(); emit();
+        return r;
+      }).catch(function(e) { onWriteErr(id, e, 'Google sign-in failed'); throw e; });
+    },
+    // Unlink Google from the given entry.
+    googleUnlink: function(id) {
+      if (!LIVE || !leagueCode()) return Promise.reject(new Error('Not in a league'));
+      return fetch(api('/participants/' + encodeURIComponent(id) + '/google-auth'), {
+        method: 'DELETE', headers: acctHeaders(id),
+      }).then(parseJson).then(function(r) {
+        setLocalProfile(id, { hasGoogleLink: false });
+        rebuild(); emit();
+        window.wcToast && window.wcToast('Google account unlinked.', 'neutral');
+        return r;
+      }).catch(function(e) { onWriteErr(id, e, 'Could not unlink Google'); throw e; });
+    },
+    // Cross-device login: find entry by Google identity and return {participantId, name, token}.
+    googleLogin: function(idToken) {
+      if (!LIVE || !leagueCode()) return Promise.reject(new Error('Not in a league'));
+      return fetch(api('/google-login'), {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ idToken: idToken }),
+      }).then(parseJson);
+    },
+    // Full cross-device login: verify Google, claim the entry, store the token.
+    loginWithGoogle: function(idToken) {
+      var self = this;
+      return this.googleLogin(idToken).then(function(r) {
+        if (!r || !r.participantId) throw new Error('No entry found for this Google account');
+        setAcctToken(r.participantId, r.token);
+        self.claimOI(r.participantId);
+        self.refresh && self.refresh();
+        return r;
+      });
+    },
 
     refresh: function () {
       if (!LIVE) return Promise.resolve();
@@ -1877,11 +2065,36 @@ window.wcHaptic = function(type) {
   document.head.appendChild(s);
 })();
 
+/* ---- Google Sign-In button (rendered by GIS library) -------------------- */
+// Renders the official Google "Sign in with Google" button into a div.
+// Polls until the GIS library is ready (loaded async). Pass `onToken(idToken)`
+// as a prop; it fires once with the credential when the user authenticates.
+function GoogleSignInButton({onToken, opts}) {
+  const S = window.Store;
+  const ref = React.useRef(null);
+  React.useEffect(() => {
+    if (!window.WC_GOOGLE_CLIENT_ID || !S) return;
+    S.setGoogleCallback(function(token) {
+      S.clearGoogleCallback();
+      onToken(token);
+    });
+    var tries = 0;
+    function tryRender() {
+      if (ref.current && S.renderGoogleButton && S.renderGoogleButton(ref.current, opts || {})) return;
+      if (tries++ < 20) setTimeout(tryRender, 200);
+    }
+    tryRender();
+    return function() { S.clearGoogleCallback(); };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  if (!window.WC_GOOGLE_CLIENT_ID) return null;
+  return <div ref={ref} style={{minHeight: 44, marginTop: 10}} />;
+}
+
 Object.assign(window, {
   Card: Card, Btn: Btn, Flag: Flag, Avatar: Avatar, Chip: Chip, Stamp: Stamp,
   ProgressRing: ProgressRing, SegmentBar: SegmentBar, WheeshtSays: WheeshtSays,
   SectionHead: SectionHead, ToastLayer: ToastLayer, ConfettiLayer: ConfettiLayer,
-  Badges: Badges,
+  Badges: Badges, GoogleSignInButton: GoogleSignInButton,
 });
 
 </script>
@@ -3791,6 +4004,50 @@ function PasswordSection(props) {
   );
 }
 
+function GoogleSection(props) {
+  const me = props.me;
+  const hasLink = !!(me && me.hasGoogleLink);
+  const [busy, setBusy] = dState(false);
+  const lbl = { fontWeight: 800, fontSize: 13, fontFamily: 'var(--disp)' };
+  function onLinkToken(token) {
+    setBusy(true);
+    Promise.resolve(Sd.googleLink(me.id, token))
+      .then(r => {
+        setBusy(false);
+        if (r && r.avatarVersion != null) {
+          // Avatar may have been refreshed from Google photo — reload.
+          Sd.refresh && Sd.refresh();
+        }
+        window.wcToast && window.wcToast('Google account linked. Sign in anywhere with Google now.', 'happy');
+      })
+      .catch(() => setBusy(false));
+  }
+  function unlink() {
+    if (busy) return;
+    setBusy(true);
+    Promise.resolve(Sd.googleUnlink(me.id))
+      .then(() => setBusy(false))
+      .catch(() => setBusy(false));
+  }
+  if (!window.WC_GOOGLE_CLIENT_ID || !Sd.googleLink) return null;
+  return (
+    <div style={{ borderTop: '1.5px solid var(--line)', paddingTop: 14, marginTop: 4 }}>
+      <div style={lbl}>Google account{' '}
+        {hasLink ? <span style={{ color: 'var(--green)' }}>· linked ✓</span> : <span style={{ color: 'var(--ink2)' }}>· not linked</span>}
+      </div>
+      <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--ink2)', marginTop: 3, lineHeight: 1.35 }}>
+        {hasLink ? 'Sign in with Google on any device — no password needed.' : 'Link your Google account to sign in anywhere without a password.'}
+      </div>
+      {hasLink
+        ? <button onClick={unlink} disabled={busy} className="wc-btn wc-btn--sm" style={{ marginTop: 10, boxShadow: '0 4px 0 var(--shadow)', opacity: busy ? 0.5 : 1 }}>
+            {busy ? 'Working…' : 'Unlink Google'}
+          </button>
+        : <window.GoogleSignInButton onToken={onLinkToken} opts={{ text: 'continue_with', size: 'medium', theme: 'outline' }} />
+      }
+    </div>
+  );
+}
+
 function EditProfile(props) {
   const me = props.me;
   const [dispName, setDispName] = dState(me.displayName || '');
@@ -3879,6 +4136,7 @@ function EditProfile(props) {
           {includeLtMember && <div><label style={lbl}>Leadership Team?</label>{seg(lt, setLt, [{ value: false, label: 'No' }, { value: true, label: 'Yes' }])}</div>}
         </div>
         <PasswordSection me={me} />
+        <GoogleSection me={me} />
         <div style={{ marginTop: 18 }}>
           <Bd variant="ink" block onClick={() => {
             Sd.saveProfile(me.id, { displayName: dispName.trim(), favouriteTeam: fav });
@@ -6555,7 +6813,7 @@ function ChatScreen() {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100dvh - 146px - env(safe-area-inset-top, 0px))' }}>
+    <div className="chat-wrap" style={{ display: 'flex', flexDirection: 'column', height: 'calc(100dvh - 146px - env(safe-area-inset-top, 0px))' }}>
 
       {/* message list */}
       <div ref={listRef} style={{ flex: 1, overflowY: 'auto', padding: '14px 14px 6px' }}>
@@ -6895,6 +7153,15 @@ function AccountSheet(props){
   const accounts = A_S.deviceAccounts();
   const activeId = A_S.activeId();
   const includeDept = A_S.includeDepartment ? A_S.includeDepartment() : true;
+  const showGoogle = !!window.WC_GOOGLE_CLIENT_ID && !!A_S.loginWithGoogle;
+  function onGoogleLoginToken(token){
+    Promise.resolve(A_S.loginWithGoogle(token)).then(function(r){
+      props.onClose();
+      setTimeout(function(){ window.wcToast && window.wcToast('Welcome back, '+(r.name||'')+'. Wheesht spotted you.','confident'); },300);
+    }).catch(function(e){
+      window.wcToast && window.wcToast((e&&e.message)||'No entry found for that Google account','crying');
+    });
+  }
   return <div style={{position:'absolute',inset:0,zIndex:70,display:'flex',flexDirection:'column',justifyContent:'flex-end'}}>
     <div onClick={props.onClose} style={{position:'absolute',inset:0,background:'rgba(26,26,26,.45)'}}/>
     <div className="rise" style={{position:'relative',background:'var(--bg)',borderRadius:'26px 26px 0 0',padding:'18px 18px 26px',boxShadow:'0 -20px 50px rgba(0,0,0,.3)'}}>
@@ -6921,6 +7188,10 @@ function AccountSheet(props){
         <button onClick={props.onAdd} className="wc-btn wc-btn--sm" style={{flex:1,boxShadow:'0 4px 0 var(--shadow)'}}>+ Add someone</button>
         <button onClick={props.onFind} className="wc-btn wc-btn--sm" style={{flex:1,boxShadow:'0 4px 0 var(--shadow)'}}>Find my entry</button>
       </div>
+      {showGoogle && <div style={{marginTop:10}}>
+        <div style={{fontSize:11.5,fontWeight:700,color:'var(--ink2)',textAlign:'center',marginBottom:2}}>Or find your entry with Google</div>
+        <window.GoogleSignInButton onToken={onGoogleLoginToken} opts={{text:'signin_with',size:'large',theme:'outline'}}/>
+      </div>}
       <button onClick={props.onSwitch} className="wc-btn wc-btn--sm wc-btn--block" style={{marginTop:9,boxShadow:'0 4px 0 var(--shadow)'}}>Join / switch league →</button>
       <button onClick={props.onAdmin} style={{width:'100%',marginTop:11,border:'none',background:'none',cursor:'pointer',fontSize:12.5,fontWeight:800,color:'var(--ink2)',padding:'6px 0',display:'flex',alignItems:'center',justifyContent:'center',gap:6}}>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><circle cx="12" cy="12" r="3.2"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1"/></svg>
@@ -6935,6 +7206,8 @@ function AccountSignIn(props){
   const [pw,setPw]=aState('');
   const [busy,setBusy]=aState(false);
   const [err,setErr]=aState('');
+  const person = A_S.getSync ? A_S.getSync(props.id) : null;
+  const hasGoogle = !!(person && person.hasGoogleLink) && !!window.WC_GOOGLE_CLIENT_ID;
   function go(){
     if(!pw||busy) return;
     setBusy(true); setErr('');
@@ -6942,19 +7215,147 @@ function AccountSignIn(props){
       setBusy(false); props.onDone();
     }).catch(function(e){ setBusy(false); setErr((e&&e.message)||'Wrong password'); });
   }
+  function onGoogleToken(token){
+    setBusy(true); setErr('');
+    // Re-auth via Google: the endpoint recognises the matching google_id and returns a token.
+    Promise.resolve(A_S.googleLink(props.id, token)).then(function(){
+      setBusy(false); props.onDone();
+    }).catch(function(e){ setBusy(false); setErr((e&&e.message)||'Google sign-in failed'); });
+  }
   const inp={width:'100%',boxSizing:'border-box',border:'2.5px solid var(--ink)',borderRadius:12,padding:'11px 13px',fontFamily:'var(--body)',fontWeight:600,fontSize:15,marginTop:12,outline:'none'};
+  const div={display:'flex',alignItems:'center',gap:8,margin:'12px 0 2px'};
+  const line={flex:1,height:1,background:'var(--line)'};
   return <div style={{position:'absolute',inset:0,zIndex:80,display:'flex',flexDirection:'column',justifyContent:'flex-end'}}>
     <div onClick={props.onClose} style={{position:'absolute',inset:0,background:'rgba(26,26,26,.5)'}}/>
     <div className="rise" style={{position:'relative',background:'var(--bg)',borderRadius:'26px 26px 0 0',padding:'18px 18px 26px',boxShadow:'0 -20px 50px rgba(0,0,0,.3)'}}>
       <div style={{width:44,height:5,borderRadius:3,background:'var(--line)',margin:'0 auto 14px'}}/>
       <div className="dh" style={{fontSize:22}}>Sign in</div>
       <div style={{fontSize:13,fontWeight:600,color:'var(--ink2)',marginTop:4}}><b>{props.name}</b> is password-protected. Enter the password to continue.</div>
+      {hasGoogle && <>
+        <window.GoogleSignInButton onToken={onGoogleToken} opts={{text:'signin_with',size:'large',theme:'outline'}}/>
+        <div style={div}><div style={line}/><span style={{fontSize:11.5,fontWeight:700,color:'var(--ink2)'}}>or use password</span><div style={line}/></div>
+      </>}
       <input autoFocus type="password" value={pw} onChange={e=>setPw(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')go();}} placeholder="Password" style={inp}/>
       {err && <div style={{color:'var(--red)',fontWeight:800,fontSize:12.5,marginTop:8}}>{err}</div>}
       <button onClick={go} disabled={!pw||busy} className="wc-btn wc-btn--block" style={{marginTop:14,boxShadow:'0 4px 0 var(--ink)',opacity:(!pw||busy)?0.5:1}}>{busy?'Checking…':'Sign in'}</button>
       <button onClick={props.onClose} style={{width:'100%',marginTop:10,border:'none',background:'none',cursor:'pointer',fontSize:12.5,fontWeight:800,color:'var(--ink2)'}}>Cancel</button>
     </div>
   </div>;
+}
+
+/* ===========================================================================
+   DESKTOP DECK — full-screen "matchday desk" layout. A toggle (top-right)
+   flips between this and the classic floating-phone mockup. The same React
+   screens render in the centre canvas; the rail drives the same tab state.
+   =========================================================================== */
+const DECK_NAV = [['me','You'],['games','Games'],['players','Group'],['predictions','Predict'],['chat','Chat'],['summary','Verdict']];
+const DECK_HEAD = {
+  me:          ['Your desk', 'Your team, your predictions and where you stand — everything you’re playing for, in one place.'],
+  games:       ['Match centre', 'Every fixture, live scores, and what each result does to the league.'],
+  players:     ['The group', 'Who drew whom, who’s still alive, and how the table is shaping up.'],
+  predictions: ['Predictions', 'Call the tournament. Points land as the real results come in.'],
+  summary:     ['The verdict', 'Where the pot is heading — and who’s in line to collect it.'],
+};
+function deckMoney(n){ return '£' + Math.round(n||0).toLocaleString('en-GB'); }
+
+function DeckWire(){
+  const meta = A_WC.meta || {};
+  const pot = A_S.pot ? A_S.pot() : (A_WC.POT || 0);
+  const rows = (A_S.rankedByPred ? A_S.rankedByPred() : []).slice(0,6);
+  return <aside className="deck-wire">
+    <div className="wire-kk">{(A_WC.league&&A_WC.league.name)||A_WC.meta.name||'The Sweepstake'}</div>
+    <div className="wire-card">
+      <div className="wire-pot">{deckMoney(pot)}</div>
+      <div className="wire-pot__l">in the pot</div>
+      <div className="wire-stats">
+        <div><div className="wire-stat__n">{meta.stillIn!=null?meta.stillIn:'—'}</div><div className="wire-stat__l">still in</div></div>
+        <div><div className="wire-stat__n">{meta.out!=null?meta.out:'—'}</div><div className="wire-stat__l">out</div></div>
+        <div><div className="wire-stat__n">{meta.teamsLeft!=null?meta.teamsLeft:'—'}</div><div className="wire-stat__l">teams left</div></div>
+      </div>
+    </div>
+    <div className="wire-kk" style={{marginTop:26}}>Prediction league</div>
+    <div className="wire-card">
+      {rows.length===0
+        ? <div style={{fontSize:12.5,fontWeight:600,color:'var(--ink2)'}}>No predictions banked yet. Wheesht is waiting.</div>
+        : rows.map((p,i)=>(
+            <div className="wire-row" key={p.id||i}>
+              <span className="wire-rank">{i+1}</span>
+              <span className="wire-av" style={{background:p.color||'#333'}}>{p.initials||'?'}</span>
+              <span className="wire-nm">{A_S.shownName?A_S.shownName(p):p.name}</span>
+              <span className="wire-pts">{(p.predScore||0)} pts</span>
+            </div>))}
+    </div>
+  </aside>;
+}
+
+function DeckRail(props){
+  const me = props.me;
+  const taps = React.useRef({n:0,t:0});
+  function secret(){
+    const now=Date.now();
+    taps.current.n=(now-taps.current.t<2500)?taps.current.n+1:1; taps.current.t=now;
+    if(taps.current.n>=7){ taps.current.n=0; props.onDev&&props.onDev(); }
+  }
+  return <nav className="deck-rail">
+    <div className="deck-brand">
+      <span className="rd" onClick={secret}><A_W mood="confident" size={42}/></span>
+      <span className="lk">
+        <span className="wm">Wheesht</span>
+        <span className="kk">{A_WC.meta.season||'World Cup 2026'}</span>
+      </span>
+    </div>
+    <div className="deck-nav">
+      {DECK_NAV.map(([k,lab])=>(
+        <button key={k} className={props.tab===k?'on':''} onClick={()=>props.setTab(k)}>
+          <span className="ic"><Icon name={k}/></span><span className="lb">{lab}</span>
+        </button>
+      ))}
+    </div>
+    <div className="spacer"/>
+    <div className="deck-foot">
+      {me && <button className="deck-acct" onClick={props.onAccount}>
+        <window.Avatar person={Object.assign({},me,{isYou:false})} size={38}/>
+        <span className="meta">
+          <span className="nm">{A_S.shownName?A_S.shownName(me):me.name}</span>
+          <span className="sub">Switch account</span>
+        </span>
+      </button>}
+      <button className="deck-cog" onClick={props.onAdmin}>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><circle cx="12" cy="12" r="3.2"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1"/></svg>
+        <span>Organiser tools</span>
+      </button>
+    </div>
+  </nav>;
+}
+
+function DeckShell(props){
+  const tab = props.tab;
+  const head = DECK_HEAD[tab];
+  const isChat = tab==='chat';
+  return <div className="deck-shell">
+    <DeckRail me={props.me} tab={tab} setTab={props.setTab}
+      onAccount={props.onAccount} onAdmin={props.onAdmin} onDev={props.onDev}/>
+    <main className="deck-main">
+      <div className={isChat?'deck-canvas deck-canvas--chat':'deck-canvas'} key={tab+(props.me?props.me.id:'')}>
+        {head && <header className="deck-head">
+          <div className="kk">{(A_WC.league&&A_WC.league.name)||A_WC.meta.name||'Wheesht'}</div>
+          <h1>{head[0]}</h1>
+          <div className="dek">{head[1]}</div>
+          <div className="rule"/>
+        </header>}
+        {props.children}
+      </div>
+    </main>
+    <DeckWire/>
+  </div>;
+}
+
+/* layout view ('desk' = full-screen desktop, 'phone' = floating mockup) */
+const WIDE_Q = '(min-width:561px)';
+function wideNow(){ return !!(window.matchMedia && window.matchMedia(WIDE_Q).matches); }
+function initialView(){
+  try{ var v=localStorage.getItem('wheesht_view'); if(v==='phone'||v==='desk') return v; }catch(e){}
+  return 'desk';
 }
 
 const TW_DEFAULTS = /*EDITMODE-BEGIN*/{
@@ -6976,12 +7377,37 @@ function App(){
   const devReturn=React.useRef(undefined);      // league to restore after dev admin
   const [organiser,setOrganiser]=aState(false); // true while creating a league
   const [signIn,setSignIn]=aState(null);        // {id,name,proceed} account sign-in prompt
+  const [view,setView]=aState(initialView);     // 'desk' (full-screen) | 'phone' (mockup)
+  const [wide,setWide]=aState(wideNow);
   const [,tick]=aState(0);
   const [t,setTweak]=window.useTweaks(TW_DEFAULTS);
 
   // re-render on any store change
   aEffect(()=>A_S.subscribe(()=>tick(x=>x+1)),[]);
   aEffect(()=>{ A_S.refresh && A_S.refresh(); },[]);
+
+  // track viewport width so the toggle/deck only apply on wider screens
+  aEffect(()=>{
+    if(!window.matchMedia) return;
+    const mq=window.matchMedia(WIDE_Q);
+    const on=()=>setWide(mq.matches);
+    mq.addEventListener?mq.addEventListener('change',on):mq.addListener(on);
+    return ()=>{ mq.removeEventListener?mq.removeEventListener('change',on):mq.removeListener(on); };
+  },[]);
+  const deck = wide && view==='desk';
+  aEffect(()=>{ document.body.classList.toggle('deck', deck); },[deck]);
+  function toggleView(){
+    const nv = view==='desk'?'phone':'desk';
+    setView(nv);
+    try{ localStorage.setItem('wheesht_view', nv); }catch(e){}
+  }
+  const viewToggle = wide ? <button className="view-toggle" onClick={toggleView} title="Switch layout">
+    {deck
+      ? <><svg width="13" height="17" viewBox="0 0 14 20" fill="none" stroke="currentColor" strokeWidth="2"><rect x="1" y="1" width="12" height="18" rx="3"/><line x1="5.2" y1="16" x2="8.8" y2="16"/></svg>Phone view</>
+      : <><svg width="18" height="14" viewBox="0 0 22 16" fill="none" stroke="currentColor" strokeWidth="2"><rect x="1" y="1" width="20" height="12" rx="2"/><line x1="8" y1="15" x2="14" y2="15"/></svg>Desktop view</>}
+  </button> : null;
+  // Wrap onboarding/identity flows in a centred column when in deck mode.
+  function frame(node){ return deck ? <div className="deck-solo">{node}</div> : node; }
 
   // tweaks → DOM
   aEffect(()=>{ document.documentElement.style.setProperty('--red', t.accent); },[t.accent]);
@@ -7083,29 +7509,29 @@ function App(){
 
   // -------- onboarding / identity flow --------
   if(flow==='gate') return <React.Fragment>
-    <window.AccountGate onResume={resumeAccount} onJoin={()=>{setOrganiser(false);setFlow('join');}} onCreate={()=>{setOrganiser(true);setFlow('create');}}/>
-    <window.ToastLayer/><window.ConfettiLayer/>
+    {frame(<window.AccountGate onResume={resumeAccount} onJoin={()=>{setOrganiser(false);setFlow('join');}} onCreate={()=>{setOrganiser(true);setFlow('create');}}/>)}
+    {viewToggle}<window.ToastLayer/><window.ConfettiLayer/>
   </React.Fragment>;
   if(flow==='join') return <React.Fragment>
-    <window.JoinLeague onBack={()=>setFlow('gate')} onCreate={()=>{setOrganiser(true);setFlow('create');}}
-      onJoined={(league)=>{ setOrganiser(false); setFlow(league&&league.seeded?'oi-roster':'find'); }}/>
-    <window.ToastLayer/><window.ConfettiLayer/>
+    {frame(<window.JoinLeague onBack={()=>setFlow('gate')} onCreate={()=>{setOrganiser(true);setFlow('create');}}
+      onJoined={(league)=>{ setOrganiser(false); setFlow(league&&league.seeded?'oi-roster':'find'); }}/>)}
+    {viewToggle}<window.ToastLayer/><window.ConfettiLayer/>
   </React.Fragment>;
   if(flow==='create') return <React.Fragment>
-    <window.CreateLeague onBack={()=>setFlow('gate')} onCreated={()=>{ setOrganiser(true); setFlow('form'); }}/>
-    <window.ToastLayer/><window.ConfettiLayer/>
+    {frame(<window.CreateLeague onBack={()=>setFlow('gate')} onCreated={()=>{ setOrganiser(true); setFlow('form'); }}/>)}
+    {viewToggle}<window.ToastLayer/><window.ConfettiLayer/>
   </React.Fragment>;
   if(flow==='find') return <React.Fragment>
-    <window.FindMyEntry onBack={()=>setFlow('gate')} onPicked={claimOI} onNew={()=>setFlow('form')}/>
-    <window.ToastLayer/><window.ConfettiLayer/>
+    {frame(<window.FindMyEntry onBack={()=>setFlow('gate')} onPicked={claimOI} onNew={()=>setFlow('form')}/>)}
+    {viewToggle}<window.ToastLayer/><window.ConfettiLayer/>
   </React.Fragment>;
   if(flow==='form') return <React.Fragment>
-    <window.OnboardingForm onBack={()=>setFlow(me?'app':'gate')} onSubmit={onboardSubmit}/>
-    <window.ToastLayer/><window.ConfettiLayer/>
+    {frame(<window.OnboardingForm onBack={()=>setFlow(me?'app':'gate')} onSubmit={onboardSubmit}/>)}
+    {viewToggle}<window.ToastLayer/><window.ConfettiLayer/>
   </React.Fragment>;
   if(flow==='oi-roster') return <React.Fragment>
-    <window.OIRosterPicker onBack={()=>setFlow('join')} onClaim={claimOI}/>
-    <window.ToastLayer/><window.ConfettiLayer/>
+    {frame(<window.OIRosterPicker onBack={()=>setFlow('join')} onClaim={claimOI}/>)}
+    {viewToggle}<window.ToastLayer/><window.ConfettiLayer/>
   </React.Fragment>;
 
   // -------- main app --------
@@ -7119,15 +7545,23 @@ function App(){
   };
 
   return <React.Fragment>
-    <StatusBar/>
-    <div className="scroll" key={tab+(me?me.id:'')}>
-      <AppBar me={me} onAccount={()=>setAccount(true)} onDev={()=>setDev(true)}/>
-      {/* When the dev console hops into another league, the active participant
-          isn't a member there, so `me` is null — render nothing behind the
-          full-screen admin overlay rather than letting a screen read me.team. */}
-      {me ? screens[tab] : null}
-    </div>
-    <TabBar tab={tab} setTab={setTab}/>
+    {deck
+      ? <DeckShell me={me} tab={tab} setTab={setTab}
+          onAccount={()=>setAccount(true)} onAdmin={()=>setAdmin(true)} onDev={()=>setDev(true)}>
+          {me ? screens[tab] : null}
+        </DeckShell>
+      : <React.Fragment>
+          <StatusBar/>
+          <div className="scroll" key={tab+(me?me.id:'')}>
+            <AppBar me={me} onAccount={()=>setAccount(true)} onDev={()=>setDev(true)}/>
+            {/* When the dev console hops into another league, the active participant
+                isn't a member there, so `me` is null — render nothing behind the
+                full-screen admin overlay rather than letting a screen read me.team. */}
+            {me ? screens[tab] : null}
+          </div>
+          <TabBar tab={tab} setTab={setTab}/>
+        </React.Fragment>}
+    {viewToggle}
 
     {account && <AccountSheet onClose={()=>setAccount(false)}
       onAdd={()=>{setAccount(false);setFlow('form');}}

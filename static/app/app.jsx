@@ -202,6 +202,121 @@ function AccountSignIn(props){
   </div>;
 }
 
+/* ===========================================================================
+   DESKTOP DECK — full-screen "matchday desk" layout. A toggle (top-right)
+   flips between this and the classic floating-phone mockup. The same React
+   screens render in the centre canvas; the rail drives the same tab state.
+   =========================================================================== */
+const DECK_NAV = [['me','You'],['games','Games'],['players','Group'],['predictions','Predict'],['chat','Chat'],['summary','Verdict']];
+const DECK_HEAD = {
+  me:          ['Your desk', 'Your team, your predictions and where you stand — everything you’re playing for, in one place.'],
+  games:       ['Match centre', 'Every fixture, live scores, and what each result does to the league.'],
+  players:     ['The group', 'Who drew whom, who’s still alive, and how the table is shaping up.'],
+  predictions: ['Predictions', 'Call the tournament. Points land as the real results come in.'],
+  summary:     ['The verdict', 'Where the pot is heading — and who’s in line to collect it.'],
+};
+function deckMoney(n){ return '£' + Math.round(n||0).toLocaleString('en-GB'); }
+
+function DeckWire(){
+  const meta = A_WC.meta || {};
+  const pot = A_S.pot ? A_S.pot() : (A_WC.POT || 0);
+  const rows = (A_S.rankedByPred ? A_S.rankedByPred() : []).slice(0,6);
+  return <aside className="deck-wire">
+    <div className="wire-kk">{(A_WC.league&&A_WC.league.name)||A_WC.meta.name||'The Sweepstake'}</div>
+    <div className="wire-card">
+      <div className="wire-pot">{deckMoney(pot)}</div>
+      <div className="wire-pot__l">in the pot</div>
+      <div className="wire-stats">
+        <div><div className="wire-stat__n">{meta.stillIn!=null?meta.stillIn:'—'}</div><div className="wire-stat__l">still in</div></div>
+        <div><div className="wire-stat__n">{meta.out!=null?meta.out:'—'}</div><div className="wire-stat__l">out</div></div>
+        <div><div className="wire-stat__n">{meta.teamsLeft!=null?meta.teamsLeft:'—'}</div><div className="wire-stat__l">teams left</div></div>
+      </div>
+    </div>
+    <div className="wire-kk" style={{marginTop:26}}>Prediction league</div>
+    <div className="wire-card">
+      {rows.length===0
+        ? <div style={{fontSize:12.5,fontWeight:600,color:'var(--ink2)'}}>No predictions banked yet. Wheesht is waiting.</div>
+        : rows.map((p,i)=>(
+            <div className="wire-row" key={p.id||i}>
+              <span className="wire-rank">{i+1}</span>
+              <span className="wire-av" style={{background:p.color||'#333'}}>{p.initials||'?'}</span>
+              <span className="wire-nm">{A_S.shownName?A_S.shownName(p):p.name}</span>
+              <span className="wire-pts">{(p.predScore||0)} pts</span>
+            </div>))}
+    </div>
+  </aside>;
+}
+
+function DeckRail(props){
+  const me = props.me;
+  const taps = React.useRef({n:0,t:0});
+  function secret(){
+    const now=Date.now();
+    taps.current.n=(now-taps.current.t<2500)?taps.current.n+1:1; taps.current.t=now;
+    if(taps.current.n>=7){ taps.current.n=0; props.onDev&&props.onDev(); }
+  }
+  return <nav className="deck-rail">
+    <div className="deck-brand">
+      <span className="rd" onClick={secret}><A_W mood="confident" size={42}/></span>
+      <span className="lk">
+        <span className="wm">Wheesht</span>
+        <span className="kk">{A_WC.meta.season||'World Cup 2026'}</span>
+      </span>
+    </div>
+    <div className="deck-nav">
+      {DECK_NAV.map(([k,lab])=>(
+        <button key={k} className={props.tab===k?'on':''} onClick={()=>props.setTab(k)}>
+          <span className="ic"><Icon name={k}/></span><span className="lb">{lab}</span>
+        </button>
+      ))}
+    </div>
+    <div className="spacer"/>
+    <div className="deck-foot">
+      {me && <button className="deck-acct" onClick={props.onAccount}>
+        <window.Avatar person={Object.assign({},me,{isYou:false})} size={38}/>
+        <span className="meta">
+          <span className="nm">{A_S.shownName?A_S.shownName(me):me.name}</span>
+          <span className="sub">Switch account</span>
+        </span>
+      </button>}
+      <button className="deck-cog" onClick={props.onAdmin}>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><circle cx="12" cy="12" r="3.2"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1"/></svg>
+        <span>Organiser tools</span>
+      </button>
+    </div>
+  </nav>;
+}
+
+function DeckShell(props){
+  const tab = props.tab;
+  const head = DECK_HEAD[tab];
+  const isChat = tab==='chat';
+  return <div className="deck-shell">
+    <DeckRail me={props.me} tab={tab} setTab={props.setTab}
+      onAccount={props.onAccount} onAdmin={props.onAdmin} onDev={props.onDev}/>
+    <main className="deck-main">
+      <div className={isChat?'deck-canvas deck-canvas--chat':'deck-canvas'} key={tab+(props.me?props.me.id:'')}>
+        {head && <header className="deck-head">
+          <div className="kk">{(A_WC.league&&A_WC.league.name)||A_WC.meta.name||'Wheesht'}</div>
+          <h1>{head[0]}</h1>
+          <div className="dek">{head[1]}</div>
+          <div className="rule"/>
+        </header>}
+        {props.children}
+      </div>
+    </main>
+    <DeckWire/>
+  </div>;
+}
+
+/* layout view ('desk' = full-screen desktop, 'phone' = floating mockup) */
+const WIDE_Q = '(min-width:561px)';
+function wideNow(){ return !!(window.matchMedia && window.matchMedia(WIDE_Q).matches); }
+function initialView(){
+  try{ var v=localStorage.getItem('wheesht_view'); if(v==='phone'||v==='desk') return v; }catch(e){}
+  return 'desk';
+}
+
 const TW_DEFAULTS = /*EDITMODE-BEGIN*/{
   "celebration": 8,
   "accent": "#E8272A",
@@ -221,12 +336,37 @@ function App(){
   const devReturn=React.useRef(undefined);      // league to restore after dev admin
   const [organiser,setOrganiser]=aState(false); // true while creating a league
   const [signIn,setSignIn]=aState(null);        // {id,name,proceed} account sign-in prompt
+  const [view,setView]=aState(initialView);     // 'desk' (full-screen) | 'phone' (mockup)
+  const [wide,setWide]=aState(wideNow);
   const [,tick]=aState(0);
   const [t,setTweak]=window.useTweaks(TW_DEFAULTS);
 
   // re-render on any store change
   aEffect(()=>A_S.subscribe(()=>tick(x=>x+1)),[]);
   aEffect(()=>{ A_S.refresh && A_S.refresh(); },[]);
+
+  // track viewport width so the toggle/deck only apply on wider screens
+  aEffect(()=>{
+    if(!window.matchMedia) return;
+    const mq=window.matchMedia(WIDE_Q);
+    const on=()=>setWide(mq.matches);
+    mq.addEventListener?mq.addEventListener('change',on):mq.addListener(on);
+    return ()=>{ mq.removeEventListener?mq.removeEventListener('change',on):mq.removeListener(on); };
+  },[]);
+  const deck = wide && view==='desk';
+  aEffect(()=>{ document.body.classList.toggle('deck', deck); },[deck]);
+  function toggleView(){
+    const nv = view==='desk'?'phone':'desk';
+    setView(nv);
+    try{ localStorage.setItem('wheesht_view', nv); }catch(e){}
+  }
+  const viewToggle = wide ? <button className="view-toggle" onClick={toggleView} title="Switch layout">
+    {deck
+      ? <><svg width="13" height="17" viewBox="0 0 14 20" fill="none" stroke="currentColor" strokeWidth="2"><rect x="1" y="1" width="12" height="18" rx="3"/><line x1="5.2" y1="16" x2="8.8" y2="16"/></svg>Phone view</>
+      : <><svg width="18" height="14" viewBox="0 0 22 16" fill="none" stroke="currentColor" strokeWidth="2"><rect x="1" y="1" width="20" height="12" rx="2"/><line x1="8" y1="15" x2="14" y2="15"/></svg>Desktop view</>}
+  </button> : null;
+  // Wrap onboarding/identity flows in a centred column when in deck mode.
+  function frame(node){ return deck ? <div className="deck-solo">{node}</div> : node; }
 
   // tweaks → DOM
   aEffect(()=>{ document.documentElement.style.setProperty('--red', t.accent); },[t.accent]);
@@ -328,29 +468,29 @@ function App(){
 
   // -------- onboarding / identity flow --------
   if(flow==='gate') return <React.Fragment>
-    <window.AccountGate onResume={resumeAccount} onJoin={()=>{setOrganiser(false);setFlow('join');}} onCreate={()=>{setOrganiser(true);setFlow('create');}}/>
-    <window.ToastLayer/><window.ConfettiLayer/>
+    {frame(<window.AccountGate onResume={resumeAccount} onJoin={()=>{setOrganiser(false);setFlow('join');}} onCreate={()=>{setOrganiser(true);setFlow('create');}}/>)}
+    {viewToggle}<window.ToastLayer/><window.ConfettiLayer/>
   </React.Fragment>;
   if(flow==='join') return <React.Fragment>
-    <window.JoinLeague onBack={()=>setFlow('gate')} onCreate={()=>{setOrganiser(true);setFlow('create');}}
-      onJoined={(league)=>{ setOrganiser(false); setFlow(league&&league.seeded?'oi-roster':'find'); }}/>
-    <window.ToastLayer/><window.ConfettiLayer/>
+    {frame(<window.JoinLeague onBack={()=>setFlow('gate')} onCreate={()=>{setOrganiser(true);setFlow('create');}}
+      onJoined={(league)=>{ setOrganiser(false); setFlow(league&&league.seeded?'oi-roster':'find'); }}/>)}
+    {viewToggle}<window.ToastLayer/><window.ConfettiLayer/>
   </React.Fragment>;
   if(flow==='create') return <React.Fragment>
-    <window.CreateLeague onBack={()=>setFlow('gate')} onCreated={()=>{ setOrganiser(true); setFlow('form'); }}/>
-    <window.ToastLayer/><window.ConfettiLayer/>
+    {frame(<window.CreateLeague onBack={()=>setFlow('gate')} onCreated={()=>{ setOrganiser(true); setFlow('form'); }}/>)}
+    {viewToggle}<window.ToastLayer/><window.ConfettiLayer/>
   </React.Fragment>;
   if(flow==='find') return <React.Fragment>
-    <window.FindMyEntry onBack={()=>setFlow('gate')} onPicked={claimOI} onNew={()=>setFlow('form')}/>
-    <window.ToastLayer/><window.ConfettiLayer/>
+    {frame(<window.FindMyEntry onBack={()=>setFlow('gate')} onPicked={claimOI} onNew={()=>setFlow('form')}/>)}
+    {viewToggle}<window.ToastLayer/><window.ConfettiLayer/>
   </React.Fragment>;
   if(flow==='form') return <React.Fragment>
-    <window.OnboardingForm onBack={()=>setFlow(me?'app':'gate')} onSubmit={onboardSubmit}/>
-    <window.ToastLayer/><window.ConfettiLayer/>
+    {frame(<window.OnboardingForm onBack={()=>setFlow(me?'app':'gate')} onSubmit={onboardSubmit}/>)}
+    {viewToggle}<window.ToastLayer/><window.ConfettiLayer/>
   </React.Fragment>;
   if(flow==='oi-roster') return <React.Fragment>
-    <window.OIRosterPicker onBack={()=>setFlow('join')} onClaim={claimOI}/>
-    <window.ToastLayer/><window.ConfettiLayer/>
+    {frame(<window.OIRosterPicker onBack={()=>setFlow('join')} onClaim={claimOI}/>)}
+    {viewToggle}<window.ToastLayer/><window.ConfettiLayer/>
   </React.Fragment>;
 
   // -------- main app --------
@@ -364,15 +504,23 @@ function App(){
   };
 
   return <React.Fragment>
-    <StatusBar/>
-    <div className="scroll" key={tab+(me?me.id:'')}>
-      <AppBar me={me} onAccount={()=>setAccount(true)} onDev={()=>setDev(true)}/>
-      {/* When the dev console hops into another league, the active participant
-          isn't a member there, so `me` is null — render nothing behind the
-          full-screen admin overlay rather than letting a screen read me.team. */}
-      {me ? screens[tab] : null}
-    </div>
-    <TabBar tab={tab} setTab={setTab}/>
+    {deck
+      ? <DeckShell me={me} tab={tab} setTab={setTab}
+          onAccount={()=>setAccount(true)} onAdmin={()=>setAdmin(true)} onDev={()=>setDev(true)}>
+          {me ? screens[tab] : null}
+        </DeckShell>
+      : <React.Fragment>
+          <StatusBar/>
+          <div className="scroll" key={tab+(me?me.id:'')}>
+            <AppBar me={me} onAccount={()=>setAccount(true)} onDev={()=>setDev(true)}/>
+            {/* When the dev console hops into another league, the active participant
+                isn't a member there, so `me` is null — render nothing behind the
+                full-screen admin overlay rather than letting a screen read me.team. */}
+            {me ? screens[tab] : null}
+          </div>
+          <TabBar tab={tab} setTab={setTab}/>
+        </React.Fragment>}
+    {viewToggle}
 
     {account && <AccountSheet onClose={()=>setAccount(false)}
       onAdd={()=>{setAccount(false);setFlow('form');}}
