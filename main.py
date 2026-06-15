@@ -460,12 +460,12 @@ def _resolve(league_people: List[Dict[str, Any]], admin: Dict[str, Any]):
         if dm_type == "winner":
             market = {"key": dm["id"], "q": fa + " " + na + " vs " + fb + " " + nb + " — who wins?",
                       "kind": "team", "points": dm.get("points", 5),
-                      "options": [f["a"], f["b"]], "answer": None}
+                      "options": [f["a"], f["b"], "draw"], "answer": None}
             if f.get("status") == "done" and f.get("score"):
                 sc = f["score"]
                 if sc[0] > sc[1]:   market["answer"] = f["a"]
                 elif sc[1] > sc[0]: market["answer"] = f["b"]
-                # draw: no winner → answer stays None
+                else:               market["answer"] = "draw"
         else:
             market = {"key": dm["id"], "q": fa + " " + na + " vs " + fb + " " + nb + " — exact score?",
                       "kind": "scoreline", "points": dm.get("points", 5),

@@ -24,6 +24,7 @@ function pickComplete(m, picks) {
 }
 
 function optLabel(m, opt) {
+  if (opt === 'draw') return { main: 'Draw', sub: 'Honours even', flag: '🤝', id: 'draw' };
   if (m.kind === 'player') return { main: opt.name, sub: WCp.TEAMS[opt.team] ? WCp.TEAMS[opt.team].name : '', flag: WCp.TEAMS[opt.team] ? WCp.TEAMS[opt.team].flag : '', id: opt.id };
   if (m.kind === 'stage') return { main: opt, sub: '', flag: '', id: opt };
   const t = WCp.TEAMS[opt];
@@ -217,10 +218,12 @@ function Market(props) {
               const count = withPick.filter(function(p){ return p.picks[m.key] === opt; }).length;
               const pct = Math.round(100 * count / withPick.length);
               const t = WCp.TEAMS[opt];
+              const oFlag = opt === 'draw' ? '🤝' : (t ? t.flag : '');
+              const oName = opt === 'draw' ? 'Draw' : (t ? t.name : opt);
               return (
                 <div key={opt} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 5 }}>
-                  <span style={{ fontSize: 18, flexShrink: 0 }}>{t ? t.flag : ''}</span>
-                  <span style={{ fontWeight: 700, fontSize: 12.5, minWidth: 70, flexShrink: 0 }}>{t ? t.name : opt}</span>
+                  <span style={{ fontSize: 18, flexShrink: 0 }}>{oFlag}</span>
+                  <span style={{ fontWeight: 700, fontSize: 12.5, minWidth: 70, flexShrink: 0 }}>{oName}</span>
                   <div style={{ flex: 1, height: 10, borderRadius: 999, background: 'var(--line)', overflow: 'hidden' }}>
                     <div style={{ height: '100%', width: pct + '%', background: m.answer === opt ? 'var(--green)' : 'var(--ink)', borderRadius: 999, transition: 'width .4s' }}/>
                   </div>
@@ -272,7 +275,13 @@ function PredictionsScreen(props) {
   const [, bump] = pState(0);
   if (!me) return null;
   const markets = Sp.visiblePredictions ? Sp.visiblePredictions() : (WCp.predictions || Sp.PREDICTIONS).filter(m => ((WCp.meta && WCp.meta.hiddenPredictions) || []).indexOf(m.key) < 0);
-  const open = markets.filter(m => !isResolved(m));
+  const dmTs = k => { const p = String(k).split('_'); const n = parseInt(p[p.length - 1], 10); return isFinite(n) ? n : 0; };
+  const open = markets.filter(m => !isResolved(m)).sort((a, b) => {
+    const ad = a.key.startsWith('dm_'), bd = b.key.startsWith('dm_');
+    if (ad && bd) return dmTs(b.key) - dmTs(a.key); // newest dynamic market first
+    if (ad !== bd) return ad ? -1 : 1;              // all dynamic markets above static
+    return 0;                                        // static markets keep original order
+  });
   const graded = markets.filter(m => isResolved(m));
   const made = Sp.madeVisiblePredictions ? Sp.madeVisiblePredictions(me) : (me.picks ? Object.keys(me.picks).filter(k => me.picks[k] != null && (!Array.isArray(me.picks[k]) || me.picks[k].length)).length : 0);
   const missing = open.filter(m => !pickComplete(m, me.picks || {}));
