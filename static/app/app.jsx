@@ -121,10 +121,11 @@ function AccountSheet(props){
       window.wcToast && window.wcToast((e&&e.message)||'No entry found for that Google account','crying');
     });
   }
-  return <div style={{position:'absolute',inset:0,zIndex:70,display:'flex',flexDirection:'column',justifyContent:'flex-end'}}>
-    <div onClick={props.onClose} style={{position:'absolute',inset:0,background:'rgba(26,26,26,.45)'}}/>
-    <div className="rise" style={{position:'relative',background:'var(--bg)',borderRadius:'26px 26px 0 0',padding:'18px 18px 26px',boxShadow:'0 -20px 50px rgba(0,0,0,.3)'}}>
-      <div style={{width:44,height:5,borderRadius:3,background:'var(--line)',margin:'0 auto 14px'}}/>
+  const chrome = window.wcSheetChrome(70);
+  return <div style={chrome.wrap}>
+    <div onClick={props.onClose} style={chrome.backdrop}/>
+    <div className={chrome.cls} style={chrome.sheet}>
+      {!chrome.deck && <div style={{width:44,height:5,borderRadius:3,background:'var(--line)',margin:'0 auto 14px'}}/>}
       <div className="dh" style={{fontSize:22,marginBottom:3}}>Switch account</div>
       <div style={{fontSize:12.5,fontWeight:600,color:'var(--ink2)',marginBottom:13}}>Everyone on this device. No passwords — just tap who you are.</div>
       <div style={{display:'flex',flexDirection:'column',gap:9,maxHeight:280,overflowY:'auto'}}>
@@ -184,10 +185,11 @@ function AccountSignIn(props){
   const inp={width:'100%',boxSizing:'border-box',border:'2.5px solid var(--ink)',borderRadius:12,padding:'11px 13px',fontFamily:'var(--body)',fontWeight:600,fontSize:15,marginTop:12,outline:'none'};
   const div={display:'flex',alignItems:'center',gap:8,margin:'12px 0 2px'};
   const line={flex:1,height:1,background:'var(--line)'};
-  return <div style={{position:'absolute',inset:0,zIndex:80,display:'flex',flexDirection:'column',justifyContent:'flex-end'}}>
-    <div onClick={props.onClose} style={{position:'absolute',inset:0,background:'rgba(26,26,26,.5)'}}/>
-    <div className="rise" style={{position:'relative',background:'var(--bg)',borderRadius:'26px 26px 0 0',padding:'18px 18px 26px',boxShadow:'0 -20px 50px rgba(0,0,0,.3)'}}>
-      <div style={{width:44,height:5,borderRadius:3,background:'var(--line)',margin:'0 auto 14px'}}/>
+  const chrome = window.wcSheetChrome(80);
+  return <div style={chrome.wrap}>
+    <div onClick={props.onClose} style={chrome.backdrop}/>
+    <div className={chrome.cls} style={chrome.sheet}>
+      {!chrome.deck && <div style={{width:44,height:5,borderRadius:3,background:'var(--line)',margin:'0 auto 14px'}}/>}
       <div className="dh" style={{fontSize:22}}>Sign in</div>
       <div style={{fontSize:13,fontWeight:600,color:'var(--ink2)',marginTop:4}}><b>{props.name}</b> is password-protected. Enter the password to continue.</div>
       {hasGoogle && <>

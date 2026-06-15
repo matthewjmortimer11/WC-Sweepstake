@@ -277,9 +277,39 @@ function GoogleSignInButton({onToken, opts}) {
   return <div ref={ref} style={{minHeight: 44, marginTop: 10}} />;
 }
 
+/* ---- bottom-sheet / modal chrome ---------------------------------------- *
+   On phones (and the phone-mockup view) overlays slide up as a bottom sheet.
+   On the desktop "deck" layout a bottom sheet anchored to the scrolling
+   centre column feels stuck and the backdrop can't be clicked off — so there
+   we render a centred, viewport-fixed modal instead. Returns the styles +
+   animation class for the outer wrap, the backdrop and the sheet itself. */
+function wcSheetChrome(zIndex) {
+  var deck = typeof document !== 'undefined' && document.body.classList.contains('deck');
+  return {
+    deck: deck,
+    cls: deck ? 'pop' : 'rise',
+    wrap: {
+      position: 'fixed', inset: 0, zIndex: zIndex || 70, display: 'flex',
+      flexDirection: 'column', boxSizing: 'border-box',
+      justifyContent: deck ? 'center' : 'flex-end',
+      alignItems: deck ? 'center' : 'stretch',
+      padding: deck ? '24px' : 0,
+    },
+    backdrop: { position: 'fixed', inset: 0, background: 'rgba(26,26,26,.45)' },
+    sheet: deck
+      ? { position: 'relative', background: 'var(--bg)', borderRadius: 24, padding: '22px 22px 24px',
+          boxShadow: '0 30px 80px -22px rgba(0,0,0,.5), 0 0 0 2px var(--ink)',
+          width: 'min(460px, 100%)', maxHeight: '86dvh', overflowY: 'auto',
+          WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain' }
+      : { position: 'relative', background: 'var(--bg)', borderRadius: '26px 26px 0 0', padding: '18px 18px 26px',
+          boxShadow: '0 -20px 50px rgba(0,0,0,.3)', maxHeight: '88dvh', overflowY: 'auto',
+          WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain' },
+  };
+}
+
 Object.assign(window, {
   Card: Card, Btn: Btn, Flag: Flag, Avatar: Avatar, Chip: Chip, Stamp: Stamp,
   ProgressRing: ProgressRing, SegmentBar: SegmentBar, WheeshtSays: WheeshtSays,
   SectionHead: SectionHead, ToastLayer: ToastLayer, ConfettiLayer: ConfettiLayer,
-  Badges: Badges, GoogleSignInButton: GoogleSignInButton,
+  Badges: Badges, GoogleSignInButton: GoogleSignInButton, wcSheetChrome: wcSheetChrome,
 });
