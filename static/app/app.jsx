@@ -439,6 +439,14 @@ function App(){
         ];
         const pick=pool[(Math.random()*pool.length)|0];
         window.wcToast&&window.wcToast(pick[0],pick[1]);
+        // Nudge for unresolved dynamic match predictions
+        const dynOpen = (A_WC.PREDICTIONS || []).filter(function(m){ return m.key && m.key.startsWith('dm_') && m.answer == null && !(me.picks && me.picks[m.key] != null); });
+        if (dynOpen.length > 0) {
+          setTimeout(function(){
+            const dm = dynOpen[0];
+            window.wcToast && window.wcToast('New match prediction open: ' + dm.q + ' Worth ' + dm.points + ' pts — pick now!', 'mischievous');
+          }, 1800);
+        }
       }
       if(t.bias){
         const scotMsgs=[

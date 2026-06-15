@@ -405,6 +405,101 @@ function SettingsAdmin() {
    );
 }
 
+function MatchPredAdmin() {
+  const upcoming = (WCa.FIXTURES || []).filter(function(f) { return f.status !== 'done'; });
+  const [fixId, setFixId] = React.useState(upcoming.length ? upcoming[0].id : '');
+  const [mtype, setMtype] = React.useState('winner');
+  const [pts, setPts] = React.useState(5);
+  const [busy, setBusy] = React.useState(false);
+  const [dmList, setDmList] = React.useState(null); // null = not loaded yet
+  const leagueCode = Sa.leagueCode ? Sa.leagueCode() : '';
+
+  function load() {
+    // Read current dynamic markets from the predictions array (they start with "dm_")
+    const all = WCa.PREDICTIONS || [];
+    setDmList(all.filter(function(m) { return m.key && m.key.startsWith('dm_'); }));
+  }
+
+  React.useEffect(load, []);
+
+  function create() {
+    if (!fixId || busy) return;
+    setBusy(true);
+    fetch(Sa.api('/predictions/match'), {
+      method: 'POST',
+      headers: Sa.adminHeaders(),
+      body: JSON.stringify({ fixture_id: fixId, type: mtype, points: pts, notify_chat: true }),
+    }).then(function(r) { return r.json().then(function(j) { if (!r.ok) throw new Error(j.detail || 'Failed'); return j; }); })
+      .then(function() {
+        setBusy(false);
+        Sa.refresh && Sa.refresh().then(load);
+        window.wcToast && window.wcToast('Match prediction created! Chat has been notified.', 'mischievous');
+      }).catch(function(e) { setBusy(false); window.wcToast && window.wcToast((e && e.message) || 'Failed', 'crying'); });
+  }
+
+  function remove(id) {
+    fetch(Sa.api('/predictions/match/' + encodeURIComponent(id)), {
+      method: 'DELETE', headers: Sa.adminHeaders(),
+    }).then(function() {
+      Sa.refresh && Sa.refresh().then(load);
+      window.wcToast && window.wcToast('Market removed.', 'neutral');
+    }).catch(function() { window.wcToast && window.wcToast('Failed to remove.', 'crying'); });
+  }
+
+  function fixLabel(f) {
+    const ta = WCa.TEAMS[f.a] || {}, tb = WCa.TEAMS[f.b] || {};
+    return (ta.flag || '') + ' ' + (ta.name || f.a) + ' vs ' + (tb.flag || '') + ' ' + (tb.name || f.b) + ' · ' + (f.dateLabel || '') + ' ' + (f.time || '');
+  }
+
+  const segs = { background: '#fff', border: '2px solid var(--ink)', borderRadius: 12, display: 'flex', overflow: 'hidden', marginBottom: 10 };
+  const seg = function(active) { return { flex: 1, border: 'none', padding: '8px 0', fontFamily: 'var(--disp)', fontWeight: 800, fontSize: 13, cursor: 'pointer', background: active ? 'var(--ink)' : '#fff', color: active ? '#fff' : 'var(--ink)' }; };
+
+  return (
+    <div style={{ marginTop: 22, paddingTop: 16, borderTop: '2px dashed var(--line)' }}>
+      <div className="dh" style={{ fontSize: 15, marginBottom: 6 }}>Match predictions</div>
+      <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink2)', marginBottom: 10 }}>Create a one-off prediction tied to an upcoming game. Auto-grades when you log the result.</div>
+      {upcoming.length === 0
+        ? <div style={{ fontSize: 12.5, color: 'var(--ink2)', fontWeight: 600, padding: '10px 0' }}>No upcoming fixtures to predict on.</div>
+        : <>
+          <select
+            value={fixId}
+            onChange={function(e) { setFixId(e.target.value); }}
+            style={{ width: '100%', border: '2px solid var(--ink)', borderRadius: 11, padding: '9px 11px', fontFamily: 'var(--body)', fontWeight: 700, fontSize: 13, outline: 'none', marginBottom: 10, background: '#fff' }}
+          >
+            {upcoming.map(function(f) { return <option key={f.id} value={f.id}>{fixLabel(f)}</option>; })}
+          </select>
+          <div style={segs}>
+            <button style={seg(mtype==='winner')} onClick={function(){ setMtype('winner'); }}>Who wins?</button>
+            <button style={seg(mtype==='scoreline')} onClick={function(){ setMtype('scoreline'); }}>Exact score</button>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 10 }}>
+            <span style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--ink2)', flexShrink: 0 }}>Points:</span>
+            {[2, 3, 5, 10, 15].map(function(n) {
+              return <button key={n} onClick={function(){ setPts(n); }} style={{ border: '2px solid var(--ink)', borderRadius: 8, padding: '5px 10px', fontFamily: 'var(--disp)', fontWeight: 800, fontSize: 13, cursor: 'pointer', background: pts===n?'var(--yellow)':'#fff' }}>{n}</button>;
+            })}
+          </div>
+          <button onClick={create} disabled={busy || !fixId} className="wc-btn wc-btn--ink wc-btn--block wc-btn--sm" style={{ marginBottom: 6 }}>
+            {busy ? 'Creating…' : 'Create & notify chat'}
+          </button>
+        </>}
+      {dmList && dmList.length > 0 && <>
+        <div className="dh" style={{ fontSize: 13, margin: '14px 0 7px', textTransform: 'uppercase', letterSpacing: '.04em' }}>Active match predictions</div>
+        {dmList.map(function(m) {
+          return (
+            <div key={m.key} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 0', borderBottom: '1.5px solid var(--line)' }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontWeight: 700, fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.q}</div>
+                <div style={{ fontSize: 11, color: 'var(--ink2)', fontWeight: 600 }}>{m.points} pts · {m.answer != null ? '✓ Graded: ' + m.answer : 'Open'}</div>
+              </div>
+              <button onClick={function(){ remove(m.key); }} style={{ border: '2px solid var(--red)', borderRadius: 8, padding: '4px 9px', fontFamily: 'var(--disp)', fontWeight: 800, fontSize: 12, cursor: 'pointer', background: '#fff', color: 'var(--red)', flexShrink: 0 }}>Remove</button>
+            </div>
+          );
+        })}
+      </>}
+    </div>
+  );
+}
+
 function AdminPanel(props) {
    const [, bump] = aState2(0);
    React.useEffect(() => Sa.subscribe(() => bump(x => x + 1)), []);
@@ -471,6 +566,7 @@ function AdminPanel(props) {
          {sec === 'predict' && <>
            <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--ink2)', marginBottom: 10 }}>Set the answer once it's known — every entrant's score and the league re-grade instantly.</div>
            {(WCa.predictions || Sa.PREDICTIONS).map(m => <PredAdmin key={m.key} m={m} />)}
+           <MatchPredAdmin />
          </>}
 
          {sec === 'people' && <PeopleAdmin />}

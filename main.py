@@ -444,6 +444,37 @@ def _resolve(league_people: List[Dict[str, Any]], admin: Dict[str, Any]):
 
     # 4. auto-grade predictions, then apply manual answers on top
     predictions = standings.grade_predictions(_wc_data["predictions"], teams, fixtures, ladder)
+
+    # 4b. inject dynamic fixture markets (auto-grade from this league's results)
+    dm_list = admin.get("dynamicMarkets") or []
+    team_map = {t["code"]: t for t in teams}
+    fix_map  = {f["id"]: f for f in fixtures}
+    for dm in dm_list:
+        f = fix_map.get(dm.get("fixture_id", ""))
+        if not f:
+            continue
+        ta = team_map.get(f["a"], {}); tb = team_map.get(f["b"], {})
+        fa = ta.get("flag", f["a"]); fb = tb.get("flag", f["b"])
+        na = ta.get("name", f["a"]); nb = tb.get("name", f["b"])
+        dm_type = dm.get("type", "winner")
+        if dm_type == "winner":
+            market = {"key": dm["id"], "q": fa + " " + na + " vs " + fb + " " + nb + " — who wins?",
+                      "kind": "team", "points": dm.get("points", 5),
+                      "options": [f["a"], f["b"]], "answer": None}
+            if f.get("status") == "done" and f.get("score"):
+                sc = f["score"]
+                if sc[0] > sc[1]:   market["answer"] = f["a"]
+                elif sc[1] > sc[0]: market["answer"] = f["b"]
+                # draw: no winner → answer stays None
+        else:
+            market = {"key": dm["id"], "q": fa + " " + na + " vs " + fb + " " + nb + " — exact score?",
+                      "kind": "scoreline", "points": dm.get("points", 5),
+                      "options": [f["a"], f["b"]], "answer": None}
+            if f.get("status") == "done" and f.get("score"):
+                sc = f["score"]
+                market["answer"] = str(sc[0]) + "-" + str(sc[1])
+        predictions.append(market)
+
     for m in predictions:
         if m["key"] in admin_preds:
             ans = admin_preds[m["key"]]
@@ -1524,6 +1555,94 @@ async def post_system_chat(
         session.add(msg)
         await session.commit()
         return _chat_to_dict(msg)
+
+
+class DynamicMarketPayload(BaseModel):
+    fixture_id: str
+    type: str  # "winner" | "scoreline"
+    points: int = 5
+    notify_chat: bool = True
+
+
+@app.post("/api/leagues/{code}/predictions/match")
+async def create_match_prediction(
+    code: str,
+    payload: DynamicMarketPayload,
+    x_wheesht_admin_token: Optional[str] = Header(None, alias="X-Wheesht-Admin-Token"),
+):
+    """Admin creates an ad-hoc fixture prediction market."""
+    if payload.type not in ("winner", "scoreline"):
+        raise HTTPException(status_code=400, detail="type must be winner or scoreline")
+    if not 1 <= payload.points <= 50:
+        raise HTTPException(status_code=400, detail="points must be 1–50")
+    async with AsyncSessionLocal() as session:
+        league = await _get_league_by_code(session, code.upper())
+        if league is None:
+            raise HTTPException(status_code=404, detail="league not found")
+        _require_admin(league, x_wheesht_admin_token)
+        # validate fixture exists and is upcoming
+        fix = next((f for f in _base_fixtures() if f["id"] == payload.fixture_id), None)
+        if fix is None:
+            raise HTTPException(status_code=404, detail="fixture not found")
+        team_map = {t["code"]: t for t in _wc_data["teams"]}
+        ta = team_map.get(fix["a"], {}); tb = team_map.get(fix["b"], {})
+        na = ta.get("name", fix["a"]); nb = tb.get("name", fix["b"])
+        fa = ta.get("flag", ""); fb = tb.get("flag", "")
+        market_id = "dm_" + fix["id"].replace("-", "_") + "_" + str(int(time.time()))
+        label = fa + " " + na + " vs " + fb + " " + nb + " — " + payload.type
+        # load / create AdminOverride
+        row = await session.get(AdminOverride, league.id)
+        data = dict(row.data) if row and row.data else {}
+        dms = list(data.get("dynamicMarkets") or [])
+        dms.append({"id": market_id, "fixture_id": payload.fixture_id,
+                    "type": payload.type, "points": payload.points, "label": label})
+        data["dynamicMarkets"] = dms
+        if row:
+            row.data = data
+        else:
+            session.add(AdminOverride(league_id=league.id, data=data))
+        # optional chat announcement
+        if payload.notify_chat:
+            type_label = "winner" if payload.type == "winner" else "exact scoreline"
+            chat_text = ("New match prediction: " + fa + " " + na + " vs " + fb + " " + nb +
+                         " — predict the " + type_label + "! Worth " + str(payload.points) +
+                         " point" + ("s" if payload.points != 1 else "") + ". Head to Predictions to pick.")
+            chat_msg = ChatMessage(
+                id=uuid.uuid4().hex[:10], league_id=league.id,
+                author_id="wheesht", author="Wheesht",
+                initials="W", color="#1A1A1A", team="mischievous",
+                text=chat_text, ts=int(time.time() * 1000),
+            )
+            session.add(chat_msg)
+        await session.commit()
+        return {"id": market_id, "label": label}
+
+
+@app.delete("/api/leagues/{code}/predictions/match/{market_id}")
+async def delete_match_prediction(
+    code: str,
+    market_id: str,
+    x_wheesht_admin_token: Optional[str] = Header(None, alias="X-Wheesht-Admin-Token"),
+):
+    """Admin removes a dynamic fixture prediction market."""
+    async with AsyncSessionLocal() as session:
+        league = await _get_league_by_code(session, code.upper())
+        if league is None:
+            raise HTTPException(status_code=404, detail="league not found")
+        _require_admin(league, x_wheesht_admin_token)
+        row = await session.get(AdminOverride, league.id)
+        if not row or not row.data:
+            return {"ok": True}
+        data = dict(row.data)
+        dms = [m for m in (data.get("dynamicMarkets") or []) if m["id"] != market_id]
+        data["dynamicMarkets"] = dms
+        # also remove any stored answer for this market
+        preds = dict(data.get("predictions") or {})
+        preds.pop(market_id, None)
+        data["predictions"] = preds
+        row.data = data
+        await session.commit()
+        return {"ok": True}
 
 
 @app.delete("/api/leagues/{code}/chat/{message_id}")

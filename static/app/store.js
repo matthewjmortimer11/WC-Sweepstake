@@ -324,6 +324,7 @@
     if (v == null) return false;
     if (m.kind === 'team2') return Array.isArray(v) && v.length === 2;
     if (m.kind === 'number') return v !== '' && isFinite(Number(v));
+    if (m.kind === 'scoreline') { return typeof v === 'string' && /^\d+-\d+$/.test(v); }
     return true;
   }
   function madeVisiblePredictions(p) {

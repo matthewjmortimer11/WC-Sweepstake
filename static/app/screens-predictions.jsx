@@ -19,6 +19,7 @@ function pickComplete(m, picks) {
   if (v == null) return false;
   if (m.kind === 'team2') return Array.isArray(v) && v.length === 2;
   if (m.kind === 'number') return v !== '' && isFinite(Number(v));
+  if (m.kind === 'scoreline') return typeof v === 'string' && /^\d+-\d+$/.test(v);
   return true;
 }
 
@@ -29,10 +30,42 @@ function optLabel(m, opt) {
   return { main: t ? t.name : opt, sub: t ? 'Group ' + t.group + ' · ' + t.odds : '', flag: t ? t.flag : '', id: opt };
 }
 
+function ScorelinePicker({ pick, answer, resolved, locked, onPick }) {
+  const parts = pick ? pick.split('-') : ['', ''];
+  const home = parts[0] != null ? parts[0] : '';
+  const away = parts[1] != null ? parts[1] : '';
+  function set(side, v) {
+    if (resolved || locked) return;
+    const h = side === 0 ? v : home;
+    const a = side === 1 ? v : away;
+    if (h === '' && a === '') { onPick(null); return; }
+    onPick(h + '-' + a);
+  }
+  const gotIt = answer != null && pick === answer;
+  const inp = function(val, side) {
+    return (
+      <input
+        type="number" min="0" step="1" value={val} disabled={resolved || locked}
+        onChange={function(e) { set(side, e.target.value); }}
+        style={{ width: 56, border: 'none', outline: 'none', background: 'transparent', fontFamily: 'var(--disp)', fontWeight: 900, fontSize: 28, textAlign: 'center', color: 'var(--ink)' }}
+      />
+    );
+  };
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 4, border: '2.5px solid ' + (pick && /^\d+-\d+$/.test(pick) ? (resolved ? (gotIt ? 'var(--green)' : 'var(--red)') : 'var(--ink)') : 'var(--line)'), borderRadius: 13, background: resolved ? (gotIt ? 'rgba(26,122,68,.08)' : 'rgba(232,39,42,.06)') : (pick && /^\d+-\d+$/.test(pick) ? 'var(--yellow)' : '#fff'), padding: '4px 8px', justifyContent: 'center' }}>
+      {inp(home, 0)}
+      <span className="dh" style={{ fontSize: 24, color: 'var(--ink2)', userSelect: 'none' }}>–</span>
+      {inp(away, 1)}
+      {resolved && <div style={{ marginLeft: 8, fontSize: 11.5, fontWeight: 800, color: gotIt ? 'var(--green)' : 'var(--red)' }}>{gotIt ? '✓ Correct' : 'Answer: ' + answer}</div>}
+    </div>
+  );
+}
+
 function Market(props) {
   const m = props.market, me = props.me, onPick = props.onPick;
   const isTwo = m.kind === 'team2';
   const isNumber = m.kind === 'number';
+  const isScoreline = m.kind === 'scoreline';
   const isTeam = m.kind === 'team' || isTwo;
   const locked = !!props.locked;
   const resolved = isResolved(m);
@@ -75,8 +108,8 @@ function Market(props) {
     else onPick(m.key, Number(v));
   }
 
-  const hasPick = isNumber ? (pick != null && pick !== '' && isFinite(Number(pick))) : (pick != null && (!isTwo || (Array.isArray(pick) && pick.length > 0)));
-  const hasFullPick = isNumber ? hasPick : (pick != null && (!isTwo || (Array.isArray(pick) && pick.length === 2)));
+  const hasPick = isNumber ? (pick != null && pick !== '' && isFinite(Number(pick))) : isScoreline ? (pick != null && /^\d+-\d+$/.test(pick)) : (pick != null && (!isTwo || (Array.isArray(pick) && pick.length > 0)));
+  const hasFullPick = isScoreline ? hasPick : isNumber ? hasPick : (pick != null && (!isTwo || (Array.isArray(pick) && pick.length === 2)));
 
   return (
     <Cp style={{ marginBottom: 12 }}>
@@ -105,7 +138,10 @@ function Market(props) {
           {!resolved && locked && hasPick && <Chp tone="yellow" style={{ flex: '0 0 auto' }}>Your pick</Chp>}
         </div>
       )}
-      {!isNumber && <>
+      {isScoreline && (
+        <ScorelinePicker pick={pick} answer={m.answer} resolved={resolved} locked={locked} onPick={function(v){ onPick(m.key, v); }}/>
+      )}
+      {!isNumber && !isScoreline && <>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
         {(m.options || []).map((opt, i) => {
           const o = optLabel(m, opt);
@@ -167,6 +203,35 @@ function Market(props) {
           )}
         </div>
       )}
+      {/* % breakdown — show for dynamic markets always, static markets once resolved */}
+      {(m.key.startsWith('dm_') || resolved) && m.kind !== 'number' && !isTwo && (function(){
+        const all = Sp.allSync ? Sp.allSync() : [];
+        const withPick = all.filter(function(p){ return p.picks && p.picks[m.key] != null; });
+        if (withPick.length === 0) return null;
+        const opts = (m.options && m.options.length ? m.options : (m.answer ? [m.answer] : []));
+        if (opts.length === 0) return null;
+        return (
+          <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1.5px solid var(--line)' }}>
+            <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '.05em', textTransform: 'uppercase', color: 'var(--ink2)', marginBottom: 7 }}>How the group picked</div>
+            {opts.map(function(opt) {
+              const count = withPick.filter(function(p){ return p.picks[m.key] === opt; }).length;
+              const pct = Math.round(100 * count / withPick.length);
+              const t = WCp.TEAMS[opt];
+              return (
+                <div key={opt} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 5 }}>
+                  <span style={{ fontSize: 18, flexShrink: 0 }}>{t ? t.flag : ''}</span>
+                  <span style={{ fontWeight: 700, fontSize: 12.5, minWidth: 70, flexShrink: 0 }}>{t ? t.name : opt}</span>
+                  <div style={{ flex: 1, height: 10, borderRadius: 999, background: 'var(--line)', overflow: 'hidden' }}>
+                    <div style={{ height: '100%', width: pct + '%', background: m.answer === opt ? 'var(--green)' : 'var(--ink)', borderRadius: 999, transition: 'width .4s' }}/>
+                  </div>
+                  <span style={{ fontWeight: 800, fontSize: 11.5, color: 'var(--ink2)', minWidth: 36, textAlign: 'right' }}>{pct}% · {count}</span>
+                </div>
+              );
+            })}
+            <div style={{ fontSize: 10.5, color: 'var(--ink2)', fontWeight: 600, marginTop: 4 }}>{withPick.length} of {all.length} picked</div>
+          </div>
+        );
+      })()}
     </Cp>
   );
 }
