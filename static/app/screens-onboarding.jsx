@@ -224,6 +224,7 @@ function FindMyEntry(props) {
             </Co>}
           {results.map(p => {
             const t = WCo.TEAMS[p.team];
+            const locked = So.needsSignIn && So.needsSignIn(p);
             return <button key={p.id} onClick={() => props.onPicked(p.id)} style={{ display: 'flex', alignItems: 'center', gap: 11, background: '#fff', border: '2px solid var(--line)', borderRadius: 14, padding: '10px 12px', cursor: 'pointer', textAlign: 'left' }}>
               <Ao person={p} size={38} />
               <div style={{ flex: 1, minWidth: 0 }}>
@@ -231,7 +232,12 @@ function FindMyEntry(props) {
                 <div style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--ink2)' }}>{p.location}{includeDept && p.department ? ' · ' + p.department : ''}</div>
               </div>
               {t && <Fo team={t} size={22} />}
-              <span className="dh" style={{ fontSize: 16, color: 'var(--red)' }}>This is me →</span>
+              {locked
+                ? <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 13, fontWeight: 800, color: 'var(--ink2)' }}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4"><rect x="4" y="11" width="16" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
+                    Sign in
+                  </span>
+                : <span className="dh" style={{ fontSize: 16, color: 'var(--red)' }}>This is me →</span>}
             </button>;
           })}
         </div>
