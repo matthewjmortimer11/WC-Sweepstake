@@ -460,7 +460,7 @@ body.deck .deck-canvas{animation:screenIn .42s cubic-bezier(.2,.8,.25,1) both;}
 
 <!-- Single source of truth: generated from wc_data.py by scripts/build_snapshot.py.
      No-op when the server injects window.WC_DATA above (live mode). -->
-<script type="text/babel" src="tweaks-panel.jsx?v=20260615-auth"></script>
+<script type="text/babel" src="tweaks-panel.jsx?v=20260615-dedup"></script>
 <script>
 (function(){
   var secure = location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1';
@@ -1080,7 +1080,18 @@ body.deck .deck-canvas{animation:screenIn .42s cubic-bezier(.2,.8,.25,1) both;}
         try {
           fetch(api('/participants'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(p) })
             .then(parseJson)
-            .catch(function (e) { toastError(e, 'Could not save entrant'); });
+            .catch(function (e) {
+              // Server rejected a duplicate-name signup — undo the local entry so
+              // the device isn't left with a ghost account, then resync.
+              if (e && e.status === 409) {
+                mine = mine.filter(function (m) { return m.id !== p.id; });
+                lsSet(K.mine, mine);
+                lsSet(K.device, Store.deviceIds().filter(function (x) { return x !== p.id; }));
+                if (lsGet(K.active, null) === p.id) lsSet(K.active, null);
+                Store.refresh().then(function () { rebuild(); emit(); });
+              }
+              toastError(e, 'Could not save entrant');
+            });
         } catch (e) { toastError(e, 'Could not save entrant'); }
       }
       emit();
@@ -7529,6 +7540,16 @@ function App(){
   },[flow,me&&me.id]); // eslint-disable-line
 
   function onboardSubmit(profile){
+    const nm=(profile.name||'').trim().toLowerCase();
+    const lg=A_S.activeLeague&&A_S.activeLeague();
+    // In a seeded league everyone is already on the fixed roster. If this name
+    // matches an existing entry, claim that one (which enforces sign-in when the
+    // entry is protected) instead of minting a duplicate account.
+    if(nm && lg && lg.seeded && A_S.allSync){
+      const dups=A_S.allSync().filter(p=>(p.name||'').trim().toLowerCase()===nm);
+      const existing=dups.find(p=>(A_S.deviceIds?A_S.deviceIds():[]).indexOf(p.id)<0)||dups[0];
+      if(existing){ setOrganiser(false); claimOI(existing.id); return; }
+    }
     const p=A_S.create(profile,{organiser:organiser});
     setOrganiser(false);
     A_S.refresh&&A_S.refresh();
