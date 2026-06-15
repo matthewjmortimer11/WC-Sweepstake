@@ -227,7 +227,32 @@
     if (lp.avatarVersion != null) out.avatarVersion = Math.max(lp.avatarVersion, p.avatarVersion || 0);
     // In MOCK/preview there is no server flag, so a locally-set lock drives the UI.
     if (lp.hasPassword != null && !LIVE) out.hasPassword = lp.hasPassword;
+    if (lp.hasGoogleLink != null) out.hasGoogleLink = lp.hasGoogleLink;
     return out;
+  }
+
+  // ---- Google Identity Services ------------------------------------------
+  // A single credential callback, replaced before each GIS interaction so
+  // different UI flows (link vs cross-device login) each get their own handler.
+  var _googleCb = null;
+  var _googleInitDone = false;
+
+  function _googleGISCallback(response) {
+    var cb = _googleCb; _googleCb = null;
+    if (cb && response && response.credential) cb(response.credential);
+  }
+
+  function _initGoogleOnce() {
+    if (_googleInitDone) return true;
+    if (!window.google || !window.google.accounts || !window.WC_GOOGLE_CLIENT_ID) return false;
+    window.google.accounts.id.initialize({
+      client_id: window.WC_GOOGLE_CLIENT_ID,
+      callback: _googleGISCallback,
+      auto_select: false,
+      cancel_on_tap_outside: true,
+    });
+    _googleInitDone = true;
+    return true;
   }
 
   function rebuild() {
@@ -643,6 +668,67 @@
       });
     },
     signOutAccount: function (id) { clearAcctToken(id); emit(); },
+
+    // ===== GOOGLE SIGN-IN =====
+    hasGoogleLink: function(p) { return !!(p && p.hasGoogleLink); },
+    // Set/clear the credential callback consumed by the GIS handler.
+    setGoogleCallback: function(fn) { _googleCb = fn; },
+    clearGoogleCallback: function() { _googleCb = null; },
+    // Initialize GIS (idempotent). Returns false if the library isn't ready yet.
+    initGoogle: _initGoogleOnce,
+    // Render a Google Sign-In button into `el`. Returns false if GIS isn't loaded.
+    renderGoogleButton: function(el, opts) {
+      if (!el || !_initGoogleOnce()) return false;
+      window.google.accounts.id.renderButton(el, Object.assign({
+        size: 'large', theme: 'outline', text: 'signin_with', shape: 'rectangular',
+      }, opts || {}));
+      return true;
+    },
+    // Link or re-authenticate with Google. Stores account token on success.
+    googleLink: function(id, idToken) {
+      if (!LIVE || !leagueCode()) return Promise.reject(new Error('Not in a league'));
+      return fetch(api('/participants/' + encodeURIComponent(id) + '/google-auth'), {
+        method: 'POST', headers: acctHeaders(id),
+        body: JSON.stringify({ idToken: idToken }),
+      }).then(parseJson).then(function(r) {
+        if (r.token) setAcctToken(id, r.token);
+        if (r.avatarVersion != null) setLocalProfile(id, { avatarVersion: r.avatarVersion });
+        setLocalProfile(id, { hasGoogleLink: true });
+        rebuild(); emit();
+        return r;
+      }).catch(function(e) { onWriteErr(id, e, 'Google sign-in failed'); throw e; });
+    },
+    // Unlink Google from the given entry.
+    googleUnlink: function(id) {
+      if (!LIVE || !leagueCode()) return Promise.reject(new Error('Not in a league'));
+      return fetch(api('/participants/' + encodeURIComponent(id) + '/google-auth'), {
+        method: 'DELETE', headers: acctHeaders(id),
+      }).then(parseJson).then(function(r) {
+        setLocalProfile(id, { hasGoogleLink: false });
+        rebuild(); emit();
+        window.wcToast && window.wcToast('Google account unlinked.', 'neutral');
+        return r;
+      }).catch(function(e) { onWriteErr(id, e, 'Could not unlink Google'); throw e; });
+    },
+    // Cross-device login: find entry by Google identity and return {participantId, name, token}.
+    googleLogin: function(idToken) {
+      if (!LIVE || !leagueCode()) return Promise.reject(new Error('Not in a league'));
+      return fetch(api('/google-login'), {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ idToken: idToken }),
+      }).then(parseJson);
+    },
+    // Full cross-device login: verify Google, claim the entry, store the token.
+    loginWithGoogle: function(idToken) {
+      var self = this;
+      return this.googleLogin(idToken).then(function(r) {
+        if (!r || !r.participantId) throw new Error('No entry found for this Google account');
+        setAcctToken(r.participantId, r.token);
+        self.claimOI(r.participantId);
+        self.refresh && self.refresh();
+        return r;
+      });
+    },
 
     refresh: function () {
       if (!LIVE) return Promise.resolve();

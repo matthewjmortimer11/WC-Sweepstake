@@ -252,9 +252,34 @@ window.wcHaptic = function(type) {
   document.head.appendChild(s);
 })();
 
+/* ---- Google Sign-In button (rendered by GIS library) -------------------- */
+// Renders the official Google "Sign in with Google" button into a div.
+// Polls until the GIS library is ready (loaded async). Pass `onToken(idToken)`
+// as a prop; it fires once with the credential when the user authenticates.
+function GoogleSignInButton({onToken, opts}) {
+  const S = window.Store;
+  const ref = React.useRef(null);
+  React.useEffect(() => {
+    if (!window.WC_GOOGLE_CLIENT_ID || !S) return;
+    S.setGoogleCallback(function(token) {
+      S.clearGoogleCallback();
+      onToken(token);
+    });
+    var tries = 0;
+    function tryRender() {
+      if (ref.current && S.renderGoogleButton && S.renderGoogleButton(ref.current, opts || {})) return;
+      if (tries++ < 20) setTimeout(tryRender, 200);
+    }
+    tryRender();
+    return function() { S.clearGoogleCallback(); };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  if (!window.WC_GOOGLE_CLIENT_ID) return null;
+  return <div ref={ref} style={{minHeight: 44, marginTop: 10}} />;
+}
+
 Object.assign(window, {
   Card: Card, Btn: Btn, Flag: Flag, Avatar: Avatar, Chip: Chip, Stamp: Stamp,
   ProgressRing: ProgressRing, SegmentBar: SegmentBar, WheeshtSays: WheeshtSays,
   SectionHead: SectionHead, ToastLayer: ToastLayer, ConfettiLayer: ConfettiLayer,
-  Badges: Badges,
+  Badges: Badges, GoogleSignInButton: GoogleSignInButton,
 });

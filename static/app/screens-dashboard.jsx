@@ -154,6 +154,50 @@ function PasswordSection(props) {
   );
 }
 
+function GoogleSection(props) {
+  const me = props.me;
+  const hasLink = !!(me && me.hasGoogleLink);
+  const [busy, setBusy] = dState(false);
+  const lbl = { fontWeight: 800, fontSize: 13, fontFamily: 'var(--disp)' };
+  function onLinkToken(token) {
+    setBusy(true);
+    Promise.resolve(Sd.googleLink(me.id, token))
+      .then(r => {
+        setBusy(false);
+        if (r && r.avatarVersion != null) {
+          // Avatar may have been refreshed from Google photo — reload.
+          Sd.refresh && Sd.refresh();
+        }
+        window.wcToast && window.wcToast('Google account linked. Sign in anywhere with Google now.', 'happy');
+      })
+      .catch(() => setBusy(false));
+  }
+  function unlink() {
+    if (busy) return;
+    setBusy(true);
+    Promise.resolve(Sd.googleUnlink(me.id))
+      .then(() => setBusy(false))
+      .catch(() => setBusy(false));
+  }
+  if (!window.WC_GOOGLE_CLIENT_ID || !Sd.googleLink) return null;
+  return (
+    <div style={{ borderTop: '1.5px solid var(--line)', paddingTop: 14, marginTop: 4 }}>
+      <div style={lbl}>Google account{' '}
+        {hasLink ? <span style={{ color: 'var(--green)' }}>· linked ✓</span> : <span style={{ color: 'var(--ink2)' }}>· not linked</span>}
+      </div>
+      <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--ink2)', marginTop: 3, lineHeight: 1.35 }}>
+        {hasLink ? 'Sign in with Google on any device — no password needed.' : 'Link your Google account to sign in anywhere without a password.'}
+      </div>
+      {hasLink
+        ? <button onClick={unlink} disabled={busy} className="wc-btn wc-btn--sm" style={{ marginTop: 10, boxShadow: '0 4px 0 var(--shadow)', opacity: busy ? 0.5 : 1 }}>
+            {busy ? 'Working…' : 'Unlink Google'}
+          </button>
+        : <window.GoogleSignInButton onToken={onLinkToken} opts={{ text: 'continue_with', size: 'medium', theme: 'outline' }} />
+      }
+    </div>
+  );
+}
+
 function EditProfile(props) {
   const me = props.me;
   const [dispName, setDispName] = dState(me.displayName || '');
@@ -242,6 +286,7 @@ function EditProfile(props) {
           {includeLtMember && <div><label style={lbl}>Leadership Team?</label>{seg(lt, setLt, [{ value: false, label: 'No' }, { value: true, label: 'Yes' }])}</div>}
         </div>
         <PasswordSection me={me} />
+        <GoogleSection me={me} />
         <div style={{ marginTop: 18 }}>
           <Bd variant="ink" block onClick={() => {
             Sd.saveProfile(me.id, { displayName: dispName.trim(), favouriteTeam: fav });

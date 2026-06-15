@@ -24,6 +24,8 @@ import re
 import secrets
 import time
 import uuid
+
+import httpx
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from pathlib import Path
@@ -62,6 +64,12 @@ _HTML_TEMPLATE = Path("templates/index.html").read_text(encoding="utf-8")
 # Master developer key for the hidden cross-league dev console. It must come
 # from the deployment environment; there is intentionally no committed fallback.
 _DEV_KEY: str = os.environ.get("WC_DEV_KEY", "")
+
+# Google Identity Services. The client_id is public (sent to browsers).
+# The client_secret must live ONLY in WC_GOOGLE_CLIENT_SECRET Railway env var;
+# it is never shipped to the client and is not used for token verification
+# (we use Google's tokeninfo endpoint which needs no secret).
+_GOOGLE_CLIENT_ID: str = os.environ.get("WC_GOOGLE_CLIENT_ID", "")
 
 # Organiser PIN for the pre-seeded league. This stays server-side; clients get a
 # short-lived HMAC token after proving the code.
@@ -166,6 +174,25 @@ def _account_token_ok(league: League, participant_id: str, token: Optional[str])
     return hmac.compare_digest(sig, expected)
 
 
+async def _verify_google_token(id_token: str) -> dict:
+    """Verify a Google ID token via tokeninfo and return the decoded claims.
+    Raises HTTPException on any failure (network, invalid, wrong audience)."""
+    url = f"https://oauth2.googleapis.com/tokeninfo?id_token={id_token}"
+    try:
+        async with httpx.AsyncClient(timeout=7.0) as client:
+            r = await client.get(url)
+        data = r.json()
+    except Exception:
+        raise HTTPException(status_code=502, detail="Could not reach Google to verify sign-in")
+    if "error" in data or "error_description" in data:
+        raise HTTPException(status_code=400, detail="Invalid Google token")
+    if _GOOGLE_CLIENT_ID and data.get("aud") != _GOOGLE_CLIENT_ID:
+        raise HTTPException(status_code=400, detail="Token was not issued for this app")
+    if not data.get("sub"):
+        raise HTTPException(status_code=400, detail="Google token missing subject")
+    return data
+
+
 def _slugify(name: str) -> str:
     s = re.sub(r"[^a-z0-9]+", "-", (name or "").lower()).strip("-")
     return s or "league"
@@ -266,6 +293,7 @@ def _league_people(
         d["favouriteTeam"] = (getattr(prof, "favourite_team", "") or "") if prof else ""
         d["avatarVersion"] = (getattr(prof, "avatar_version", 0) or 0) if prof else 0
         d["avatarSource"] = (getattr(prof, "avatar_source", "") or "") if prof else ""
+        d["hasGoogleLink"] = bool(getattr(prof, "google_id", None)) if prof else False
         # Config base entries (no DB row) are open until a row sets a password.
         d.setdefault("hasPassword", False)
     return list(by_id.values())
@@ -472,11 +500,13 @@ def _base_state() -> Dict[str, Any]:
 
 
 def _build_html() -> str:
-    injection = (
-        "<script>window.WC_DATA = "
-        + json.dumps(_base_state(), ensure_ascii=False)
-        + ";window.WC_LIVE = true;</script>"
-    )
+    parts = []
+    # Client ID is public — safe to embed in HTML. Secret stays server-side only.
+    if _GOOGLE_CLIENT_ID:
+        parts.append(f"window.WC_GOOGLE_CLIENT_ID={json.dumps(_GOOGLE_CLIENT_ID)};")
+    parts.append("window.WC_DATA = " + json.dumps(_base_state(), ensure_ascii=False) + ";")
+    parts.append("window.WC_LIVE = true;")
+    injection = "<script>" + "".join(parts) + "</script>"
     return _HTML_TEMPLATE.replace("<!-- WC_DATA_INJECTION -->", injection)
 
 
@@ -579,6 +609,8 @@ async def _ensure_schema() -> None:
     statements = [
         "ALTER TABLE profiles ADD COLUMN IF NOT EXISTS display_name VARCHAR NOT NULL DEFAULT ''",
         "ALTER TABLE participants ADD COLUMN IF NOT EXISTS password_hash VARCHAR",
+        "ALTER TABLE profiles ADD COLUMN IF NOT EXISTS google_id VARCHAR",
+        "CREATE INDEX IF NOT EXISTS ix_profiles_google_id ON profiles (google_id) WHERE google_id IS NOT NULL",
     ]
     async with engine.begin() as conn:
         for stmt in statements:
@@ -1159,6 +1191,173 @@ async def set_account_password(
             row.password_hash = None
             await session.commit()
         return {"ok": True, "hasPassword": False}
+
+
+# ── Google Sign-In ────────────────────────────────────────────────────────────
+# Participants may link their Google identity (via ID token → tokeninfo) to their
+# profile. Once linked they can authenticate anywhere without a password. The link
+# endpoint doubles as a re-authentication path: if the incoming google_id already
+# matches the stored one, the Google token itself is treated as proof of identity
+# (bypassing the normal account-token/password guard).
+
+class GoogleAuthPayload(BaseModel):
+    idToken: str
+
+
+@app.post("/api/leagues/{code}/participants/{participant_id}/google-auth")
+async def google_auth_link(
+    code: str,
+    participant_id: str,
+    payload: GoogleAuthPayload,
+    x_wheesht_account_token: Optional[str] = Header(None, alias="X-Wheesht-Account-Token"),
+    x_wheesht_admin_token: Optional[str] = Header(None, alias="X-Wheesht-Admin-Token"),
+):
+    """Link (or re-authenticate with) a Google account. Returns a fresh account token."""
+    if not _GOOGLE_CLIENT_ID:
+        raise HTTPException(status_code=503, detail="Google sign-in is not configured on this server")
+    claims = await _verify_google_token(payload.idToken)
+    google_sub = claims["sub"]
+
+    async with AsyncSessionLocal() as session:
+        league = await _get_league_by_code(session, code.upper())
+        if league is None:
+            raise HTTPException(status_code=404, detail="league not found")
+        if not await _participant_in_league(session, league, participant_id):
+            raise HTTPException(status_code=404, detail="participant not found")
+
+        prof = await session.get(Profile, participant_id)
+
+        # Re-auth path: existing link matches → Google token IS the auth proof.
+        re_auth = prof is not None and prof.google_id == google_sub
+
+        if not re_auth:
+            # New link: ensure this Google account is not already linked elsewhere.
+            conflict = await session.execute(
+                select(Profile).where(
+                    Profile.league_id == league.id,
+                    Profile.google_id == google_sub,
+                )
+            )
+            if conflict.scalar_one_or_none() is not None:
+                raise HTTPException(status_code=409, detail="This Google account is already linked to another entry in this league")
+            # Guard just like any other profile write.
+            await _guard_account_write(session, league, participant_id, x_wheesht_account_token, x_wheesht_admin_token)
+
+        if prof is None:
+            prof = Profile(
+                participant_id=participant_id, league_id=league.id,
+                display_name="", favourite_team="", avatar_source="",
+                avatar_version=0, google_id=google_sub, updated_at=_now(),
+            )
+            session.add(prof)
+        else:
+            prof.google_id = google_sub
+            prof.updated_at = _now()
+
+        # Pull the Google profile picture as the avatar when no photo is set yet.
+        picture_url = claims.get("picture")
+        if picture_url and prof.avatar_source in ("", "google"):
+            try:
+                asset = await session.get(ProfileAsset, participant_id)
+                if asset is None or prof.avatar_source == "google":
+                    async with httpx.AsyncClient(timeout=8.0) as client:
+                        img_r = await client.get(picture_url)
+                    if img_r.status_code == 200:
+                        ct = img_r.headers.get("content-type", "image/jpeg").split(";")[0].strip()
+                        data = img_r.content
+                        if len(data) <= _MAX_AVATAR_BYTES:
+                            if asset is None:
+                                asset = ProfileAsset(
+                                    participant_id=participant_id, league_id=league.id,
+                                    content_type=ct, data=data, updated_at=_now(),
+                                )
+                                session.add(asset)
+                            else:
+                                asset.content_type = ct
+                                asset.data = data
+                                asset.updated_at = _now()
+                            prof.avatar_source = "google"
+                            prof.avatar_version = (prof.avatar_version or 0) + 1
+            except Exception:
+                pass  # avatar fetch failure is non-fatal
+
+        await session.commit()
+        return {
+            "ok": True,
+            "token": _account_token_for(league, participant_id),
+            "avatarVersion": prof.avatar_version,
+        }
+
+
+@app.delete("/api/leagues/{code}/participants/{participant_id}/google-auth")
+async def google_auth_unlink(
+    code: str,
+    participant_id: str,
+    x_wheesht_account_token: Optional[str] = Header(None, alias="X-Wheesht-Account-Token"),
+    x_wheesht_admin_token: Optional[str] = Header(None, alias="X-Wheesht-Admin-Token"),
+):
+    """Unlink the Google identity from this participant's profile."""
+    async with AsyncSessionLocal() as session:
+        league = await _get_league_by_code(session, code.upper())
+        if league is None:
+            raise HTTPException(status_code=404, detail="league not found")
+        if not await _participant_in_league(session, league, participant_id):
+            raise HTTPException(status_code=404, detail="participant not found")
+
+        prof = await session.get(Profile, participant_id)
+        # To unlink Google, require a valid account token OR admin token.
+        # This prevents a bystander from unlinking someone else's Google account.
+        has_auth = (
+            (x_wheesht_admin_token and _admin_token_ok(league, x_wheesht_admin_token))
+            or (x_wheesht_account_token and _account_token_ok(league, participant_id, x_wheesht_account_token))
+        )
+        if not has_auth:
+            raise HTTPException(status_code=403, detail="Sign in first to unlink Google")
+
+        if prof and prof.league_id == league.id and prof.google_id:
+            prof.google_id = None
+            prof.updated_at = _now()
+            await session.commit()
+        return {"ok": True}
+
+
+class GoogleLoginPayload(BaseModel):
+    idToken: str
+
+
+@app.post("/api/leagues/{code}/google-login")
+async def google_login(code: str, payload: GoogleLoginPayload):
+    """Cross-device login: find the participant in this league linked to the given
+    Google account and return a fresh account token. No pre-existing auth needed —
+    the Google token is the credential."""
+    if not _GOOGLE_CLIENT_ID:
+        raise HTTPException(status_code=503, detail="Google sign-in is not configured on this server")
+    claims = await _verify_google_token(payload.idToken)
+    google_sub = claims["sub"]
+
+    async with AsyncSessionLocal() as session:
+        league = await _get_league_by_code(session, code.upper())
+        if league is None:
+            raise HTTPException(status_code=404, detail="league not found")
+
+        res = await session.execute(
+            select(Profile).where(Profile.league_id == league.id, Profile.google_id == google_sub)
+        )
+        prof = res.scalar_one_or_none()
+        if prof is None:
+            raise HTTPException(status_code=404, detail="No entry in this league is linked to that Google account")
+
+        p = await session.get(Participant, prof.participant_id)
+        if p is None or p.removed:
+            raise HTTPException(status_code=404, detail="participant not found")
+
+        display = (prof.display_name or "").strip() or p.name
+        return {
+            "ok": True,
+            "participantId": prof.participant_id,
+            "name": display,
+            "token": _account_token_for(league, prof.participant_id),
+        }
 
 
 # ── Admin overrides (league-scoped) ───────────────────────────────────────────
