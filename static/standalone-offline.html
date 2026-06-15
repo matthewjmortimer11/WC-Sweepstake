@@ -38198,23 +38198,29 @@ function VerdictHeader(props) {
 function StandingsBlock() {
   // Pot / charity / entrants / fee — always true, drawn from live numbers.
   const P = vPeople();
-  const cells = [{
-    v: money2(vPot()),
-    l: 'winner takes all',
+  const pot = vPot(),
+    char = vCharity();
+  const cells = [];
+  if (pot > 0) cells.push({
+    v: money2(pot),
+    l: char > 0 ? 'winner takes all' : 'whole pot to the winner',
     c: 'var(--green)'
-  }, {
-    v: money2(vCharity()),
-    l: 'raised for charity',
+  });
+  if (char > 0) cells.push({
+    v: money2(char),
+    l: pot > 0 ? 'raised for charity' : 'whole pot to charity',
     c: 'var(--red)'
-  }, {
+  });
+  cells.push({
     v: P.length,
     l: P.length === 1 ? 'entrant' : 'entrants',
     c: 'var(--ink)'
-  }, {
+  });
+  cells.push({
     v: '£' + (WC2.FEE || 0),
     l: 'to enter',
     c: 'var(--ink)'
-  }];
+  });
   return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(SH2, null, "Where it stands"), /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'grid',
@@ -40450,8 +40456,10 @@ function EditProfile(props) {
       borderRadius: '26px 26px 0 0',
       padding: '18px 18px 26px',
       boxShadow: '0 -20px 50px rgba(0,0,0,.3)',
-      maxHeight: '88vh',
-      overflowY: 'auto'
+      maxHeight: '88dvh',
+      overflowY: 'auto',
+      WebkitOverflowScrolling: 'touch',
+      overscrollBehavior: 'contain'
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
@@ -40886,7 +40894,12 @@ function WinningsCard(props) {
   const charity = Sd.charity ? Sd.charity() : WCd.POT * 0.5;
   const split = Sd.charitySplit ? Sd.charitySplit() : 0.5;
   const splitPct = Math.round(split * 100);
-  const charityLabel = splitPct <= 0 ? 'No charity split' : 'To charity (' + splitPct + '% of every entry)';
+  const allCharity = charity > 0 && pot <= 0; // 100% of the pot to charity
+  const allWinner = charity <= 0 && pot > 0; // 100% of the pot to the winner
+  const charityLabel = 'To charity (' + splitPct + '% of every entry)';
+  const headTitle = allCharity ? 'Charity pot — every entry, donated' : 'Winner fund — if ' + t.name + ' lift the cup';
+  const headVal = allCharity ? charity : pot;
+  const headColor = allCharity ? 'var(--red)' : 'var(--green)';
   const ov = overallRank(me);
   const rankTaps = React.useRef({
     n: 0,
@@ -40917,15 +40930,15 @@ function WinningsCard(props) {
       textTransform: 'uppercase',
       color: 'var(--ink2)'
     }
-  }, "Winner fund \u2014 if ", t.name, " lift the cup"), /*#__PURE__*/React.createElement("div", {
+  }, headTitle), /*#__PURE__*/React.createElement("div", {
     className: "dh",
     style: {
       fontSize: 38,
-      color: 'var(--green)',
+      color: headColor,
       lineHeight: 1,
       marginTop: 2
     }
-  }, money_d(pot))), /*#__PURE__*/React.createElement("div", {
+  }, money_d(headVal))), /*#__PURE__*/React.createElement("div", {
     onClick: rankTap,
     style: {
       textAlign: 'right',
@@ -40959,7 +40972,7 @@ function WinningsCard(props) {
       flexDirection: 'column',
       gap: 7
     }
-  }, /*#__PURE__*/React.createElement("div", {
+  }, !allCharity && /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
       alignItems: 'center',
@@ -40972,7 +40985,7 @@ function WinningsCard(props) {
     style: {
       flex: 1
     }
-  }, "\uD83C\uDFC6 Champion (one winner)"), t.alive ? /*#__PURE__*/React.createElement(Chd, {
+  }, "\uD83C\uDFC6 Champion (one winner)", allWinner ? ' — the whole pot' : ''), t.alive ? /*#__PURE__*/React.createElement(Chd, {
     tone: "ghost",
     style: {
       borderStyle: 'dashed'
@@ -40989,7 +41002,7 @@ function WinningsCard(props) {
       width: 64,
       textAlign: 'right'
     }
-  }, money_d(pot))), /*#__PURE__*/React.createElement("div", {
+  }, money_d(pot))), !allWinner && /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
       alignItems: 'center',
@@ -41009,7 +41022,7 @@ function WinningsCard(props) {
     style: {
       flex: 1
     }
-  }, charityLabel), /*#__PURE__*/React.createElement("span", {
+  }, allCharity ? 'Every entry goes to charity' : charityLabel), /*#__PURE__*/React.createElement("span", {
     className: "dh",
     style: {
       fontSize: 15,
