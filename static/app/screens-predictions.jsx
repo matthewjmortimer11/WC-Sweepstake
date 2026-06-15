@@ -68,7 +68,10 @@ function Market(props) {
   const isNumber = m.kind === 'number';
   const isScoreline = m.kind === 'scoreline';
   const isTeam = m.kind === 'team' || isTwo;
-  const locked = !!props.locked;
+  const isDm = !!(m.key && m.key.startsWith('dm_'));
+  // dm_ markets use fixture status for locking, independent of the global predictions lock
+  const dmFixLive = isDm && (m.fixture_status === 'live' || m.fixture_status === 'done');
+  const locked = isDm ? dmFixLive : !!props.locked;
   const resolved = isResolved(m);
   const pick = me.picks ? me.picks[m.key] : null;
   const picked = (id) => isTwo ? (Array.isArray(pick) && pick.indexOf(id) >= 0) : pick === id;
@@ -121,7 +124,12 @@ function Market(props) {
         </Chp>
       </div>
       <div style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--ink2)', marginBottom: 9 }}>
-        {resolved ? 'Result is in' : locked ? 'Predictions locked' : isTwo ? 'Pick the two finalists' : isNumber ? 'Open · type your answer' : 'Open · tap to pick'}
+        {resolved ? 'Result is in'
+          : locked ? (isDm && m.fixture_status === 'live' ? 'Game in progress · locked' : 'Locked · kick-off passed')
+          : isDm ? 'Open · locks at kick-off'
+          : isTwo ? 'Pick the two finalists'
+          : isNumber ? 'Open · type your answer'
+          : 'Open · tap to pick'}
       </div>
       {isNumber && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '10px 12px', border: '2.5px solid ' + (hasPick ? 'var(--ink)' : 'var(--line)'), borderRadius: 13, background: hasPick && !resolved ? 'var(--yellow)' : '#fff' }}>
@@ -284,7 +292,9 @@ function PredictionsScreen(props) {
   });
   const graded = markets.filter(m => isResolved(m));
   const made = Sp.madeVisiblePredictions ? Sp.madeVisiblePredictions(me) : (me.picks ? Object.keys(me.picks).filter(k => me.picks[k] != null && (!Array.isArray(me.picks[k]) || me.picks[k].length)).length : 0);
-  const missing = open.filter(m => !pickComplete(m, me.picks || {}));
+  // dm_ markets that have kicked off can't be picked any more — exclude from missing
+  const dmKickedOff = function(m){ return m.key.startsWith('dm_') && (m.fixture_status === 'live' || m.fixture_status === 'done'); };
+  const missing = open.filter(m => !dmKickedOff(m) && !pickComplete(m, me.picks || {}));
   const allOpenMade = open.length > 0 && missing.length === 0;
   const nextMissing = missing[0];
   const predDeadline = WCp.meta && WCp.meta.predDeadline;
@@ -306,7 +316,10 @@ function PredictionsScreen(props) {
       </div>
       {locked && <div style={{ display: 'flex', alignItems: 'center', gap: 9, background: 'var(--ink)', color: '#fff', borderRadius: 13, padding: '10px 13px', marginBottom: 12, fontSize: 13, fontWeight: 700 }}>
         <span style={{ fontSize: 18 }}>🔒</span>
-        <span>{deadlinePassed ? 'Predictions are locked — deadline has passed.' : 'Predictions are locked by the organiser.'}</span>
+        <div>
+          <div>{deadlinePassed ? 'Tournament predictions locked — deadline has passed.' : 'Tournament predictions locked by the organiser.'}</div>
+          {open.some(function(m){ return m.key.startsWith('dm_') && m.fixture_status !== 'live' && m.fixture_status !== 'done'; }) && <div style={{ fontWeight: 600, fontSize: 11.5, marginTop: 3, opacity: 0.8 }}>Match predictions above are still open until kick-off.</div>}
+        </div>
       </div>}
       {!locked && predDeadline && <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--ink2)', marginBottom: 10, padding: '7px 12px', background: 'rgba(245,200,0,.2)', borderRadius: 10 }}>
         Picks lock at {fmtDeadline(predDeadline)} — get yours in.

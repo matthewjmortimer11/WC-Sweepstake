@@ -457,11 +457,13 @@ def _resolve(league_people: List[Dict[str, Any]], admin: Dict[str, Any]):
         fa = ta.get("flag", f["a"]); fb = tb.get("flag", f["b"])
         na = ta.get("name", f["a"]); nb = tb.get("name", f["b"])
         dm_type = dm.get("type", "winner")
+        fix_status = f.get("status", "upcoming")
         if dm_type == "winner":
             market = {"key": dm["id"], "q": fa + " " + na + " vs " + fb + " " + nb + " — who wins?",
                       "kind": "team", "points": dm.get("points", 5),
-                      "options": [f["a"], f["b"], "draw"], "answer": None}
-            if f.get("status") == "done" and f.get("score"):
+                      "options": [f["a"], f["b"], "draw"], "answer": None,
+                      "fixture_id": dm["fixture_id"], "fixture_status": fix_status}
+            if fix_status == "done" and f.get("score"):
                 sc = f["score"]
                 if sc[0] > sc[1]:   market["answer"] = f["a"]
                 elif sc[1] > sc[0]: market["answer"] = f["b"]
@@ -469,8 +471,9 @@ def _resolve(league_people: List[Dict[str, Any]], admin: Dict[str, Any]):
         else:
             market = {"key": dm["id"], "q": fa + " " + na + " vs " + fb + " " + nb + " — exact score?",
                       "kind": "scoreline", "points": dm.get("points", 5),
-                      "options": [f["a"], f["b"]], "answer": None}
-            if f.get("status") == "done" and f.get("score"):
+                      "options": [f["a"], f["b"]], "answer": None,
+                      "fixture_id": dm["fixture_id"], "fixture_status": fix_status}
+            if fix_status == "done" and f.get("score"):
                 sc = f["score"]
                 market["answer"] = str(sc[0]) + "-" + str(sc[1])
         predictions.append(market)
