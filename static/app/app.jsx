@@ -674,7 +674,7 @@ function App(){
         </DeckShell>
       : <React.Fragment>
           <StatusBar/>
-          <div className="scroll" key={tab+(me?me.id:'')}>
+          <div className={"scroll"+(tab==='chat'?' scroll--chat':'')} key={tab+(me?me.id:'')}>
             <AppBar me={me} onAccount={()=>setAccount(true)} onDev={()=>setDev(true)}/>
             {/* When the dev console hops into another league, the active participant
                 isn't a member there, so `me` is null — render nothing behind the
