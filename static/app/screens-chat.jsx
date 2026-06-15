@@ -5,6 +5,7 @@
 const WCch = window.WC;
 const Sch = window.Store;
 const Wch = window.Wheesht;
+const Wch_Avatar = window.Avatar;
 const { useState: cState, useEffect: cEffect, useRef: cRef } = React;
 
 const WHEESHT_MOODS = [
@@ -152,11 +153,11 @@ function ChatScreen() {
 
           return (
             <div key={msg.id} style={{ display: 'flex', gap: 9, marginBottom: 14, flexDirection: isMe ? 'row-reverse' : 'row', alignItems: 'flex-end' }}>
-              {!isMe && (
-                <div style={{ width: 34, height: 34, borderRadius: '50%', background: msg.color || '#333', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--disp)', fontWeight: 800, fontSize: 12, flexShrink: 0, boxShadow: '0 2px 0 rgba(0,0,0,.15)' }}>
-                  {msg.initials || '?'}
-                </div>
-              )}
+              {!isMe && (function(){
+                var person = Sch.allSync().find(function(p){ return p.id === msg.author_id; })
+                  || { id: msg.author_id, initials: msg.initials || '?', color: msg.color || '#333', isYou: false };
+                return <Wch_Avatar person={person} size={34} />;
+              })()}
               <div style={{ maxWidth: '74%' }}>
                 {!isMe && (
                   <div style={{ fontSize: 10.5, fontWeight: 800, color: 'var(--ink2)', marginBottom: 4, letterSpacing: '.01em' }}>
