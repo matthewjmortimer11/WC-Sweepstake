@@ -486,6 +486,13 @@ function App(){
     setTimeout(()=>window.wcToast&&window.wcToast('Welcome, '+(p?(A_S.shownName?A_S.shownName(p):p.name):'')+'! Your team is '+((t&&t.flag)||'')+' '+(t?t.name:'')+'.',  'confident'),400);
   }
 
+  // The account sign-in prompt can be triggered from the onboarding flows
+  // (claiming a protected entry from the roster or search), so it must render
+  // alongside those screens too — not only in the main app below.
+  const signInModal = signIn && <AccountSignIn id={signIn.id} name={signIn.name}
+    onClose={()=>setSignIn(null)}
+    onDone={()=>{ const go=signIn.proceed; setSignIn(null); go&&go(); }}/>;
+
   // -------- onboarding / identity flow --------
   if(flow==='gate') return <React.Fragment>
     {frame(<window.AccountGate onResume={resumeAccount} onJoin={()=>{setOrganiser(false);setFlow('join');}} onCreate={()=>{setOrganiser(true);setFlow('create');}}/>)}
@@ -502,6 +509,7 @@ function App(){
   </React.Fragment>;
   if(flow==='find') return <React.Fragment>
     {frame(<window.FindMyEntry onBack={()=>setFlow('gate')} onPicked={claimOI} onNew={()=>setFlow('form')}/>)}
+    {signInModal}
     {viewToggle}<window.ToastLayer/><window.ConfettiLayer/>
   </React.Fragment>;
   if(flow==='form') return <React.Fragment>
@@ -510,6 +518,7 @@ function App(){
   </React.Fragment>;
   if(flow==='oi-roster') return <React.Fragment>
     {frame(<window.OIRosterPicker onBack={()=>setFlow('join')} onClaim={claimOI}/>)}
+    {signInModal}
     {viewToggle}<window.ToastLayer/><window.ConfettiLayer/>
   </React.Fragment>;
 
@@ -552,9 +561,7 @@ function App(){
       onDone={()=>{ const wasReplay=draw.replay; setDraw(null); if(!wasReplay){ setTab('me'); setTimeout(()=>window.wcConfetti&&window.wcConfetti({y:.4}),200);} }}/>}
     {admin && <window.AdminGate onClose={closeAdmin}/>}
     {dev && <window.DevConsole onClose={()=>setDev(false)} onAdmin={devAdmin}/>}
-    {signIn && <AccountSignIn id={signIn.id} name={signIn.name}
-      onClose={()=>setSignIn(null)}
-      onDone={()=>{ const go=signIn.proceed; setSignIn(null); go&&go(); }}/>}
+    {signInModal}
 
     <window.ToastLayer/>
     <window.ConfettiLayer/>

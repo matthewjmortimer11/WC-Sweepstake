@@ -48272,6 +48272,20 @@ function App() {
     setTimeout(() => window.wcToast && window.wcToast('Welcome, ' + (p ? A_S.shownName ? A_S.shownName(p) : p.name : '') + '! Your team is ' + (t && t.flag || '') + ' ' + (t ? t.name : '') + '.', 'confident'), 400);
   }
 
+  // The account sign-in prompt can be triggered from the onboarding flows
+  // (claiming a protected entry from the roster or search), so it must render
+  // alongside those screens too — not only in the main app below.
+  const signInModal = signIn && /*#__PURE__*/React.createElement(AccountSignIn, {
+    id: signIn.id,
+    name: signIn.name,
+    onClose: () => setSignIn(null),
+    onDone: () => {
+      const go = signIn.proceed;
+      setSignIn(null);
+      go && go();
+    }
+  });
+
   // -------- onboarding / identity flow --------
   if (flow === 'gate') return /*#__PURE__*/React.createElement(React.Fragment, null, frame(/*#__PURE__*/React.createElement(window.AccountGate, {
     onResume: resumeAccount,
@@ -48306,7 +48320,7 @@ function App() {
     onBack: () => setFlow('gate'),
     onPicked: claimOI,
     onNew: () => setFlow('form')
-  })), viewToggle, /*#__PURE__*/React.createElement(window.ToastLayer, null), /*#__PURE__*/React.createElement(window.ConfettiLayer, null));
+  })), signInModal, viewToggle, /*#__PURE__*/React.createElement(window.ToastLayer, null), /*#__PURE__*/React.createElement(window.ConfettiLayer, null));
   if (flow === 'form') return /*#__PURE__*/React.createElement(React.Fragment, null, frame(/*#__PURE__*/React.createElement(window.OnboardingForm, {
     onBack: () => setFlow(me ? 'app' : 'gate'),
     onSubmit: onboardSubmit
@@ -48314,7 +48328,7 @@ function App() {
   if (flow === 'oi-roster') return /*#__PURE__*/React.createElement(React.Fragment, null, frame(/*#__PURE__*/React.createElement(window.OIRosterPicker, {
     onBack: () => setFlow('join'),
     onClaim: claimOI
-  })), viewToggle, /*#__PURE__*/React.createElement(window.ToastLayer, null), /*#__PURE__*/React.createElement(window.ConfettiLayer, null));
+  })), signInModal, viewToggle, /*#__PURE__*/React.createElement(window.ToastLayer, null), /*#__PURE__*/React.createElement(window.ConfettiLayer, null));
 
   // -------- main app --------
   const screens = {
@@ -48381,16 +48395,7 @@ function App() {
   }), dev && /*#__PURE__*/React.createElement(window.DevConsole, {
     onClose: () => setDev(false),
     onAdmin: devAdmin
-  }), signIn && /*#__PURE__*/React.createElement(AccountSignIn, {
-    id: signIn.id,
-    name: signIn.name,
-    onClose: () => setSignIn(null),
-    onDone: () => {
-      const go = signIn.proceed;
-      setSignIn(null);
-      go && go();
-    }
-  }), /*#__PURE__*/React.createElement(window.ToastLayer, null), /*#__PURE__*/React.createElement(window.ConfettiLayer, null), /*#__PURE__*/React.createElement(window.TweaksPanel, {
+  }), signInModal, /*#__PURE__*/React.createElement(window.ToastLayer, null), /*#__PURE__*/React.createElement(window.ConfettiLayer, null), /*#__PURE__*/React.createElement(window.TweaksPanel, {
     title: "Tweaks"
   }, /*#__PURE__*/React.createElement(window.TweakSection, {
     label: "Atmosphere"
