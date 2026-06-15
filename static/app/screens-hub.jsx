@@ -327,18 +327,61 @@ function TrackerScreen(){
       {pre ? <FieldCard/> : <StageFunnel/>}
       <div style={{height:12}}/>
       {pre
-        ? <WheeshtSays mood="confident" label="broadcast mode" animate>Not a ball kicked yet — all {WC.meta.teamsLeft} still in. Wheesht is watching every single one of ye.</WheeshtSays>
+        ? (function(){
+            const preLines = [
+              ['Not a ball kicked yet. All '+WC.meta.teamsLeft+' nations in it. Wheesht is watching. Everyone.','confident'],
+              ['Still pre-tournament. No one has done anything wrong yet. Wheesht is making no promises.','neutral'],
+              [WC.meta.teamsLeft+' countries, all of them full of hope. Wheesht has seen hope before. It is complicated.','mischievous'],
+              ['The tournament hasn\'t started and already Wheesht has opinions. Too many. None of them public.','mischievous'],
+            ];
+            const pl = preLines[P.length % preLines.length];
+            return <WheeshtSays mood={pl[1]} label="broadcast mode" animate>{pl[0]}</WheeshtSays>;
+          })()
         : (function(){
             const n = WC.meta.teamsLeft || 0;
-            const lines =
-              n >= 40 ? [‘Still a big field. ‘+n+’ nations in it. Wheesht has made no predictions and stands by that.’,’confident’]
-            : n >= 28 ? [‘Field thinning — ‘+n+’ teams remain. Wheesht is increasingly invested in this.’,’neutral’]
-            : n >= 16 ? [n+’ left standing. The tournament is properly serious now. Wheesht concurs.’,’confident’]
-            : n >= 8  ? [n+’ nations remain. Every game counts. Wheesht is paying very close attention.’,’mischievous’]
-            : n >= 4  ? [‘Last ‘+n+’ in it. Wheesht has opinions. They are staying internal for now.’,’nervous’]
-            : n === 2  ? [‘Two teams left. The final is decided. Wheesht is prepared. Mostly.’,’nervous’]
-            : [‘The tournament has a winner. Wheesht saw the whole thing. Every minute.’,’celebrating’];
-            return <WheeshtSays mood={lines[1]} label="broadcast mode" animate>{lines[0]}</WheeshtSays>;
+            const p = function(arr){ return arr[n % arr.length]; };
+            const pool =
+              n >= 40 ? p([
+                [‘Still a big field. ‘+n+’ nations in it. Wheesht has formed opinions on all of them and is sharing none.’,’confident’],
+                [n+’ teams and counting. Everyone thinks their side has a chance. Wheesht is not saying who\’s wrong. Yet.’,’mischievous’],
+                [‘Early doors. ‘+n+’ nations still standing. Wheesht is watching. Taking notes. Not drawing conclusions. Officially.’,’neutral’],
+                [‘All ‘+n+’ still in it. The tournament has barely introduced itself. Wheesht is already invested. Quietly.’,’confident’],
+              ])
+            : n >= 28 ? p([
+                [‘Down to ‘+n+’. The group stage has done its damage. Some of those exits were, frankly, expected.’,’mischievous’],
+                [n+’ nations remain. The field is thinning and the results have been instructive. Very instructive.’,’neutral’],
+                [n+’ teams left standing. A few surprises. A few inevitabilities. Wheesht predicted none of this officially.’,’confident’],
+                [‘Still ‘+n+’ in it — but the tournament is starting to make sense. Unfortunately for some.’,’mischievous’],
+              ])
+            : n >= 16 ? p([
+                [n+’ left. Wheesht is not yet nervous. This is not entirely accurate.’,’nervous’],
+                [n+’ nations remain. The knockout rounds reward no one who is not ready. Wheesht has noted this.’,’neutral’],
+                [‘Still ‘+n+’ in it. Genuine tension now. Wheesht is professionally calm and personally extremely stressed.’,’nervous’],
+                [n+’ teams. Wheesht has strong views on all of them. They are staying internal until further notice.’,’mischievous’],
+              ])
+            : n >= 8 ? p([
+                [n+’ teams left. No hiding now. Wheesht is watching with considerable focus and very little blinking.’,’nervous’],
+                [‘Last ‘+n+’. Every game from here ends someone\’s tournament. Wheesht finds this quite something.’,’neutral’],
+                [n+’ nations left — some very capable, some very fortunate. Wheesht knows which is which.’,’mischievous’],
+                [‘Down to ‘+n+’. This is where the tournament is truly decided. Wheesht is taking this very seriously.’,’confident’],
+              ])
+            : n >= 3 ? p([
+                [‘Last ‘+n+’. At this point, Wheesht\’s opinions are strong, specific, and entirely unpublished.’,’mischievous’],
+                [n+’ teams. The semi-finals are decided. Wheesht is composed. This is not entirely accurate.’,’nervous’],
+                [‘Final ‘+n+’. Wheesht has watched every minute of this and still has complicated feelings.’,’nervous’],
+                [‘Down to ‘+n+’ nations. Prior predictions are being quietly deleted. Not by Wheesht. Wheesht made none.’,’mischievous’],
+              ])
+            : n === 2 ? p([
+                [‘Two teams left. Wheesht has views on both. Professionally neutral. Technically.’,’nervous’],
+                [‘Final two. One of them is winning this. Wheesht knew all along. Obviously.’,’confident’],
+                [‘Just two. Wheesht has been here for all of it and is absolutely, completely fine.’,’nervous’],
+              ])
+            : p([
+                [‘We have a winner. The tournament is over. Wheesht saw everything and needs a moment.’,’celebrating’],
+                [‘Champion crowned. Wheesht was present for the whole thing and has complicated feelings.’,’neutral’],
+                [‘It\’s done. One nation above all others. Wheesht is going to need a sit down.’,’celebrating’],
+              ]);
+            return <WheeshtSays mood={pool[1]} label="broadcast mode" animate>{pool[0]}</WheeshtSays>;
           })()}
       <div style={{display:'flex',gap:7,overflowX:'auto',padding:'16px 0 10px',margin:'0 -2px'}}>
         {filtersShown.map(([k,lab])=>(
