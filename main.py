@@ -743,6 +743,8 @@ class LeagueCreate(BaseModel):
     includeLtMember: bool = True
     locations: List[str] = Field(default_factory=list)
     locationsFreeText: bool = False
+    entryFee: float = 5
+    charitySplit: float = 0.5
     customFields: List[Dict[str, Any]] = Field(default_factory=list)
 
 
@@ -755,23 +757,60 @@ class AdminAuthPayload(BaseModel):
     code: str
 
 
-def _clean_custom_fields(items: List[Dict[str, Any]]) -> List[Dict[str, str]]:
-    out: List[Dict[str, str]] = []
+def _clean_custom_fields(items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    out: List[Dict[str, Any]] = []
     seen = set()
     for raw in items or []:
         label = str((raw or {}).get("label") or "").strip()[:40]
         if not label:
             continue
-        key = re.sub(r"[^a-z0-9]+", "_", label.lower()).strip("_")[:32] or f"field_{len(out) + 1}"
+        kind = str((raw or {}).get("type") or "text").strip()
+        if kind not in {"text", "select", "suggest"}:
+            kind = "text"
+        options = [
+            str(x).strip()[:40]
+            for x in ((raw or {}).get("options") or [])
+            if str(x).strip()
+        ][:20]
+        if kind in {"select", "suggest"} and not options:
+            kind = "text"
+        raw_key = str((raw or {}).get("key") or "").strip().lower()
+        raw_key = re.sub(r"[^a-z0-9_]+", "_", raw_key).strip("_")[:32]
+        key = raw_key or re.sub(r"[^a-z0-9]+", "_", label.lower()).strip("_")[:32] or f"field_{len(out) + 1}"
         base = key
         n = 2
         while key in seen:
             key = f"{base}_{n}"[:32]
             n += 1
         seen.add(key)
-        out.append({"key": key, "label": label, "type": "text"})
+        item: Dict[str, Any] = {
+            "key": key,
+            "label": label,
+            "type": kind,
+            "required": bool((raw or {}).get("required")),
+        }
+        if options:
+            item["options"] = options
+        out.append(item)
         if len(out) >= 6:
             break
+    return out
+
+
+def _clean_custom_answers(values: Dict[str, Any], fields: List[Dict[str, Any]]) -> Dict[str, str]:
+    values = values or {}
+    out: Dict[str, str] = {}
+    for f in fields or []:
+        key = str(f.get("key") or "")
+        if not key:
+            continue
+        val = str(values.get(key) or "").strip()[:80]
+        if f.get("type") == "select":
+            allowed = [str(x) for x in (f.get("options") or [])]
+            if val and val not in allowed:
+                val = ""
+        if val:
+            out[key] = val
     return out
 
 
@@ -784,6 +823,14 @@ async def create_league(payload: LeagueCreate):
     if len(payload.password or "") < 4:
         raise HTTPException(status_code=400, detail="Password must be at least 4 characters")
     purpose = "friends" if payload.purpose == "friends" else "work"
+    try:
+        entry_fee = max(0.0, round(float(payload.entryFee), 2))
+    except (TypeError, ValueError):
+        entry_fee = 5.0
+    try:
+        charity_split = max(0.0, min(1.0, float(payload.charitySplit)))
+    except (TypeError, ValueError):
+        charity_split = 0.5
     meta = {
         "purpose": purpose,
         "includeDepartment": bool(payload.includeDepartment) if purpose == "work" else False,
@@ -791,6 +838,8 @@ async def create_league(payload: LeagueCreate):
         "includeLtMember": bool(payload.includeLtMember) if purpose == "work" else False,
         "locations": [str(x).strip()[:40] for x in (payload.locations or []) if str(x).strip()][:12],
         "locationsFreeText": bool(payload.locationsFreeText),
+        "entryFee": entry_fee,
+        "charitySplit": charity_split,
         "customFields": _clean_custom_fields(payload.customFields),
     }
     if not meta["locations"]:
@@ -884,7 +933,12 @@ class ParticipantPayload(BaseModel):
     joinedAt: Optional[int] = None
 
 
-def _apply_payload(row: Participant, p: ParticipantPayload, league: League) -> None:
+def _apply_payload(
+    row: Participant,
+    p: ParticipantPayload,
+    league: League,
+    custom_field_defs: Optional[List[Dict[str, Any]]] = None,
+) -> None:
     row.league_id = league.id
     row.name = p.name
     row.initials = p.initials or _initials(p.name)
@@ -900,7 +954,7 @@ def _apply_payload(row: Participant, p: ParticipantPayload, league: League) -> N
     row.alive = bool(p.alive)
     row.is_oi = bool(p.isOI) or str(p.id).startswith("oi-")
     row.picks = p.picks or {}
-    row.custom_fields = p.customFields or {}
+    row.custom_fields = _clean_custom_answers(p.customFields or {}, custom_field_defs or [])
     row.pred_score = int(p.predScore or 0)
     row.joined_at = int(p.joinedAt or 0)
     row.removed = False
@@ -914,7 +968,9 @@ async def _upsert_participant(session, league: League, payload: ParticipantPaylo
     if creating:
         row = Participant(id=payload.id, league_id=league.id)
         session.add(row)
-    _apply_payload(row, payload, league)
+    admin = await _get_admin_data(session, league)
+    meta = admin.get("meta") or {}
+    _apply_payload(row, payload, league, _clean_custom_fields(list(meta.get("customFields") or [])))
     # First self-signup in a fresh (non-seeded) league becomes the organiser.
     if creating and not league.seeded:
         existing = await session.scalar(

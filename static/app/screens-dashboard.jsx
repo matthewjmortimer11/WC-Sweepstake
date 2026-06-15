@@ -221,6 +221,25 @@ function EditProfile(props) {
     return <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>{opts.map(o =>
       <button key={String(o.value)} onClick={() => set(o.value)} className="wc-btn wc-btn--sm" style={{ flex: 1, background: val === o.value ? 'var(--yellow)' : '#fff', boxShadow: val === o.value ? '0 4px 0 var(--ink)' : '0 4px 0 var(--shadow)' }}>{o.label}</button>)}</div>;
   }
+  function customInput(f) {
+    const val = customFields[f.key] || '';
+    const set = v => setCustomFields(Object.assign({}, customFields, { [f.key]: v }));
+    const options = f.options || [];
+    if (f.type === 'select') {
+      return <select style={fld} value={val} onChange={e => set(e.target.value)}>
+        <option value="">{f.required ? 'Choose one' : 'Optional'}</option>
+        {options.map(o => <option key={o} value={o}>{o}</option>)}
+      </select>;
+    }
+    if (f.type === 'suggest') {
+      const id = 'wh-edit-custom-' + f.key;
+      return <>
+        <input style={fld} value={val} onChange={e => set(e.target.value)} placeholder="optional" maxLength={80} list={id} />
+        <datalist id={id}>{options.map(o => <option key={o} value={o} />)}</datalist>
+      </>;
+    }
+    return <input style={fld} value={val} onChange={e => set(e.target.value)} placeholder="optional" maxLength={80} />;
+  }
   function onFile(e) {
     const f = e.target.files && e.target.files[0];
     e.target.value = '';
@@ -288,8 +307,8 @@ function EditProfile(props) {
           </div>}
           {includeLtMember && <div><label style={lbl}>Leadership Team?</label>{seg(lt, setLt, [{ value: false, label: 'No' }, { value: true, label: 'Yes' }])}</div>}
           {customDefs.map(f => <div key={f.key}>
-            <label style={lbl}>{f.label}</label>
-            <input style={fld} value={customFields[f.key] || ''} onChange={e => setCustomFields(Object.assign({}, customFields, { [f.key]: e.target.value }))} placeholder="optional" maxLength={80} />
+            <label style={lbl}>{f.label}{f.required && <span style={{ color: 'var(--ink2)', fontWeight: 600 }}> · required</span>}</label>
+            {customInput(f)}
           </div>)}
         </div>
         <PasswordSection me={me} />

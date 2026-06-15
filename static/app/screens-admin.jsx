@@ -236,24 +236,45 @@ function moneyAdmin(n) {
 
 function CustomFieldsAdmin(props) {
    const fields = props.fields || [];
-   function change(i, label) {
-      props.onChange(fields.map((f, idx) => idx === i ? Object.assign({}, f, { label: label }) : f));
+   function patch(i, next) {
+      props.onChange(fields.map((f, idx) => idx === i ? Object.assign({}, f, next) : f));
    }
    function remove(i) {
       props.onChange(fields.filter((_, idx) => idx !== i));
    }
    function add() {
       if (fields.length >= 6) return;
-      props.onChange(fields.concat([{ key: '', label: '' }]));
+      props.onChange(fields.concat([{ key: '', label: '', type: 'text', required: false, options: [] }]));
    }
+   function seg(val, set, opts) {
+      return <div style={{ display: 'flex', gap: 7, marginTop: 7 }}>{opts.map(o => (
+         <button key={o.value} onClick={() => set(o.value)} className="wc-btn wc-btn--sm"
+           style={{ flex: 1, background: val === o.value ? 'var(--yellow)' : '#fff', boxShadow: val === o.value ? '0 4px 0 var(--ink)' : '0 4px 0 var(--shadow)' }}>
+           {o.label}
+         </button>
+      ))}</div>;
+   }
+   const typeOpts = [{ value: 'text', label: 'Text' }, { value: 'select', label: 'Dropdown' }, { value: 'suggest', label: 'List + other' }];
    return <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
-      <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink2)', lineHeight: 1.4 }}>Optional extra questions on signup. Existing answers stay attached to each entrant.</div>
+      <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink2)', lineHeight: 1.4 }}>Optional extra questions on signup. Dropdowns only allow listed answers; suggested lists still allow custom text.</div>
       {fields.map((f, i) => (
-         <div key={i} style={{ display: 'flex', gap: 7, alignItems: 'center' }}>
-            <input value={f.label || ''} onChange={e => change(i, e.target.value)}
-              style={{ flex: 1, border: '2px solid var(--ink)', borderRadius: 11, padding: '9px 12px', fontFamily: 'var(--body)', fontWeight: 600, fontSize: 14, outline: 'none', background: '#fff' }}
-              placeholder="Question label" maxLength={40} />
-            <button onClick={() => remove(i)} className="wc-btn wc-btn--sm" style={{ flex: '0 0 auto', background: '#fff' }}>Remove</button>
+         <div key={i} style={{ border: '2px solid var(--line)', borderRadius: 14, padding: 10, background: '#fff' }}>
+            <div style={{ display: 'flex', gap: 7, alignItems: 'center' }}>
+               <input value={f.label || ''} onChange={e => patch(i, { label: e.target.value })}
+                 style={{ flex: 1, border: '2px solid var(--ink)', borderRadius: 11, padding: '9px 12px', fontFamily: 'var(--body)', fontWeight: 600, fontSize: 14, outline: 'none', background: '#fff' }}
+                 placeholder="Question label" maxLength={40} />
+               <button onClick={() => remove(i)} className="wc-btn wc-btn--sm" style={{ flex: '0 0 auto', background: '#fff' }}>Remove</button>
+            </div>
+            {seg(f.type || 'text', v => patch(i, { type: v }), typeOpts)}
+            {(f.type === 'select' || f.type === 'suggest') && <div>
+               <input value={(f.options || []).join(', ')} onChange={e => patch(i, { options: e.target.value.split(',').map(x => x.trim()).filter(Boolean) })}
+                 style={{ width: '100%', border: '2px solid var(--ink)', borderRadius: 11, padding: '9px 12px', fontFamily: 'var(--body)', fontWeight: 600, fontSize: 14, outline: 'none', background: '#fff', marginTop: 8 }}
+                 placeholder="Options, separated by commas" />
+               <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--ink2)', marginTop: 4 }}>{f.type === 'select' ? 'Only these answers can be saved.' : 'Suggestions only; other answers are allowed.'}</div>
+            </div>}
+            <button onClick={() => patch(i, { required: !f.required })} style={{ marginTop: 8, border: 'none', background: 'none', padding: 0, cursor: 'pointer', fontSize: 12, fontWeight: 800, color: f.required ? 'var(--green)' : 'var(--ink2)' }}>
+               {f.required ? 'Required' : 'Optional'}
+            </button>
          </div>
       ))}
       {fields.length < 6 && <button onClick={add} className="wc-btn wc-btn--sm wc-btn--ghost" style={{ width: '100%' }}>Add custom field</button>}

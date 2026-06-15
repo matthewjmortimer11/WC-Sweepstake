@@ -30,31 +30,67 @@ function Seg(p) {
 
 function CustomFieldSetup(p) {
   const fields = p.fields || [];
-  function change(i, label) {
-    p.onChange(fields.map((f, idx) => idx === i ? { ...f, label: label } : f));
+  function patch(i, next) {
+    p.onChange(fields.map((f, idx) => idx === i ? { ...f, ...next } : f));
   }
   function remove(i) {
     p.onChange(fields.filter((_, idx) => idx !== i));
   }
   function add() {
     if (fields.length >= 6) return;
-    p.onChange(fields.concat([{ key: '', label: '' }]));
+    p.onChange(fields.concat([{ key: '', label: '', type: 'text', required: false, options: [] }]));
   }
+  const typeOpts = [
+    { value: 'text', label: 'Text' },
+    { value: 'select', label: 'Dropdown' },
+    { value: 'suggest', label: 'List + other' },
+  ];
   return (
     <div>
       <Lab opt>Custom signup questions</Lab>
-      <div style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--ink2)', marginTop: 4 }}>Add anything else you want people to fill in, like relationship, nickname or team name.</div>
+      <div style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--ink2)', marginTop: 4 }}>Add text fields, locked dropdowns, or suggested lists where people can still type their own answer.</div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
         {fields.map((f, i) => (
-          <div key={i} style={{ display: 'flex', gap: 7, alignItems: 'center' }}>
-            <input style={{ ...inp, marginTop: 0, padding: '10px 12px', fontSize: 14 }} value={f.label || ''} onChange={e => change(i, e.target.value)} placeholder="Question label" maxLength={40} />
-            <button onClick={() => remove(i)} className="wc-btn wc-btn--sm" style={{ flex: '0 0 auto', background: '#fff' }}>Remove</button>
+          <div key={i} style={{ border: '2px solid var(--line)', borderRadius: 14, padding: 10, background: '#fff' }}>
+            <div style={{ display: 'flex', gap: 7, alignItems: 'center' }}>
+              <input style={{ ...inp, marginTop: 0, padding: '10px 12px', fontSize: 14 }} value={f.label || ''} onChange={e => patch(i, { label: e.target.value })} placeholder="Question label" maxLength={40} />
+              <button onClick={() => remove(i)} className="wc-btn wc-btn--sm" style={{ flex: '0 0 auto', background: '#fff' }}>Remove</button>
+            </div>
+            <Seg value={f.type || 'text'} onChange={v => patch(i, { type: v })} options={typeOpts} />
+            {(f.type === 'select' || f.type === 'suggest') && <div>
+              <input style={{ ...inp, padding: '10px 12px', fontSize: 14 }} value={(f.options || []).join(', ')} onChange={e => patch(i, { options: e.target.value.split(',').map(x => x.trim()).filter(Boolean) })} placeholder="Options, separated by commas" />
+              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--ink2)', marginTop: 4 }}>{f.type === 'select' ? 'Only these answers can be saved.' : 'These show as suggestions, but other answers are allowed.'}</div>
+            </div>}
+            <button onClick={() => patch(i, { required: !f.required })} style={{ marginTop: 8, border: 'none', background: 'none', padding: 0, cursor: 'pointer', fontSize: 12, fontWeight: 800, color: f.required ? 'var(--green)' : 'var(--ink2)' }}>
+              {f.required ? 'Required' : 'Optional'}
+            </button>
           </div>
         ))}
         {fields.length < 6 && <button onClick={add} className="wc-btn wc-btn--sm wc-btn--ghost" style={{ width: '100%' }}>Add custom field</button>}
       </div>
     </div>
   );
+}
+
+function CustomAnswerField(p) {
+  const f = p.field;
+  const val = p.value || '';
+  const set = v => p.onChange(f.key, v);
+  const options = f.options || [];
+  if (f.type === 'select') {
+    return <select style={inp} value={val} onChange={e => set(e.target.value)}>
+      <option value="">{f.required ? 'Choose one' : 'Optional'}</option>
+      {options.map(o => <option key={o} value={o}>{o}</option>)}
+    </select>;
+  }
+  if (f.type === 'suggest') {
+    const id = 'wh-custom-' + f.key;
+    return <>
+      <input style={inp} value={val} onChange={e => set(e.target.value)} placeholder="Your answer" maxLength={80} list={id} />
+      <datalist id={id}>{options.map(o => <option key={o} value={o} />)}</datalist>
+    </>;
+  }
+  return <input style={inp} value={val} onChange={e => set(e.target.value)} placeholder="Your answer" maxLength={80} />;
 }
 
 /* =================== ACCOUNT / LEAGUE GATE =================== */
@@ -177,6 +213,8 @@ function CreateLeague(props) {
   const [includeLtMember, setIncludeLtMember] = oState(true);
   const [locInput, setLocInput] = oState('Edinburgh, London');
   const [locationsFreeText, setLocationsFreeText] = oState(false);
+  const [entryFee, setEntryFee] = oState('5');
+  const [charitySplit, setCharitySplit] = oState(0.5);
   const [customFields, setCustomFields] = oState([]);
   const [err, setErr] = oState('');
   const [busy, setBusy] = oState(false);
@@ -203,6 +241,8 @@ function CreateLeague(props) {
       includeLtMember: purpose === 'work' && includeLtMember,
       locations: locations.length ? locations : ['Edinburgh', 'London'],
       locationsFreeText: locationsFreeText,
+      entryFee: Math.max(0, Number(entryFee) || 0),
+      charitySplit: charitySplit,
       customFields: customFields.filter(f => (f.label || '').trim()),
     };
     So.createLeague(name.trim(), cleanCode, pw, opts).then(function (res) {
@@ -244,6 +284,20 @@ function CreateLeague(props) {
             <Seg value={purpose} onChange={setPurpose} options={[{ value: 'work', label: 'Work' }, { value: 'friends', label: 'Friends & family' }]} />
             <div style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--ink2)', marginTop: 6 }}>
               {purpose === 'work' ? 'Collect work details during signup. You can fine-tune them now.' : 'Keeps signup simple: names only, plus any custom questions you add.'}
+            </div>
+          </div>
+          <div>
+            <Lab>Entry fee</Lab>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <span className="dh" style={{ fontSize: 24, marginTop: 6 }}>£</span>
+              <input type="number" min="0" step="0.5" style={inp} value={entryFee} onChange={e => setEntryFee(e.target.value)} placeholder="5" />
+            </div>
+          </div>
+          <div>
+            <Lab>Charity split</Lab>
+            <Seg value={charitySplit} onChange={setCharitySplit} options={[0, 0.25, 0.5, 0.75, 1].map(v => ({ value: v, label: Math.round(v * 100) + '%' }))} />
+            <div style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--ink2)', marginTop: 6 }}>
+              {charitySplit === 0 ? 'Everything goes to the winner fund.' : charitySplit === 1 ? 'Everything goes to charity.' : Math.round(charitySplit * 100) + '% to charity, the rest to the winner fund.'}
             </div>
           </div>
           {purpose === 'work' && <>
@@ -333,7 +387,9 @@ function OnboardingForm(props) {
   const locationsFreeText = So.locationsFreeText ? So.locationsFreeText() : false;
   const [loc, setLoc] = oState(locationOpts[0] || 'Edinburgh');
   const [lt, setLt] = oState(false);
-  const ok = name.trim().length > 0;
+  const setCustom = (key, value) => setCustomFields({ ...customFields, [key]: value });
+  const requiredMissing = customDefs.some(f => f.required && !String(customFields[f.key] || '').trim());
+  const ok = name.trim().length > 0 && !requiredMissing;
   const split = So.charitySplit ? So.charitySplit() : 0.5;
   const fee = WCo.FEE || 0;
   const charityPerEntry = fee * split;
@@ -377,8 +433,8 @@ function OnboardingForm(props) {
             <Seg value={lt} onChange={setLt} options={[{ value: false, label: 'No' }, { value: true, label: 'Yes' }]} />
           </div>}
           {customDefs.map(f => <div key={f.key}>
-            <Lab opt>{f.label}</Lab>
-            <input style={inp} value={customFields[f.key] || ''} onChange={e => setCustomFields({ ...customFields, [f.key]: e.target.value })} placeholder="Your answer" maxLength={80} />
+            <Lab opt={!f.required}>{f.label}</Lab>
+            <CustomAnswerField field={f} value={customFields[f.key]} onChange={setCustom} />
           </div>)}
         </div>
 
@@ -395,7 +451,7 @@ function OnboardingForm(props) {
 
         <div style={{ marginTop: 18 }}>
           <Bo variant="ink" block onClick={() => ok && props.onSubmit({ name: name.trim(), department: includeDept ? dept.trim() : '', location: includeLocation ? loc : '', ltMember: includeLtMember ? lt : false, customFields: customFields })}>
-            {ok ? 'To the draw →' : 'Add your name first'}
+            {ok ? 'To the draw →' : name.trim() ? 'Finish required fields' : 'Add your name first'}
           </Bo>
         </div>
       </div>
