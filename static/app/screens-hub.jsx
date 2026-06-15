@@ -329,10 +329,11 @@ function TrackerScreen(){
       {pre
         ? (function(){
             const preLines = [
-              ['Not a ball kicked yet. All '+WC.meta.teamsLeft+' nations in it. Wheesht is watching. Everyone.','confident'],
-              ['Still pre-tournament. No one has done anything wrong yet. Wheesht is making no promises.','neutral'],
-              [WC.meta.teamsLeft+' countries, all of them full of hope. Wheesht has seen hope before. It is complicated.','mischievous'],
-              ['The tournament hasn\'t started and already Wheesht has opinions. Too many. None of them public.','mischievous'],
+              [‘Not a ball kicked yet and Wheesht is already stressed. ‘+WC.meta.teamsLeft+’ nations. Anything could happen. Anything.’,’nervous’],
+              [‘Pre-tournament. Everyone is optimistic. Wheesht finds optimism suspicious but is trying to be supportive.’,’mischievous’],
+              [WC.meta.teamsLeft+’ teams and every single fan thinks their lot has a real shot this time. Wheesht is not here to crush dreams. Not yet.’,’mischievous’],
+              [‘Before a ball is kicked, Wheesht would like to say: good luck to all ‘+WC.meta.teamsLeft+’ nations. Some will need it considerably more than others.’,’confident’],
+              [‘It hasn\’t started and Wheesht is already emotionally prepared for chaos. ‘+WC.meta.teamsLeft+’ teams. It\’s going to be something.’,’nervous’],
             ];
             const pl = preLines[P.length % preLines.length];
             return <WheeshtSays mood={pl[1]} label="broadcast mode" animate>{pl[0]}</WheeshtSays>;
@@ -342,44 +343,50 @@ function TrackerScreen(){
             const p = function(arr){ return arr[n % arr.length]; };
             const pool =
               n >= 40 ? p([
-                [‘Still a big field. ‘+n+’ nations in it. Wheesht has formed opinions on all of them and is sharing none.’,’confident’],
-                [n+’ teams and counting. Everyone thinks their side has a chance. Wheesht is not saying who\’s wrong. Yet.’,’mischievous’],
-                [‘Early doors. ‘+n+’ nations still standing. Wheesht is watching. Taking notes. Not drawing conclusions. Officially.’,’neutral’],
-                [‘All ‘+n+’ still in it. The tournament has barely introduced itself. Wheesht is already invested. Quietly.’,’confident’],
+                [‘Still ‘+n+’ teams in it. We\’re barely getting started. Wheesht has clocked every single one of them, though.’,’confident’],
+                [n+’ nations left and everyone\’s convinced they\’re going all the way. Football is genuinely beautiful and delusional in equal measure.’,’mischievous’],
+                [‘Early days. ‘+n+’ teams still standing. A few of them genuinely deserve to be there. The rest are on borrowed time. Wheesht knows which is which.’,’mischievous’],
+                [‘Still a full field — ‘+n+’ going. The group stage is doing its job of separating the hopeful from the merely present.’,’neutral’],
+                [n+’ in it. Nobody\’s panicking. Nobody should be. Except perhaps two or three of them, who know who they are.’,’confident’],
               ])
             : n >= 28 ? p([
-                [‘Down to ‘+n+’. The group stage has done its damage. Some of those exits were, frankly, expected.’,’mischievous’],
-                [n+’ nations remain. The field is thinning and the results have been instructive. Very instructive.’,’neutral’],
-                [n+’ teams left standing. A few surprises. A few inevitabilities. Wheesht predicted none of this officially.’,’confident’],
-                [‘Still ‘+n+’ in it — but the tournament is starting to make sense. Unfortunately for some.’,’mischievous’],
+                [‘Down to ‘+n+’ and it\’s getting spicy. The group stage dished out justice. Mostly. Wheesht has a few questions about some of those results.’,’mischievous’],
+                [n+’ left standing. Some real surprises already. Some crushing inevitabilities. Wheesht is saying nothing about which is which.’,’neutral’],
+                [‘Still ‘+n+’ in it and every one of them thinks the draw was kind. Half of them are wrong. This is what makes it brilliant.’,’mischievous’],
+                [n+’ nations remain. The quality is rising. The excuses are getting more creative. Wheesht is enjoying both.’,’confident’],
+                [‘Groups done. ‘+n+’ survivors. A few upsets, a few collapses, and at least one result that has Wheesht still confused.’,’shocked’],
               ])
             : n >= 16 ? p([
-                [n+’ left. Wheesht is not yet nervous. This is not entirely accurate.’,’nervous’],
-                [n+’ nations remain. The knockout rounds reward no one who is not ready. Wheesht has noted this.’,’neutral’],
-                [‘Still ‘+n+’ in it. Genuine tension now. Wheesht is professionally calm and personally extremely stressed.’,’nervous’],
-                [n+’ teams. Wheesht has strong views on all of them. They are staying internal until further notice.’,’mischievous’],
+                [‘Knockouts. ‘+n+’ teams left and none of them want to be next. The tension is real and Wheesht is absolutely feeling it.’,’nervous’],
+                [n+’ nations still in it and now there\’s no second chances. One bad day and you\’re on a plane home. Brutal. Wheesht respects this greatly.’,’confident’],
+                [‘Last ‘+n+’. The tournament is properly revealing itself now. Some of these stories are going to be extraordinary.’,’celebrating’],
+                [n+’ teams, and honestly? It\’s wide open. Anyone can win this. Some more than others. But still. Anyone. Basically.’,’nervous’],
+                [‘Getting real now. ‘+n+’ teams, single elimination, no hiding. Wheesht is on the edge of the seat and not ashamed to admit it.’,’nervous’],
               ])
             : n >= 8 ? p([
-                [n+’ teams left. No hiding now. Wheesht is watching with considerable focus and very little blinking.’,’nervous’],
-                [‘Last ‘+n+’. Every game from here ends someone\’s tournament. Wheesht finds this quite something.’,’neutral’],
-                [n+’ nations left — some very capable, some very fortunate. Wheesht knows which is which.’,’mischievous’],
-                [‘Down to ‘+n+’. This is where the tournament is truly decided. Wheesht is taking this very seriously.’,’confident’],
+                [‘Last ‘+n+’. This is it now. The business end. Wheesht has been waiting for this since the draw.’,’confident’],
+                [n+’ teams left and every single match from here is a classic waiting to happen. Or a disaster. Usually both.’,’mischievous’],
+                [‘Quarter-final territory. ‘+n+’ nations. The gap between winning this thing and going home early has never felt smaller.’,’nervous’],
+                [n+’ left and the quality is remarkable. Wheesht has watched every game and the scorelines do not tell the full story. None of them do.’,’neutral’],
+                [‘Down to ‘+n+’. At this point, the sweepstake is very much alive. Maybe. Check above. Could be brutal.’,’mischievous’],
               ])
             : n >= 3 ? p([
-                [‘Last ‘+n+’. At this point, Wheesht\’s opinions are strong, specific, and entirely unpublished.’,’mischievous’],
-                [n+’ teams. The semi-finals are decided. Wheesht is composed. This is not entirely accurate.’,’nervous’],
-                [‘Final ‘+n+’. Wheesht has watched every minute of this and still has complicated feelings.’,’nervous’],
-                [‘Down to ‘+n+’ nations. Prior predictions are being quietly deleted. Not by Wheesht. Wheesht made none.’,’mischievous’],
+                [‘Final ‘+n+’. Semi-final football. The best kind of football. Everything on the line. Wheesht is barely holding it together.’,’nervous’],
+                [n+’ teams left and they all deserve to be here. Mostly. One of them got lucky in the quarters and Wheesht saw it.’,’mischievous’],
+                [‘Last ‘+n+’ standing in a 48-team tournament. Think about that. These teams earned it. Some of them. Wheesht is proud of most of them.’,’celebrating’],
+                [n+’ nations and a final to be decided. Wheesht has been watching since day one and is absolutely not going to predict the winner. Not after last time.’,’nervous’],
               ])
             : n === 2 ? p([
-                [‘Two teams left. Wheesht has views on both. Professionally neutral. Technically.’,’nervous’],
-                [‘Final two. One of them is winning this. Wheesht knew all along. Obviously.’,’confident’],
-                [‘Just two. Wheesht has been here for all of it and is absolutely, completely fine.’,’nervous’],
+                [‘Two teams. One trophy. Someone in this sweepstake is about to be very happy or very quiet. Wheesht is excited. Don\’t tell anyone.’,’celebrating’],
+                [‘Final two standing. Wheesht watched 47 other nations go home to get here. This better be worth it. It probably will be.’,’confident’],
+                [‘The finalists are set. Two nations, one cup, and a whole sweepstake hanging on ninety minutes. Wheesht is prepared. Mostly.’,’nervous’],
+                [‘Just two left. Wheesht has opinions on both of them. Has had since the group stage, frankly. Will be sharing some after the final whistle.’,’mischievous’],
               ])
             : p([
-                [‘We have a winner. The tournament is over. Wheesht saw everything and needs a moment.’,’celebrating’],
-                [‘Champion crowned. Wheesht was present for the whole thing and has complicated feelings.’,’neutral’],
-                [‘It\’s done. One nation above all others. Wheesht is going to need a sit down.’,’celebrating’],
+                [‘We have our champion. What a tournament. The winner was the right winner. Wheesht is genuinely moved. Don\’t.’,’celebrating’],
+                [‘It\’s done. One nation lifts the cup. Everyone else goes home. That\’s football. That\’s the whole of it. Wheesht loves this sport.’,’celebrating’],
+                [‘Tournament over. Champion crowned. Wheesht has watched every minute and already wants to do it all again.’,’celebrating’],
+                [‘That\’s that. The best team won. Or the luckiest. Or a bit of both. Wheesht will debate this internally for years.’,’mischievous’],
               ]);
             return <WheeshtSays mood={pool[1]} label="broadcast mode" animate>{pool[0]}</WheeshtSays>;
           })()}
