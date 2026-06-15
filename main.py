@@ -374,17 +374,20 @@ async def _guard_account_write(
     session, league: League, participant_id: str,
     account_token: Optional[str], admin_token: Optional[str],
 ) -> None:
-    """Sign-in lock: a write to a PASSWORD-PROTECTED entry needs a valid account
-    token (obtained once at sign-in) or the organiser's token. Open (passwordless)
-    entries are unaffected — the existing "just tap who you are" behaviour."""
+    """Sign-in lock: a write to a CLAIMED entry needs a valid account token
+    (obtained once at sign-in, via password or Google) or the organiser's token.
+    An entry is claimed once it has a password or a linked Google account. Open
+    (unclaimed) entries are unaffected — the existing "just tap who you are"."""
     h = await _account_password_hash(session, league, participant_id)
-    if not h:
+    prof = await session.get(Profile, participant_id)
+    has_google = prof is not None and prof.league_id == league.id and bool(prof.google_id)
+    if not h and not has_google:
         return
     if admin_token and _admin_token_ok(league, admin_token):
         return
     if account_token and _account_token_ok(league, participant_id, account_token):
         return
-    raise HTTPException(status_code=403, detail="This entry is password-protected — sign in to edit it.")
+    raise HTTPException(status_code=403, detail="This entry is protected — sign in to edit it.")
 
 
 # ── State assembly ────────────────────────────────────────────────────────────
@@ -1197,14 +1200,18 @@ async def set_account_password(
             raise HTTPException(status_code=404, detail="participant not found")
 
         existing = await _account_password_hash(session, league, participant_id)
-        if existing:
+        gprof = await session.get(Profile, participant_id)
+        has_google = gprof is not None and gprof.league_id == league.id and bool(gprof.google_id)
+        # Changing an existing password — or setting one on an entry already claimed
+        # via Google — requires proof, so a bystander can't lock the owner out.
+        if existing or has_google:
             ok = (
-                (payload.currentPassword and _verify_password(payload.currentPassword, existing))
+                (existing and payload.currentPassword and _verify_password(payload.currentPassword, existing))
                 or (x_wheesht_account_token and _account_token_ok(league, participant_id, x_wheesht_account_token))
                 or (x_wheesht_admin_token and _admin_token_ok(league, x_wheesht_admin_token))
             )
             if not ok:
-                raise HTTPException(status_code=403, detail="Enter your current password to change it")
+                raise HTTPException(status_code=403, detail="Sign in first to set a password on this entry")
 
         new = payload.newPassword
         if new:  # set / change
@@ -1257,6 +1264,9 @@ async def google_auth_link(
         if not await _participant_in_league(session, league, participant_id):
             raise HTTPException(status_code=404, detail="participant not found")
 
+        # Make sure the entry exists as a real row (seeded base entries are
+        # otherwise config-only) so cross-device Google login can find it later.
+        await _get_or_materialise(session, league, participant_id)
         prof = await session.get(Profile, participant_id)
 
         # Re-auth path: existing link matches → Google token IS the auth proof.
@@ -1380,10 +1390,13 @@ async def google_login(code: str, payload: GoogleLoginPayload):
             raise HTTPException(status_code=404, detail="No entry in this league is linked to that Google account")
 
         p = await session.get(Participant, prof.participant_id)
-        if p is None or p.removed:
+        base = _seeded_base(league, prof.participant_id)
+        if p is not None and p.removed:
+            raise HTTPException(status_code=404, detail="participant not found")
+        if p is None and base is None:
             raise HTTPException(status_code=404, detail="participant not found")
 
-        display = (prof.display_name or "").strip() or p.name
+        display = (prof.display_name or "").strip() or (p.name if p else base.get("name", ""))
         return {
             "ok": True,
             "participantId": prof.participant_id,
