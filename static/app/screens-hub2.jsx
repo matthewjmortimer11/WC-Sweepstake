@@ -155,6 +155,35 @@ function vResultNote(f){
   var isMassive=!draw&&(aWin?aO>bO*8:bO>aO*8);
   var isUpset=!draw&&(aWin?aO>bO*2.5:bO>aO*2.5);
 
+  /* ---- Classic rivalries — checked before individual team lines ---- */
+  var pair=function(x,y){ return (f.a===x&&f.b===y)||(f.a===y&&f.b===x); };
+  if(pair('SCO','ENG')){
+    var scoWon2=(f.a==='SCO'&&aWin)||(f.b==='SCO'&&!aWin&&!draw);
+    if(draw) return 'Scotland vs England and they can\'t separate them. Wheesht is choosing to enjoy this.';
+    if(scoWon2) return 'SCOTLAND BEAT ENGLAND. Wheesht is officially done for the night. That\'s it. That\'s the tournament.';
+    return 'England beat Scotland. Wheesht is making notes. Very, very detailed notes. We move on. Apparently.';
+  }
+  if(pair('BRA','ARG')){
+    var braWon=(f.a==='BRA'&&aWin)||(f.b==='BRA'&&!aWin&&!draw);
+    if(draw) return 'Brazil and Argentina share the points. The most watchable 0–0 imaginable. Wheesht was gripping the desk.';
+    return (braWon?'Brazil':'Argentina')+' win El Clásico de las Américas. Wheesht has been waiting for this fixture. Worth the wait.';
+  }
+  if(pair('ESP','POR')){
+    var espWon=(f.a==='ESP'&&aWin)||(f.b==='ESP'&&!aWin&&!draw);
+    if(draw) return 'Spain and Portugal split the points. The Iberian derby ends in stalemate. Nobody wins. Everyone watches.';
+    return (espWon?'Spain':'Portugal')+' take the Iberian bragging rights. Wheesht watched every second of that one.';
+  }
+  if(pair('GER','FRA')){
+    var gerWon=(f.a==='GER'&&aWin)||(f.b==='GER'&&!aWin&&!draw);
+    if(draw) return 'Germany and France cancel each other out. Wheesht expected a final, got a draw. Still worth it.';
+    return (gerWon?'Germany':'France')+' win the grudge match. Wheesht has been looking forward to this one for years.';
+  }
+  if(pair('ARG','KSA')){
+    if(draw) return 'Argentina and Saudi Arabia draw. Wheesht is having 2022 flashbacks already.';
+    var argWon2=(f.a==='ARG'&&aWin)||(f.b==='ARG'&&!aWin&&!draw);
+    return argWon2?'Argentina get revenge on Saudi Arabia. Wheesht remembers everything.':'Saudi Arabia beat Argentina AGAIN. Wheesht is closing the laptop and going for a walk.';
+  }
+
   /* ---- Scotland ---- */
   if(f.a==='SCO'||f.b==='SCO'){
     var scoWon=(f.a==='SCO'&&aWin)||(f.b==='SCO'&&!aWin&&!draw);
@@ -194,8 +223,12 @@ function vResultNote(f){
   ]);
 
   /* ---- High-scoring ---- */
-  if(total>=7) return pick([wN+' and '+lN+' put on an absolute show — '+a+'–'+b+'. Wheesht barely blinked. That was breathtaking.',wN+' vs '+lN+': '+a+'–'+b+'. The defences took the day off. Wheesht is not complaining.']);
+  if(total>=8) return pick([wN+' vs '+lN+': '+a+'–'+b+'. That wasn\'t a football match, that was a film. Wheesht needs to lie down.',a+'–'+b+'. Wheesht has refereed tournaments since 1966. That is one of the most extraordinary scorelines Wheesht has ever witnessed.']);
+  if(total>=6) return pick([wN+' and '+lN+' put on an absolute show — '+a+'–'+b+'. Wheesht barely blinked. That was breathtaking.',wN+' vs '+lN+': '+a+'–'+b+'. The defences took the day off. Wheesht is not complaining.']);
   if(total>=5) return pick([wN+' vs '+lN+' delivers '+total+' goals. Wheesht approves of the spectacle. This is what the tournament is for.',a+'–'+b+'. Goals, chaos, and a result at the end of it. Wheesht enjoyed every minute.']);
+
+  /* ---- 1–0 — a classic ---- */
+  if(margin===1&&total===1) return pick([wN+' win 1–0. A single goal, a clean sheet, and three points. Wheesht respects the professionalism.',wN+' grind out a 1–0. Defensive. Deliberate. Deeply satisfying if you\'re '+wN+'. Wheesht notes the result without further comment.']);
 
   /* ---- Hammering ---- */
   if(margin>=4) return pick([
