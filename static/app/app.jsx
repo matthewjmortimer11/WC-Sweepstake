@@ -100,7 +100,15 @@ function TabBar(props){
   return <div className="tabbar tabbar--6">
     {tabs.map(([k,lab])=>(
       <button key={k} className={props.tab===k?'on':''} onClick={()=>props.setTab(k)}>
-        <span className="ic"><Icon name={k}/></span>
+        <span className="ic" style={{position:'relative'}}>
+          <Icon name={k}/>
+          {k==='chat' && props.chatBadge && props.tab!=='chat' && <span style={{
+            position:'absolute',top:-1,right:-2,width:9,height:9,borderRadius:'50%',
+            background:props.chatBadge==='wheesht'?'var(--yellow)':'var(--red)',
+            border:props.chatBadge==='wheesht'?'1.5px solid var(--ink)':'1.5px solid #fff',
+            display:'block',pointerEvents:'none',
+          }}/>}
+        </span>
         {lab}
       </button>
     ))}
@@ -276,7 +284,15 @@ function DeckRail(props){
     <div className="deck-nav">
       {DECK_NAV.map(([k,lab])=>(
         <button key={k} className={props.tab===k?'on':''} onClick={()=>props.setTab(k)}>
-          <span className="ic"><Icon name={k}/></span><span className="lb">{lab}</span>
+          <span className="ic" style={{position:'relative'}}>
+            <Icon name={k}/>
+            {k==='chat' && props.chatBadge && props.tab!=='chat' && <span style={{
+              position:'absolute',top:-2,right:-3,width:9,height:9,borderRadius:'50%',
+              background:props.chatBadge==='wheesht'?'var(--yellow)':'var(--red)',
+              border:props.chatBadge==='wheesht'?'1.5px solid var(--ink)':'1.5px solid #fff',
+              display:'block',pointerEvents:'none',
+            }}/>}
+          </span><span className="lb">{lab}</span>
         </button>
       ))}
     </div>
@@ -302,7 +318,7 @@ function DeckShell(props){
   const head = DECK_HEAD[tab];
   const isChat = tab==='chat';
   return <div className="deck-shell">
-    <DeckRail me={props.me} tab={tab} setTab={props.setTab}
+    <DeckRail me={props.me} tab={tab} setTab={props.setTab} chatBadge={props.chatBadge}
       onAccount={props.onAccount} onAdmin={props.onAdmin} onDev={props.onDev}/>
     <main className="deck-main">
       <div className={isChat?'deck-canvas deck-canvas--chat':'deck-canvas'} key={tab+(props.me?props.me.id:'')}>
@@ -337,7 +353,15 @@ const TW_DEFAULTS = /*EDITMODE-BEGIN*/{
 
 function App(){
   const me = A_S.active();
-  const [tab,setTab]=aState('me');
+  const [tab,_setTab]=aState('me');
+  const [chatBadge,setChatBadge]=aState(null); // null | 'new' | 'wheesht'
+  function setTab(t){
+    _setTab(t);
+    if(t==='chat'){
+      setChatBadge(null);
+      try{ localStorage.setItem('wcChatSeen', String(Date.now())); }catch(e){}
+    }
+  }
   const [flow,setFlow]=aState(me?'app':'gate'); // gate | find | form | app
   const [draw,setDraw]=aState(null);            // {forceTeam, replay}
   const [account,setAccount]=aState(false);
@@ -354,6 +378,21 @@ function App(){
   // re-render on any store change
   aEffect(()=>A_S.subscribe(()=>tick(x=>x+1)),[]);
   aEffect(()=>{ A_S.refresh && A_S.refresh(); },[]);
+
+  // chat unread badge — ChatScreen calls window.__wcOnChatPoll(msgs) after each poll
+  aEffect(()=>{
+    try{ if(!localStorage.getItem('wcChatSeen')) localStorage.setItem('wcChatSeen', String(Date.now())); }catch(e){}
+    window.__wcOnChatPoll=function(msgs){
+      if(tab==='chat'){
+        try{ localStorage.setItem('wcChatSeen', String(Date.now())); }catch(e){}
+        return;
+      }
+      var seen=0; try{ seen=parseInt(localStorage.getItem('wcChatSeen')||'0',10)||0; }catch(e){}
+      var fresh=msgs.filter(function(m){ return (m.ts||0)>seen; });
+      if(!fresh.length) return;
+      setChatBadge(fresh.some(function(m){ return m.author_id==='wheesht'; })?'wheesht':'new');
+    };
+  },[tab]);
 
   // track viewport width so the toggle/deck only apply on wider screens
   aEffect(()=>{
@@ -629,7 +668,7 @@ function App(){
 
   return <React.Fragment>
     {deck
-      ? <DeckShell me={me} tab={tab} setTab={setTab}
+      ? <DeckShell me={me} tab={tab} setTab={setTab} chatBadge={chatBadge}
           onAccount={()=>setAccount(true)} onAdmin={()=>setAdmin(true)} onDev={()=>setDev(true)}>
           {me ? screens[tab] : null}
         </DeckShell>
@@ -642,7 +681,7 @@ function App(){
                 full-screen admin overlay rather than letting a screen read me.team. */}
             {me ? screens[tab] : null}
           </div>
-          <TabBar tab={tab} setTab={setTab}/>
+          <TabBar tab={tab} setTab={setTab} chatBadge={chatBadge}/>
         </React.Fragment>}
     {viewToggle}
 

@@ -46,8 +46,10 @@ function ChatScreen() {
         return data;
       });
     }).then(function(data) {
-      setMsgs(Array.isArray(data) ? data : []);
+      var arr = Array.isArray(data) ? data : [];
+      setMsgs(arr);
       setErr(false);
+      if (window.__wcOnChatPoll) window.__wcOnChatPoll(arr);
     }).catch(function() { setErr(true); });
   }
 
