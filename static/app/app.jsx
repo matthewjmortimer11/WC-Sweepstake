@@ -168,6 +168,10 @@ function AccountSignIn(props){
   const [err,setErr]=aState('');
   const person = A_S.getSync ? A_S.getSync(props.id) : null;
   const hasGoogle = !!(person && person.hasGoogleLink) && !!window.WC_GOOGLE_CLIENT_ID;
+  // If the entry has no password (it was claimed via Google only), don't offer
+  // a password field — Google is the only way in. When the person is unknown
+  // (data not loaded) fall back to showing the password field.
+  const hasPw = person ? !!person.hasPassword : true;
   function go(){
     if(!pw||busy) return;
     setBusy(true); setErr('');
@@ -191,14 +195,18 @@ function AccountSignIn(props){
     <div className={chrome.cls} style={chrome.sheet}>
       {!chrome.deck && <div style={{width:44,height:5,borderRadius:3,background:'var(--line)',margin:'0 auto 14px'}}/>}
       <div className="dh" style={{fontSize:22}}>Sign in</div>
-      <div style={{fontSize:13,fontWeight:600,color:'var(--ink2)',marginTop:4}}><b>{props.name}</b> is password-protected. Enter the password to continue.</div>
+      <div style={{fontSize:13,fontWeight:600,color:'var(--ink2)',marginTop:4}}>
+        <b>{props.name}</b> {hasPw
+          ? (hasGoogle ? 'is protected. Sign in to continue.' : 'is password-protected. Enter the password to continue.')
+          : 'is protected. Sign in with Google to continue.'}
+      </div>
       {hasGoogle && <>
         <window.GoogleSignInButton onToken={onGoogleToken} opts={{text:'signin_with',size:'large',theme:'outline'}}/>
-        <div style={div}><div style={line}/><span style={{fontSize:11.5,fontWeight:700,color:'var(--ink2)'}}>or use password</span><div style={line}/></div>
+        {hasPw && <div style={div}><div style={line}/><span style={{fontSize:11.5,fontWeight:700,color:'var(--ink2)'}}>or use password</span><div style={line}/></div>}
       </>}
-      <input autoFocus type="password" value={pw} onChange={e=>setPw(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')go();}} placeholder="Password" style={inp}/>
+      {hasPw && <input autoFocus type="password" value={pw} onChange={e=>setPw(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')go();}} placeholder="Password" style={inp}/>}
       {err && <div style={{color:'var(--red)',fontWeight:800,fontSize:12.5,marginTop:8}}>{err}</div>}
-      <button onClick={go} disabled={!pw||busy} className="wc-btn wc-btn--block" style={{marginTop:14,boxShadow:'0 4px 0 var(--ink)',opacity:(!pw||busy)?0.5:1}}>{busy?'Checking…':'Sign in'}</button>
+      {hasPw && <button onClick={go} disabled={!pw||busy} className="wc-btn wc-btn--block" style={{marginTop:14,boxShadow:'0 4px 0 var(--ink)',opacity:(!pw||busy)?0.5:1}}>{busy?'Checking…':'Sign in'}</button>}
       <button onClick={props.onClose} style={{width:'100%',marginTop:10,border:'none',background:'none',cursor:'pointer',fontSize:12.5,fontWeight:800,color:'var(--ink2)'}}>Cancel</button>
     </div>
   </div>;

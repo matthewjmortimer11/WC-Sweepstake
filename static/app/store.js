@@ -635,8 +635,16 @@
     hasPassword: function (p) { return !!(p && p.hasPassword); },
     // Do we hold a sign-in token for this account on this device?
     isSignedIn: function (id) { return !!acctToken(id); },
-    // Does taking over / editing this account need a password we don't hold yet?
-    needsSignIn: function (p) { return !!(p && p.hasPassword) && !acctToken(p.id); },
+    // Does taking over this account need authentication we don't hold yet?
+    // An entry is protected once it has been claimed — either by setting a
+    // password or by linking a Google account. Picking it on a new device then
+    // requires the password or a matching Google sign-in.
+    needsSignIn: function (p) {
+      if (!p || acctToken(p.id)) return false;
+      if (p.hasPassword) return true;
+      if (p.hasGoogleLink && window.WC_GOOGLE_CLIENT_ID) return true;
+      return false;
+    },
     // Prove a password; on success store a reusable token for this device.
     authAccount: function (id, password) {
       if (!LIVE) { setAcctToken(id, 'mock'); return Promise.resolve({ ok: true }); }
