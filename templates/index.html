@@ -139,7 +139,7 @@ button{font-family:inherit;}
 
 /* ---------- tab bar ---------- */
 .tabbar{position:absolute;left:0;right:0;bottom:0;height:84px;display:flex;align-items:flex-start;
-  padding:10px 12px 0;gap:2px;background:linear-gradient(180deg,rgba(244,238,227,0) 0%,var(--bg) 26%);z-index:25;
+  padding:14px 12px 0;gap:2px;background:linear-gradient(180deg,rgba(244,238,227,0) 0%,var(--bg) 26%);z-index:25;
   -webkit-user-select:none;user-select:none;}
 .tabbar button{flex:1;border:none;background:none;cursor:pointer;display:flex;flex-direction:column;
   align-items:center;gap:3px;padding:6px 0;color:var(--ink2);font-weight:700;font-size:10.5px;font-family:var(--body);
@@ -396,7 +396,7 @@ body.deck .screen{border-radius:0;height:100%;background:var(--bg);}
 .deck-canvas--chat{max-width:780px;padding:18px 36px 0;}
 body.deck .chat-wrap{height:calc(100dvh - 84px) !important;}
 /* chat input clears safe-area-inset-bottom so it sits above the home indicator */
-.chat-wrap > div:last-child{padding-bottom:max(4px, env(safe-area-inset-bottom, 4px));}
+.chat-wrap > div:last-child{padding-bottom:env(safe-area-inset-bottom, 0px);}
 body.deck .wc-toasts{top:auto;bottom:22px;left:auto;right:22px;width:min(380px,38vw);align-items:flex-end;}
 /* the editorial deck header already states the section title — hide the screen's
    own duplicate title in deck, keeping its useful stat subline. */
@@ -472,26 +472,26 @@ body.deck .deck-canvas{animation:screenIn .42s cubic-bezier(.2,.8,.25,1) both;}
 
 <!-- Single source of truth: generated from wc_data.py by scripts/build_snapshot.py.
      No-op when the server injects window.WC_DATA above (live mode). -->
-<script src="app/wc-snapshot.js?v=20260615-chatfix"></script>
-<script src="app/data.js?v=20260615-chatfix"></script>
-<script src="app/store.js?v=20260615-chatfix"></script>
-<script type="text/babel" src="app/wheesht-mascot.jsx?v=20260615-chatfix"></script>
-<script type="text/babel" src="app/ui.jsx?v=20260615-chatfix"></script>
-<script type="text/babel" src="tweaks-panel.jsx?v=20260615-chatfix"></script>
-<script type="text/babel" src="app/screens-hub.jsx?v=20260615-chatfix"></script>
-<script type="text/babel" src="app/screens-hub2.jsx?v=20260615-chatfix"></script>
-<script type="text/babel" src="app/screens-onboarding.jsx?v=20260615-chatfix"></script>
-<script type="text/babel" src="app/screens-dashboard.jsx?v=20260615-chatfix"></script>
-<script type="text/babel" src="app/screens-competition.jsx?v=20260615-chatfix"></script>
-<script type="text/babel" src="app/screens-predictions.jsx?v=20260615-chatfix"></script>
-<script type="text/babel" src="app/screens-games.jsx?v=20260615-chatfix"></script>
-<script type="text/babel" src="app/screens-match-centre.jsx?v=20260615-chatfix"></script>
-<script type="text/babel" src="app/screens-what-if.jsx?v=20260615-chatfix"></script>
-<script type="text/babel" src="app/screens-admin.jsx?v=20260615-chatfix"></script>
-<script type="text/babel" src="app/screens-chat.jsx?v=20260615-chatfix"></script>
-<script type="text/babel" src="app/screens-dev.jsx?v=20260615-chatfix"></script>
-<script type="text/babel" src="app/app.jsx?v=20260615-chatfix"></script>
-<script type="text/babel" src="app/stage.jsx?v=20260615-chatfix"></script>
+<script src="app/wc-snapshot.js?v=20260615-tabfix"></script>
+<script src="app/data.js?v=20260615-tabfix"></script>
+<script src="app/store.js?v=20260615-tabfix"></script>
+<script type="text/babel" src="app/wheesht-mascot.jsx?v=20260615-tabfix"></script>
+<script type="text/babel" src="app/ui.jsx?v=20260615-tabfix"></script>
+<script type="text/babel" src="tweaks-panel.jsx?v=20260615-tabfix"></script>
+<script type="text/babel" src="app/screens-hub.jsx?v=20260615-tabfix"></script>
+<script type="text/babel" src="app/screens-hub2.jsx?v=20260615-tabfix"></script>
+<script type="text/babel" src="app/screens-onboarding.jsx?v=20260615-tabfix"></script>
+<script type="text/babel" src="app/screens-dashboard.jsx?v=20260615-tabfix"></script>
+<script type="text/babel" src="app/screens-competition.jsx?v=20260615-tabfix"></script>
+<script type="text/babel" src="app/screens-predictions.jsx?v=20260615-tabfix"></script>
+<script type="text/babel" src="app/screens-games.jsx?v=20260615-tabfix"></script>
+<script type="text/babel" src="app/screens-match-centre.jsx?v=20260615-tabfix"></script>
+<script type="text/babel" src="app/screens-what-if.jsx?v=20260615-tabfix"></script>
+<script type="text/babel" src="app/screens-admin.jsx?v=20260615-tabfix"></script>
+<script type="text/babel" src="app/screens-chat.jsx?v=20260615-tabfix"></script>
+<script type="text/babel" src="app/screens-dev.jsx?v=20260615-tabfix"></script>
+<script type="text/babel" src="app/app.jsx?v=20260615-tabfix"></script>
+<script type="text/babel" src="app/stage.jsx?v=20260615-tabfix"></script>
 <script>
 (function(){
   var secure = location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1';
