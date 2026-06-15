@@ -465,6 +465,7 @@ function OIRosterPicker(props) {
           {all.map(function(p) {
             const t = WCo.TEAMS[p.team];
             const mine = myIds.has(p.id);
+            const locked = !mine && So.needsSignIn && So.needsSignIn(p);
             return (
               <button
                 key={p.id}
@@ -486,7 +487,12 @@ function OIRosterPicker(props) {
                 </div>
                 {mine
                   ? <span style={{ fontSize: 12, fontWeight: 800, color: 'var(--ink2)' }}>on device</span>
-                  : <span className="dh" style={{ fontSize: 18 }}>→</span>}
+                  : locked
+                    ? <span title="Protected — sign in to claim" style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 800, color: 'var(--ink2)' }}>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4"><rect x="4" y="11" width="16" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
+                        Sign in
+                      </span>
+                    : <span className="dh" style={{ fontSize: 18 }}>→</span>}
               </button>
             );
           })}

@@ -460,7 +460,7 @@ body.deck .deck-canvas{animation:screenIn .42s cubic-bezier(.2,.8,.25,1) both;}
 
 <!-- Single source of truth: generated from wc_data.py by scripts/build_snapshot.py.
      No-op when the server injects window.WC_DATA above (live mode). -->
-<script type="text/babel" src="tweaks-panel.jsx?v=20260615-modal"></script>
+<script type="text/babel" src="tweaks-panel.jsx?v=20260615-auth"></script>
 <script>
 (function(){
   var secure = location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1';
@@ -1211,8 +1211,16 @@ body.deck .deck-canvas{animation:screenIn .42s cubic-bezier(.2,.8,.25,1) both;}
     hasPassword: function (p) { return !!(p && p.hasPassword); },
     // Do we hold a sign-in token for this account on this device?
     isSignedIn: function (id) { return !!acctToken(id); },
-    // Does taking over / editing this account need a password we don't hold yet?
-    needsSignIn: function (p) { return !!(p && p.hasPassword) && !acctToken(p.id); },
+    // Does taking over this account need authentication we don't hold yet?
+    // An entry is protected once it has been claimed — either by setting a
+    // password or by linking a Google account. Picking it on a new device then
+    // requires the password or a matching Google sign-in.
+    needsSignIn: function (p) {
+      if (!p || acctToken(p.id)) return false;
+      if (p.hasPassword) return true;
+      if (p.hasGoogleLink && window.WC_GOOGLE_CLIENT_ID) return true;
+      return false;
+    },
     // Prove a password; on success store a reusable token for this device.
     authAccount: function (id, password) {
       if (!LIVE) { setAcctToken(id, 'mock'); return Promise.resolve({ ok: true }); }
@@ -3844,6 +3852,7 @@ function OIRosterPicker(props) {
           {all.map(function(p) {
             const t = WCo.TEAMS[p.team];
             const mine = myIds.has(p.id);
+            const locked = !mine && So.needsSignIn && So.needsSignIn(p);
             return (
               <button
                 key={p.id}
@@ -3865,7 +3874,12 @@ function OIRosterPicker(props) {
                 </div>
                 {mine
                   ? <span style={{ fontSize: 12, fontWeight: 800, color: 'var(--ink2)' }}>on device</span>
-                  : <span className="dh" style={{ fontSize: 18 }}>→</span>}
+                  : locked
+                    ? <span title="Protected — sign in to claim" style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 800, color: 'var(--ink2)' }}>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4"><rect x="4" y="11" width="16" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
+                        Sign in
+                      </span>
+                    : <span className="dh" style={{ fontSize: 18 }}>→</span>}
               </button>
             );
           })}
@@ -7251,6 +7265,10 @@ function AccountSignIn(props){
   const [err,setErr]=aState('');
   const person = A_S.getSync ? A_S.getSync(props.id) : null;
   const hasGoogle = !!(person && person.hasGoogleLink) && !!window.WC_GOOGLE_CLIENT_ID;
+  // If the entry has no password (it was claimed via Google only), don't offer
+  // a password field — Google is the only way in. When the person is unknown
+  // (data not loaded) fall back to showing the password field.
+  const hasPw = person ? !!person.hasPassword : true;
   function go(){
     if(!pw||busy) return;
     setBusy(true); setErr('');
@@ -7274,14 +7292,18 @@ function AccountSignIn(props){
     <div className={chrome.cls} style={chrome.sheet}>
       {!chrome.deck && <div style={{width:44,height:5,borderRadius:3,background:'var(--line)',margin:'0 auto 14px'}}/>}
       <div className="dh" style={{fontSize:22}}>Sign in</div>
-      <div style={{fontSize:13,fontWeight:600,color:'var(--ink2)',marginTop:4}}><b>{props.name}</b> is password-protected. Enter the password to continue.</div>
+      <div style={{fontSize:13,fontWeight:600,color:'var(--ink2)',marginTop:4}}>
+        <b>{props.name}</b> {hasPw
+          ? (hasGoogle ? 'is protected. Sign in to continue.' : 'is password-protected. Enter the password to continue.')
+          : 'is protected. Sign in with Google to continue.'}
+      </div>
       {hasGoogle && <>
         <window.GoogleSignInButton onToken={onGoogleToken} opts={{text:'signin_with',size:'large',theme:'outline'}}/>
-        <div style={div}><div style={line}/><span style={{fontSize:11.5,fontWeight:700,color:'var(--ink2)'}}>or use password</span><div style={line}/></div>
+        {hasPw && <div style={div}><div style={line}/><span style={{fontSize:11.5,fontWeight:700,color:'var(--ink2)'}}>or use password</span><div style={line}/></div>}
       </>}
-      <input autoFocus type="password" value={pw} onChange={e=>setPw(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')go();}} placeholder="Password" style={inp}/>
+      {hasPw && <input autoFocus type="password" value={pw} onChange={e=>setPw(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')go();}} placeholder="Password" style={inp}/>}
       {err && <div style={{color:'var(--red)',fontWeight:800,fontSize:12.5,marginTop:8}}>{err}</div>}
-      <button onClick={go} disabled={!pw||busy} className="wc-btn wc-btn--block" style={{marginTop:14,boxShadow:'0 4px 0 var(--ink)',opacity:(!pw||busy)?0.5:1}}>{busy?'Checking…':'Sign in'}</button>
+      {hasPw && <button onClick={go} disabled={!pw||busy} className="wc-btn wc-btn--block" style={{marginTop:14,boxShadow:'0 4px 0 var(--ink)',opacity:(!pw||busy)?0.5:1}}>{busy?'Checking…':'Sign in'}</button>}
       <button onClick={props.onClose} style={{width:'100%',marginTop:10,border:'none',background:'none',cursor:'pointer',fontSize:12.5,fontWeight:800,color:'var(--ink2)'}}>Cancel</button>
     </div>
   </div>;
