@@ -176,12 +176,12 @@ function VerdictHeader(props){
 function StandingsBlock(){
   // Pot / charity / entrants / fee — always true, drawn from live numbers.
   const P = vPeople();
-  const cells = [
-    { v: money2(vPot()), l: 'winner takes all', c: 'var(--green)' },
-    { v: money2(vCharity()), l: 'raised for charity', c: 'var(--red)' },
-    { v: P.length, l: P.length === 1 ? 'entrant' : 'entrants', c: 'var(--ink)' },
-    { v: '£' + (WC2.FEE || 0), l: 'to enter', c: 'var(--ink)' },
-  ];
+  const pot = vPot(), char = vCharity();
+  const cells = [];
+  if (pot > 0) cells.push({ v: money2(pot), l: char > 0 ? 'winner takes all' : 'whole pot to the winner', c: 'var(--green)' });
+  if (char > 0) cells.push({ v: money2(char), l: pot > 0 ? 'raised for charity' : 'whole pot to charity', c: 'var(--red)' });
+  cells.push({ v: P.length, l: P.length === 1 ? 'entrant' : 'entrants', c: 'var(--ink)' });
+  cells.push({ v: '£' + (WC2.FEE || 0), l: 'to enter', c: 'var(--ink)' });
   return (
     <>
       <SH2>Where it stands</SH2>

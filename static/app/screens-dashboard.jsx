@@ -238,7 +238,7 @@ function EditProfile(props) {
   return (
     <div style={{ position: 'absolute', inset: 0, zIndex: 70, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
       <div onClick={props.onClose} style={{ position: 'absolute', inset: 0, background: 'rgba(26,26,26,.45)' }} />
-      <div className="rise" style={{ position: 'relative', background: 'var(--bg)', borderRadius: '26px 26px 0 0', padding: '18px 18px 26px', boxShadow: '0 -20px 50px rgba(0,0,0,.3)', maxHeight: '88vh', overflowY: 'auto' }}>
+      <div className="rise" style={{ position: 'relative', background: 'var(--bg)', borderRadius: '26px 26px 0 0', padding: '18px 18px 26px', boxShadow: '0 -20px 50px rgba(0,0,0,.3)', maxHeight: '88dvh', overflowY: 'auto', WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain' }}>
         <div style={{ width: 44, height: 5, borderRadius: 3, background: 'var(--line)', margin: '0 auto 14px' }} />
         <div className="dh" style={{ fontSize: 22, marginBottom: 14 }}>Edit your profile</div>
 
@@ -401,7 +401,12 @@ function WinningsCard(props) {
   const charity = Sd.charity ? Sd.charity() : (WCd.POT * 0.5);
   const split = Sd.charitySplit ? Sd.charitySplit() : 0.5;
   const splitPct = Math.round(split * 100);
-  const charityLabel = splitPct <= 0 ? 'No charity split' : 'To charity (' + splitPct + '% of every entry)';
+  const allCharity = charity > 0 && pot <= 0;   // 100% of the pot to charity
+  const allWinner = charity <= 0 && pot > 0;    // 100% of the pot to the winner
+  const charityLabel = 'To charity (' + splitPct + '% of every entry)';
+  const headTitle = allCharity ? 'Charity pot — every entry, donated' : ('Winner fund — if ' + t.name + ' lift the cup');
+  const headVal = allCharity ? charity : pot;
+  const headColor = allCharity ? 'var(--red)' : 'var(--green)';
   const ov = overallRank(me);
   const rankTaps = React.useRef({n:0,t:0});
   function rankTap(){
@@ -414,8 +419,8 @@ function WinningsCard(props) {
     <Cd bordered>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
-          <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.06em', textTransform: 'uppercase', color: 'var(--ink2)' }}>Winner fund — if {t.name} lift the cup</div>
-          <div className="dh" style={{ fontSize: 38, color: 'var(--green)', lineHeight: 1, marginTop: 2 }}>{money_d(pot)}</div>
+          <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.06em', textTransform: 'uppercase', color: 'var(--ink2)' }}>{headTitle}</div>
+          <div className="dh" style={{ fontSize: 38, color: headColor, lineHeight: 1, marginTop: 2 }}>{money_d(headVal)}</div>
         </div>
         <div onClick={rankTap} style={{ textAlign: 'right', background: 'var(--bg)', border: '2px solid var(--line)', borderRadius: 12, padding: '7px 11px', cursor: 'default' }}>
           <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: '.04em', color: 'var(--ink2)' }}>OVERALL</div>
@@ -423,16 +428,20 @@ function WinningsCard(props) {
         </div>
       </div>
       <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 7 }}>
+        {!allCharity && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 700, opacity: t.alive ? 1 : .4 }}>
-          <span style={{ flex: 1 }}>🏆 Champion (one winner)</span>
+          <span style={{ flex: 1 }}>🏆 Champion (one winner){allWinner ? ' — the whole pot' : ''}</span>
           {t.alive ? <Chd tone="ghost" style={{ borderStyle: 'dashed' }}>still in</Chd> : <span style={{ fontSize: 11, color: 'var(--ink2)' }}>out</span>}
           <span className="dh" style={{ fontSize: 15, width: 64, textAlign: 'right' }}>{money_d(pot)}</span>
         </div>
+        )}
+        {!allWinner && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 700, background: 'var(--bg)', borderRadius: 10, padding: '8px 10px', marginTop: 2 }}>
           <span style={{ fontSize: 16 }}>❤️</span>
-          <span style={{ flex: 1 }}>{charityLabel}</span>
+          <span style={{ flex: 1 }}>{allCharity ? 'Every entry goes to charity' : charityLabel}</span>
           <span className="dh" style={{ fontSize: 15, width: 64, textAlign: 'right', color: 'var(--red)' }}>{money_d(charity)}</span>
         </div>
+        )}
       </div>
     </Cd>
   );
