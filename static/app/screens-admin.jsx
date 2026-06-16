@@ -471,7 +471,7 @@ function SettingsAdmin() {
 }
 
 function MatchPredAdmin() {
-  const upcoming = (WCa.FIXTURES || []).filter(function(f) { return f.status !== 'done'; });
+  const upcoming = (WCa.FIXTURES || []).filter(function(f) { return ['live', 'halfTime', 'done'].indexOf(f.status) < 0; });
   const [fixId, setFixId] = React.useState(upcoming.length ? upcoming[0].id : '');
   const [mtype, setMtype] = React.useState('winner');
   const [pts, setPts] = React.useState(5);

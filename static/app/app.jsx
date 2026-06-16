@@ -374,10 +374,28 @@ function App(){
   const [wide,setWide]=aState(wideNow);
   const [,tick]=aState(0);
   const [t,setTweak]=window.useTweaks(TW_DEFAULTS);
+  function refreshStore(){
+    if(!A_S.refresh) return null;
+    const p=A_S.refresh();
+    if(p&&p.catch) p.catch(()=>{});
+    return p;
+  }
 
   // re-render on any store change
   aEffect(()=>A_S.subscribe(()=>tick(x=>x+1)),[]);
-  aEffect(()=>{ A_S.refresh && A_S.refresh(); },[]);
+  aEffect(()=>{ refreshStore(); },[]);
+  aEffect(()=>{
+    if(!A_S.live || !A_S.refresh) return;
+    const refreshVisible=()=>{ if(!document.hidden) refreshStore(); };
+    const timer=setInterval(refreshVisible,45000);
+    document.addEventListener('visibilitychange', refreshVisible);
+    window.addEventListener('focus', refreshVisible);
+    return ()=>{
+      clearInterval(timer);
+      document.removeEventListener('visibilitychange', refreshVisible);
+      window.removeEventListener('focus', refreshVisible);
+    };
+  },[]);
 
   // chat unread badge — ChatScreen calls window.__wcOnChatPoll(msgs) after each poll
   aEffect(()=>{

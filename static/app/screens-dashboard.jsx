@@ -44,7 +44,23 @@ function resizeToDataUrl(file, size, cb) {
 }
 
 function dashTeam(code) { return WCd.TEAMS[code] || { code: code || '?', name: code || 'TBD', flag: '🏳️', rounds: 0, stage: 'group', odds: '0' }; }
+function dashFixtureStatus(m) {
+  return String((m && (m.fixture_status || m.fixtureStatus || m.status)) || '').toLowerCase();
+}
+function dashFixtureActive(m) {
+  return ['live', 'halftime', 'half_time', 'half-time', 'inplay', 'in_play', 'in-progress', 'inprogress', 'paused'].indexOf(dashFixtureStatus(m)) >= 0;
+}
+function dashFixtureFinished(m) {
+  return ['done', 'ft', 'fulltime', 'full_time', 'full-time', 'finished'].indexOf(dashFixtureStatus(m)) >= 0;
+}
+function dashDynamicKickedOff(m) {
+  return m && String(m.key || '').indexOf('dm_') === 0 && (dashFixtureActive(m) || dashFixtureFinished(m));
+}
+function dashCountableMarkets(me, markets) {
+  return (markets || []).filter(m => !dashDynamicKickedOff(m) || dashPickComplete(m, (me && me.picks) || {}));
+}
 function dashPredictionResolved(m) {
+  if (m && String(m.key || '').indexOf('dm_') === 0 && !dashFixtureFinished(m)) return false;
   if (m.kind === 'team2') return Array.isArray(m.answer) && m.answer.length > 0 && m.answer.every(function (x) { return x != null; });
   return m.answer != null;
 }
@@ -436,8 +452,9 @@ function PredCard(props) {
   const rank = meR ? meR.predRank : ranked.length;
   const submitted = Sd.madeVisiblePredictions ? Sd.madeVisiblePredictions(me) : (me.picks ? Object.keys(me.picks).length : 0);
   const markets = Sd.visiblePredictions ? Sd.visiblePredictions() : (WCd.predictions || Sd.PREDICTIONS);
-  const totalMkts = markets.length;
-  const openLeft = markets.filter(m => !dashPredictionResolved(m) && !dashPickComplete(m, me.picks || {})).length;
+  const countableMarkets = dashCountableMarkets(me, markets);
+  const totalMkts = countableMarkets.length;
+  const openLeft = countableMarkets.filter(m => !dashPredictionResolved(m) && !dashPickComplete(m, me.picks || {})).length;
   const locked = Sd.predictionsLocked ? Sd.predictionsLocked() : !!WCd.meta.predictionsLocked;
   const note = locked
     ? 'Locked in. Time to pretend you were confident all along.'
@@ -526,7 +543,8 @@ function ActivityFeed(props) {
   const items = [];
   if (pre) {
     const submitted = Sd.madeVisiblePredictions ? Sd.madeVisiblePredictions(me) : (me.picks ? Object.keys(me.picks).length : 0);
-    const totalMkts = Sd.visiblePredictions ? Sd.visiblePredictions().length : (WCd.predictions || Sd.PREDICTIONS).length;
+    const markets = Sd.visiblePredictions ? Sd.visiblePredictions() : (WCd.predictions || Sd.PREDICTIONS);
+    const totalMkts = dashCountableMarkets(me, markets).length;
     items.push({ m: 'confident', t: 'You drew ' + t.name + ' ' + t.flag, d: 'Group ' + t.group + '. Locked in. May the football gods be kind.', when: 'just now' });
     if (submitted < totalMkts) items.push({ m: 'mischievous', t: 'Predictions are open', d: (totalMkts - submitted) + ' still to call before kick-off. Get them in.', when: 'now' });
     else items.push({ m: 'happy', t: 'All predictions in', d: 'Every market called. Wheesht has them in writing.', when: 'now' });

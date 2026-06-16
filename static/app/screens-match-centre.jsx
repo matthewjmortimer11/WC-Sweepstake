@@ -52,6 +52,10 @@ function mcOwned() {
 /* ---- predictions: which of the user's picks ride on this match? ---------- */
 function mcResolved(m) {
   if (!m) return false;
+  if (String(m.key || '').indexOf('dm_') === 0) {
+    const st = String(m.fixture_status || m.fixtureStatus || m.status || '').toLowerCase();
+    if (['done', 'ft', 'fulltime', 'full_time', 'full-time', 'finished'].indexOf(st) < 0) return false;
+  }
   if (m.kind === 'team2') return Array.isArray(m.answer) && m.answer.length > 0 && m.answer.every(x => x != null);
   return m.answer != null;
 }
@@ -377,7 +381,10 @@ function MatchCentreScreen() {
   const hero = nextMine || heroPick;
 
   // filtered, dated list (live shown separately at top)
-  let list = all.filter(f => mcStatus(f) !== 'live');
+  let list = all.filter(f => {
+    const st = mcStatus(f);
+    return st !== 'live' && st !== 'halfTime';
+  });
   if (filter === 'mine' && mineTeam) list = list.filter(f => f.a === mineTeam || f.b === mineTeam);
   else if (filter === 'owned') list = list.filter(f => owned[f.a] || owned[f.b]);
   else if (filter === 'done') list = list.filter(f => mcStatus(f) === 'done');

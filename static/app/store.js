@@ -362,12 +362,24 @@
   }
 
   // ---- scoring ------------------------------------------------------------
+  function marketFixtureStatus(m) {
+    return String((m && (m.fixture_status || m.fixtureStatus || m.status)) || '').toLowerCase();
+  }
+  function marketFinished(m) {
+    return ['done', 'ft', 'fulltime', 'full_time', 'full-time', 'finished'].indexOf(marketFixtureStatus(m)) >= 0;
+  }
+  function marketResolved(m) {
+    if (!m) return false;
+    if (String(m.key || '').indexOf('dm_') === 0 && !marketFinished(m)) return false;
+    if (m.kind === 'team2') return Array.isArray(m.answer) && m.answer.length > 0 && m.answer.every(function (x) { return x != null; });
+    return m.answer != null;
+  }
   function predScoreOf(p) {
     if (!p) return 0;
     if (p.picks) {
       var s = 0;
       (WC.PREDICTIONS || []).forEach(function (m) {
-        if (m.answer == null) return;
+        if (!marketResolved(m)) return;
         var pts = Number(m.points) || 0;
         var pick = p.picks[m.key];
         if (pick == null) return;
@@ -606,7 +618,8 @@
     update: function (id, patch) {
       var idx = -1; mine.forEach(function (p, i) { if (p.id === id) idx = i; });
       if (idx < 0) return null;
-      mine[idx] = Object.assign({}, mine[idx], patch);
+      var current = Store.getSync(id) || mine[idx];
+      mine[idx] = Object.assign({}, current, patch);
       if (patch.name) mine[idx].initials = initials(patch.name);
       patchServerPerson(id, patch);
       lsSet(K.mine, mine); rebuild();

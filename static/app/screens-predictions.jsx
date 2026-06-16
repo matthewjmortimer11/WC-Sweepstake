@@ -10,6 +10,7 @@ const { Card: Cp, Btn: Bp, Flag: Fp, Avatar: Ap, Chip: Chp, WheeshtSays: Saysp, 
 const { useState: pState } = React;
 
 function isResolved(m) {
+  if (m && String(m.key || '').indexOf('dm_') === 0 && !fixtureFinished(m)) return false;
   if (m.kind === 'team2') return Array.isArray(m.answer) && m.answer.length > 0 && m.answer.every(function (x) { return x != null; });
   return m.answer != null;
 }
@@ -27,12 +28,15 @@ function fixtureStatus(m) {
   return String((m && (m.fixture_status || m.fixtureStatus || m.status)) || '').toLowerCase();
 }
 function fixtureKickedOff(m) {
-  const st = fixtureStatus(m);
-  return ['live', 'halftime', 'half_time', 'half-time', 'inplay', 'in_play', 'in-progress', 'inprogress', 'paused', 'done', 'ft', 'fulltime', 'full_time', 'full-time', 'finished'].indexOf(st) >= 0;
+  return fixtureActive(m) || fixtureFinished(m);
 }
 function fixtureActive(m) {
   const st = fixtureStatus(m);
   return ['live', 'halftime', 'half_time', 'half-time', 'inplay', 'in_play', 'in-progress', 'inprogress', 'paused'].indexOf(st) >= 0;
+}
+function fixtureFinished(m) {
+  const st = fixtureStatus(m);
+  return ['done', 'ft', 'fulltime', 'full_time', 'full-time', 'finished'].indexOf(st) >= 0;
 }
 
 function optLabel(m, opt) {
@@ -303,9 +307,10 @@ function PredictionsScreen(props) {
     return 0;                                        // static markets keep original order
   });
   const graded = markets.filter(m => isResolved(m));
-  const made = Sp.madeVisiblePredictions ? Sp.madeVisiblePredictions(me) : (me.picks ? Object.keys(me.picks).filter(k => me.picks[k] != null && (!Array.isArray(me.picks[k]) || me.picks[k].length)).length : 0);
   // dm_ markets that have kicked off can't be picked any more — exclude from missing
   const dmKickedOff = function(m){ return m.key.startsWith('dm_') && fixtureKickedOff(m); };
+  const countableMarkets = markets.filter(m => !dmKickedOff(m) || pickComplete(m, me.picks || {}));
+  const made = countableMarkets.filter(m => pickComplete(m, me.picks || {})).length;
   const missing = open.filter(m => !dmKickedOff(m) && !pickComplete(m, me.picks || {}));
   const allOpenMade = open.length > 0 && missing.length === 0;
   const nextMissing = missing[0];
@@ -322,7 +327,7 @@ function PredictionsScreen(props) {
         <div>
           <div className="dh" style={{ fontSize: 26 }}>Predictions</div>
           <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink2)' }}>
-            {made} of {markets.length} made · {missing.length ? missing.length + ' still to call' : 'all open calls in'} · {Sp.predScoreOf(me)} pts banked
+            {made} of {countableMarkets.length} made · {missing.length ? missing.length + ' still to call' : 'all open calls in'} · {Sp.predScoreOf(me)} pts banked
           </div>
         </div>
       </div>

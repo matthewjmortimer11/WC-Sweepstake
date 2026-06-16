@@ -65,8 +65,22 @@ function badgesFor(p) {
   const out = [];
   if (!p || !S) return out;
   if (p.isOrganiser) out.push({ icon: '🛡️', label: 'Organiser' });
-  const total = S.visiblePredictions ? S.visiblePredictions().length : 0;
-  const made = S.madeVisiblePredictions ? S.madeVisiblePredictions(p) : 0;
+  const complete = function(m) {
+    const v = p.picks && p.picks[m.key];
+    if (v == null) return false;
+    if (m.kind === 'team2') return Array.isArray(v) && v.length === 2;
+    if (m.kind === 'number') return v !== '' && isFinite(Number(v));
+    if (m.kind === 'scoreline') return typeof v === 'string' && /^\d+-\d+$/.test(v);
+    return true;
+  };
+  const unavailable = function(m) {
+    if (!m || String(m.key || '').indexOf('dm_') !== 0) return false;
+    const st = String(m.fixture_status || m.fixtureStatus || m.status || '').toLowerCase();
+    return ['live', 'halftime', 'half_time', 'half-time', 'inplay', 'in_play', 'in-progress', 'inprogress', 'paused', 'done', 'ft', 'fulltime', 'full_time', 'full-time', 'finished'].indexOf(st) >= 0 && !complete(m);
+  };
+  const markets = S.visiblePredictions ? S.visiblePredictions().filter(function(m) { return !unavailable(m); }) : [];
+  const total = markets.length;
+  const made = markets.filter(complete).length;
   if (total && made >= total) out.push({ icon: '🎯', label: 'Full card', tone: 'green' });
   const score = S.predScoreOf ? S.predScoreOf(p) : 0;
   if (score > 0) out.push({ icon: '✅', label: score + ' pts', tone: 'green' });

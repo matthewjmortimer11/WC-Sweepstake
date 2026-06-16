@@ -33,11 +33,34 @@ function cmpRec(a, b) {
 }
 function oddsVal(t) { const n = parseInt(String(t.odds || '0').replace(/[^0-9]/g, ''), 10); return isFinite(n) ? n : 999999; }
 function emptyRec(t) { return { code: t.code, team: t, P: 0, W: 0, D: 0, L: 0, GF: 0, GA: 0, Pts: 0 }; }
+function compKickoffMs(f) {
+  try {
+    const tm = (f && f.time && /^\d{2}:\d{2}/.test(f.time)) ? f.time.slice(0, 5) : '00:00';
+    const t = new Date(((f && f.dateISO) || '') + 'T' + tm + ':00').getTime();
+    return isFinite(t) ? t : null;
+  } catch (e) { return null; }
+}
+function compStatus(f) {
+  const raw = String((f && f.status) || 'upcoming');
+  const st = raw.toLowerCase();
+  if (['done', 'ft', 'fulltime', 'full_time', 'full-time', 'finished'].indexOf(st) >= 0) return 'done';
+  if (['halftime', 'half_time', 'half-time'].indexOf(st) >= 0) return 'halfTime';
+  if (['live', 'inplay', 'in_play', 'in-progress', 'inprogress', 'paused'].indexOf(st) >= 0) return 'live';
+  const ko = compKickoffMs(f);
+  if (ko == null) return raw;
+  const age = Date.now() - ko;
+  if (age < 0) return 'upcoming';
+  if (age <= 135 * 60 * 1000) return 'live';
+  return 'needsResult';
+}
+function compFixtureDone(f) { return compStatus(f) === 'done' && f.score && f.score[0] != null && f.score[1] != null; }
+function compFixturePlayable(f) { const st = compStatus(f); return st === 'upcoming' || st === 'live' || st === 'halfTime'; }
+function compFixtureSort(a, b) { return (compKickoffMs(a) || 0) - (compKickoffMs(b) || 0); }
 
 function tallyTable(teams, fixtures, byOddsIfEmpty) {
   const rec = {}; teams.forEach(t => rec[t.code] = emptyRec(t));
   fixtures.forEach(f => {
-    if (f.status !== 'done' || !f.score || f.score[0] == null || f.score[1] == null) return;
+    if (!compFixtureDone(f)) return;
     const A = rec[f.a], B = rec[f.b]; if (!A || !B) return;
     const ga = f.score[0], gb = f.score[1];
     A.P++; B.P++; A.GF += ga; A.GA += gb; B.GF += gb; B.GA += ga;
@@ -54,8 +77,8 @@ function tallyTable(teams, fixtures, byOddsIfEmpty) {
 
 function groupModel(groupId) {
   const teams = WCc.TEAM_LIST.filter(t => t.group === groupId);
-  const fixtures = (WCc.FIXTURES || []).filter(f => f.stage === 'group' && f.group === groupId);
-  const doneFx = fixtures.filter(f => f.status === 'done' && f.score && f.score[0] != null && f.score[1] != null);
+  const fixtures = (WCc.FIXTURES || []).filter(f => f.stage === 'group' && f.group === groupId).slice().sort(compFixtureSort);
+  const doneFx = fixtures.filter(compFixtureDone);
   const ranked = tallyTable(teams, fixtures, true);
   // Previous standings (exclude the latest finished matchday) → recent movement.
   let latestMd = 0; doneFx.forEach(f => { if ((f.matchday || 0) > latestMd) latestMd = f.matchday || 0; });
@@ -156,11 +179,16 @@ function MyGroupDashboard(props) {
   const leader = G.ranked[0];
   const showMove = G.hasResults && G.latestMd > 1;
 
-  const myFix = G.fixtures.filter(f => f.a === t.code || f.b === t.code);
-  const gamesLeft = myFix.filter(f => f.status !== 'done').length;
-  const nextFix = myFix.find(f => f.status !== 'done');
-  const nextOpp = nextFix ? WCc.TEAMS[nextFix.a === t.code ? nextFix.b : nextFix.a] : null;
+  const myFix = G.fixtures.filter(f => f.a === t.code || f.b === t.code).slice().sort(compFixtureSort);
+  const futureFix = myFix.filter(compFixturePlayable);
+  const gamesLeft = futureFix.length;
   const status = qualStatus(t, G, mePos, gamesLeft);
+  const nextFix = futureFix[0];
+  const nextStatus = nextFix ? compStatus(nextFix) : '';
+  const nextLabel = nextStatus === 'live' ? 'LIVE NOW' : nextStatus === 'halfTime' ? 'HALF-TIME' : (status.mustWin ? 'MUST-WIN GAME' : 'YOUR NEXT GROUP GAME');
+  const nextOpp = nextFix ? WCc.TEAMS[nextFix.a === t.code ? nextFix.b : nextFix.a] : null;
+  const staleFix = myFix.find(f => compStatus(f) === 'needsResult');
+  const staleOpp = staleFix ? WCc.TEAMS[staleFix.a === t.code ? staleFix.b : staleFix.a] : null;
 
   // movers within the group (only meaningful once a 2nd matchday exists)
   let biggestMover = null, biggestFaller = null;
@@ -235,9 +263,24 @@ function MyGroupDashboard(props) {
             <span className={status.mustWin ? 'flame' : ''} style={{ fontSize: 30 }}>{status.mustWin ? '🔥' : '⚽'}</span>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '.06em' }}>
-                {status.mustWin ? 'MUST-WIN GAME' : 'YOUR NEXT GROUP GAME'} · {nextFix.dateLabel} · {nextFix.time}
+                {nextLabel} · {nextFix.dateLabel} · {nextFix.time}
               </div>
               <div className="dh" style={{ fontSize: 19, marginTop: 2, lineHeight: 1 }}>{t.name} <span style={{ opacity: .55 }}>v</span> {nextOpp.name} {nextOpp.flag}</div>
+            </div>
+          </div>
+        </Cc>
+      )}
+
+      {!nextFix && staleFix && staleOpp && t.alive && (
+        <Cc bordered style={{ marginTop: 12, background: 'var(--yellow)', color: 'var(--ink)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
+            <span style={{ fontSize: 30 }}>⏱</span>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '.06em' }}>
+                RESULT NEEDED · {staleFix.dateLabel} · {staleFix.time}
+              </div>
+              <div className="dh" style={{ fontSize: 19, marginTop: 2, lineHeight: 1 }}>{t.name} <span style={{ opacity: .55 }}>v</span> {staleOpp.name} {staleOpp.flag}</div>
+              <div style={{ fontSize: 11, fontWeight: 700, marginTop: 4 }}>Once the score is entered, the table and rivals will update.</div>
             </div>
           </div>
         </Cc>
