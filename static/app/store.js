@@ -906,14 +906,18 @@
       if (!LIVE) return Promise.resolve();
       var c = leagueCode();
       if (!c) return Promise.resolve();
-      return fetch('/api/leagues/' + encodeURIComponent(c) + '/state').then(function (r) { return r.json(); }).then(function (d) {
-        if (d && d.people) {
+      return fetch('/api/leagues/' + encodeURIComponent(c) + '/state', { cache: 'no-store' }).then(parseJson).then(function (d) {
+        if (d && Array.isArray(d.people)) {
           window.WC_DATA = d;
           if (d.adminOverrides) admin = d.adminOverrides;
           if (window.__rebuildWC) window.__rebuildWC();
           rebuild(); emit();
         }
-      }).catch(function () {});
+        return d;
+      }).catch(function (e) {
+        try { console.warn('Wheesht state refresh failed', e); } catch (_) {}
+        return null;
+      });
     },
 
     // ===== DEV CONSOLE (hidden cross-league admin) =====

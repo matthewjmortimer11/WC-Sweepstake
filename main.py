@@ -477,7 +477,7 @@ def _resolve(league_people: List[Dict[str, Any]], admin: Dict[str, Any]):
                       "kind": "team", "points": dm_points,
                       "options": [f["a"], f["b"], "draw"], "answer": None,
                       "fixture_id": fixture_id, "fixture_status": fix_status}
-            if fix_status == "done" and f.get("score"):
+            if _status_is_done(fix_status) and f.get("score"):
                 sc = f["score"]
                 if sc[0] > sc[1]:   market["answer"] = f["a"]
                 elif sc[1] > sc[0]: market["answer"] = f["b"]
@@ -487,7 +487,7 @@ def _resolve(league_people: List[Dict[str, Any]], admin: Dict[str, Any]):
                       "kind": "scoreline", "points": dm_points,
                       "options": [f["a"], f["b"]], "answer": None,
                       "fixture_id": fixture_id, "fixture_status": fix_status}
-            if fix_status == "done" and f.get("score"):
+            if _status_is_done(fix_status) and f.get("score"):
                 sc = f["score"]
                 market["answer"] = str(sc[0]) + "-" + str(sc[1])
         predictions.append(market)
@@ -554,6 +554,12 @@ def _league_state(league: League, league_people: List[Dict[str, Any]], admin: Di
     data["meta"] = meta
     data["pot"] = len(people) * fee
     return data
+
+
+def _status_is_done(status: Any) -> bool:
+    return str(status or "").strip().lower() in {
+        "done", "ft", "fulltime", "full_time", "full-time", "finished",
+    }
 
 
 def _base_state() -> Dict[str, Any]:
@@ -1596,10 +1602,10 @@ async def google_login(code: str, payload: GoogleLoginPayload):
 # ── Admin overrides (league-scoped) ───────────────────────────────────────────
 
 class AdminPayload(BaseModel):
-    teams: Dict[str, Any] = {}
-    fixtures: Dict[str, Any] = {}
-    predictions: Dict[str, Any] = {}
-    meta: Dict[str, Any] = {}
+    teams: Dict[str, Any] = Field(default_factory=dict)
+    fixtures: Dict[str, Any] = Field(default_factory=dict)
+    predictions: Dict[str, Any] = Field(default_factory=dict)
+    meta: Dict[str, Any] = Field(default_factory=dict)
 
 
 @app.put("/api/leagues/{code}/admin")

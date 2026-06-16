@@ -139,7 +139,7 @@ function mcTally(teams, fixtures) {
 function mcImpact(f) {
   const st = f.stage || 'group';
   if (st !== 'group') {
-    if (f.status === 'done' && f.score) {
+    if (mcStatus(f) === 'done' && f.score) {
       const w = f.score[0] > f.score[1] ? f.a : f.score[1] > f.score[0] ? f.b : null;
       if (w) return { type: 'ko', text: mcName(w) + ' advance · ' + mcName(w === f.a ? f.b : f.a) + ' are out' };
     }
@@ -148,7 +148,7 @@ function mcImpact(f) {
   if (!f.score || f.score[0] == null || f.score[1] == null) return null;
   const teams = WCmc.TEAM_LIST.filter(t => t.group === f.group);
   const groupFx = (WCmc.FIXTURES || []).filter(x => x.stage === 'group' && x.group === f.group);
-  const doneOther = groupFx.filter(x => x.id !== f.id && x.status === 'done' && x.score && x.score[0] != null);
+  const doneOther = groupFx.filter(x => x.id !== f.id && mcStatus(x) === 'done' && x.score && x.score[0] != null);
   const before = mcTally(teams, doneOther);
   const after = mcTally(teams, doneOther.concat([{ a: f.a, b: f.b, score: f.score }]));
   const pb = {}, pa = {}; before.forEach(r => pb[r.code] = r.pos); after.forEach(r => pa[r.code] = r.pos);

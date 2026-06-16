@@ -20,7 +20,11 @@ function ownedSet() {
   return set;
 }
 function statusOf(f) {
-  return f.status || 'upcoming';
+  const raw = String((f && f.status) || 'upcoming').toLowerCase();
+  if (['done', 'ft', 'fulltime', 'full_time', 'full-time', 'finished'].indexOf(raw) >= 0) return 'done';
+  if (['halftime', 'half_time', 'half-time', 'paused'].indexOf(raw) >= 0) return 'halfTime';
+  if (['live', 'inplay', 'in_play', 'in-progress', 'inprogress'].indexOf(raw) >= 0) return 'live';
+  return raw || 'upcoming';
 }
 
 function TeamLine(props) {
@@ -105,7 +109,8 @@ function GamesScreen() {
   if (filter === 'mine' && mineTeam) list = all.filter(f => f.a === mineTeam || f.b === mineTeam);
   else if (filter === 'owned') list = all.filter(f => owned[f.a] || owned[f.b]);
 
-  // next upcoming overall, and your team's next
+  // next playable overall, and your team's next. Half-time/live matches stay
+  // visible here; only finished fixtures drop out.
   const upcoming = all.filter(f => statusOf(f) !== 'done');
   const nextOverall = upcoming[0];
   const nextMine = mineTeam ? upcoming.find(f => f.a === mineTeam || f.b === mineTeam) : null;

@@ -30,6 +30,11 @@ window.__wheeshtEgg2 = function(){
   try{ window.wcToast && window.wcToast(EGG2_LINES[(Math.random()*EGG2_LINES.length)|0], 'confident'); }catch(e){}
 };
 
+function appFixtureDone(f){
+  const st=String((f&&f.status)||'').toLowerCase();
+  return ['done','ft','fulltime','full_time','full-time','finished'].indexOf(st)>=0;
+}
+
 /* ---- tab icons ---- */
 function Icon(props){
   const sw=2.4;
@@ -530,10 +535,10 @@ function App(){
   aEffect(()=>{
     if(flow!=='app'||!me||!me.team) return;
     const myCode=me.team;
-    const seen=new Set((A_WC.FIXTURES||[]).filter(function(f){ return f.status==='done'; }).map(function(f){ return f.id; }));
+    const seen=new Set((A_WC.FIXTURES||[]).filter(appFixtureDone).map(function(f){ return f.id; }));
     const unsub=A_S.subscribe(function(){
       const newDone=(A_WC.FIXTURES||[]).filter(function(f){
-        return f.status==='done' && !seen.has(f.id) && (f.a===myCode||f.b===myCode);
+        return appFixtureDone(f) && !seen.has(f.id) && (f.a===myCode||f.b===myCode);
       });
       newDone.forEach(function(f){
         seen.add(f.id);

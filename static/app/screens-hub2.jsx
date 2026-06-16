@@ -130,7 +130,8 @@ function SideBetsScreen(props){
 function vPeople(){ return window.Store ? window.Store.allSync() : (WC2.PEOPLE || []); }
 function vTeam(code){ return WC2.TEAMS[code] || { code: code || '?', name: code || 'TBD', flag: '🏳️', group: '?', odds: '0', alive: true, rounds: 0 }; }
 function vOwners(code){ return vPeople().filter(function(p){ return p.team === code; }); }
-function vDoneFixtures(){ return (WC2.FIXTURES || []).filter(function(f){ return f.status === 'done' && f.score; }); }
+function vFixtureDone(f){ var st = String((f && f.status) || '').toLowerCase(); return ['done','ft','fulltime','full_time','full-time','finished'].indexOf(st) >= 0; }
+function vDoneFixtures(){ return (WC2.FIXTURES || []).filter(function(f){ return vFixtureDone(f) && f.score; }); }
 function vAnswer(key){ const m = (WC2.PREDICTIONS || []).find(function(x){ return x.key === key; }); return m ? m.answer : null; }
 function vEliminated(){ return WC2.TEAM_LIST.filter(function(t){ return !t.alive; }); }
 function vPot(){ return window.Store ? window.Store.pot() : WC2.POT * 0.5; }

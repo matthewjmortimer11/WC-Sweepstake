@@ -17,6 +17,10 @@ const { useState: wiState } = React;
 function wiTeam(code) {
   return WCwi.TEAMS[code] || { code: code || 'TBD', name: code || 'TBD', flag: '🏳️', group: '?' };
 }
+function wiDone(f) {
+  const st = String((f && f.status) || '').toLowerCase();
+  return ['done', 'ft', 'fulltime', 'full_time', 'full-time', 'finished'].indexOf(st) >= 0;
+}
 
 function wiTally(teams, fixtures) {
   const rec = {};
@@ -43,7 +47,7 @@ function wiGroupImpact(f, hypoScore) {
   const teams = (WCwi.TEAM_LIST || []).filter(t => t.group === f.group);
   if (!teams.length) return null;
   const allFx = (WCwi.FIXTURES || []).filter(x => x.stage === 'group' && x.group === f.group);
-  const otherDone = allFx.filter(x => x.id !== f.id && x.status === 'done' && x.score && x.score[0] != null);
+  const otherDone = allFx.filter(x => x.id !== f.id && wiDone(x) && x.score && x.score[0] != null);
   const before = wiTally(teams, otherDone);
   const after = wiTally(teams, otherDone.concat([{ a: f.a, b: f.b, score: hypoScore }]));
   const beforeMap = {};
