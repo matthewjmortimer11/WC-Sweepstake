@@ -264,6 +264,24 @@
     if (lp.hasGoogleLink != null) out.hasGoogleLink = lp.hasGoogleLink;
     return out;
   }
+  function patchServerPerson(id, patch) {
+    if (!id || !patch || !WC.PEOPLE) return;
+    WC.PEOPLE = WC.PEOPLE.map(function (p) {
+      if (p.id !== id) return p;
+      var next = Object.assign({}, p, patch);
+      if (patch.name) next.initials = initials(patch.name);
+      return next;
+    });
+  }
+  function mergeLocalWithServer(local, server) {
+    if (!server) return local;
+    // A claimed seeded entry is copied into localStorage. On another device that
+    // local copy can become stale, so the server row must win for synced fields
+    // such as picks/customFields while the device still keeps its account link.
+    return Object.assign({}, local, server, {
+      leagueCode: local.leagueCode || server.leagueCode,
+    });
+  }
 
   // ---- Google Identity Services ------------------------------------------
   // A single credential callback, replaced before each GIS interaction so
@@ -302,13 +320,15 @@
         seededNames[(p.name || '').trim().toLowerCase()] = 1;
       });
     }
+    var serverById = {};
+    (WC.PEOPLE || []).forEach(function (p) { serverById[p.id] = p; });
     cache = [];
     // device-created entries: only those for the active league (or untagged)
     mine.forEach(function (p) {
       if (seen[p.id] || removed.indexOf(p.id) >= 0) return;
       if (code && p.leagueCode && p.leagueCode !== code) return;
       if (seededNames[(p.name || '').trim().toLowerCase()] && !seededIds[p.id]) return;
-      seen[p.id] = 1; cache.push(overlayProfile(liveStatus(p)));
+      seen[p.id] = 1; cache.push(overlayProfile(liveStatus(mergeLocalWithServer(p, serverById[p.id]))));
     });
     // server/seed people are already league-scoped by the backend
     (WC.PEOPLE || []).forEach(function (p) {
@@ -588,6 +608,7 @@
       if (idx < 0) return null;
       mine[idx] = Object.assign({}, mine[idx], patch);
       if (patch.name) mine[idx].initials = initials(patch.name);
+      patchServerPerson(id, patch);
       lsSet(K.mine, mine); rebuild();
       if (LIVE && leagueCode()) {
         try {
@@ -636,6 +657,8 @@
       if (inMine) { this.update(id, { picks: picks }); }
       else if (LIVE && leagueCode()) {
         // seeded roster entry not yet in `mine` — persist the pick directly
+        patchServerPerson(id, { picks: picks });
+        rebuild();
         try {
           fetch(api('/participants/' + id + '/picks'), { method: 'PUT', headers: acctHeaders(id), body: JSON.stringify({ key: key, value: value }) })
             .then(parseJson)
