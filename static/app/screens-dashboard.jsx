@@ -67,7 +67,7 @@ function overallRank(me) {
 }
 
 function ProfileHeader(props) {
-  const me = props.me;
+  const me = (props.me && Sd.getSync && Sd.getSync(props.me.id)) || props.me;
   const includeDept = Sd.includeDepartment ? Sd.includeDepartment() : true;
   const includeLocation = Sd.includeLocation ? Sd.includeLocation() : true;
   const includeLtMember = Sd.includeLtMember ? Sd.includeLtMember() : true;
@@ -78,13 +78,20 @@ function ProfileHeader(props) {
   if (includeLocation && me.location) chips.push({ text: me.location });
   if (includeDept && me.department) chips.push({ text: me.department });
   if (includeLtMember && me.ltMember) chips.push({ text: 'LT', tone: 'yellow' });
+  const shownCustomKeys = {};
   customDefs.forEach(f => {
+    shownCustomKeys[f.key] = true;
     const raw = me.customFields && me.customFields[f.key];
     if (f.type === 'tags') {
       (Array.isArray(raw) ? raw : []).forEach(tag => chips.push({ text: tag, tone: 'yellow' }));
     } else if (raw != null && String(raw).trim()) {
       chips.push({ text: f.label + ': ' + String(raw).trim() });
     }
+  });
+  Object.keys(me.customFields || {}).forEach(key => {
+    if (shownCustomKeys[key]) return;
+    const raw = me.customFields[key];
+    if (Array.isArray(raw)) raw.forEach(tag => chips.push({ text: tag, tone: 'yellow' }));
   });
   const shownChips = chips.slice(0, 10);
   if (chips.length > shownChips.length) shownChips.push({ text: '+' + (chips.length - shownChips.length) });

@@ -27,7 +27,7 @@ function ChatScreen() {
   const listRef = cRef(null);
   const isLive = !!window.WC_LIVE;
   const leagueCode = Sch.leagueCode && Sch.leagueCode();
-  const isOrganiser = Sch.hasAdminToken && Sch.hasAdminToken();
+  const isOrganiser = Sch.hasAdminTokenForActive ? Sch.hasAdminTokenForActive() : false;
 
   function scrollBottom() {
     setTimeout(function() {
@@ -64,9 +64,14 @@ function ChatScreen() {
 
   cEffect(function() { scrollBottom(); }, [msgs.length]);
 
+  cEffect(function() {
+    if (asWheesht && !isOrganiser) setAsWheesht(false);
+  }, [asWheesht, isOrganiser]);
+
   function send() {
     if (!text.trim() || busy || !leagueCode) return;
     if (!asWheesht && !me) return;
+    if (asWheesht && !isOrganiser) return;
     setBusy(true);
     var url = asWheesht ? Sch.api('/chat/system') : Sch.api('/chat');
     var body = asWheesht
@@ -227,7 +232,7 @@ function ChatScreen() {
           )}
           {!me && !asWheesht && (
             <div style={{ padding: '10px 16px 12px', textAlign: 'center', fontSize: 13, color: asWheesht ? 'rgba(255,255,255,.5)' : 'var(--ink2)', fontWeight: 600 }}>
-              Pick who you are to join the chat — or send as Wheesht above.
+              Pick who you are to join the chat.
             </div>
           )}
         </div>

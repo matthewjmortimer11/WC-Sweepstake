@@ -22,6 +22,7 @@
     admin: 'wheesht_admin_v1', removed: 'wheesht_removed_v1',
     league: 'wheesht_league_v1', leagues: 'wheesht_leagues_v1',
     adminTokens: 'wheesht_admin_tokens_v1',
+    adminOwners: 'wheesht_admin_owners_v1',
     profiles: 'wheesht_profiles_v1',
     acctTokens: 'wheesht_acct_tokens_v1',
   };
@@ -72,6 +73,13 @@
     var tokens = ssGet(K.adminTokens, {});
     tokens[code] = token;
     ssSet(K.adminTokens, tokens);
+    var owners = ssGet(K.adminOwners, {});
+    owners[code] = lsGet(K.active, null) || '';
+    ssSet(K.adminOwners, owners);
+  }
+  function adminTokenOwner(code) {
+    var owners = ssGet(K.adminOwners, {});
+    return owners[code || leagueCode()] || '';
   }
   function adminHeaders(extra) {
     var h = Object.assign({ 'Content-Type': 'application/json' }, extra || {});
@@ -401,6 +409,12 @@
     api: api,
     adminHeaders: adminHeaders,
     hasAdminToken: function () { return !!adminToken(); },
+    hasAdminTokenForActive: function () {
+      var token = adminToken();
+      var owner = adminTokenOwner();
+      var active = lsGet(K.active, null);
+      return !!(token && owner && active && owner === active);
+    },
     setAdminToken: setAdminToken,
     verifyAdminCode: function (code) {
       if (!LIVE) return Promise.resolve({ ok: true });
