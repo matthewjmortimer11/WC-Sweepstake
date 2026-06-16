@@ -128,7 +128,9 @@ function AppBar(props){
     return ()=> sc.removeEventListener('scroll', onScroll);
   },[]);
   // Secret gesture: tap the mascot 7 times within ~2.5s to open the dev console.
+  // Disabled when the server reports no dev key is configured (WC_DEV_ENABLED).
   function secretTap(){
+    if(window.WC_DEV_ENABLED === false) return;
     const now = Date.now();
     taps.current.n = (now - taps.current.t < 2500) ? taps.current.n + 1 : 1;
     taps.current.t = now;
@@ -192,6 +194,7 @@ function AccountSheet(props){
     });
   }
   const chrome = window.wcSheetChrome(70);
+  const isOrganiser = A_S.hasAdminTokenForActive ? A_S.hasAdminTokenForActive() : false;
   return <div style={chrome.wrap}>
     <div onClick={props.onClose} style={chrome.backdrop}/>
     <div className={chrome.cls} style={chrome.sheet}>
@@ -221,7 +224,7 @@ function AccountSheet(props){
       <button onClick={props.onSwitch} className="wc-btn wc-btn--sm wc-btn--block" style={{marginTop:9,boxShadow:'0 4px 0 var(--shadow)'}}>Join / switch league →</button>
       <button onClick={props.onAdmin} style={{width:'100%',marginTop:11,border:'none',background:'none',cursor:'pointer',fontSize:12.5,fontWeight:800,color:'var(--ink2)',padding:'6px 0',display:'flex',alignItems:'center',justifyContent:'center',gap:6}}>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><circle cx="12" cy="12" r="3.2"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1"/></svg>
-        Organiser tools
+        {isOrganiser ? 'Organiser tools' : "I'm the organiser"}
       </button>
     </div>
   </div>;
@@ -331,6 +334,7 @@ function DeckRail(props){
   const me = props.me;
   const taps = React.useRef({n:0,t:0});
   function secret(){
+    if(window.WC_DEV_ENABLED === false) return;
     const now=Date.now();
     taps.current.n=(now-taps.current.t<2500)?taps.current.n+1:1; taps.current.t=now;
     if(taps.current.n>=7){ taps.current.n=0; props.onDev&&props.onDev(); }
@@ -367,10 +371,10 @@ function DeckRail(props){
           <span className="sub">Switch account</span>
         </span>
       </button>}
-      <button className="deck-cog" onClick={props.onAdmin}>
+      {(A_S.hasAdminTokenForActive && A_S.hasAdminTokenForActive()) && <button className="deck-cog" onClick={props.onAdmin}>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><circle cx="12" cy="12" r="3.2"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1"/></svg>
         <span>Organiser tools</span>
-      </button>
+      </button>}
     </div>
   </nav>;
 }
@@ -787,11 +791,13 @@ function App(){
       <window.TweakSlider label="Celebration" value={t.celebration} min={0} max={10} step={1} onChange={v=>setTweak('celebration',v)}/>
       <window.TweakToggle label="Wheesht's Scottish bias" value={t.bias} onChange={v=>setTweak('bias',v)}/>
       <window.TweakToggle label="Match-programme texture" value={t.texture} onChange={v=>setTweak('texture',v)}/>
-      <window.TweakSection label="Admin"/>
-      <div style={{padding:'4px 14px 8px'}}>
-        <button onClick={()=>setAdmin(true)} style={{width:'100%',border:'none',borderRadius:11,background:'var(--ink)',color:'#fff',fontFamily:'var(--disp)',fontWeight:800,fontSize:13.5,padding:'12px',cursor:'pointer',boxShadow:'0 4px 0 #000'}}>Open Wheesht's clipboard →</button>
-        <div style={{fontSize:11,fontWeight:600,color:'var(--ink2)',marginTop:6,lineHeight:1.35}}>Set results, knock teams out, grade predictions.</div>
-      </div>
+      {(A_S.hasAdminTokenForActive && A_S.hasAdminTokenForActive()) && <React.Fragment>
+        <window.TweakSection label="Admin"/>
+        <div style={{padding:'4px 14px 8px'}}>
+          <button onClick={()=>setAdmin(true)} style={{width:'100%',border:'none',borderRadius:11,background:'var(--ink)',color:'#fff',fontFamily:'var(--disp)',fontWeight:800,fontSize:13.5,padding:'12px',cursor:'pointer',boxShadow:'0 4px 0 #000'}}>Open Wheesht's clipboard →</button>
+          <div style={{fontSize:11,fontWeight:600,color:'var(--ink2)',marginTop:6,lineHeight:1.35}}>Set results, knock teams out, grade predictions.</div>
+        </div>
+      </React.Fragment>}
       <window.TweakToggle label="Lock predictions" value={t.locked} onChange={v=>setTweak('locked',v)}/>
       <window.TweakColor label="Alert accent" value={t.accent} options={['#E8272A','#9E1B32','#E07A1A']} onChange={v=>setTweak('accent',v)}/>
       <div style={{padding:'10px 14px'}}>

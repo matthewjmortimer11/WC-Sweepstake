@@ -582,10 +582,98 @@ function MatchPredAdmin() {
   );
 }
 
+function AdminBackupCard() {
+   const league = WCa.league || {};
+   const [busy, setBusy] = aState2(false);
+   function download() {
+     if (busy || !Sa.exportLeague) return;
+     setBusy(true);
+     Promise.resolve(Sa.exportLeague()).then(function(data) {
+       const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+       const url = URL.createObjectURL(blob);
+       const a = document.createElement('a');
+       const stamp = new Date().toISOString().slice(0, 10);
+       a.href = url;
+       a.download = 'wheesht-' + String(league.code || 'league').toLowerCase() + '-' + stamp + '.json';
+       document.body.appendChild(a); a.click(); document.body.removeChild(a);
+       URL.revokeObjectURL(url);
+       setBusy(false);
+       if (window.wcToast) window.wcToast('Backup downloaded.', 'confident');
+     }).catch(function(e) {
+       setBusy(false);
+       if (window.wcToast) window.wcToast((e && e.message) || 'Export failed', 'crying');
+     });
+   }
+   return (
+     <Ca flat style={{ marginBottom: 12 }}>
+       <div className="dh" style={{ fontSize: 17, marginBottom: 6 }}>Backups</div>
+       <div style={{ fontSize: 12.5, fontWeight: 650, color: 'var(--ink2)', lineHeight: 1.4, marginBottom: 8 }}>
+         Download a full snapshot — entries, picks, predictions, chat and results — before any risky change. No passwords are included.
+       </div>
+       <button onClick={download} disabled={busy} className="wc-btn wc-btn--sm wc-btn--ink" style={{ width: '100%' }}>{busy ? 'Preparing…' : 'Download backup (JSON)'}</button>
+     </Ca>
+   );
+}
+
+function AdminDangerZone() {
+   const league = WCa.league || {};
+   const [open, setOpen] = aState2(false);
+   const [code, setCode] = aState2('');
+   const [name, setName] = aState2('');
+   const [busy, setBusy] = aState2(false);
+   const [err, setErr] = aState2('');
+   // The seeded flagship league is never deletable from the organiser tools.
+   if (!league.code || league.seeded) return null;
+   const ready = code.trim().toUpperCase() === String(league.code).toUpperCase()
+     && name.trim() === String(league.name || '');
+   const inputStyle = { width: '100%', border: '2px solid var(--ink)', borderRadius: 10, padding: '9px 11px', fontFamily: 'var(--body)', fontWeight: 800, fontSize: 14, outline: 'none', background: '#fff', marginTop: 7 };
+   function go() {
+     if (!ready || busy) return;
+     setBusy(true); setErr('');
+     Promise.resolve(Sa.deleteLeague(code.trim(), name.trim())).then(function() {
+       if (window.wcToast) window.wcToast('League deleted.', 'neutral');
+       // The active league is cleared in the store; reload boots back to the gate.
+       setTimeout(function() { window.location.reload(); }, 400);
+     }).catch(function(e) {
+       setBusy(false);
+       setErr((e && e.message) || 'Could not delete league');
+     });
+   }
+   return (
+     <Ca bordered style={{ borderColor: 'var(--red)', marginTop: 12 }}>
+       <div className="dh" style={{ fontSize: 17, marginBottom: 6, color: 'var(--red)' }}>Danger zone</div>
+       <div style={{ fontSize: 12.5, fontWeight: 650, color: 'var(--ink2)', lineHeight: 1.4 }}>
+         Permanently delete <strong>{league.name}</strong> — every entry, pick, prediction, chat message and result. This cannot be undone.
+       </div>
+       {!open
+         ? <button onClick={function() { setOpen(true); }} style={{ marginTop: 10, width: '100%', border: '2px solid var(--red)', borderRadius: 11, background: '#fff', color: 'var(--red)', fontFamily: 'var(--disp)', fontWeight: 800, fontSize: 13.5, padding: '10px', cursor: 'pointer' }}>Delete this league…</button>
+         : <div style={{ marginTop: 8 }}>
+             <div style={{ fontSize: 11.5, fontWeight: 800, color: 'var(--ink2)' }}>Type the league code (<strong>{league.code}</strong>) to confirm</div>
+             <input value={code} onChange={function(e) { setCode(e.target.value); }} placeholder={league.code} style={inputStyle} />
+             <div style={{ fontSize: 11.5, fontWeight: 800, color: 'var(--ink2)', marginTop: 9 }}>Type the league name exactly to confirm</div>
+             <input value={name} onChange={function(e) { setName(e.target.value); }} placeholder={league.name} style={inputStyle} />
+             <div style={{ display: 'flex', gap: 8, marginTop: 11 }}>
+               <button onClick={function() { setOpen(false); setCode(''); setName(''); setErr(''); }} style={{ flex: 1, border: '2px solid var(--ink)', borderRadius: 11, background: '#fff', fontFamily: 'var(--disp)', fontWeight: 800, fontSize: 13, padding: '10px', cursor: 'pointer' }}>Cancel</button>
+               <button onClick={go} disabled={!ready || busy} style={{ flex: 1, border: 'none', borderRadius: 11, background: ready && !busy ? 'var(--red)' : 'var(--line)', color: '#fff', fontFamily: 'var(--disp)', fontWeight: 800, fontSize: 13, padding: '10px', cursor: ready && !busy ? 'pointer' : 'not-allowed' }}>{busy ? 'Deleting…' : 'Delete forever'}</button>
+             </div>
+           </div>}
+       {err && <div style={{ color: 'var(--red)', fontSize: 12, fontWeight: 800, marginTop: 8 }}>{err}</div>}
+     </Ca>
+   );
+}
+
 function AdminHealth() {
    const health = Sa.fixtureHealth ? Sa.fixtureHealth() : {};
    const lastRefresh = Sa.lastRefreshAt ? Sa.lastRefreshAt() : 0;
-   const audit = Sa.adminAudit ? Sa.adminAudit() : [];
+   const [audit, setAudit] = aState2(Sa.adminAudit ? Sa.adminAudit() : []);
+   React.useEffect(function() {
+     if (!Sa.fetchAudit) return;
+     var live = true;
+     Promise.resolve(Sa.fetchAudit()).then(function(events) {
+       if (live && Array.isArray(events)) setAudit(events);
+     });
+     return function() { live = false; };
+   }, []);
    const fixtures = WCa.FIXTURES || [];
    const total = fixtures.length;
    const live = Number(health.liveFixtures || 0);
@@ -609,6 +697,12 @@ function AdminHealth() {
        prediction_removed: 'Prediction removed',
        wheesht_message: 'Wheesht message sent',
        chat_deleted: 'Chat message deleted',
+       participant_removed: 'Entrant removed',
+       password_reset: 'Password reset by organiser',
+       password_cleared: 'Password cleared by organiser',
+       admin_auth: 'Organiser signed in',
+       admin_auth_failed: 'Failed organiser sign-in',
+       league_deleted: 'League deleted',
      };
      return map[a.action] || a.action || 'Change';
    }
@@ -648,11 +742,12 @@ function AdminHealth() {
            'Sensitive code/password attempts are rate-limited server-side.',
          ].map(function(txt) {
            return <div key={txt} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', padding: '5px 0', fontSize: 12.5, fontWeight: 700, color: 'var(--ink2)', lineHeight: 1.32 }}>
-             <span style={{ color: 'var(--green)', fontWeight: 900 }}>✓</span><span>{txt}</span>
-           </div>;
-         })}
-       </Ca>
-       <SHa>Recent organiser activity</SHa>
+            <span style={{ color: 'var(--green)', fontWeight: 900 }}>✓</span><span>{txt}</span>
+          </div>;
+        })}
+      </Ca>
+      <AdminBackupCard />
+      <SHa>Recent organiser activity</SHa>
        {audit.length
          ? <Ca flat style={{ padding: '2px 13px' }}>
              {audit.slice(0, 12).map(function(a, i) {
@@ -670,6 +765,7 @@ function AdminHealth() {
              <div className="dh" style={{ fontSize: 15, marginTop: 5 }}>No organiser activity logged yet.</div>
              <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--ink2)', marginTop: 3 }}>New saves, match predictions and moderation actions will appear here.</div>
            </Ca>}
+       <AdminDangerZone />
      </>
    );
 }

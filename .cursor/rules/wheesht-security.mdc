@@ -1,0 +1,35 @@
+---
+description: Wheesht security invariants — keep these holes closed across all changes
+alwaysApply: true
+---
+
+# Wheesht Security Invariants
+
+These must hold for every change to the backend (`main.py`, `models.py`) and the
+client store/screens. Breaking one is a regression — add or update a test in
+`tests/test_security.py` when touching the related area.
+
+## Data isolation
+- Every league-scoped query MUST filter by `league_id`. Never return another
+  league's participants, chat, profiles, overrides or audit rows.
+
+## Secrets
+- Never return password or organiser hashes in any API response. Entries expose
+  only a `hasPassword` boolean; Google identities expose only `hasGoogleLink`.
+- Store secrets as PBKDF2 hashes (`_hash_password`). No plaintext comparisons.
+
+## Authorisation
+- All organiser writes go through `await _require_admin(session, league, token)`.
+- Chat posts require proof of the author id: a session (`s1.`), account (`a1.`)
+  or admin token — see `_chat_author_ok`. Never trust `author_id` alone.
+- Protected-entry writes go through `_guard_account_write`.
+
+## New endpoints
+- Mutations that change a league must rate-limit (`_rate_limit`) and write a
+  durable audit row (`_log_audit`) where an organiser action occurred.
+- Destructive actions require explicit confirmation (exact code + name).
+
+## Process
+- Run `pytest tests/test_security.py` before any push touching auth, chat,
+  organiser actions, isolation, or headers.
+- Push to `main` only after the user confirms.

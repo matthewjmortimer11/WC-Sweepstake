@@ -1,0 +1,10 @@
+# Development / test dependencies. Install on top of the runtime deps:
+#   pip install -r requirements-dev.txt
+-r requirements.txt
+
+pytest>=8.0
+pytest-asyncio>=0.23
+httpx>=0.27
+# Lets the security suite run against a throwaway SQLite database when no
+# TEST_DATABASE_URL (Postgres) is provided.
+aiosqlite>=0.20

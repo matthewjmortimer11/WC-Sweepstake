@@ -25,6 +25,7 @@
     adminOwners: 'wheesht_admin_owners_v1',
     profiles: 'wheesht_profiles_v1',
     acctTokens: 'wheesht_acct_tokens_v1',
+    sessionTokens: 'wheesht_session_tokens_v1',
   };
 
   var CHARITY_SPLIT = 0.5;
@@ -106,6 +107,41 @@
   // hold one, plus the organiser token when present (covers admin overrides).
   function acctHeaders(id, extra) {
     var h = Object.assign({ 'Content-Type': 'application/json' }, extra || {});
+    var at = acctToken(id);
+    if (at) h['X-Wheesht-Account-Token'] = at;
+    var admin = adminToken();
+    if (admin) h['X-Wheesht-Admin-Token'] = admin;
+    return h;
+  }
+
+  // Per-participant session tokens: proof this device controls an entry. Issued
+  // by the server at claim/sign-in (and on demand via ensureSessionToken), then
+  // sent when posting chat so a stranger can't post as someone else's id.
+  function sessionTokens() { return lsGet(K.sessionTokens, {}); }
+  function sessionToken(id) { var t = sessionTokens(); return (id && t[id]) || ''; }
+  function setSessionToken(id, token) { if (!id || !token) return; var t = sessionTokens(); t[id] = token; lsSet(K.sessionTokens, t); }
+  function clearSessionToken(id) { var t = sessionTokens(); if (t[id]) { delete t[id]; lsSet(K.sessionTokens, t); } }
+  // Make sure we hold a session token for this entry, fetching one if needed.
+  // Claimed entries pass their account token so the server will issue; open
+  // entries are issued freely (matching the existing tap-who-you-are model).
+  function ensureSessionToken(id) {
+    if (!LIVE) return Promise.resolve('mock');
+    if (!id || !leagueCode()) return Promise.resolve('');
+    var existing = sessionToken(id);
+    if (existing) return Promise.resolve(existing);
+    return fetch(api('/participants/' + encodeURIComponent(id) + '/session'), {
+      method: 'POST', headers: acctHeaders(id), body: '{}',
+    }).then(parseJson).then(function (j) {
+      if (j && j.token) { setSessionToken(id, j.token); return j.token; }
+      return '';
+    });
+  }
+  // Headers for posting chat as `id`: session token (primary proof), plus the
+  // account/organiser token when held so the server has every accepted path.
+  function chatHeaders(id, extra) {
+    var h = Object.assign({ 'Content-Type': 'application/json' }, extra || {});
+    var st = sessionToken(id);
+    if (st) h['X-Wheesht-Session-Token'] = st;
     var at = acctToken(id);
     if (at) h['X-Wheesht-Account-Token'] = at;
     var admin = adminToken();
@@ -468,6 +504,9 @@
     leagueCode: leagueCode,
     api: api,
     adminHeaders: adminHeaders,
+    chatHeaders: chatHeaders,
+    ensureSessionToken: ensureSessionToken,
+    clearSessionToken: clearSessionToken,
     hasAdminToken: function () { return !!adminToken(); },
     hasAdminTokenForActive: function () {
       var token = adminToken();
@@ -481,10 +520,12 @@
       if (!LIVE) return Promise.resolve({ ok: true });
       var c = leagueCode();
       if (!c) return Promise.reject(new Error('Join a league first'));
+      // Send the device's active entry so the server can bind the token to it.
+      var active = lsGet(K.active, null) || '';
       return fetch(api('/admin/auth'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code: code || '' }),
+        body: JSON.stringify({ code: code || '', participantId: active }),
       }).then(parseJson).then(function (j) {
         if (j && j.token) setAdminToken(c, j.token);
         return j;
@@ -631,6 +672,7 @@
         try {
           fetch(api('/participants'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(p) })
             .then(parseJson)
+            .then(function (j) { if (j && j.sessionToken) setSessionToken(p.id, j.sessionToken); })
             .catch(function (e) {
               // Server rejected a duplicate-name signup — undo the local entry so
               // the device isn't left with a ghost account, then resync.
@@ -821,7 +863,11 @@
       var c = leagueCode();
       if (!c) return Promise.reject(new Error('Join a league first'));
       return fetch(api('/participants/' + id + '/auth'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: password || '' }) })
-        .then(parseJson).then(function (j) { if (j && j.token) setAcctToken(id, j.token); return j; });
+        .then(parseJson).then(function (j) {
+          if (j && j.token) setAcctToken(id, j.token);
+          if (j && j.sessionToken) setSessionToken(id, j.sessionToken);
+          return j;
+        });
     },
     // Set, change or clear a password. opts: {newPassword, currentPassword}.
     // newPassword '' clears the lock. Stores the fresh token on success.
@@ -841,7 +887,8 @@
         body: JSON.stringify({ newPassword: opts.newPassword || '', currentPassword: opts.currentPassword || '' }),
       }).then(parseJson).then(function (j) {
         if (j && j.token) setAcctToken(id, j.token);
-        if (clearing) clearAcctToken(id);
+        if (j && j.sessionToken) setSessionToken(id, j.sessionToken);
+        if (clearing) { clearAcctToken(id); clearSessionToken(id); }
         return Store.refresh().then(function () { return j; });
       });
     },
@@ -870,6 +917,7 @@
         body: JSON.stringify({ idToken: idToken }),
       }).then(parseJson).then(function(r) {
         if (r.token) setAcctToken(id, r.token);
+        if (r.sessionToken) setSessionToken(id, r.sessionToken);
         if (r.avatarVersion != null) setLocalProfile(id, { avatarVersion: r.avatarVersion });
         setLocalProfile(id, { hasGoogleLink: true });
         rebuild(); emit();
@@ -902,6 +950,7 @@
       return this.googleLogin(idToken).then(function(r) {
         if (!r || !r.participantId) throw new Error('No entry found for this Google account');
         setAcctToken(r.participantId, r.token);
+        if (r.sessionToken) setSessionToken(r.participantId, r.sessionToken);
         self.claimOI(r.participantId);
         self.refresh && self.refresh();
         return r;
@@ -938,6 +987,32 @@
       return fetch('/api/dev/leagues', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: key }) })
         .then(function (r) { return r.json().then(function (j) { if (!r.ok) throw new Error(j.detail || 'Developer access denied'); return j; }); });
     },
+    // Organiser backup: full league snapshot as JSON (no secrets). Organiser-only.
+    exportLeague: function () {
+      if (!LIVE) return Promise.reject(new Error('Export only works on the server'));
+      var c = leagueCode();
+      if (!c) return Promise.reject(new Error('Join a league first'));
+      return fetch(api('/export'), { headers: adminHeaders({}), cache: 'no-store' }).then(parseJson);
+    },
+    // Organiser-initiated permanent deletion of the active league. Requires the
+    // organiser token (sent via adminHeaders) plus exact code + name match.
+    deleteLeague: function (confirmCode, confirmName) {
+      if (!LIVE) return Promise.reject(new Error('League deletion only works on the server'));
+      var code = leagueCode();
+      if (!code) return Promise.reject(new Error('Join a league first'));
+      return fetch(api(''), {
+        method: 'DELETE', headers: adminHeaders({}),
+        body: JSON.stringify({ confirmCode: confirmCode || '', confirmName: confirmName || '' }),
+      }).then(function (r) {
+        return r.json().then(function (j) {
+          if (!r.ok) throw new Error((j && j.detail) || 'Could not delete league');
+          lsSet(K.league, null);
+          lsSet(K.active, null);
+          rebuild(); emit();
+          return j;
+        });
+      });
+    },
     devDeleteLeague: function (key, league, confirmCode, confirmName) {
       if (!LIVE) return Promise.reject(new Error('League deletion only works on the server'));
       var code = league && league.code;
@@ -972,6 +1047,18 @@
     adminState: function () { return admin; },
     adminAudit: function () {
       return (admin && Array.isArray(admin.audit)) ? admin.audit.slice().reverse() : [];
+    },
+    // Durable audit trail from the DB (organiser-only). Falls back to the JSON
+    // blob in adminAudit() when offline or in MOCK mode. Returns newest-first.
+    fetchAudit: function () {
+      if (!LIVE) return Promise.resolve(this.adminAudit());
+      var c = leagueCode();
+      if (!c) return Promise.resolve([]);
+      var fallback = this.adminAudit();
+      return fetch(api('/audit'), { headers: adminHeaders({}), cache: 'no-store' })
+        .then(parseJson)
+        .then(function (j) { return (j && Array.isArray(j.events)) ? j.events : fallback; })
+        .catch(function () { return fallback; });
     },
     lastRefreshAt: function () { return lastRefreshAt; },
     fixtureHealth: function () {

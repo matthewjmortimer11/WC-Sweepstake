@@ -41,7 +41,7 @@ from sqlalchemy.exc import IntegrityError
 import standings
 import sync
 from db import AsyncSessionLocal, engine
-from models import AdminOverride, Base, ChatMessage, League, Participant, Profile, ProfileAsset
+from models import AdminOverride, AuditEvent, Base, ChatMessage, League, Participant, Profile, ProfileAsset
 from wc_data import _initials, generate_wc_data, get_admin_pin, get_league_seed
 
 log = logging.getLogger(__name__)
@@ -130,6 +130,29 @@ def _audit_event(data: Dict[str, Any], action: str, actor: str = "organiser", de
     return out
 
 
+def _log_audit(
+    session,
+    league_id: str,
+    action: str,
+    actor: str = "organiser",
+    actor_id: Optional[str] = None,
+    detail: str = "",
+) -> None:
+    """Append a durable audit row. Added to the caller's session (not committed
+    here) so it lands in the same transaction as the change it records. This is
+    the source of truth the Security tab reads; the JSON `audit` array on
+    AdminOverride is kept in parallel only for backward compatibility."""
+    session.add(AuditEvent(
+        id=uuid.uuid4().hex,
+        league_id=league_id,
+        ts=int(time.time() * 1000),
+        action=str(action or "change")[:40],
+        actor=str(actor or "organiser")[:40],
+        actor_id=(str(actor_id)[:64] if actor_id else None),
+        detail=str(detail or "")[:180],
+    ))
+
+
 # ── Passwords ────────────────────────────────────────────────────────────────
 # Salted PBKDF2-HMAC-SHA256. No third-party dependency; constant-time compare.
 
@@ -153,39 +176,94 @@ def _verify_password(password: str, stored: str) -> bool:
         return False
 
 
-def _admin_token_for(league: League) -> str:
+def _admin_token_for(league: League, participant_id: Optional[str] = None) -> str:
+    """Mint an organiser token. When the organiser's device participant id is
+    known the token is bound to it (`v2.{ts}.{pid}.{sig}`) so the server can
+    confirm the holder is still a real entry; otherwise a legacy unbound `v1.`
+    token is issued."""
     ts = str(int(time.time()))
+    if participant_id:
+        msg = f"{league.id}:{league.code}:{participant_id}:{ts}".encode("utf-8")
+        sig = hmac.new(_ADMIN_SECRET.encode("utf-8"), msg, hashlib.sha256).hexdigest()
+        return f"v2.{ts}.{participant_id}.{sig}"
     msg = f"{league.id}:{league.code}:{ts}".encode("utf-8")
     sig = hmac.new(_ADMIN_SECRET.encode("utf-8"), msg, hashlib.sha256).hexdigest()
     return f"v1.{ts}.{sig}"
 
 
-def _admin_token_ok(league: League, token: Optional[str]) -> bool:
+def _admin_token_parse(league: League, token: Optional[str]) -> Optional[str]:
+    """Validate an admin token's signature and TTL. Returns the bound participant
+    id for a valid v2 token, "" for a valid (unbound) v1 token, or None when the
+    token is missing, malformed, expired, or wrongly signed."""
+    raw = token or ""
+    if raw.startswith("v2."):
+        try:
+            _version, ts_s, pid, sig = raw.split(".", 3)
+            ts = int(ts_s)
+        except (ValueError, AttributeError):
+            return None
+        if int(time.time()) - ts > _ADMIN_TOKEN_TTL_SECONDS:
+            return None
+        msg = f"{league.id}:{league.code}:{pid}:{ts_s}".encode("utf-8")
+        expected = hmac.new(_ADMIN_SECRET.encode("utf-8"), msg, hashlib.sha256).hexdigest()
+        return pid if hmac.compare_digest(sig, expected) else None
     try:
-        version, ts_s, sig = (token or "").split(".", 2)
+        version, ts_s, sig = raw.split(".", 2)
         ts = int(ts_s)
     except (ValueError, AttributeError):
-        return False
+        return None
     if version != "v1" or int(time.time()) - ts > _ADMIN_TOKEN_TTL_SECONDS:
-        return False
+        return None
     msg = f"{league.id}:{league.code}:{ts_s}".encode("utf-8")
     expected = hmac.new(_ADMIN_SECRET.encode("utf-8"), msg, hashlib.sha256).hexdigest()
-    return hmac.compare_digest(sig, expected)
+    return "" if hmac.compare_digest(sig, expected) else None
+
+
+def _admin_token_ok(league: League, token: Optional[str]) -> bool:
+    """Signature/TTL check only (no DB lookup). Used where a request just needs
+    to know the caller is the organiser — chat, password resets, Google unlink.
+    Endpoint write-guards use the async _require_admin for the v2 binding check."""
+    return _admin_token_parse(league, token) is not None
+
+
+# Leagues whose organiser code still falls back to the member password are logged
+# once per process so the warning is visible without spamming every auth attempt.
+_legacy_org_warned: set = set()
 
 
 def _admin_code_ok(league: League, code: str) -> bool:
     code = code or ""
-    if league.seeded and league.code == _CONFIG_LEAGUE_CODE:
-        return bool(_ADMIN_PIN) and hmac.compare_digest(code, _ADMIN_PIN)
+    # Every organiser code is now verified against a stored PBKDF2 hash — the
+    # seeded league's hash is set from the configured PIN at startup, so there is
+    # no plaintext comparison anywhere.
     if league.organiser_hash:
         return _verify_password(code, league.organiser_hash)
-    # Legacy custom leagues created before separate organiser codes shipped.
-    return _verify_password(code, league.password_hash)
+    # Legacy custom leagues created before separate organiser codes shipped have
+    # no organiser_hash; fall back to the member password as the organiser code.
+    if league.password_hash:
+        if league.id not in _legacy_org_warned:
+            _legacy_org_warned.add(league.id)
+            log.warning(
+                "League %s has no organiser_hash; using legacy member-password fallback",
+                league.code,
+            )
+        return _verify_password(code, league.password_hash)
+    return False
 
 
-def _require_admin(league: League, token: Optional[str]) -> None:
-    if not _admin_token_ok(league, token):
+async def _require_admin(session, league: League, token: Optional[str]) -> None:
+    """Guard every organiser write. Validates the token signature/TTL and, for
+    v2 (participant-bound) tokens, confirms the bound entry is still a real,
+    non-removed participant in this league — so a token minted for an entry that
+    was later removed stops working. v1 tokens stay accepted during transition."""
+    pid = _admin_token_parse(league, token)
+    if pid is None:
         raise HTTPException(status_code=403, detail="Organiser access required")
+    if pid:
+        row = await session.get(Participant, pid)
+        in_league = row is not None and row.league_id == league.id and not row.removed
+        if not in_league and _seeded_base(league, pid) is None:
+            raise HTTPException(status_code=403, detail="Organiser access required")
 
 
 # Per-account sign-in tokens. Same HMAC construction as the organiser token but
@@ -212,6 +290,56 @@ def _account_token_ok(league: League, participant_id: str, token: Optional[str])
     msg = f"acct:{league.id}:{participant_id}:{ts_s}".encode("utf-8")
     expected = hmac.new(_ADMIN_SECRET.encode("utf-8"), msg, hashlib.sha256).hexdigest()
     return hmac.compare_digest(sig, expected)
+
+
+# Per-participant SESSION tokens. A session token is proof that this device
+# currently controls a given entry — issued whenever the server has just
+# confirmed control (claim, sign-in, or an explicit session request for an open
+# entry). It is lighter than an account token: an account token is the
+# password/Google sign-in LOCK, whereas a session token just stops a stranger
+# from POSTing chat as someone else's id. Same HMAC construction and server
+# secret; never leaves the server unverified.
+_SESSION_TOKEN_TTL_SECONDS = 90 * 24 * 60 * 60  # 90 days
+
+
+def _session_token_for(league: League, participant_id: str) -> str:
+    ts = str(int(time.time()))
+    msg = f"sess:{league.id}:{participant_id}:{ts}".encode("utf-8")
+    sig = hmac.new(_ADMIN_SECRET.encode("utf-8"), msg, hashlib.sha256).hexdigest()
+    return f"s1.{ts}.{sig}"
+
+
+def _session_token_ok(league: League, participant_id: str, token: Optional[str]) -> bool:
+    try:
+        version, ts_s, sig = (token or "").split(".", 2)
+        ts = int(ts_s)
+    except (ValueError, AttributeError):
+        return False
+    if version != "s1" or int(time.time()) - ts > _SESSION_TOKEN_TTL_SECONDS:
+        return False
+    msg = f"sess:{league.id}:{participant_id}:{ts_s}".encode("utf-8")
+    expected = hmac.new(_ADMIN_SECRET.encode("utf-8"), msg, hashlib.sha256).hexdigest()
+    return hmac.compare_digest(sig, expected)
+
+
+def _chat_author_ok(
+    league: League,
+    author_id: str,
+    session_token: Optional[str],
+    account_token: Optional[str],
+    admin_token: Optional[str],
+) -> bool:
+    """A chat message may only be posted as `author_id` by someone who can prove
+    they control that entry: a session token (issued at claim/sign-in), an
+    account token (password/Google sign-in), or the organiser's admin token.
+    Knowing another entrant's id is no longer enough to post as them."""
+    if admin_token and _admin_token_ok(league, admin_token):
+        return True
+    if session_token and _session_token_ok(league, author_id, session_token):
+        return True
+    if account_token and _account_token_ok(league, author_id, account_token):
+        return True
+    return False
 
 
 async def _verify_google_token(id_token: str) -> dict:
@@ -662,6 +790,8 @@ def _build_html() -> str:
         parts.append(f"window.WC_GOOGLE_CLIENT_ID={json.dumps(_GOOGLE_CLIENT_ID)};")
     parts.append("window.WC_DATA = " + json.dumps(_base_state(), ensure_ascii=False) + ";")
     parts.append("window.WC_LIVE = true;")
+    # The hidden dev console is only reachable when a dev key is configured.
+    parts.append("window.WC_DEV_ENABLED = " + ("true" if _DEV_KEY else "false") + ";")
     injection = "<script>" + "".join(parts) + "</script>"
     return _HTML_TEMPLATE.replace("<!-- WC_DATA_INJECTION -->", injection)
 
@@ -673,6 +803,10 @@ async def _seed_and_migrate() -> None:
     code = (seed["code"] or "OI").upper()
     async with AsyncSessionLocal() as session:
         league = await _get_league_by_code(session, code)
+        # The organiser PIN is stored only as a hash, re-derived from config on
+        # every startup so it can be rotated via WC_ADMIN_PIN without a migration
+        # (mirrors how the member password is kept in sync below). Never plaintext.
+        organiser_hash = _hash_password(_ADMIN_PIN) if _ADMIN_PIN else None
         if league is None:
             league = League(
                 id=uuid.uuid4().hex,
@@ -680,6 +814,7 @@ async def _seed_and_migrate() -> None:
                 slug=_slugify(seed["name"]),
                 name=seed["name"],
                 password_hash=_hash_password(seed["password"]),
+                organiser_hash=organiser_hash,
                 seeded=bool(seed["seeded"]),
                 created_at=_now(),
             )
@@ -687,11 +822,13 @@ async def _seed_and_migrate() -> None:
             await session.commit()
             log.info("Seeded league %s (%s)", code, seed["name"])
         else:
-            # Keep the seeded league's public details + password in sync with config.
+            # Keep the seeded league's public details + secrets in sync with config.
             league.name = seed["name"]
             league.seeded = bool(seed["seeded"])
             if seed["password"]:
                 league.password_hash = _hash_password(seed["password"])
+            if organiser_hash:
+                league.organiser_hash = organiser_hash
             await session.commit()
 
         await _migrate_legacy_json(session, league)
@@ -815,6 +952,34 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="Wheesht — World Cup Sweepstake 2026", lifespan=lifespan)
 
 
+# Content Security Policy. Tuned to exactly what the app loads: React/Babel from
+# unpkg, Google Identity, and Google Fonts. 'unsafe-eval' is required because
+# Babel compiles the JSX in the browser, and 'unsafe-inline' because the page
+# ships inline styles and bootstrap scripts. Tightening these would need a build
+# step (item 8+), so this is the safe maximum for the current no-bundler setup.
+_CSP = (
+    "default-src 'self'; "
+    "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://unpkg.com https://accounts.google.com https://www.gstatic.com; "
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+    "font-src 'self' https://fonts.gstatic.com; "
+    "img-src 'self' data: blob: https:; "
+    "connect-src 'self' https://accounts.google.com https://www.googleapis.com; "
+    "frame-src https://accounts.google.com; "
+    "frame-ancestors 'none'; base-uri 'self'; form-action 'self'; "
+    "object-src 'none'; manifest-src 'self'; worker-src 'self'"
+)
+
+
+@app.middleware("http")
+async def _security_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+    response.headers.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+    response.headers.setdefault("Content-Security-Policy", _CSP)
+    return response
+
+
 # ── Pages + global state ──────────────────────────────────────────────────────
 
 @app.get("/", response_class=HTMLResponse)
@@ -854,6 +1019,8 @@ class LeagueJoin(BaseModel):
 
 class AdminAuthPayload(BaseModel):
     code: str
+    # The device's active participant id, so the issued token can be bound to it.
+    participantId: Optional[str] = None
 
 
 def _clean_custom_fields(items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -1025,8 +1192,155 @@ async def admin_auth(code: str, payload: AdminAuthPayload, request: Request):
         if league is None:
             raise HTTPException(status_code=404, detail="league not found")
         if not _admin_code_ok(league, payload.code or ""):
+            _log_audit(session, league.id, "admin_auth_failed", "unknown", detail="Wrong organiser code")
+            await session.commit()
             raise HTTPException(status_code=403, detail="Wrong organiser code")
-        return {"ok": True, "token": _admin_token_for(league)}
+        # Bind the token to the device's active entry when it is a real member of
+        # this league; otherwise fall back to an unbound token.
+        pid = (payload.participantId or "").strip()
+        if pid and not await _participant_in_league(session, league, pid):
+            pid = ""
+        _log_audit(session, league.id, "admin_auth", "organiser", actor_id=(pid or None), detail="Organiser signed in")
+        await session.commit()
+        return {"ok": True, "token": _admin_token_for(league, pid or None)}
+
+
+@app.get("/api/leagues/{code}/audit")
+async def league_audit(
+    code: str,
+    x_wheesht_admin_token: Optional[str] = Header(None, alias="X-Wheesht-Admin-Token"),
+):
+    """Durable organiser audit trail for the Security tab. Organiser-only; the
+    newest 200 events, newest first."""
+    async with AsyncSessionLocal() as session:
+        league = await _get_league_by_code(session, code.upper())
+        if league is None:
+            raise HTTPException(status_code=404, detail="league not found")
+        await _require_admin(session, league, x_wheesht_admin_token)
+        res = await session.execute(
+            select(AuditEvent).where(AuditEvent.league_id == league.id)
+            .order_by(AuditEvent.ts.desc()).limit(200)
+        )
+        events = [
+            {
+                "ts": e.ts,
+                "action": e.action,
+                "actor": e.actor,
+                "actorId": e.actor_id,
+                "detail": e.detail,
+            }
+            for e in res.scalars().all()
+        ]
+    return {"events": events}
+
+
+class OrganiserDeleteLeaguePayload(BaseModel):
+    confirmCode: str
+    confirmName: str
+
+
+@app.delete("/api/leagues/{code}")
+async def delete_league(
+    code: str,
+    payload: OrganiserDeleteLeaguePayload,
+    request: Request,
+    x_wheesht_admin_token: Optional[str] = Header(None, alias="X-Wheesht-Admin-Token"),
+):
+    """Organiser-initiated permanent deletion of their own league.
+
+    Requires the organiser token plus exact code + name confirmation (the same
+    shape as the dev delete). The seeded flagship league is intentionally not
+    deletable here — that stays a dev-only operation so a routine organiser
+    action can never wipe the main sweepstake."""
+    _rate_limit(request, "league:delete:" + code.upper(), 6, 10 * 60)
+    async with AsyncSessionLocal() as session:
+        league = await _get_league_by_code(session, code.upper())
+        if league is None:
+            raise HTTPException(status_code=404, detail="league not found")
+        await _require_admin(session, league, x_wheesht_admin_token)
+        if league.seeded and league.code == _CONFIG_LEAGUE_CODE:
+            raise HTTPException(status_code=400, detail="This league can't be deleted from here.")
+        if (payload.confirmCode or "").strip().upper() != league.code:
+            raise HTTPException(status_code=400, detail="Type the league code exactly to delete it")
+        if (payload.confirmName or "").strip() != league.name:
+            raise HTTPException(status_code=400, detail="Type the league name exactly to delete it")
+
+        # The league's own audit rows go with it, so record the deletion in the
+        # durable application log rather than the table we're about to wipe.
+        log.warning("Organiser deleted league %s (%s)", league.code, league.name)
+        await session.execute(delete(ChatMessage).where(ChatMessage.league_id == league.id))
+        await session.execute(delete(ProfileAsset).where(ProfileAsset.league_id == league.id))
+        await session.execute(delete(Profile).where(Profile.league_id == league.id))
+        await session.execute(delete(Participant).where(Participant.league_id == league.id))
+        await session.execute(delete(AdminOverride).where(AdminOverride.league_id == league.id))
+        await session.execute(delete(AuditEvent).where(AuditEvent.league_id == league.id))
+        await session.delete(league)
+        await session.commit()
+        return {"ok": True, "deleted": {"code": league.code, "name": league.name}}
+
+
+@app.get("/api/leagues/{code}/export")
+async def export_league(
+    code: str,
+    x_wheesht_admin_token: Optional[str] = Header(None, alias="X-Wheesht-Admin-Token"),
+):
+    """Organiser backup of a whole league as a JSON bundle. Organiser-only, and
+    deliberately free of secrets: no password or organiser hashes, and Google
+    identities are reduced to a boolean. Pair with docs/SECURITY.md."""
+    async with AsyncSessionLocal() as session:
+        league = await _get_league_by_code(session, code.upper())
+        if league is None:
+            raise HTTPException(status_code=404, detail="league not found")
+        await _require_admin(session, league, x_wheesht_admin_token)
+
+        rows = await _participant_rows(session, league)
+        profile_map = await _profiles_for(session, league)
+        people = _league_people(league, rows, profile_map)  # merged view, no hashes
+
+        # Identity layer, with raw Google ids redacted to a boolean.
+        profiles_out = [
+            {
+                "participantId": p.participant_id,
+                "displayName": p.display_name or "",
+                "favouriteTeam": p.favourite_team or "",
+                "avatarVersion": p.avatar_version or 0,
+                "avatarSource": p.avatar_source or "",
+                "hasGoogleLink": bool(p.google_id),
+            }
+            for p in profile_map.values()
+        ]
+
+        chat_res = await session.execute(
+            select(ChatMessage).where(ChatMessage.league_id == league.id)
+            .order_by(ChatMessage.ts.asc())
+        )
+        chat = [_chat_to_dict(m) for m in chat_res.scalars().all()]
+
+        admin = await _get_admin_data(session, league)
+
+        audit_res = await session.execute(
+            select(AuditEvent).where(AuditEvent.league_id == league.id)
+            .order_by(AuditEvent.ts.asc())
+        )
+        audit = [
+            {"ts": e.ts, "action": e.action, "actor": e.actor, "actorId": e.actor_id, "detail": e.detail}
+            for e in audit_res.scalars().all()
+        ]
+
+        return {
+            "exportedAt": _now().isoformat(),
+            "league": {
+                "code": league.code,
+                "name": league.name,
+                "seeded": league.seeded,
+                "createdAt": league.created_at.isoformat() if league.created_at else None,
+            },
+            "participants": people,
+            "profiles": profiles_out,
+            "chat": chat,
+            "adminOverrides": admin,
+            "audit": audit,
+        }
 
 
 @app.get("/api/leagues/{code}/state")
@@ -1142,7 +1456,11 @@ async def create_participant(
                     detail="An entry already exists for that name — find it and sign in instead of creating a new one.",
                 )
         row = await _upsert_participant(session, league, payload)
-        return {"ok": True, "participant": _participant_to_dict(row, league.code)}
+        return {
+            "ok": True,
+            "participant": _participant_to_dict(row, league.code),
+            "sessionToken": _session_token_for(league, row.id),
+        }
 
 
 @app.put("/api/leagues/{code}/participants/{participant_id}")
@@ -1160,7 +1478,11 @@ async def update_participant(
         await _guard_account_write(session, league, participant_id, x_wheesht_account_token, x_wheesht_admin_token)
         payload.id = participant_id
         row = await _upsert_participant(session, league, payload)
-        return {"ok": True, "participant": _participant_to_dict(row, league.code)}
+        return {
+            "ok": True,
+            "participant": _participant_to_dict(row, league.code),
+            "sessionToken": _session_token_for(league, row.id),
+        }
 
 
 @app.delete("/api/leagues/{code}/participants/{participant_id}")
@@ -1173,17 +1495,19 @@ async def delete_participant(
         league = await _get_league_by_code(session, code.upper())
         if league is None:
             raise HTTPException(status_code=404, detail="league not found")
-        _require_admin(league, x_wheesht_admin_token)
+        await _require_admin(session, league, x_wheesht_admin_token)
         row = await session.get(Participant, participant_id)
         is_seeded_base = (
             league.seeded and league.code == _CONFIG_LEAGUE_CODE
             and any(rp["id"] == participant_id for rp in _ROSTER)
         )
         if row is not None and row.league_id == league.id:
+            removed_name = (row.name or "").strip() or participant_id
             if is_seeded_base:
                 row.removed = True  # tombstone, keep the row
             else:
                 await session.delete(row)
+            _log_audit(session, league.id, "participant_removed", "organiser", detail=removed_name)
             await session.commit()
             return {"ok": True}
         if is_seeded_base:
@@ -1191,6 +1515,7 @@ async def delete_participant(
             session.add(Participant(
                 id=participant_id, league_id=league.id, name="", removed=True,
             ))
+            _log_audit(session, league.id, "participant_removed", "organiser", detail=participant_id)
             await session.commit()
             return {"ok": True}
         raise HTTPException(status_code=404, detail="participant not found")
@@ -1234,6 +1559,33 @@ async def set_pick(
         row.picks = picks
         await session.commit()
         return {"ok": True, "picks": picks}
+
+
+@app.post("/api/leagues/{code}/participants/{participant_id}/session")
+async def issue_session(
+    code: str,
+    participant_id: str,
+    request: Request,
+    x_wheesht_account_token: Optional[str] = Header(None, alias="X-Wheesht-Account-Token"),
+    x_wheesht_admin_token: Optional[str] = Header(None, alias="X-Wheesht-Admin-Token"),
+):
+    """Issue a session token proving this device controls `participant_id`.
+
+    Open (unclaimed) entries follow the existing "tap who you are" trust model:
+    whoever holds the device may take the entry, so a token is issued freely.
+    Claimed entries (password or Google) must present a valid account or admin
+    token first — exactly like any other protected write. The token is what the
+    chat endpoint checks, so this is how a device earns the right to post."""
+    _rate_limit(request, "session:" + code.upper() + ":" + participant_id, 30, 10 * 60)
+    async with AsyncSessionLocal() as session:
+        league = await _get_league_by_code(session, code.upper())
+        if league is None:
+            raise HTTPException(status_code=404, detail="league not found")
+        if not await _participant_in_league(session, league, participant_id):
+            raise HTTPException(status_code=404, detail="participant not found")
+        # No-op for open entries; raises 403 for claimed entries without proof.
+        await _guard_account_write(session, league, participant_id, x_wheesht_account_token, x_wheesht_admin_token)
+        return {"ok": True, "token": _session_token_for(league, participant_id)}
 
 
 # ── Profiles & avatars (league-scoped) ────────────────────────────────────────
@@ -1453,7 +1805,11 @@ async def account_auth(code: str, participant_id: str, payload: AccountAuthPaylo
             raise HTTPException(status_code=400, detail="This entry has no password set")
         if not _verify_password(payload.password or "", h):
             raise HTTPException(status_code=403, detail="Wrong password")
-        return {"ok": True, "token": _account_token_for(league, participant_id)}
+        return {
+            "ok": True,
+            "token": _account_token_for(league, participant_id),
+            "sessionToken": _session_token_for(league, participant_id),
+        }
 
 
 @app.put("/api/leagues/{code}/participants/{participant_id}/password")
@@ -1492,6 +1848,10 @@ async def set_account_password(
             if not ok:
                 raise HTTPException(status_code=403, detail="Sign in first to set a password on this entry")
 
+        # An organiser acting on someone else's entry is a privileged reset and
+        # is recorded in the audit trail (a member changing their own is not).
+        by_admin = bool(x_wheesht_admin_token and _admin_token_ok(league, x_wheesht_admin_token))
+
         new = payload.newPassword
         if new:  # set / change
             if len(new) < _MIN_ACCOUNT_PASSWORD:
@@ -1500,13 +1860,22 @@ async def set_account_password(
             if row is None:
                 raise HTTPException(status_code=404, detail="participant not found")
             row.password_hash = _hash_password(new)
+            if by_admin:
+                _log_audit(session, league.id, "password_reset", "organiser", detail=(row.name or participant_id))
             await session.commit()
-            return {"ok": True, "hasPassword": True, "token": _account_token_for(league, participant_id)}
+            return {
+                "ok": True,
+                "hasPassword": True,
+                "token": _account_token_for(league, participant_id),
+                "sessionToken": _session_token_for(league, participant_id),
+            }
 
         # clear the lock
         row = await session.get(Participant, participant_id)
         if row is not None and row.league_id == league.id:
             row.password_hash = None
+            if by_admin:
+                _log_audit(session, league.id, "password_cleared", "organiser", detail=(row.name or participant_id))
             await session.commit()
         return {"ok": True, "hasPassword": False}
 
@@ -1606,6 +1975,7 @@ async def google_auth_link(
         return {
             "ok": True,
             "token": _account_token_for(league, participant_id),
+            "sessionToken": _session_token_for(league, participant_id),
             "avatarVersion": prof.avatar_version,
         }
 
@@ -1682,6 +2052,7 @@ async def google_login(code: str, payload: GoogleLoginPayload, request: Request)
             "participantId": prof.participant_id,
             "name": display,
             "token": _account_token_for(league, prof.participant_id),
+            "sessionToken": _session_token_for(league, prof.participant_id),
         }
 
 
@@ -1704,7 +2075,7 @@ async def put_admin(
         league = await _get_league_by_code(session, code.upper())
         if league is None:
             raise HTTPException(status_code=404, detail="league not found")
-        _require_admin(league, x_wheesht_admin_token)
+        await _require_admin(session, league, x_wheesht_admin_token)
         row = await session.get(AdminOverride, league.id)
         incoming = payload.model_dump()
         if row is None:
@@ -1724,6 +2095,7 @@ async def put_admin(
             merged = _audit_event(merged, "admin_save", "organiser", "Organiser settings saved")
             row.data = merged
             row.updated_at = _now()
+        _log_audit(session, league.id, "admin_save", "organiser", detail="Organiser settings saved")
         await session.commit()
         return {"ok": True}
 
@@ -1759,7 +2131,13 @@ async def get_chat(code: str):
 
 
 @app.post("/api/leagues/{code}/chat")
-async def post_chat(code: str, payload: ChatPayload):
+async def post_chat(
+    code: str,
+    payload: ChatPayload,
+    x_wheesht_session_token: Optional[str] = Header(None, alias="X-Wheesht-Session-Token"),
+    x_wheesht_account_token: Optional[str] = Header(None, alias="X-Wheesht-Account-Token"),
+    x_wheesht_admin_token: Optional[str] = Header(None, alias="X-Wheesht-Admin-Token"),
+):
     text = payload.text.strip()[:280]
     if not text:
         raise HTTPException(status_code=400, detail="empty message")
@@ -1767,6 +2145,13 @@ async def post_chat(code: str, payload: ChatPayload):
         league = await _get_league_by_code(session, code.upper())
         if league is None:
             raise HTTPException(status_code=404, detail="league not found")
+        # The poster must prove they control the entry they are posting as —
+        # a stranger knowing an `author_id` can no longer impersonate them.
+        if not _chat_author_ok(
+            league, payload.author_id,
+            x_wheesht_session_token, x_wheesht_account_token, x_wheesht_admin_token,
+        ):
+            raise HTTPException(status_code=403, detail="Sign in as yourself to post in the chat.")
         rows = await _participant_rows(session, league)
         profiles = await _profiles_for(session, league)
         people = _league_people(league, rows, profiles)
@@ -1806,7 +2191,7 @@ async def post_system_chat(
         league = await _get_league_by_code(session, code.upper())
         if league is None:
             raise HTTPException(status_code=404, detail="league not found")
-        _require_admin(league, x_wheesht_admin_token)
+        await _require_admin(session, league, x_wheesht_admin_token)
         msg = ChatMessage(
             id=uuid.uuid4().hex[:10], league_id=league.id,
             author_id="wheesht", author="Wheesht",
@@ -1822,6 +2207,7 @@ async def post_system_chat(
             row.updated_at = _now()
         else:
             session.add(AdminOverride(league_id=league.id, data=data, updated_at=_now()))
+        _log_audit(session, league.id, "wheesht_message", "organiser", detail=text)
         await session.commit()
         return _chat_to_dict(msg)
 
@@ -1848,7 +2234,7 @@ async def create_match_prediction(
         league = await _get_league_by_code(session, code.upper())
         if league is None:
             raise HTTPException(status_code=404, detail="league not found")
-        _require_admin(league, x_wheesht_admin_token)
+        await _require_admin(session, league, x_wheesht_admin_token)
         # validate fixture exists and is upcoming
         fix = next((f for f in _base_fixtures() if f["id"] == payload.fixture_id), None)
         if fix is None:
@@ -1872,6 +2258,7 @@ async def create_match_prediction(
             row.updated_at = _now()
         else:
             session.add(AdminOverride(league_id=league.id, data=data, updated_at=_now()))
+        _log_audit(session, league.id, "prediction_opened", "organiser", detail=label)
         # optional chat announcement
         if payload.notify_chat:
             type_label = "winner" if payload.type == "winner" else "exact scoreline"
@@ -1900,7 +2287,7 @@ async def delete_match_prediction(
         league = await _get_league_by_code(session, code.upper())
         if league is None:
             raise HTTPException(status_code=404, detail="league not found")
-        _require_admin(league, x_wheesht_admin_token)
+        await _require_admin(session, league, x_wheesht_admin_token)
         row = await session.get(AdminOverride, league.id)
         if not row or not row.data:
             return {"ok": True}
@@ -1917,6 +2304,7 @@ async def delete_match_prediction(
         data = _audit_event(data, "prediction_removed", "organiser", market_id)
         row.data = data
         row.updated_at = _now()
+        _log_audit(session, league.id, "prediction_removed", "organiser", detail=market_id)
         await session.commit()
         return {"ok": True}
 
@@ -1931,7 +2319,7 @@ async def delete_chat(
         league = await _get_league_by_code(session, code.upper())
         if league is None:
             raise HTTPException(status_code=404, detail="league not found")
-        _require_admin(league, x_wheesht_admin_token)
+        await _require_admin(session, league, x_wheesht_admin_token)
         row = await session.get(ChatMessage, message_id)
         if row is None or row.league_id != league.id:
             raise HTTPException(status_code=404, detail="message not found")
@@ -1947,6 +2335,10 @@ async def delete_chat(
             audit_row.updated_at = _now()
         else:
             session.add(AdminOverride(league_id=league.id, data=data, updated_at=_now()))
+        _log_audit(
+            session, league.id, "chat_deleted", "organiser",
+            detail=(row.author or "unknown") + ": " + (row.text or "")[:80],
+        )
         await session.delete(row)
         await session.commit()
         return {"ok": True}
@@ -2013,6 +2405,7 @@ async def dev_delete_league(code: str, payload: DevDeleteLeaguePayload, request:
         await session.execute(delete(Profile).where(Profile.league_id == league.id))
         await session.execute(delete(Participant).where(Participant.league_id == league.id))
         await session.execute(delete(AdminOverride).where(AdminOverride.league_id == league.id))
+        await session.execute(delete(AuditEvent).where(AuditEvent.league_id == league.id))
         await session.delete(league)
         await session.commit()
         return {"ok": True, "deleted": {"code": league.code, "name": league.name}}

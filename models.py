@@ -213,3 +213,24 @@ class AdminOverride(Base):
     )
     data: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False, default=dict)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class AuditEvent(Base):
+    """An append-only record of an organiser (or dev/system) action on a league.
+
+    The durable counterpart to the capped JSON `audit` array kept on
+    AdminOverride: that array stays for backward compatibility, but this table is
+    the source of truth the Security tab reads, and it is never trimmed."""
+
+    __tablename__ = "audit_events"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)  # uuid hex
+    league_id: Mapped[str] = mapped_column(
+        String, ForeignKey("leagues.id"), nullable=False, index=True
+    )
+    ts: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)  # ms epoch
+    action: Mapped[str] = mapped_column(String, nullable=False)
+    actor: Mapped[str] = mapped_column(String, nullable=False, default="organiser")
+    # Participant id of the actor when known (organiser entry, dev, etc.).
+    actor_id: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    detail: Mapped[str] = mapped_column(String, nullable=False, default="")

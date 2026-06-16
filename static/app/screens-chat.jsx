@@ -73,24 +73,40 @@ function ChatScreen() {
     if (!asWheesht && !me) return;
     if (asWheesht && !isOrganiser) return;
     setBusy(true);
-    var url = asWheesht ? Sch.api('/chat/system') : Sch.api('/chat');
     var body = asWheesht
       ? JSON.stringify({ text: text.trim(), mood: mood })
       : JSON.stringify({ author_id: me.id, text: text.trim() });
-    var headers = asWheesht ? Sch.adminHeaders() : { 'Content-Type': 'application/json' };
-    fetch(url, { method: 'POST', headers: headers, body: body })
-      .then(function(r) {
-        return r.json().then(function(msg) {
-          if (!r.ok) throw new Error((msg && msg.detail) || 'Message failed');
-          return msg;
-        });
-      }).then(function(msg) {
-        if (msg && msg.id) setMsgs(function(prev) { return prev.concat([msg]); });
-        setText('');
-        setBusy(false);
-        setErr(false);
-        window.wcHaptic && window.wcHaptic('light');
-      }).catch(function() { setBusy(false); setErr(true); });
+    // Wheesht announcements use the organiser token; ordinary posts must prove
+    // the device controls `me` via a session token (fetched on first post).
+    var prep = asWheesht
+      ? Promise.resolve(Sch.adminHeaders())
+      : (Sch.ensureSessionToken ? Sch.ensureSessionToken(me.id) : Promise.resolve())
+          .then(function() { return Sch.chatHeaders(me.id); });
+    prep.then(function(headers) {
+      var url = asWheesht ? Sch.api('/chat/system') : Sch.api('/chat');
+      return fetch(url, { method: 'POST', headers: headers, body: body });
+    }).then(function(r) {
+      return r.json().then(function(msg) {
+        if (!r.ok) {
+          var e = new Error((msg && msg.detail) || 'Message failed');
+          e.status = r.status;
+          throw e;
+        }
+        return msg;
+      });
+    }).then(function(msg) {
+      if (msg && msg.id) setMsgs(function(prev) { return prev.concat([msg]); });
+      setText('');
+      setBusy(false);
+      setErr(false);
+      window.wcHaptic && window.wcHaptic('light');
+    }).catch(function(e) {
+      // A 403 means our session token is missing/stale — drop it so the next
+      // attempt re-issues one (and a protected entry re-prompts for sign-in).
+      if (e && e.status === 403 && !asWheesht && me && Sch.clearSessionToken) Sch.clearSessionToken(me.id);
+      setBusy(false);
+      setErr(true);
+    });
   }
 
   if (!isLive) {
