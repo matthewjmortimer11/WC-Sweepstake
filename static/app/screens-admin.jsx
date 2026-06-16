@@ -231,6 +231,7 @@ function PredAdmin(props) {
 }
 
 function moneyAdmin(n) {
+   if (window.Store && window.Store.money) return window.Store.money(n);
    return '£' + (Math.round(Number(n || 0) * 100) / 100).toLocaleString('en-GB', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 }
 
@@ -297,8 +298,11 @@ function SettingsAdmin() {
    const [, bump] = aState2(0);
    React.useEffect(() => Sa.subscribe(() => bump(x => x + 1)), []);
    const feeNow = Sa.entryFee ? Sa.entryFee() : WCa.FEE;
+   const currencyNow = Sa.currency ? Sa.currency() : '£';
    const [fee, setFee] = aState2(String(feeNow || 0));
    React.useEffect(() => setFee(String(feeNow || 0)), [feeNow]);
+   const [currency, setCurrency] = aState2(currencyNow);
+   React.useEffect(() => setCurrency(currencyNow), [currencyNow]);
    const locationsNow = Sa.locations ? Sa.locations() : ['Edinburgh', 'London'];
    const [locInput, setLocInput] = aState2(locationsNow.join(', '));
    React.useEffect(() => setLocInput(locationsNow.join(', ')), [locationsNow.join(',')]);
@@ -336,8 +340,9 @@ function SettingsAdmin() {
    function saveFee() {
      const val = Number(fee);
      if (!isFinite(val) || val < 0) { setFee(String(feeNow || 0)); return; }
+     if (Sa.setCurrency) Sa.setCurrency(currency || '£');
      Sa.setEntryFee(val);
-     if (window.wcToast) window.wcToast('Entry fee set to £' + val.toLocaleString('en-GB'), 'confident');
+     if (window.wcToast) window.wcToast('Entry fee set to ' + ((Sa.money && Sa.money(val)) || moneyAdmin(val)), 'confident');
    }
    function saveLocations() {
      const arr = locInput.split(',').map(s => s.trim()).filter(Boolean);
@@ -362,7 +367,9 @@ function SettingsAdmin() {
        <Ca bordered style={{ background: 'var(--yellow)', marginBottom: 12 }}>
          <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.06em', textTransform: 'uppercase' }}>Entry fee</div>
          <div style={{ display: 'flex', gap: 9, alignItems: 'center', marginTop: 7 }}>
-           <span className="dh" style={{ fontSize: 24 }}>£</span>
+           <select value={currency} onChange={e => setCurrency(e.target.value)} style={{ ...fld, flex: '0 0 78px', fontSize: 20, paddingLeft: 9, paddingRight: 8 }}>
+             {['£', '€', '$'].map(c => <option key={c} value={c}>{c}</option>)}
+           </select>
            <input type="number" min="0" step="0.5" value={fee} onChange={e => setFee(e.target.value)} style={fld} />
            <button onClick={saveFee} className="wc-btn wc-btn--sm wc-btn--ink" style={{ flex: '0 0 auto' }}>Save</button>
          </div>

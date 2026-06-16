@@ -9,7 +9,10 @@ const Sd = window.Store;
 const { Card: Cd, Btn: Bd, Flag: Fd, Avatar: Ad, Chip: Chd, Stamp: Std, ProgressRing: PRd, WheeshtSays: Saysd, SectionHead: SHd } = window;
 const { useState: dState } = React;
 
-function money_d(n) { return '£' + Math.round(n).toLocaleString('en-GB'); }
+function money_d(n) {
+  if (Sd && Sd.money) return Sd.money(n);
+  return '£' + (Math.round(Number(n || 0) * 100) / 100).toLocaleString('en-GB', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+}
 const PRE = () => (WCd.meta.phase === 'pre');
 function stageName(t) {
   if (t.stage === 'group') return 'Group stage';
@@ -549,11 +552,11 @@ function ActivityFeed(props) {
     if (submitted < totalMkts) items.push({ m: 'mischievous', t: 'Predictions are open', d: (totalMkts - submitted) + ' still to call before kick-off. Get them in.', when: 'now' });
     else items.push({ m: 'happy', t: 'All predictions in', d: 'Every market called. Wheesht has them in writing.', when: 'now' });
     items.push({ m: 'broadcast', t: 'Tournament is underway', d: 'The first whistle has gone. Wheesht is taking notes.', when: 'live' });
-    items.push({ m: 'neutral', t: 'You entered the sweepstake', d: 'Buy-in confirmed. £' + WCd.FEE + ' in the pot. Welcome aboard.', when: 'on joining' });
+    items.push({ m: 'neutral', t: 'You entered the sweepstake', d: 'Buy-in confirmed. ' + money_d(WCd.FEE) + ' in the pot. Welcome aboard.', when: 'on joining' });
   } else {
     if (!t.alive) items.push({ m: 'crying', t: t.name + ' knocked out', d: stageName(t) + ' — your run ends here. The side game awaits.', when: '2h ago' });
     else items.push({ m: 'confident', t: t.name + ' still standing', d: 'Through to the ' + stageName(t).toLowerCase() + '. Wheesht is quietly impressed.', when: '2h ago' });
-    items.push({ m: 'broadcast', t: 'You entered the sweepstake', d: 'Buy-in confirmed. £' + WCd.FEE + ' in the pot. Welcome aboard.', when: 'on joining' });
+    items.push({ m: 'broadcast', t: 'You entered the sweepstake', d: 'Buy-in confirmed. ' + money_d(WCd.FEE) + ' in the pot. Welcome aboard.', when: 'on joining' });
   }
   return (
     <Cd flat style={{ padding: '6px 14px' }}>

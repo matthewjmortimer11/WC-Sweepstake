@@ -6,7 +6,7 @@ const { Card, Btn, Flag, Avatar, Chip, Stamp, ProgressRing, SegmentBar, WheeshtS
 const W = window.Wheesht;
 const { useState: uState, useMemo: uMemo } = React;
 
-function money(n){ return '£' + n.toLocaleString('en-GB'); }
+function money(n){ return window.Store && window.Store.money ? window.Store.money(n) : '£' + (Math.round(Number(n || 0) * 100) / 100).toLocaleString('en-GB', { minimumFractionDigits: 0, maximumFractionDigits: 2 }); }
 function ownerName(code){ const o = WC.ownersOf(code); return o.length ? o[0].name : 'nobody'; }
 function stageLabel(t){
   if (t.stage === 'qf') return 'Quarter-final';

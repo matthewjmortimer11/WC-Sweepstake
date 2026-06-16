@@ -233,7 +233,7 @@ const DECK_HEAD = {
   predictions: ['Predictions', 'Call the tournament. Points land as the real results come in.'],
   summary:     ['The verdict', 'Where the pot is heading — and who’s in line to collect it.'],
 };
-function deckMoney(n){ return '£' + Math.round(n||0).toLocaleString('en-GB'); }
+function deckMoney(n){ return A_S && A_S.money ? A_S.money(n) : '£' + (Math.round(Number(n || 0) * 100) / 100).toLocaleString('en-GB', { minimumFractionDigits: 0, maximumFractionDigits: 2 }); }
 
 function DeckWire(){
   const meta = A_WC.meta || {};

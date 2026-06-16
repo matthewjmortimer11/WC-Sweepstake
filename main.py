@@ -539,6 +539,7 @@ def _league_state(league: League, league_people: List[Dict[str, Any]], admin: Di
     meta["includeLocation"] = bool(admin_meta.get("includeLocation", True))
     meta["includeLtMember"] = bool(admin_meta.get("includeLtMember", True))
     meta["purpose"] = str(admin_meta.get("purpose", "work"))
+    meta["currency"] = str(admin_meta.get("currency") or "£").strip()[:4] or "£"
     try:
         cs = admin_meta.get("charitySplit")
         meta["charitySplit"] = max(0.0, min(1.0, float(cs))) if cs is not None else 0.5
@@ -567,6 +568,7 @@ def _base_state() -> Dict[str, Any]:
     meta["groupSize"] = 0
     meta["stillIn"] = 0
     meta["out"] = 0
+    meta["currency"] = "£"
     data["meta"] = meta
     data["pot"] = 0
     return data
@@ -759,6 +761,7 @@ class LeagueCreate(BaseModel):
     locations: List[str] = Field(default_factory=list)
     locationsFreeText: bool = False
     entryFee: float = 5
+    currency: str = "£"
     charitySplit: float = 0.5
     customFields: List[Dict[str, Any]] = Field(default_factory=list)
 
@@ -865,6 +868,7 @@ async def create_league(payload: LeagueCreate):
         entry_fee = max(0.0, round(float(payload.entryFee), 2))
     except (TypeError, ValueError):
         entry_fee = 5.0
+    currency = str(payload.currency or "£").strip()[:4] or "£"
     try:
         charity_split = max(0.0, min(1.0, float(payload.charitySplit)))
     except (TypeError, ValueError):
@@ -877,6 +881,7 @@ async def create_league(payload: LeagueCreate):
         "locations": [str(x).strip()[:40] for x in (payload.locations or []) if str(x).strip()][:12],
         "locationsFreeText": bool(payload.locationsFreeText),
         "entryFee": entry_fee,
+        "currency": currency,
         "charitySplit": charity_split,
         "customFields": _clean_custom_fields(payload.customFields),
     }

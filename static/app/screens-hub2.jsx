@@ -6,7 +6,7 @@ const { Card: Card2, Btn: Btn2, Flag: Flag2, Avatar: Avatar2, Chip: Chip2, Stamp
 const W2 = window.Wheesht;
 const RS = React;
 
-function money2(n){ return '£' + n.toLocaleString('en-GB'); }
+function money2(n){ return window.Store && window.Store.money ? window.Store.money(n) : '£' + (Math.round(Number(n || 0) * 100) / 100).toLocaleString('en-GB', { minimumFractionDigits: 0, maximumFractionDigits: 2 }); }
 function ownerName2(code){ const o = WC2.ownersOf(code); return o.length ? o[0].name : 'nobody'; }
 
 /* =================== SIDE BETS =================== */
@@ -336,7 +336,7 @@ function StandingsBlock(){
   if (pot > 0) cells.push({ v: money2(pot), l: char > 0 ? 'winner takes all' : 'whole pot to the winner', c: 'var(--green)' });
   if (char > 0) cells.push({ v: money2(char), l: pot > 0 ? 'raised for charity' : 'whole pot to charity', c: 'var(--red)' });
   cells.push({ v: P.length, l: P.length === 1 ? 'entrant' : 'entrants', c: 'var(--ink)' });
-  cells.push({ v: '£' + (WC2.FEE || 0), l: 'to enter', c: 'var(--ink)' });
+  cells.push({ v: money2(WC2.FEE || 0), l: 'to enter', c: 'var(--ink)' });
   return (
     <>
       <SH2>Where it stands</SH2>

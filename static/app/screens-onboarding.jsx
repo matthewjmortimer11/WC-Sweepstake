@@ -250,6 +250,7 @@ function CreateLeague(props) {
   const [locInput, setLocInput] = oState('Edinburgh, London');
   const [locationsFreeText, setLocationsFreeText] = oState(false);
   const [entryFee, setEntryFee] = oState('5');
+  const [currency, setCurrency] = oState('£');
   const [charitySplit, setCharitySplit] = oState(0.5);
   const [customFields, setCustomFields] = oState([]);
   const [err, setErr] = oState('');
@@ -278,6 +279,7 @@ function CreateLeague(props) {
       locations: locations.length ? locations : ['Edinburgh', 'London'],
       locationsFreeText: locationsFreeText,
       entryFee: Math.max(0, Number(entryFee) || 0),
+      currency: currency || '£',
       charitySplit: charitySplit,
       organiserCode: organiserCode,
       customFields: customFields.filter(f => (f.label || '').trim()),
@@ -334,7 +336,9 @@ function CreateLeague(props) {
           <div>
             <Lab>Entry fee</Lab>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-              <span className="dh" style={{ fontSize: 24, marginTop: 6 }}>£</span>
+              <select value={currency} onChange={e => setCurrency(e.target.value)} style={{ ...inp, flex: '0 0 86px', fontSize: 20, paddingLeft: 10, paddingRight: 10 }}>
+                {['£', '€', '$'].map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
               <input type="number" min="0" step="0.5" style={inp} value={entryFee} onChange={e => setEntryFee(e.target.value)} placeholder="5" />
             </div>
           </div>
@@ -437,6 +441,7 @@ function OnboardingForm(props) {
   const ok = name.trim().length > 0 && !requiredMissing;
   const split = So.charitySplit ? So.charitySplit() : 0.5;
   const fee = WCo.FEE || 0;
+  const money = So.money || function(n){ return '£' + (Math.round(Number(n || 0) * 100) / 100).toLocaleString('en-GB', { minimumFractionDigits: 0, maximumFractionDigits: 2 }); };
   const charityPerEntry = fee * split;
   const winnerAfterEntry = (window.Store ? window.Store.pot() : WCo.POT * (1 - split)) + fee * (1 - split);
   return (
@@ -485,12 +490,12 @@ function OnboardingForm(props) {
 
         {fee > 0 && <Co bordered style={{ marginTop: 20, background: 'var(--yellow)' }}>
           <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: '.05em', textTransform: 'uppercase' }}>Your buy-in</div>
-          <div className="dh" style={{ fontSize: 28, margin: '2px 0 4px' }}>You're putting in £{fee}.</div>
+          <div className="dh" style={{ fontSize: 28, margin: '2px 0 4px' }}>You're putting in {money(fee)}.</div>
           {split < 0.01
-            ? <div style={{ fontSize: 14, fontWeight: 600 }}>The full amount goes into a winner-takes-all fund — <b>{'£' + Math.round(winnerAfterEntry).toLocaleString('en-GB')}</b> once you're in, and growing with every sign-up.</div>
+            ? <div style={{ fontSize: 14, fontWeight: 600 }}>The full amount goes into a winner-takes-all fund — <b>{money(winnerAfterEntry)}</b> once you're in, and growing with every sign-up.</div>
             : split > 0.99
               ? <div style={{ fontSize: 14, fontWeight: 600 }}>The full entry goes to charity. This is a fun-only sweepstake — no winner fund.</div>
-              : <div style={{ fontSize: 14, fontWeight: 600 }}><b>£{charityPerEntry.toFixed(2).replace(/\.00$/, '')} goes to charity</b>, the rest into a winner-takes-all fund — <b>{'£' + Math.round(winnerAfterEntry).toLocaleString('en-GB')}</b> once you're in, and growing with every sign-up.</div>
+              : <div style={{ fontSize: 14, fontWeight: 600 }}><b>{money(charityPerEntry)} goes to charity</b>, the rest into a winner-takes-all fund — <b>{money(winnerAfterEntry)}</b> once you're in, and growing with every sign-up.</div>
           }
         </Co>}
 

@@ -19,7 +19,11 @@
   var h = R.createElement;
 
   /* ---- live panels ------------------------------------------------------ */
-  function money(n) { return '£' + (n || 0).toLocaleString('en-GB'); }
+  function money(n) {
+    return window.Store && window.Store.money
+      ? window.Store.money(n)
+      : '£' + (Math.round(Number(n || 0) * 100) / 100).toLocaleString('en-GB', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+  }
 
   function Stat(props) {
     return h('div', { className: 'sp-stat' },

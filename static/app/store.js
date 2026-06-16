@@ -130,6 +130,7 @@
       includeLocation: WC.meta.includeLocation !== false,
       includeLtMember: WC.meta.includeLtMember !== false,
       charitySplit: WC.meta.charitySplit != null ? Number(WC.meta.charitySplit) : CHARITY_SPLIT,
+      currency: WC.meta.currency || '£',
       purpose: WC.meta.purpose || 'work',
       locations: WC.meta.locations || ['Edinburgh', 'London'],
       locationsFreeText: !!WC.meta.locationsFreeText,
@@ -168,6 +169,7 @@
     WC.meta.includeDepartment = !admin.meta || admin.meta.includeDepartment !== false;
     WC.meta.includeLocation = !admin.meta || admin.meta.includeLocation !== false;
     WC.meta.includeLtMember = !admin.meta || admin.meta.includeLtMember !== false;
+    WC.meta.currency = (admin.meta && admin.meta.currency) || BASE.meta.currency || '£';
     WC.meta.purpose = (admin.meta && admin.meta.purpose) || BASE.meta.purpose;
     WC.meta.locations = (admin.meta && Array.isArray(admin.meta.locations) && admin.meta.locations.length) ? admin.meta.locations : BASE.meta.locations;
     WC.meta.locationsFreeText = admin.meta && admin.meta.locationsFreeText != null ? !!admin.meta.locationsFreeText : BASE.meta.locationsFreeText;
@@ -184,6 +186,17 @@
     if (admin.meta && admin.meta.charitySplit != null) return Number(admin.meta.charitySplit);
     var v = WC.charitySplit != null ? WC.charitySplit : WC.CHARITY_SPLIT;
     return v == null ? CHARITY_SPLIT : Number(v);
+  }
+  function currencyValue() {
+    var c = (admin.meta && admin.meta.currency) || (WC.meta && WC.meta.currency) || BASE.meta.currency || '£';
+    c = String(c || '£').trim().slice(0, 4);
+    return c || '£';
+  }
+  function formatMoney(n) {
+    var val = Number(n || 0);
+    if (!isFinite(val)) val = 0;
+    val = Math.round(val * 100) / 100;
+    return currencyValue() + val.toLocaleString('en-GB', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
   }
 
   function cleanCustomFields(fields) {
@@ -582,6 +595,8 @@
     charity: function () { return cache.length * (WC.FEE || 0) * charitySplitValue(); },
     pot: function () { return cache.length * (WC.FEE || 0) * (1 - charitySplitValue()); },
     charitySplit: charitySplitValue,
+    currency: currencyValue,
+    money: formatMoney,
 
     search: function (q) {
       q = (q || '').trim().toLowerCase();
@@ -947,6 +962,11 @@
     teamsAlive: function () { return WC.TEAM_LIST.filter(function (t) { return t.alive; }).length; },
     phase: function () { return WC.meta.phase; },
     entryFee: function () { return WC.FEE || 0; },
+    setCurrency: function (currency) {
+      var c = String(currency || '£').trim().slice(0, 4) || '£';
+      admin.meta = admin.meta || {}; admin.meta.currency = c;
+      commitAdmin();
+    },
     includeDepartment: function () { return !WC.meta || WC.meta.includeDepartment !== false; },
     setPhase: function (phase) {
       admin.meta = admin.meta || {}; admin.meta.phase = phase;
@@ -1087,6 +1107,7 @@
       var keep = admin.meta || {};
       admin = { teams: {}, fixtures: {}, predictions: {}, meta: {
         entryFee: keep.entryFee,
+        currency: keep.currency,
         includeDepartment: keep.includeDepartment,
         includeLocation: keep.includeLocation,
         includeLtMember: keep.includeLtMember,
