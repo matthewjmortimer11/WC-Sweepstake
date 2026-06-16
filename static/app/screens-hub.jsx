@@ -276,10 +276,26 @@ function liveMarketPickLabel(m, p) {
   const t = WC.TEAMS[pick];
   return t ? t.name : String(pick);
 }
+function hasPredictionPick(m, p) {
+  if (!m || !p || !p.picks) return false;
+  const pick = p.picks[m.key];
+  if (pick == null || pick === '') return false;
+  if (Array.isArray(pick)) return pick.length > 0;
+  return true;
+}
+function dynamicFixtureStatus(m) {
+  return String((m && (m.fixture_status || m.fixtureStatus || m.status)) || '').toLowerCase();
+}
 function liveMarketsForPerson(p) {
   const markets = window.Store && window.Store.visiblePredictions ? window.Store.visiblePredictions() : (WC.PREDICTIONS || []);
   return markets.filter(function(m) {
-    return m && String(m.key || '').indexOf('dm_') === 0 && m.fixture_status === 'live' && p && p.picks && p.picks[m.key] != null;
+    if (!m || String(m.key || '').indexOf('dm_') !== 0 || !hasPredictionPick(m, p)) return false;
+    const status = dynamicFixtureStatus(m);
+    return status !== 'done' && status !== 'ft' && m.answer == null;
+  }).sort(function(a, b) {
+    const al = dynamicFixtureStatus(a) === 'live' ? 0 : 1;
+    const bl = dynamicFixtureStatus(b) === 'live' ? 0 : 1;
+    return al - bl;
   }).map(function(m) {
     return { market: m, pick: liveMarketPickLabel(m, p) };
   });

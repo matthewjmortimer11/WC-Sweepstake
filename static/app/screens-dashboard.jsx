@@ -290,10 +290,23 @@ function EditProfile(props) {
   }
   const teamOpts = (WCd.TEAM_LIST || []).slice().sort((a, b) => a.name.localeCompare(b.name));
   const chrome = window.wcSheetChrome(70);
+  const wrapStyle = Object.assign({}, chrome.wrap, { height: '100dvh', maxHeight: '100dvh', overflow: 'hidden' });
+  const sheetStyle = Object.assign({}, chrome.sheet, { paddingBottom: 0 });
+  const saveBarStyle = {
+    position: 'sticky', bottom: 0, zIndex: 2, margin: '18px -18px 0',
+    padding: '12px 18px calc(14px + env(safe-area-inset-bottom))',
+    background: 'var(--bg)', borderTop: '2px solid var(--line)',
+    boxShadow: '0 -12px 24px rgba(26,26,26,.08)'
+  };
+  if (chrome.deck) {
+    saveBarStyle.margin = '18px -22px 0';
+    saveBarStyle.padding = '12px 22px 16px';
+    saveBarStyle.borderRadius = '0 0 22px 22px';
+  }
   return (
-    <div style={chrome.wrap}>
+    <div style={wrapStyle}>
       <div onClick={props.onClose} style={chrome.backdrop} />
-      <div className={chrome.cls} style={chrome.sheet}>
+      <div className={chrome.cls} style={sheetStyle}>
         {!chrome.deck && <div style={{ width: 44, height: 5, borderRadius: 3, background: 'var(--line)', margin: '0 auto 14px' }} />}
         <div className="dh" style={{ fontSize: 22, marginBottom: 14 }}>Edit your profile</div>
 
@@ -346,7 +359,7 @@ function EditProfile(props) {
         </div>
         <PasswordSection me={me} />
         <GoogleSection me={me} />
-        <div style={{ marginTop: 18 }}>
+        <div style={saveBarStyle}>
           <Bd variant="ink" block onClick={() => {
             Sd.saveProfile(me.id, { displayName: dispName.trim(), favouriteTeam: fav });
             // Keep the base name untouched (organiser's record); only details change.
