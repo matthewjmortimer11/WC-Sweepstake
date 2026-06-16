@@ -266,12 +266,100 @@ function StageFunnel(){
   );
 }
 
+function liveMarketPickLabel(m, p) {
+  const pick = p && p.picks ? p.picks[m.key] : null;
+  if (pick == null || pick === '') return 'No pick yet';
+  if (m.kind === 'scoreline') return String(pick);
+  if (m.kind === 'number') return String(pick);
+  if (Array.isArray(pick)) return pick.map(function(x){ const t = WC.TEAMS[x]; return t ? t.name : x; }).join(', ');
+  if (pick === 'draw') return 'Draw';
+  const t = WC.TEAMS[pick];
+  return t ? t.name : String(pick);
+}
+function liveMarketsForPerson(p) {
+  const markets = window.Store && window.Store.visiblePredictions ? window.Store.visiblePredictions() : (WC.PREDICTIONS || []);
+  return markets.filter(function(m) {
+    return m && String(m.key || '').indexOf('dm_') === 0 && m.fixture_status === 'live';
+  }).map(function(m) {
+    return { market: m, pick: liveMarketPickLabel(m, p) };
+  });
+}
+function PersonSnapshot(props) {
+  const p = props.person;
+  if (!p) return null;
+  const t = WC.TEAMS[p.team] || { code: p.team || '?', name: p.team || 'TBD', flag: '🏳️', group: '—', alive: true };
+  const fixtures = (WC.FIXTURES || []).filter(function(f){ return f.a === t.code || f.b === t.code; });
+  const livePicks = liveMarketsForPerson(p);
+  const shown = window.Store && window.Store.shownName ? window.Store.shownName(p) : p.name;
+  const chrome = window.wcSheetChrome ? window.wcSheetChrome(72) : null;
+  const wrap = chrome ? chrome.wrap : { position: 'fixed', inset: 0, zIndex: 9999 };
+  const backdrop = chrome ? chrome.backdrop : { position: 'absolute', inset: 0, background: 'rgba(0,0,0,.35)' };
+  const sheet = chrome ? chrome.sheet : { position: 'absolute', left: 0, right: 0, bottom: 0, background: 'var(--bg)', borderRadius: '22px 22px 0 0', padding: 18, maxHeight: '82dvh', overflowY: 'auto' };
+  const cls = chrome ? chrome.cls : '';
+  return (
+    <div style={wrap}>
+      <div onClick={props.onClose} style={backdrop} />
+      <div className={cls} style={sheet}>
+        {!chrome || !chrome.deck ? <div style={{ width: 44, height: 5, borderRadius: 3, background: 'var(--line)', margin: '0 auto 14px' }} /> : null}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <Avatar person={Object.assign({}, p, { isYou: false })} size={54} />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div className="dh" style={{ fontSize: 24, lineHeight: 1 }}>{shown}</div>
+            <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--ink2)', marginTop: 4 }}>{p.location || p.city || '—'}{p.department ? ' · ' + p.department : ''}</div>
+          </div>
+          <button onClick={props.onClose} className="wc-btn wc-btn--sm" style={{ background: '#fff', flex: '0 0 auto' }}>Close</button>
+        </div>
+
+        <Card bordered style={{ marginTop: 14, background: 'var(--yellow)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <Flag team={t} size={34} />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 10.5, fontWeight: 900, letterSpacing: '.06em', textTransform: 'uppercase' }}>Group {t.group}</div>
+              <div className="dh" style={{ fontSize: 21, lineHeight: 1 }}>{t.name}</div>
+            </div>
+            <Chip tone={t.alive ? 'green' : 'red'}>{t.alive ? 'Still in' : 'Out'}</Chip>
+          </div>
+        </Card>
+
+        <SectionHead aside={fixtures.length + ' games'}>Team games</SectionHead>
+        <Card flat style={{ padding: '3px 13px' }}>
+          {fixtures.map(function(f, i) {
+            const a = WC.TEAMS[f.a] || { code: f.a, name: f.a, flag: '' };
+            const b = WC.TEAMS[f.b] || { code: f.b, name: f.b, flag: '' };
+            const score = f.score && f.score[0] != null && f.score[1] != null ? f.score[0] + '–' + f.score[1] : f.time;
+            return <div key={f.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 0', borderBottom: i < fixtures.length - 1 ? '1.5px solid var(--line)' : 'none' }}>
+              <span style={{ fontSize: 18 }}>{a.flag}</span>
+              <span style={{ fontSize: 11, fontWeight: 900, width: 34 }}>{a.code}</span>
+              <span className="dh" style={{ fontSize: 16, width: 42, textAlign: 'center' }}>{score}</span>
+              <span style={{ fontSize: 11, fontWeight: 900, width: 34, textAlign: 'right' }}>{b.code}</span>
+              <span style={{ fontSize: 18 }}>{b.flag}</span>
+              <span style={{ marginLeft: 'auto', fontSize: 10.5, fontWeight: 800, color: 'var(--ink2)' }}>{f.status === 'done' ? 'FT' : f.status === 'live' ? 'LIVE' : f.dateLabel}</span>
+            </div>;
+          })}
+        </Card>
+
+        <SectionHead aside="live only">Live predictions</SectionHead>
+        <Card flat style={{ padding: '4px 13px' }}>
+          {livePicks.length
+            ? livePicks.map(function(row, i) {
+                return <div key={row.market.key} style={{ padding: '10px 0', borderBottom: i < livePicks.length - 1 ? '1.5px solid var(--line)' : 'none' }}>
+                  <div style={{ fontSize: 13, fontWeight: 800, lineHeight: 1.25 }}>{row.market.q}</div>
+                  <div className="dh" style={{ fontSize: 17, marginTop: 3 }}>{row.pick}</div>
+                </div>;
+              })
+            : <div style={{ padding: '18px 0', textAlign: 'center', fontSize: 12.5, fontWeight: 700, color: 'var(--ink2)' }}>No live match predictions right now.</div>}
+        </Card>
+      </div>
+    </div>
+  );
+}
+
 function PersonRow(props){
   const p=props.person; const t=WC.TEAMS[p.team]||{code:p.team||'?',flag:'🏳️',rounds:0,stage:'group'}; const you=props.you;
   const pts = window.Store ? window.Store.predScoreOf(p) : (p.predScore||0);
   const includeDept = window.Store && window.Store.includeDepartment ? window.Store.includeDepartment() : true;
   return (
-    <div style={{display:'flex',alignItems:'center',gap:9,padding:'9px 4px',borderBottom:'1.5px solid var(--line)',opacity:p.alive?1:.62}}>
+    <button onClick={props.onOpen} style={{width:'100%',display:'flex',alignItems:'center',gap:9,padding:'9px 4px',border:'none',borderBottom:'1.5px solid var(--line)',background:'none',textAlign:'left',fontFamily:'var(--body)',cursor:'pointer',opacity:p.alive?1:.62}}>
       <Avatar person={Object.assign({},p,{isYou:false})} size={34} dim={!p.alive}/>
       <div style={{flex:1,minWidth:0}}>
         <div style={{fontWeight:800,fontSize:14,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{p.name}{you&&' (you)'}</div>
@@ -289,13 +377,14 @@ function PersonRow(props){
             ? <span style={{width:32,textAlign:'center',fontSize:18}}>⚽</span>
             : <ProgressRing value={t.rounds/6} size={32} stroke={5} color={t.stage==='qf'?'var(--green)':'var(--yellow)'}/>)
         : <Stamp tone="red" rotate={-6} style={{fontSize:10}}>OUT</Stamp>}
-    </div>
+    </button>
   );
 }
 
 function TrackerScreen(){
   const [filter,setFilter]=uState('all');
   const [dept,setDept]=uState('');
+  const [selected,setSelected]=uState(null);
   const pre = WC.meta.phase === 'pre';
   const P = window.Store ? window.Store.allSync() : WC.PEOPLE;
   const youId = window.Store ? window.Store.activeId() : null;
@@ -403,11 +492,13 @@ function TrackerScreen(){
         </select>
       </div>}
       <Card flat style={{padding:'4px 14px'}}>
-        {list.map(p=><PersonRow key={p.id} person={p} you={p.id===youId} pre={pre}/>)}
+        {list.map(p=><PersonRow key={p.id} person={p} you={p.id===youId} pre={pre} onOpen={()=>setSelected(p)}/>)}
       </Card>
+      {selected && <PersonSnapshot person={(window.Store && window.Store.getSync && window.Store.getSync(selected.id)) || selected} onClose={()=>setSelected(null)} />}
     </div>
   );
 }
 
 window.DashboardScreen = DashboardScreen;
 window.TrackerScreen = TrackerScreen;
+window.PersonSnapshot = PersonSnapshot;

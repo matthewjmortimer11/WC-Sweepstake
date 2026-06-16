@@ -70,11 +70,16 @@ function badgesFor(p) {
   if (total && made >= total) out.push({ icon: '🎯', label: 'Full card', tone: 'green' });
   const score = S.predScoreOf ? S.predScoreOf(p) : 0;
   if (score > 0) out.push({ icon: '✅', label: score + ' pts', tone: 'green' });
-  let rank = 0;
-  if (S.rankedByPred) { const r = S.rankedByPred().find(function (x) { return x.id === p.id; }); rank = r ? r.predRank : 0; }
-  if (rank === 1) out.push({ icon: '🥇', label: 'Top of the league', tone: 'yellow' });
-  else if (rank === 2) out.push({ icon: '🥈', label: '2nd overall', tone: 'yellow' });
-  else if (rank === 3) out.push({ icon: '🥉', label: '3rd overall', tone: 'yellow' });
+  let rank = 0, uniqueRank = false;
+  if (S.rankedByPred) {
+    const rows = S.rankedByPred();
+    const r = rows.find(function (x) { return x.id === p.id; });
+    rank = r ? r.predRank : 0;
+    uniqueRank = !!(r && score > 0 && rows.filter(function (x) { return x.predScore === r.predScore; }).length === 1);
+  }
+  if (uniqueRank && rank === 1) out.push({ icon: '🥇', label: 'Top of the league', tone: 'yellow' });
+  else if (uniqueRank && rank === 2) out.push({ icon: '🥈', label: '2nd overall', tone: 'yellow' });
+  else if (uniqueRank && rank === 3) out.push({ icon: '🥉', label: '3rd overall', tone: 'yellow' });
   const t = WC.TEAMS[p.team];
   if (t) out.push(t.alive ? { icon: '🟢', label: 'Team still in', tone: 'green' } : { icon: '💀', label: 'Knocked out', tone: 'red' });
   const fav = S.favTeam ? S.favTeam(p) : null;

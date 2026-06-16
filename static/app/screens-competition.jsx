@@ -134,6 +134,7 @@ function StatPill(props) {
 /* ---- the dashboard ------------------------------------------------------ */
 function MyGroupDashboard(props) {
   const me = props.me;
+  const [selectedPerson, setSelectedPerson] = cgState(null);
   const t = WCc.TEAMS[me.team];
   if (!t) return <div className="pad"><Saysc mood="neutral" compact>No team drawn yet — once you are in the draw your group appears here.</Saysc></div>;
 
@@ -260,7 +261,11 @@ function MyGroupDashboard(props) {
                     {r.team.name}{r.pos === 1 && G.hasResults ? ' 👑' : ''}{isMe ? <span style={{ color: 'var(--red)' }}> · YOU</span> : ''}
                   </div>
                   <div style={{ fontSize: 10.5, fontWeight: 700, color: 'var(--ink2)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    {o.mine ? 'you' : o.name}{o.extra > 0 ? ' +' + o.extra : ''}
+                    {o.person
+                      ? <button onClick={() => setSelectedPerson(o.person)} style={{ border: 'none', background: 'none', padding: 0, margin: 0, cursor: 'pointer', font: 'inherit', color: 'inherit', textDecoration: 'underline', textDecorationThickness: 1, textUnderlineOffset: 2 }}>
+                          {o.mine ? 'you' : o.name}{o.extra > 0 ? ' +' + o.extra : ''}
+                        </button>
+                      : o.name}
                   </div>
                 </div>
                 <span style={{ width: 22, textAlign: 'center', fontSize: 12.5, fontWeight: 700, color: 'var(--ink2)' }}>{G.hasResults ? r.P : '–'}</span>
@@ -313,6 +318,7 @@ function MyGroupDashboard(props) {
       <Saysc mood={status.mood} label="your group" animate>
         {status.detail}{rivalAbove && status.mustWin ? ' Beat ' + rivalAbove.team.name + ' and the maths changes fast.' : ''}
       </Saysc>
+      {selectedPerson && window.PersonSnapshot && <window.PersonSnapshot person={(Sc.getSync && Sc.getSync(selectedPerson.id)) || selectedPerson} onClose={() => setSelectedPerson(null)} />}
     </div>
   );
 }
