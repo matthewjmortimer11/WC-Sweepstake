@@ -68,6 +68,9 @@ class League(Base):
     name: Mapped[str] = mapped_column(String, nullable=False)
     # Salted PBKDF2 hash ("algo$iterations$salt$hash") — never plaintext.
     password_hash: Mapped[str] = mapped_column(String, nullable=False)
+    # Private organiser/admin code. Older custom leagues may have NULL here; the
+    # backend falls back to password_hash for those legacy rows.
+    organiser_hash: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     # Seeded leagues reveal a pre-assigned roster (from tournament config) at
     # join time instead of doing a fresh random draw.
     seeded: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)

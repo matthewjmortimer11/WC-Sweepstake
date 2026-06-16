@@ -77,6 +77,15 @@
     owners[code] = lsGet(K.active, null) || '';
     ssSet(K.adminOwners, owners);
   }
+  function bindAdminTokenToActive(code) {
+    code = code || leagueCode();
+    if (!code || !adminToken(code)) return;
+    var active = lsGet(K.active, null);
+    if (!active) return;
+    var owners = ssGet(K.adminOwners, {});
+    owners[code] = active;
+    ssSet(K.adminOwners, owners);
+  }
   function adminTokenOwner(code) {
     var owners = ssGet(K.adminOwners, {});
     return owners[code || leagueCode()] || '';
@@ -448,6 +457,7 @@
       return !!(token && owner && active && owner === active);
     },
     setAdminToken: setAdminToken,
+    bindAdminTokenToActive: bindAdminTokenToActive,
     verifyAdminCode: function (code) {
       if (!LIVE) return Promise.resolve({ ok: true });
       var c = leagueCode();
@@ -466,7 +476,9 @@
     createLeague: function (name, code, password, options) {
       options = Object.assign({}, options || {});
       options.customFields = cleanCustomFields(options.customFields || []);
-      var body = Object.assign({ name: name, code: code, password: password }, options);
+      var organiserCode = options.organiserCode || '';
+      delete options.organiserCode;
+      var body = Object.assign({ name: name, code: code, password: password, organiserCode: organiserCode }, options);
       if (!LIVE) {
         var L = { id: 'mock-' + code, code: (code || '').toUpperCase(), name: name || 'Sweepstake', seeded: false };
         admin.meta = Object.assign({}, admin.meta || {}, options);
@@ -477,6 +489,7 @@
       return fetch('/api/leagues', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
         .then(function (r) { return r.json().then(function (j) { if (!r.ok) throw new Error(j.detail || 'Could not create league'); return j; }); })
         .then(function (j) {
+          if (j && j.adminToken && j.league && j.league.code) setAdminToken(j.league.code, j.adminToken);
           admin = { teams: {}, fixtures: {}, predictions: {}, meta: Object.assign({}, options) };
           applyAdmin();
           setActiveLeague(j.league); rebuild(); emit();

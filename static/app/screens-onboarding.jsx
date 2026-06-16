@@ -202,7 +202,7 @@ function JoinLeague(props) {
           <Wo mood="mischievous" size={72} animate />
           <div>
             <div className="dh" style={{ fontSize: 24, lineHeight: 1 }}>Join a league</div>
-            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink2)', marginTop: 4 }}>Enter the league code and password your organiser gave you.</div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink2)', marginTop: 4 }}>Enter the league code and member password your organiser gave you.</div>
           </div>
         </div>
         <div style={{ marginTop: 20 }}>
@@ -217,14 +217,14 @@ function JoinLeague(props) {
           />
         </div>
         <div style={{ marginTop: 14 }}>
-          <Lab>Password</Lab>
+          <Lab>Member password</Lab>
           <input
             type="password"
             style={inp}
             value={pw}
             onChange={e => { setPw(e.target.value); setErr(''); }}
             onKeyDown={e => e.key === 'Enter' && submit()}
-            placeholder="League password"
+            placeholder="Member password"
           />
         </div>
         {err && <div style={{ marginTop: 10, fontSize: 13, fontWeight: 700, color: 'var(--red)' }}>{err}</div>}
@@ -242,6 +242,7 @@ function CreateLeague(props) {
   const [name, setName] = oState('');
   const [code, setCode] = oState('');
   const [pw, setPw] = oState('');
+  const [organiserCode, setOrganiserCode] = oState('');
   const [purpose, setPurpose] = oState('work');
   const [includeDept, setIncludeDept] = oState(true);
   const [includeLocation, setIncludeLocation] = oState(true);
@@ -254,7 +255,7 @@ function CreateLeague(props) {
   const [err, setErr] = oState('');
   const [busy, setBusy] = oState(false);
   const cleanCode = code.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
-  const ok = name.trim().length > 0 && cleanCode.length >= 2 && pw.length >= 4;
+  const ok = name.trim().length > 0 && cleanCode.length >= 2 && pw.length >= 4 && organiserCode.length >= 4 && organiserCode !== pw;
   const toggleRow = (onClick, on, title, text) => <button onClick={onClick} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 11, textAlign: 'left', border: '2px solid var(--line)', borderRadius: 13, background: '#fff', padding: '11px 12px', cursor: 'pointer' }}>
     <span style={{ width: 42, height: 24, borderRadius: 999, background: on ? 'var(--green)' : 'var(--line)', border: '2px solid var(--ink)', position: 'relative', flex: '0 0 auto' }}>
       <span style={{ position: 'absolute', top: 2, left: on ? 20 : 2, width: 16, height: 16, borderRadius: '50%', background: '#fff', border: '2px solid var(--ink)' }} />
@@ -278,6 +279,7 @@ function CreateLeague(props) {
       locationsFreeText: locationsFreeText,
       entryFee: Math.max(0, Number(entryFee) || 0),
       charitySplit: charitySplit,
+      organiserCode: organiserCode,
       customFields: customFields.filter(f => (f.label || '').trim()),
     };
     So.createLeague(name.trim(), cleanCode, pw, opts).then(function (res) {
@@ -297,7 +299,7 @@ function CreateLeague(props) {
           <Wo mood="confident" size={72} animate />
           <div>
             <div className="dh" style={{ fontSize: 24, lineHeight: 1 }}>Create a league</div>
-            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink2)', marginTop: 4 }}>You'll be the organiser. Share the code and password with your group.</div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink2)', marginTop: 4 }}>You'll be the organiser. Share the league code and member password. Keep the organiser code private.</div>
           </div>
         </div>
         <div style={{ marginTop: 20, display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -311,8 +313,16 @@ function CreateLeague(props) {
             <div style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--ink2)', marginTop: 4 }}>2–12 letters or numbers. People type this to join.</div>
           </div>
           <div>
-            <Lab>Password</Lab>
+            <Lab>Member password</Lab>
             <input type="password" style={inp} value={pw} onChange={e => { setPw(e.target.value); setErr(''); }} onKeyDown={e => e.key === 'Enter' && submit()} placeholder="At least 4 characters" />
+            <div style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--ink2)', marginTop: 4 }}>People use this with the league code to join. It does not unlock organiser tools.</div>
+          </div>
+          <div>
+            <Lab>Private organiser code</Lab>
+            <input type="password" style={inp} value={organiserCode} onChange={e => { setOrganiserCode(e.target.value); setErr(''); }} onKeyDown={e => e.key === 'Enter' && submit()} placeholder="Different from member password" />
+            <div style={{ fontSize: 11.5, fontWeight: 600, color: organiserCode && organiserCode === pw ? 'var(--red)' : 'var(--ink2)', marginTop: 4 }}>
+              Only the organiser uses this to open settings, results, chat moderation and league controls.
+            </div>
           </div>
           <div>
             <Lab>Who is this for?</Lab>

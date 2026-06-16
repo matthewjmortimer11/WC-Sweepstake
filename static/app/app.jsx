@@ -583,6 +583,7 @@ function App(){
       if(existing){ setOrganiser(false); claimOI(existing.id); return; }
     }
     const p=A_S.create(profile,{organiser:organiser});
+    if(organiser && A_S.bindAdminTokenToActive) A_S.bindAdminTokenToActive();
     setOrganiser(false);
     A_S.refresh&&A_S.refresh();
     setDraw({participant:p}); setFlow('app');

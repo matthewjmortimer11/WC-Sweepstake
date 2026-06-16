@@ -140,6 +140,9 @@ def _admin_code_ok(league: League, code: str) -> bool:
     code = code or ""
     if league.seeded and league.code == _CONFIG_LEAGUE_CODE:
         return bool(_ADMIN_PIN) and hmac.compare_digest(code, _ADMIN_PIN)
+    if league.organiser_hash:
+        return _verify_password(code, league.organiser_hash)
+    # Legacy custom leagues created before separate organiser codes shipped.
     return _verify_password(code, league.password_hash)
 
 
@@ -678,6 +681,7 @@ async def _ensure_schema() -> None:
     """
     statements = [
         "ALTER TABLE profiles ADD COLUMN IF NOT EXISTS display_name VARCHAR NOT NULL DEFAULT ''",
+        "ALTER TABLE leagues ADD COLUMN IF NOT EXISTS organiser_hash VARCHAR",
         "ALTER TABLE participants ADD COLUMN IF NOT EXISTS password_hash VARCHAR",
         "ALTER TABLE profiles ADD COLUMN IF NOT EXISTS google_id VARCHAR",
         "ALTER TABLE participants ADD COLUMN IF NOT EXISTS custom_fields JSON NOT NULL DEFAULT '{}'::json",
@@ -747,6 +751,7 @@ class LeagueCreate(BaseModel):
     name: str
     code: str
     password: str
+    organiserCode: Optional[str] = None
     purpose: str = "work"
     includeDepartment: bool = True
     includeLocation: bool = True
@@ -850,6 +855,11 @@ async def create_league(payload: LeagueCreate):
     name = (payload.name or "").strip()[:60] or "Sweepstake"
     if len(payload.password or "") < 4:
         raise HTTPException(status_code=400, detail="Password must be at least 4 characters")
+    organiser_code = (payload.organiserCode or payload.password or "").strip()
+    if len(organiser_code) < 4:
+        raise HTTPException(status_code=400, detail="Organiser code must be at least 4 characters")
+    if payload.organiserCode is not None and hmac.compare_digest(organiser_code, payload.password or ""):
+        raise HTTPException(status_code=400, detail="Use a different organiser code from the member password")
     purpose = "friends" if payload.purpose == "friends" else "work"
     try:
         entry_fee = max(0.0, round(float(payload.entryFee), 2))
@@ -878,7 +888,9 @@ async def create_league(payload: LeagueCreate):
             raise HTTPException(status_code=409, detail="That code is already taken")
         league = League(
             id=uuid.uuid4().hex, code=code, slug=_slugify(name), name=name,
-            password_hash=_hash_password(payload.password), seeded=False, created_at=_now(),
+            password_hash=_hash_password(payload.password),
+            organiser_hash=_hash_password(organiser_code),
+            seeded=False, created_at=_now(),
         )
         try:
             session.add(league)
@@ -896,7 +908,7 @@ async def create_league(payload: LeagueCreate):
             await session.rollback()
             log.exception("Could not initialise admin overrides for new league %s", code)
             raise HTTPException(status_code=500, detail="Could not initialise league settings. Try again.")
-        return {"league": _league_public(league)}
+        return {"league": _league_public(league), "adminToken": _admin_token_for(league)}
 
 
 @app.post("/api/leagues/join")

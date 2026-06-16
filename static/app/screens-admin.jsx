@@ -799,7 +799,7 @@ function ChatAdmin() {
 function AdminGate(props) {
    const serverAuth = !!(Sa.live && Sa.verifyAdminCode);
    const [ok, setOk] = aState2(() => {
-     return serverAuth ? !!(Sa.hasAdminToken && Sa.hasAdminToken()) : true;
+     return serverAuth ? !!(Sa.hasAdminTokenForActive ? Sa.hasAdminTokenForActive() : (Sa.hasAdminToken && Sa.hasAdminToken())) : true;
    });
    const [entry, setEntry] = aState2('');
    const [bad, setBad] = aState2(false);
@@ -808,14 +808,14 @@ function AdminGate(props) {
    if (ok) return <AdminPanel onClose={props.onClose} />;
 
    // Which code does this league expect? The seeded main league uses the
-   // organiser PIN; a self-created league uses its own password.
+   // organiser PIN; self-created leagues use their private organiser code.
    const league = Sa.activeLeague && Sa.activeLeague();
    const seeded = !!(league && league.seeded);
    const hint = !serverAuth
      ? 'Preview mode — the clipboard is open.'
      : seeded
        ? 'Use the organiser PIN for this league.'
-       : 'Use the password you set when you created “' + ((league && league.name) || 'this league') + '”.';
+       : 'Use the private organiser code set when “' + ((league && league.name) || 'this league') + '” was created.';
 
    function submit() {
      if (!entry || busy) return;
@@ -849,7 +849,7 @@ function AdminGate(props) {
            value={entry}
            onChange={e => { setEntry(e.target.value); setBad(false); }}
            onKeyDown={e => { if (e.key === 'Enter') submit(); }}
-           placeholder="Code"
+           placeholder={seeded ? 'Organiser PIN' : 'Organiser code'}
            style={{ width: '100%', border: '2.5px solid var(--ink)', borderRadius: 14, padding: '13px 16px', fontFamily: 'var(--disp)', fontWeight: 800, fontSize: 22, textAlign: 'center', letterSpacing: '.1em', marginTop: 14, outline: 'none' }}
          />
          <button onClick={submit} disabled={!entry || busy} className="wc-btn wc-btn--ink wc-btn--block" style={{ marginTop: 14, opacity: entry && !busy ? 1 : 0.4 }}>{busy ? 'Checking…' : 'Unlock the clipboard'}</button>
