@@ -451,29 +451,39 @@ def _resolve(league_people: List[Dict[str, Any]], admin: Dict[str, Any]):
     team_map = {t["code"]: t for t in teams}
     fix_map  = {f["id"]: f for f in fixtures}
     for dm in dm_list:
-        f = fix_map.get(dm.get("fixture_id", ""))
+        if not isinstance(dm, dict):
+            continue
+        market_id = str(dm.get("id") or "")
+        fixture_id = str(dm.get("fixture_id") or "")
+        if not market_id or not fixture_id:
+            continue
+        f = fix_map.get(fixture_id)
         if not f:
             continue
         ta = team_map.get(f["a"], {}); tb = team_map.get(f["b"], {})
         fa = ta.get("flag", f["a"]); fb = tb.get("flag", f["b"])
         na = ta.get("name", f["a"]); nb = tb.get("name", f["b"])
         dm_type = dm.get("type", "winner")
+        try:
+            dm_points = max(1, min(50, int(dm.get("points", 5))))
+        except (TypeError, ValueError):
+            dm_points = 5
         fix_status = f.get("status", "upcoming")
         if dm_type == "winner":
-            market = {"key": dm["id"], "q": fa + " " + na + " vs " + fb + " " + nb + " — who wins?",
-                      "kind": "team", "points": dm.get("points", 5),
+            market = {"key": market_id, "q": fa + " " + na + " vs " + fb + " " + nb + " — who wins?",
+                      "kind": "team", "points": dm_points,
                       "options": [f["a"], f["b"], "draw"], "answer": None,
-                      "fixture_id": dm["fixture_id"], "fixture_status": fix_status}
+                      "fixture_id": fixture_id, "fixture_status": fix_status}
             if fix_status == "done" and f.get("score"):
                 sc = f["score"]
                 if sc[0] > sc[1]:   market["answer"] = f["a"]
                 elif sc[1] > sc[0]: market["answer"] = f["b"]
                 else:               market["answer"] = "draw"
         else:
-            market = {"key": dm["id"], "q": fa + " " + na + " vs " + fb + " " + nb + " — exact score?",
-                      "kind": "scoreline", "points": dm.get("points", 5),
+            market = {"key": market_id, "q": fa + " " + na + " vs " + fb + " " + nb + " — exact score?",
+                      "kind": "scoreline", "points": dm_points,
                       "options": [f["a"], f["b"]], "answer": None,
-                      "fixture_id": dm["fixture_id"], "fixture_status": fix_status}
+                      "fixture_id": fixture_id, "fixture_status": fix_status}
             if fix_status == "done" and f.get("score"):
                 sc = f["score"]
                 market["answer"] = str(sc[0]) + "-" + str(sc[1])
@@ -1772,7 +1782,10 @@ async def delete_match_prediction(
         if not row or not row.data:
             return {"ok": True}
         data = dict(row.data)
-        dms = [m for m in (data.get("dynamicMarkets") or []) if m["id"] != market_id]
+        dms = [
+            m for m in (data.get("dynamicMarkets") or [])
+            if isinstance(m, dict) and m.get("id") != market_id
+        ]
         data["dynamicMarkets"] = dms
         # also remove any stored answer for this market
         preds = dict(data.get("predictions") or {})

@@ -340,11 +340,12 @@
       var s = 0;
       (WC.PREDICTIONS || []).forEach(function (m) {
         if (m.answer == null) return;
+        var pts = Number(m.points) || 0;
         var pick = p.picks[m.key];
         if (pick == null) return;
-        if (m.kind === 'team2') { if (Array.isArray(pick) && Array.isArray(m.answer) && pick.length === m.answer.length && pick.slice().sort().join() === m.answer.slice().sort().join()) s += m.points; }
-        else if (m.kind === 'number') { if (Number(pick) === Number(m.answer)) s += m.points; }
-        else if (pick === m.answer) s += m.points;
+        if (m.kind === 'team2') { if (Array.isArray(pick) && Array.isArray(m.answer) && pick.length === m.answer.length && pick.slice().sort().join() === m.answer.slice().sort().join()) s += pts; }
+        else if (m.kind === 'number') { if (Number(pick) === Number(m.answer)) s += pts; }
+        else if (pick === m.answer) s += pts;
       });
       return s;
     }
@@ -511,7 +512,7 @@
     predScoreOf: predScoreOf,
     visiblePredictions: visiblePredictions,
     madeVisiblePredictions: madeVisiblePredictions,
-    maxPredPoints: function () { return visiblePredictions().reduce(function (a, m) { return a + m.points; }, 0); },
+    maxPredPoints: function () { return visiblePredictions().reduce(function (a, m) { return a + (Number(m.points) || 0); }, 0); },
     predictionsLocked: function () {
       var deadline = WC.meta && WC.meta.predDeadline;
       var deadlinePassed = !!(deadline && new Date() > new Date(deadline));
