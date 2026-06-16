@@ -120,6 +120,7 @@
   // in place (the static preview's only path).
   var admin = LIVE ? { teams: {}, fixtures: {}, predictions: {}, meta: {} }
                    : lsGet(K.admin, { teams: {}, fixtures: {}, predictions: {}, meta: {} });
+  var lastRefreshAt = LIVE ? Date.now() : 0;
 
   var BASE = {
     teams: {}, preds: {},
@@ -385,7 +386,12 @@
 
   // ---- scoring ------------------------------------------------------------
   function marketFixtureStatus(m) {
-    return String((m && (m.fixture_status || m.fixtureStatus || m.status)) || '').toLowerCase();
+    var raw = String((m && (m.fixture_status || m.fixtureStatus || m.status)) || '').trim();
+    var st = raw.toLowerCase();
+    if (['done', 'ft', 'fulltime', 'full_time', 'full-time', 'finished'].indexOf(st) >= 0) return 'done';
+    if (['halftime', 'half_time', 'half-time', 'ht', 'paused'].indexOf(st) >= 0) return 'halfTime';
+    if (['live', 'inplay', 'in_play', 'in-progress', 'inprogress', '1h', '2h'].indexOf(st) >= 0) return 'live';
+    return st || 'upcoming';
   }
   function marketFinished(m) {
     return ['done', 'ft', 'fulltime', 'full_time', 'full-time', 'finished'].indexOf(marketFixtureStatus(m)) >= 0;
@@ -911,6 +917,7 @@
           window.WC_DATA = d;
           if (d.adminOverrides) admin = d.adminOverrides;
           if (window.__rebuildWC) window.__rebuildWC();
+          lastRefreshAt = Date.now();
           rebuild(); emit();
         }
         return d;
@@ -963,6 +970,19 @@
 
     // ===== ADMIN (scoped to the active league) =====
     adminState: function () { return admin; },
+    adminAudit: function () {
+      return (admin && Array.isArray(admin.audit)) ? admin.audit.slice().reverse() : [];
+    },
+    lastRefreshAt: function () { return lastRefreshAt; },
+    fixtureHealth: function () {
+      var meta = WC.meta || {};
+      return {
+        updatedAt: meta.fixturesUpdatedAt || null,
+        liveFixtures: Number(meta.liveFixtures || 0),
+        finishedFixtures: Number(meta.finishedFixtures || 0),
+        needsResult: Number(meta.needsResult || 0),
+      };
+    },
     teamsAlive: function () { return WC.TEAM_LIST.filter(function (t) { return t.alive; }).length; },
     phase: function () { return WC.meta.phase; },
     entryFee: function () { return WC.FEE || 0; },

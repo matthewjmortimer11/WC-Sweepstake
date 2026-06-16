@@ -49,10 +49,15 @@ function resizeToDataUrl(file, size, cb) {
 
 function dashTeam(code) { return WCd.TEAMS[code] || { code: code || '?', name: code || 'TBD', flag: '🏳️', rounds: 0, stage: 'group', odds: '0' }; }
 function dashFixtureStatus(m) {
-  return String((m && (m.fixture_status || m.fixtureStatus || m.status)) || '').toLowerCase();
+  const raw = String((m && (m.fixture_status || m.fixtureStatus || m.status)) || '').trim();
+  const st = raw.toLowerCase();
+  if (['done', 'ft', 'fulltime', 'full_time', 'full-time', 'finished'].indexOf(st) >= 0) return 'done';
+  if (['halftime', 'half_time', 'half-time', 'ht', 'paused'].indexOf(st) >= 0) return 'halfTime';
+  if (['live', 'inplay', 'in_play', 'in-progress', 'inprogress', '1h', '2h'].indexOf(st) >= 0) return 'live';
+  return st || 'upcoming';
 }
 function dashFixtureActive(m) {
-  return ['live', 'halftime', 'half_time', 'half-time', 'inplay', 'in_play', 'in-progress', 'inprogress', 'paused'].indexOf(dashFixtureStatus(m)) >= 0;
+  return dashFixtureStatus(m) === 'live' || dashFixtureStatus(m) === 'halfTime';
 }
 function dashFixtureFinished(m) {
   return ['done', 'ft', 'fulltime', 'full_time', 'full-time', 'finished'].indexOf(dashFixtureStatus(m)) >= 0;
@@ -405,7 +410,7 @@ function TeamCard(props) {
   const nextTie = (WCd.R16 || []).find(x => (x.a === me.team || x.b === me.team) && !x.done);
   const opp = nextTie ? WCd.TEAMS[nextTie.a === me.team ? nextTie.b : nextTie.a] : null;
   const pre = PRE();
-  const nextFix = (WCd.FIXTURES || []).find(f => (f.a === me.team || f.b === me.team) && (f.status || 'upcoming') !== 'done');
+  const nextFix = (WCd.FIXTURES || []).find(f => (f.a === me.team || f.b === me.team) && !dashFixtureFinished(f));
   const fixOpp = nextFix ? WCd.TEAMS[nextFix.a === me.team ? nextFix.b : nextFix.a] : null;
   return (
     <Cd bordered className="pop" style={t.alive ? null : { background: 'var(--ink)', color: '#fff' }}>
@@ -445,6 +450,46 @@ function TeamCard(props) {
           </div>
           <span className="flame" style={{ fontSize: 24 }}>🔥</span>
         </div>}
+    </Cd>
+  );
+}
+
+function GroupRivalCard(props) {
+  const me = props.me;
+  const comp = window.WheeshtCompetition;
+  const t = dashTeam(me.team);
+  if (!comp || !t || !t.group) return null;
+  const G = comp.groupModel(t.group);
+  const meRow = G.ranked.find(r => r.code === t.code);
+  if (!meRow) return null;
+  const above = G.ranked.find(r => r.pos === meRow.pos - 1);
+  const below = G.ranked.find(r => r.pos === meRow.pos + 1);
+  const next = G.fixtures.filter(f => (f.a === t.code || f.b === t.code) && comp.compFixturePlayable(f)).sort(comp.compFixtureSort)[0];
+  const opp = next ? WCd.TEAMS[next.a === t.code ? next.b : next.a] : null;
+  const gapAbove = above ? Math.max(0, above.Pts - meRow.Pts) : 0;
+  const gapBelow = below ? Math.max(0, meRow.Pts - below.Pts) : 0;
+  return (
+    <Cd bordered style={{ background: 'var(--ink)', color: '#fff' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+        <div>
+          <div style={{ fontSize: 10.5, fontWeight: 900, letterSpacing: '.07em', color: 'var(--yellow)', textTransform: 'uppercase' }}>Group {t.group} pressure</div>
+          <div className="dh" style={{ fontSize: 24, color: '#fff', lineHeight: 1, marginTop: 3 }}>#{meRow.pos}<span style={{ fontSize: 13, color: 'rgba(255,255,255,.55)' }}>/{G.ranked.length}</span> · {G.hasResults ? meRow.Pts + ' pts' : 'awaiting kick-off'}</div>
+        </div>
+        <button onClick={props.onOpen} className="wc-btn wc-btn--sm" style={{ flex: '0 0 auto', background: 'var(--yellow)', boxShadow: '0 3px 0 #000' }}>Open group</button>
+      </div>
+      {(above || below) && <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 12 }}>
+        <div style={{ background: 'rgba(255,255,255,.1)', borderRadius: 12, padding: '9px 10px' }}>
+          <div style={{ fontSize: 9.5, fontWeight: 900, letterSpacing: '.05em', color: '#ffb3b4' }}>TO CATCH</div>
+          <div style={{ fontSize: 13, fontWeight: 850, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{above ? above.team.name + ' +' + gapAbove : 'Nobody'}</div>
+        </div>
+        <div style={{ background: 'rgba(255,255,255,.1)', borderRadius: 12, padding: '9px 10px' }}>
+          <div style={{ fontSize: 9.5, fontWeight: 900, letterSpacing: '.05em', color: '#9be8b8' }}>CHASING YOU</div>
+          <div style={{ fontSize: 13, fontWeight: 850, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{below ? below.team.name + (gapBelow ? ' -' + gapBelow : ' level') : 'Nobody'}</div>
+        </div>
+      </div>}
+      {next && opp && <div style={{ marginTop: 10, fontSize: 12.2, fontWeight: 750, color: 'rgba(255,255,255,.72)', lineHeight: 1.35 }}>
+        Next swing: {t.name} v {opp.name} · {next.dateLabel} {next.time}. This is where the table can move.
+      </div>}
     </Cd>
   );
 }
@@ -591,6 +636,8 @@ function MeScreen(props) {
       </Saysd>
       <SHd>Your team</SHd>
       <TeamCard me={me} onGames={props.goGames} />
+      <SHd aside="who to beat">Your group</SHd>
+      <GroupRivalCard me={me} onOpen={props.goGroup} />
       <SHd aside={(Sd.predictionsLocked && Sd.predictionsLocked()) ? 'locked' : 'open'}>Predictions</SHd>
       <PredCard me={me} onOpen={props.goPredictions} />
       <SHd>{pre ? 'Potential winnings' : 'Results & winnings'}</SHd>

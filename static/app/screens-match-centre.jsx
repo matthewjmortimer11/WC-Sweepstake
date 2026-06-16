@@ -21,12 +21,13 @@ function mcTeam(code) { return WCmc.TEAMS[code] || { code: code || 'TBD', name: 
 function mcName(code) { return mcTeam(code).name; }
 function mcHasScore(f) { return !!(f && f.score && f.score[0] != null && f.score[1] != null); }
 function mcStatus(f) {
-  const raw = (f && f.status) || 'upcoming';
-  if (raw === 'done') return 'done';
-  if (raw === 'live') return 'live';
-  if (raw === 'halfTime') return 'halfTime';
+  const raw = String((f && f.status) || 'upcoming').trim();
+  const st = raw.toLowerCase();
+  if (['done', 'ft', 'fulltime', 'full_time', 'full-time', 'finished'].indexOf(st) >= 0) return 'done';
+  if (['halftime', 'half_time', 'half-time', 'ht', 'paused'].indexOf(st) >= 0) return 'halfTime';
+  if (['live', 'inplay', 'in_play', 'in-progress', 'inprogress', '1h', '2h'].indexOf(st) >= 0) return 'live';
   const ko = mcKickoffMs(f);
-  if (ko == null) return raw;
+  if (ko == null) return raw || 'upcoming';
   const age = Date.now() - ko;
   if (age < 0) return 'upcoming';
   // Until an organiser records a result, treat the match window as live, then

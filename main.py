@@ -30,8 +30,9 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+from zoneinfo import ZoneInfo
 
-from fastapi import FastAPI, Header, HTTPException
+from fastapi import FastAPI, Header, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse, Response
 from pydantic import BaseModel, Field
 from sqlalchemy import delete, func, select, text
@@ -87,10 +88,46 @@ _PARTICIPANTS_FILE = _DATA_DIR / "participants.json"
 _ADMIN_FILE = _DATA_DIR / "admin.json"
 _CHAT_FILE = _DATA_DIR / "chat.json"
 _MAX_CHAT = 200
+_RATE_BUCKETS: Dict[str, List[float]] = {}
+_UK_TZ = ZoneInfo("Europe/London")
 
 
 def _now() -> datetime:
     return datetime.now(tz=timezone.utc)
+
+
+def _client_key(request: Request) -> str:
+    forwarded = (request.headers.get("x-forwarded-for") or "").split(",")[0].strip()
+    host = forwarded or (request.client.host if request.client else "unknown")
+    return host[:80]
+
+
+def _rate_limit(request: Request, bucket: str, limit: int, window_seconds: int) -> None:
+    now = time.time()
+    if len(_RATE_BUCKETS) > 5000:
+        cutoff = now - window_seconds
+        for stale_key in [k for k, vals in _RATE_BUCKETS.items() if not vals or max(vals) < cutoff]:
+            _RATE_BUCKETS.pop(stale_key, None)
+    key = f"{bucket}:{_client_key(request)}"
+    hits = [t for t in _RATE_BUCKETS.get(key, []) if now - t < window_seconds]
+    if len(hits) >= limit:
+        raise HTTPException(status_code=429, detail="Too many attempts. Try again shortly.")
+    hits.append(now)
+    _RATE_BUCKETS[key] = hits
+
+
+def _audit_event(data: Dict[str, Any], action: str, actor: str = "organiser", detail: str = "") -> Dict[str, Any]:
+    out = dict(data) if isinstance(data, dict) else {}
+    audit = [x for x in (out.get("audit") or []) if isinstance(x, dict)]
+    audit = audit[-79:]
+    audit.append({
+        "ts": int(time.time() * 1000),
+        "action": str(action or "change")[:40],
+        "actor": str(actor or "organiser")[:40],
+        "detail": str(detail or "")[:180],
+    })
+    out["audit"] = audit
+    return out
 
 
 # ── Passwords ────────────────────────────────────────────────────────────────
@@ -551,6 +588,7 @@ def _league_state(league: League, league_people: List[Dict[str, Any]], admin: Di
     meta["customFields"] = _clean_custom_fields(list(admin_meta.get("customFields") or []))
     meta["predDeadline"] = admin_meta.get("predDeadline") or None
     meta["hiddenPredictions"] = list(admin_meta.get("hiddenPredictions") or [])
+    meta.update(_fixture_health(fixtures))
     data["meta"] = meta
     data["pot"] = len(people) * fee
     return data
@@ -559,6 +597,42 @@ def _league_state(league: League, league_people: List[Dict[str, Any]], admin: Di
 def _status_is_done(status: Any) -> bool:
     return str(status or "").strip().lower() in {
         "done", "ft", "fulltime", "full_time", "full-time", "finished",
+    }
+
+
+def _status_is_live(status: Any) -> bool:
+    return str(status or "").strip().lower() in {
+        "live", "halftime", "half_time", "half-time", "inplay", "in_play",
+        "in-progress", "inprogress", "paused", "ht", "1h", "2h",
+    }
+
+
+def _fixture_health(fixtures: List[Dict[str, Any]]) -> Dict[str, Any]:
+    updated: List[str] = [
+        str(f.get("updatedAt"))
+        for f in fixtures or []
+        if f.get("updatedAt")
+    ]
+    needs_result = 0
+    now_ms = int(time.time() * 1000)
+    for f in fixtures or []:
+        if _status_is_done(f.get("status")):
+            continue
+        if _status_is_live(f.get("status")):
+            continue
+        try:
+            tm = str(f.get("time") or "00:00")[:5]
+            kick = datetime.fromisoformat(str(f.get("dateISO")) + "T" + tm + ":00")
+            kick_utc = kick.replace(tzinfo=_UK_TZ).astimezone(timezone.utc)
+            if now_ms - int(kick_utc.timestamp() * 1000) > 135 * 60 * 1000:
+                needs_result += 1
+        except Exception:
+            pass
+    return {
+        "fixturesUpdatedAt": max(updated) if updated else None,
+        "liveFixtures": sum(1 for f in fixtures or [] if _status_is_live(f.get("status"))),
+        "finishedFixtures": sum(1 for f in fixtures or [] if _status_is_done(f.get("status"))),
+        "needsResult": needs_result,
     }
 
 
@@ -575,6 +649,7 @@ def _base_state() -> Dict[str, Any]:
     meta["stillIn"] = 0
     meta["out"] = 0
     meta["currency"] = "£"
+    meta.update(_fixture_health(data.get("fixtures") or []))
     data["meta"] = meta
     data["pot"] = 0
     return data
@@ -857,7 +932,8 @@ def _clean_custom_answers(values: Dict[str, Any], fields: List[Dict[str, Any]]) 
 
 
 @app.post("/api/leagues")
-async def create_league(payload: LeagueCreate):
+async def create_league(payload: LeagueCreate, request: Request):
+    _rate_limit(request, "league:create", 20, 10 * 60)
     code = (payload.code or "").strip().upper()
     if not re.fullmatch(r"[A-Z0-9]{2,12}", code):
         raise HTTPException(status_code=400, detail="Code must be 2–12 letters or numbers")
@@ -912,7 +988,13 @@ async def create_league(payload: LeagueCreate):
             await session.rollback()
             raise HTTPException(status_code=409, detail="That code is already taken")
 
-        session.add(AdminOverride(league_id=league.id, data={"teams": {}, "fixtures": {}, "predictions": {}, "meta": meta}, updated_at=_now()))
+        initial_admin = _audit_event(
+            {"teams": {}, "fixtures": {}, "predictions": {}, "meta": meta},
+            "league_created",
+            "organiser",
+            "League created",
+        )
+        session.add(AdminOverride(league_id=league.id, data=initial_admin, updated_at=_now()))
         try:
             await session.commit()
         except IntegrityError:
@@ -923,7 +1005,8 @@ async def create_league(payload: LeagueCreate):
 
 
 @app.post("/api/leagues/join")
-async def join_league(payload: LeagueJoin):
+async def join_league(payload: LeagueJoin, request: Request):
+    _rate_limit(request, "league:join:" + (payload.code or "").strip().upper(), 20, 10 * 60)
     code = (payload.code or "").strip().upper()
     async with AsyncSessionLocal() as session:
         league = await _get_league_by_code(session, code)
@@ -935,7 +1018,8 @@ async def join_league(payload: LeagueJoin):
 
 
 @app.post("/api/leagues/{code}/admin/auth")
-async def admin_auth(code: str, payload: AdminAuthPayload):
+async def admin_auth(code: str, payload: AdminAuthPayload, request: Request):
+    _rate_limit(request, "admin:auth:" + code.upper(), 10, 10 * 60)
     async with AsyncSessionLocal() as session:
         league = await _get_league_by_code(session, code.upper())
         if league is None:
@@ -1357,8 +1441,9 @@ class AccountPasswordPayload(BaseModel):
 
 
 @app.post("/api/leagues/{code}/participants/{participant_id}/auth")
-async def account_auth(code: str, participant_id: str, payload: AccountAuthPayload):
+async def account_auth(code: str, participant_id: str, payload: AccountAuthPayload, request: Request):
     """Sign in to a password-protected entry; returns a reusable account token."""
+    _rate_limit(request, "account:auth:" + code.upper() + ":" + participant_id, 12, 10 * 60)
     async with AsyncSessionLocal() as session:
         league = await _get_league_by_code(session, code.upper())
         if league is None:
@@ -1562,10 +1647,11 @@ class GoogleLoginPayload(BaseModel):
 
 
 @app.post("/api/leagues/{code}/google-login")
-async def google_login(code: str, payload: GoogleLoginPayload):
+async def google_login(code: str, payload: GoogleLoginPayload, request: Request):
     """Cross-device login: find the participant in this league linked to the given
     Google account and return a fresh account token. No pre-existing auth needed —
     the Google token is the credential."""
+    _rate_limit(request, "google:login:" + code.upper(), 30, 10 * 60)
     if not _GOOGLE_CLIENT_ID:
         raise HTTPException(status_code=503, detail="Google sign-in is not configured on this server")
     claims = await _verify_google_token(payload.idToken)
@@ -1622,7 +1708,11 @@ async def put_admin(
         row = await session.get(AdminOverride, league.id)
         incoming = payload.model_dump()
         if row is None:
-            session.add(AdminOverride(league_id=league.id, data=incoming, updated_at=_now()))
+            session.add(AdminOverride(
+                league_id=league.id,
+                data=_audit_event(incoming, "admin_save", "organiser", "Organiser settings saved"),
+                updated_at=_now(),
+            ))
         else:
             # Older clients only know about teams/fixtures/predictions/meta.
             # Preserve server-owned top-level keys such as dynamicMarkets so a
@@ -1631,6 +1721,7 @@ async def put_admin(
             merged = dict(existing)
             for key in ("teams", "fixtures", "predictions", "meta"):
                 merged[key] = incoming.get(key) or {}
+            merged = _audit_event(merged, "admin_save", "organiser", "Organiser settings saved")
             row.data = merged
             row.updated_at = _now()
         await session.commit()
@@ -1724,6 +1815,13 @@ async def post_system_chat(
             text=text, ts=int(time.time() * 1000),
         )
         session.add(msg)
+        row = await session.get(AdminOverride, league.id)
+        data = _audit_event(row.data if row and row.data else {}, "wheesht_message", "organiser", text)
+        if row:
+            row.data = data
+            row.updated_at = _now()
+        else:
+            session.add(AdminOverride(league_id=league.id, data=data, updated_at=_now()))
         await session.commit()
         return _chat_to_dict(msg)
 
@@ -1768,10 +1866,12 @@ async def create_match_prediction(
         dms.append({"id": market_id, "fixture_id": payload.fixture_id,
                     "type": payload.type, "points": payload.points, "label": label})
         data["dynamicMarkets"] = dms
+        data = _audit_event(data, "prediction_opened", "organiser", label)
         if row:
             row.data = data
+            row.updated_at = _now()
         else:
-            session.add(AdminOverride(league_id=league.id, data=data))
+            session.add(AdminOverride(league_id=league.id, data=data, updated_at=_now()))
         # optional chat announcement
         if payload.notify_chat:
             type_label = "winner" if payload.type == "winner" else "exact scoreline"
@@ -1814,7 +1914,9 @@ async def delete_match_prediction(
         preds = dict(data.get("predictions") or {})
         preds.pop(market_id, None)
         data["predictions"] = preds
+        data = _audit_event(data, "prediction_removed", "organiser", market_id)
         row.data = data
+        row.updated_at = _now()
         await session.commit()
         return {"ok": True}
 
@@ -1833,6 +1935,18 @@ async def delete_chat(
         row = await session.get(ChatMessage, message_id)
         if row is None or row.league_id != league.id:
             raise HTTPException(status_code=404, detail="message not found")
+        audit_row = await session.get(AdminOverride, league.id)
+        data = _audit_event(
+            audit_row.data if audit_row and audit_row.data else {},
+            "chat_deleted",
+            "organiser",
+            (row.author or "unknown") + ": " + (row.text or "")[:80],
+        )
+        if audit_row:
+            audit_row.data = data
+            audit_row.updated_at = _now()
+        else:
+            session.add(AdminOverride(league_id=league.id, data=data, updated_at=_now()))
         await session.delete(row)
         await session.commit()
         return {"ok": True}
@@ -1860,7 +1974,8 @@ def _dev_key_ok(key: str) -> bool:
 
 
 @app.post("/api/dev/leagues")
-async def dev_list_leagues(payload: DevAuth):
+async def dev_list_leagues(payload: DevAuth, request: Request):
+    _rate_limit(request, "dev:list", 8, 10 * 60)
     if not _dev_key_ok(payload.key):
         # Same shape whether the key is wrong or the feature is off — no probing.
         raise HTTPException(status_code=403, detail="Developer access denied")
@@ -1880,7 +1995,8 @@ async def dev_list_leagues(payload: DevAuth):
 
 
 @app.delete("/api/dev/leagues/{code}")
-async def dev_delete_league(code: str, payload: DevDeleteLeaguePayload):
+async def dev_delete_league(code: str, payload: DevDeleteLeaguePayload, request: Request):
+    _rate_limit(request, "dev:delete:" + code.upper(), 6, 10 * 60)
     if not _dev_key_ok(payload.key):
         raise HTTPException(status_code=403, detail="Developer access denied")
     async with AsyncSessionLocal() as session:

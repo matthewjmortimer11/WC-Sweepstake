@@ -15,6 +15,15 @@ function adminTeam(code) {
   return WCa.TEAMS[code] || { code: code || 'TBD', name: code || 'To be decided', flag: '🏳️' };
 }
 
+function adminStatus(f) {
+  const raw = String((f && f.status) || 'upcoming').trim();
+  const st = raw.toLowerCase();
+  if (['done', 'ft', 'fulltime', 'full_time', 'full-time', 'finished'].indexOf(st) >= 0) return 'done';
+  if (['halftime', 'half_time', 'half-time', 'ht', 'paused'].indexOf(st) >= 0) return 'halfTime';
+  if (['live', 'inplay', 'in_play', 'in-progress', 'inprogress', '1h', '2h'].indexOf(st) >= 0) return 'live';
+  return 'upcoming';
+}
+
 /* ---- match banter ----------------------------------------------------------
     When the organiser saves a full-time score, Wheesht pipes up in the house
     voice: homeland bias for Scotland, dry "remaining professional" digs at
@@ -131,7 +140,7 @@ function ScoreStepper(props) {
 function FixtureAdminRow(props) {
    const f = props.f; const [open, setOpen] = aState2(false);
    const ta = adminTeam(f.a), tb = adminTeam(f.b);
-   const st = f.status || 'upcoming';
+   const st = adminStatus(f);
    return (
      <Ca flat style={{ padding: '11px 13px', marginBottom: 8 }}>
        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -479,7 +488,7 @@ function SettingsAdmin() {
 }
 
 function MatchPredAdmin() {
-  const upcoming = (WCa.FIXTURES || []).filter(function(f) { return ['live', 'halfTime', 'done'].indexOf(f.status) < 0; });
+  const upcoming = (WCa.FIXTURES || []).filter(function(f) { return ['live', 'halfTime', 'done'].indexOf(adminStatus(f)) < 0; });
   const [fixId, setFixId] = React.useState(upcoming.length ? upcoming[0].id : '');
   const [mtype, setMtype] = React.useState('winner');
   const [pts, setPts] = React.useState(5);
@@ -573,6 +582,98 @@ function MatchPredAdmin() {
   );
 }
 
+function AdminHealth() {
+   const health = Sa.fixtureHealth ? Sa.fixtureHealth() : {};
+   const lastRefresh = Sa.lastRefreshAt ? Sa.lastRefreshAt() : 0;
+   const audit = Sa.adminAudit ? Sa.adminAudit() : [];
+   const fixtures = WCa.FIXTURES || [];
+   const total = fixtures.length;
+   const live = Number(health.liveFixtures || 0);
+   const finished = Number(health.finishedFixtures || 0);
+   const needs = Number(health.needsResult || 0);
+   function age(ts) {
+     if (!ts) return 'Not yet';
+     const t = typeof ts === 'number' ? ts : new Date(ts).getTime();
+     if (!isFinite(t)) return 'Unknown';
+     const mins = Math.max(0, Math.round((Date.now() - t) / 60000));
+     if (mins < 1) return 'Just now';
+     if (mins < 60) return mins + 'm ago';
+     const hrs = Math.floor(mins / 60);
+     return hrs + 'h ' + (mins % 60) + 'm ago';
+   }
+   function auditLabel(a) {
+     const map = {
+       league_created: 'League created',
+       admin_save: 'Settings/results saved',
+       prediction_opened: 'Prediction opened',
+       prediction_removed: 'Prediction removed',
+       wheesht_message: 'Wheesht message sent',
+       chat_deleted: 'Chat message deleted',
+     };
+     return map[a.action] || a.action || 'Change';
+   }
+   return (
+     <>
+       <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--ink2)', marginBottom: 10 }}>
+         Check the data feed, result gaps and organiser security before matchdays get busy.
+       </div>
+       <Ca bordered style={{ background: needs ? 'rgba(245,200,0,.18)' : 'rgba(26,122,68,.08)', marginBottom: 12 }}>
+         <div className="dh" style={{ fontSize: 18, marginBottom: 8 }}>Data health</div>
+         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+           {[
+             ['Last app sync', age(lastRefresh)],
+             ['Fixture feed', health.updatedAt ? age(health.updatedAt) : 'Static fallback'],
+             ['Live / HT', String(live)],
+             ['Need result', String(needs)],
+             ['Finished', finished + '/' + total],
+             ['Upcoming', String(Math.max(0, total - finished - live))],
+           ].map(function(row) {
+             return <div key={row[0]} style={{ background: '#fff', border: '2px solid var(--line)', borderRadius: 12, padding: '9px 10px' }}>
+               <div style={{ fontSize: 9.5, fontWeight: 900, letterSpacing: '.05em', textTransform: 'uppercase', color: 'var(--ink2)' }}>{row[0]}</div>
+               <div className="dh" style={{ fontSize: 16, lineHeight: 1.1, marginTop: 2 }}>{row[1]}</div>
+             </div>;
+           })}
+         </div>
+         {needs > 0 && <div style={{ marginTop: 10, fontSize: 12, fontWeight: 800, color: 'var(--red)', lineHeight: 1.35 }}>
+           {needs} fixture{needs === 1 ? '' : 's'} look past the match window without a final score. Check Results and enter/verify them.
+         </div>}
+       </Ca>
+       <Ca flat style={{ marginBottom: 12 }}>
+         <div className="dh" style={{ fontSize: 17, marginBottom: 7 }}>Security checklist</div>
+         {[
+           'Member password and private organiser code are separate.',
+           'Organiser codes are verified on the server and never shown back in the app.',
+           'Admin writes require a short-lived organiser token.',
+           'Send as Wheesht only appears after organiser sign-in.',
+           'Sensitive code/password attempts are rate-limited server-side.',
+         ].map(function(txt) {
+           return <div key={txt} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', padding: '5px 0', fontSize: 12.5, fontWeight: 700, color: 'var(--ink2)', lineHeight: 1.32 }}>
+             <span style={{ color: 'var(--green)', fontWeight: 900 }}>✓</span><span>{txt}</span>
+           </div>;
+         })}
+       </Ca>
+       <SHa>Recent organiser activity</SHa>
+       {audit.length
+         ? <Ca flat style={{ padding: '2px 13px' }}>
+             {audit.slice(0, 12).map(function(a, i) {
+               return <div key={i} style={{ padding: '10px 0', borderBottom: i < Math.min(audit.length, 12) - 1 ? '1.5px solid var(--line)' : 'none' }}>
+                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
+                   <div className="dh" style={{ fontSize: 14 }}>{auditLabel(a)}</div>
+                   <div style={{ fontSize: 10.5, fontWeight: 800, color: 'var(--ink2)', whiteSpace: 'nowrap' }}>{age(a.ts)}</div>
+                 </div>
+                 {a.detail && <div style={{ fontSize: 12, fontWeight: 650, color: 'var(--ink2)', marginTop: 2, lineHeight: 1.35 }}>{a.detail}</div>}
+               </div>;
+             })}
+           </Ca>
+         : <Ca flat style={{ textAlign: 'center', padding: '22px 14px' }}>
+             <Wa mood="neutral" size={52} animate />
+             <div className="dh" style={{ fontSize: 15, marginTop: 5 }}>No organiser activity logged yet.</div>
+             <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--ink2)', marginTop: 3 }}>New saves, match predictions and moderation actions will appear here.</div>
+           </Ca>}
+     </>
+   );
+}
+
 function AdminPanel(props) {
    const [, bump] = aState2(0);
    React.useEffect(() => Sa.subscribe(() => bump(x => x + 1)), []);
@@ -587,7 +688,7 @@ function AdminPanel(props) {
    const byDate = []; const seen = {};
    fixtures.forEach(f => { if (!seen[f.dateISO]) { seen[f.dateISO] = { label: f.dateLabel, items: [] }; byDate.push(seen[f.dateISO]); } seen[f.dateISO].items.push(f); });
 
-   const secs = [['results', 'Results'], ['teams', 'Teams'], ['predict', 'Predictions'], ['people', 'People'], ['chat', 'Chat'], ['settings', 'Settings']];
+   const secs = [['results', 'Results'], ['teams', 'Teams'], ['predict', 'Predictions'], ['people', 'People'], ['chat', 'Chat'], ['settings', 'Settings'], ['health', 'Health']];
 
    return (
      <div className="moment" style={{ background: 'var(--bg)' }}>
@@ -647,6 +748,8 @@ function AdminPanel(props) {
          {sec === 'chat' && <ChatAdmin />}
 
          {sec === 'settings' && <SettingsAdmin />}
+
+         {sec === 'health' && <AdminHealth />}
 
          <div style={{ marginTop: 22, borderTop: '2px solid var(--line)', paddingTop: 16 }}>
            <button onClick={() => { if (window.confirm('Reset ALL results, eliminations and answers back to pre-kickoff?')) Sa.adminReset(); }}

@@ -400,3 +400,11 @@ function CompetitionScreen() {
 
 window.MyGroupDashboard = MyGroupDashboard;
 window.CompetitionScreen = CompetitionScreen;
+window.WheeshtCompetition = {
+  groupModel: groupModel,
+  ownersByCode: ownersByCode,
+  ownerLabel: ownerLabel,
+  compStatus: compStatus,
+  compFixturePlayable: compFixturePlayable,
+  compFixtureSort: compFixtureSort,
+};

@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'wheesht-pwa-20260616-reliability1-1';
+const CACHE_VERSION = 'wheesht-pwa-20260616-sets2to6-1';
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const PAGE_CACHE = `${CACHE_VERSION}-pages`;
 
@@ -38,6 +38,12 @@ self.addEventListener('install', (event) => {
       .then((cache) => cache.addAll(STATIC_ASSETS))
       .then(() => self.skipWaiting())
   );
+});
+
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
 });
 
 self.addEventListener('activate', (event) => {

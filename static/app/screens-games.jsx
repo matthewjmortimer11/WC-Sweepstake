@@ -22,8 +22,8 @@ function ownedSet() {
 function statusOf(f) {
   const raw = String((f && f.status) || 'upcoming').toLowerCase();
   if (['done', 'ft', 'fulltime', 'full_time', 'full-time', 'finished'].indexOf(raw) >= 0) return 'done';
-  if (['halftime', 'half_time', 'half-time', 'paused'].indexOf(raw) >= 0) return 'halfTime';
-  if (['live', 'inplay', 'in_play', 'in-progress', 'inprogress'].indexOf(raw) >= 0) return 'live';
+  if (['halftime', 'half_time', 'half-time', 'ht', 'paused'].indexOf(raw) >= 0) return 'halfTime';
+  if (['live', 'inplay', 'in_play', 'in-progress', 'inprogress', '1h', '2h'].indexOf(raw) >= 0) return 'live';
   return raw || 'upcoming';
 }
 

@@ -32,11 +32,24 @@ function fixtureKickedOff(m) {
 }
 function fixtureActive(m) {
   const st = fixtureStatus(m);
-  return ['live', 'halftime', 'half_time', 'half-time', 'inplay', 'in_play', 'in-progress', 'inprogress', 'paused'].indexOf(st) >= 0;
+  return ['live', 'halftime', 'half_time', 'half-time', 'ht', 'inplay', 'in_play', 'in-progress', 'inprogress', 'paused', '1h', '2h'].indexOf(st) >= 0;
 }
 function fixtureFinished(m) {
   const st = fixtureStatus(m);
   return ['done', 'ft', 'fulltime', 'full_time', 'full-time', 'finished'].indexOf(st) >= 0;
+}
+function timeLeftLabel(dt, now) {
+  if (!dt) return '';
+  const ms = new Date(dt).getTime() - now;
+  if (!isFinite(ms)) return '';
+  if (ms <= 0) return 'locked';
+  const mins = Math.ceil(ms / 60000);
+  if (mins < 60) return mins + 'm left';
+  const hrs = Math.floor(mins / 60);
+  const rem = mins % 60;
+  if (hrs < 24) return hrs + 'h' + (rem ? ' ' + rem + 'm' : '') + ' left';
+  const days = Math.floor(hrs / 24);
+  return days + 'd ' + (hrs % 24) + 'h left';
 }
 
 function optLabel(m, opt) {
@@ -294,9 +307,47 @@ function LbRow(props) {
   );
 }
 
+function PredictionPulse(props) {
+  const { markets, missing, me, locked, deadlineLabel } = props;
+  const live = markets.filter(m => String(m.key || '').indexOf('dm_') === 0);
+  const lead = live[0] || missing[0];
+  if (!lead && !deadlineLabel) return null;
+  const hasPick = lead ? pickComplete(lead, me.picks || {}) : false;
+  const active = lead && fixtureActive(lead);
+  const kicked = lead && fixtureKickedOff(lead);
+  return (
+    <Cp bordered style={{ marginBottom: 12, background: active ? 'var(--ink)' : 'var(--yellow)', color: active ? '#fff' : 'var(--ink)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
+        <span style={{ fontSize: 28 }}>{active ? '●' : '⏱'}</span>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 10.5, fontWeight: 900, letterSpacing: '.07em', textTransform: 'uppercase', color: active ? 'var(--yellow)' : 'rgba(26,26,26,.65)' }}>
+            {active ? 'Game live · picks locked' : lead && String(lead.key || '').indexOf('dm_') === 0 ? 'Live match prediction' : 'Prediction deadline'}
+          </div>
+          <div className="dh" style={{ fontSize: 18, lineHeight: 1.08, marginTop: 2, color: active ? '#fff' : 'var(--ink)' }}>
+            {lead ? lead.q : 'Tournament picks'}
+          </div>
+          <div style={{ fontSize: 12, fontWeight: 750, marginTop: 4, opacity: active ? .78 : .72 }}>
+            {lead
+              ? hasPick ? (kicked ? 'Your pick is locked in.' : 'You have picked. You can change it until lock.') : (kicked ? 'You missed this one.' : 'No pick yet. This is where points disappear quietly.')
+              : 'Get the card finished before it locks.'}
+          </div>
+        </div>
+        <Chp tone={hasPick ? 'green' : kicked || locked ? 'red' : 'ghost'} style={{ flex: '0 0 auto', background: active ? '#fff' : undefined }}>
+          {hasPick ? 'Picked' : kicked || locked ? 'Locked' : (deadlineLabel || 'Open')}
+        </Chp>
+      </div>
+    </Cp>
+  );
+}
+
 function PredictionsScreen(props) {
   const me = Sp.active();
   const [, bump] = pState(0);
+  const [now, setNow] = pState(Date.now());
+  React.useEffect(function() {
+    const iv = setInterval(function() { setNow(Date.now()); }, 30000);
+    return function() { clearInterval(iv); };
+  }, []);
   if (!me) return null;
   const markets = Sp.visiblePredictions ? Sp.visiblePredictions() : (WCp.predictions || Sp.PREDICTIONS).filter(m => ((WCp.meta && WCp.meta.hiddenPredictions) || []).indexOf(m.key) < 0);
   const dmTs = k => { const p = String(k).split('_'); const n = parseInt(p[p.length - 1], 10); return isFinite(n) ? n : 0; };
@@ -317,6 +368,8 @@ function PredictionsScreen(props) {
   const predDeadline = WCp.meta && WCp.meta.predDeadline;
   const deadlinePassed = predDeadline && new Date() > new Date(predDeadline);
   const locked = Sp.predictionsLocked ? Sp.predictionsLocked() : (!!(WCp.meta && WCp.meta.predictionsLocked) || !!deadlinePassed);
+  const deadlineLabel = predDeadline ? timeLeftLabel(predDeadline, now) : '';
+  const completionPct = countableMarkets.length ? Math.round(100 * made / countableMarkets.length) : 100;
   function onPick(key, val) { Sp.setPick(me.id, key, val); bump(x => x + 1); }
   function fmtDeadline(dt) {
     try { return new Date(dt).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' }); } catch (e) { return dt; }
@@ -327,10 +380,11 @@ function PredictionsScreen(props) {
         <div>
           <div className="dh" style={{ fontSize: 26 }}>Predictions</div>
           <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink2)' }}>
-            {made} of {countableMarkets.length} made · {missing.length ? missing.length + ' still to call' : 'all open calls in'} · {Sp.predScoreOf(me)} pts banked
+            {completionPct}% complete · {missing.length ? missing.length + ' still to call' : 'all open calls in'} · {Sp.predScoreOf(me)} pts banked
           </div>
         </div>
       </div>
+      <PredictionPulse markets={open} missing={missing} me={me} locked={locked} deadlineLabel={deadlineLabel} />
       {locked && <div style={{ display: 'flex', alignItems: 'center', gap: 9, background: 'var(--ink)', color: '#fff', borderRadius: 13, padding: '10px 13px', marginBottom: 12, fontSize: 13, fontWeight: 700 }}>
         <span style={{ fontSize: 18 }}>🔒</span>
         <div>
@@ -339,7 +393,7 @@ function PredictionsScreen(props) {
         </div>
       </div>}
       {!locked && predDeadline && <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--ink2)', marginBottom: 10, padding: '7px 12px', background: 'rgba(245,200,0,.2)', borderRadius: 10 }}>
-        Picks lock at {fmtDeadline(predDeadline)} — get yours in.
+        Picks lock at {fmtDeadline(predDeadline)}{deadlineLabel ? ' · ' + deadlineLabel : ''} — get yours in.
       </div>}
       {!locked && nextMissing && <Cp flat style={{ marginBottom: 12, padding: '11px 13px', background: 'rgba(245,200,0,.22)', border: '2px solid rgba(26,26,26,.16)' }}>
         <div style={{ fontSize: 10.5, fontWeight: 900, letterSpacing: '.07em', textTransform: 'uppercase', color: 'var(--ink2)' }}>Next call to make</div>
@@ -360,6 +414,12 @@ function PredictionsScreen(props) {
       </>}
       <SHp aside="org-wide">Prediction league</SHp>
       <PredLeaderboard me={me} />
+      <Cp flat style={{ marginTop: 12, padding: '11px 13px', background: 'rgba(26,26,26,.04)' }}>
+        <div style={{ fontSize: 10.5, fontWeight: 900, letterSpacing: '.07em', textTransform: 'uppercase', color: 'var(--ink2)' }}>Scoring</div>
+        <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--ink2)', lineHeight: 1.38, marginTop: 4 }}>
+          Open markets can be changed until they lock. Match predictions lock at kick-off. Settled markets show the answer and your points immediately.
+        </div>
+      </Cp>
       <div style={{ height: 14 }} />
       <Saysp mood="confident" compact>Every point's logged. Wheesht remembers. Especially the bad calls.</Saysp>
     </div>

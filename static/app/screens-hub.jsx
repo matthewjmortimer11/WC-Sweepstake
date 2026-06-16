@@ -288,13 +288,20 @@ function hasPredictionPick(m, p) {
   return true;
 }
 function dynamicFixtureStatus(m) {
-  return String((m && (m.fixture_status || m.fixtureStatus || m.status)) || '').toLowerCase();
+  const raw = String((m && (m.fixture_status || m.fixtureStatus || m.status)) || '').trim();
+  const st = raw.toLowerCase();
+  if (['done', 'ft', 'fulltime', 'full_time', 'full-time', 'finished'].indexOf(st) >= 0) return 'done';
+  if (['halftime', 'half_time', 'half-time', 'ht', 'paused'].indexOf(st) >= 0) return 'halfTime';
+  if (['live', 'inplay', 'in_play', 'in-progress', 'inprogress', '1h', '2h'].indexOf(st) >= 0) return 'live';
+  return st || 'upcoming';
 }
 function isActiveFixtureStatus(status) {
-  return ['live', 'halftime', 'half_time', 'half-time', 'inplay', 'in_play', 'in-progress', 'inprogress', 'paused'].indexOf(status) >= 0;
+  const st = String(status || '').toLowerCase();
+  return ['live', 'halftime', 'half_time', 'half-time', 'inplay', 'in_play', 'in-progress', 'inprogress', 'paused'].indexOf(st) >= 0;
 }
 function isFinishedFixtureStatus(status) {
-  return ['done', 'ft', 'fulltime', 'full_time', 'full-time', 'finished'].indexOf(status) >= 0;
+  const st = String(status || '').toLowerCase();
+  return ['done', 'ft', 'fulltime', 'full_time', 'full-time', 'finished'].indexOf(st) >= 0;
 }
 function liveMarketsForPerson(p) {
   const markets = window.Store && window.Store.visiblePredictions ? window.Store.visiblePredictions() : (WC.PREDICTIONS || []);
@@ -345,7 +352,7 @@ function PersonSnapshot(props) {
       <span className="dh" style={{ fontSize: 16, width: 42, textAlign: 'center' }}>{score}</span>
       <span style={{ fontSize: 11, fontWeight: 900, width: 34, textAlign: 'right' }}>{b.code}</span>
       <span style={{ fontSize: 18 }}>{b.flag}</span>
-      <span style={{ marginLeft: 'auto', fontSize: 10.5, fontWeight: 800, color: 'var(--ink2)' }}>{isFinishedFixtureStatus(dynamicFixtureStatus(f)) ? 'FT' : dynamicFixtureStatus(f) === 'halftime' ? 'HT' : isActiveFixtureStatus(dynamicFixtureStatus(f)) ? 'LIVE' : f.dateLabel}</span>
+      <span style={{ marginLeft: 'auto', fontSize: 10.5, fontWeight: 800, color: 'var(--ink2)' }}>{isFinishedFixtureStatus(dynamicFixtureStatus(f)) ? 'FT' : dynamicFixtureStatus(f) === 'halfTime' ? 'HT' : isActiveFixtureStatus(dynamicFixtureStatus(f)) ? 'LIVE' : f.dateLabel}</span>
     </div>;
   }
   const body = (

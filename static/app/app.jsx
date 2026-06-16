@@ -35,6 +35,59 @@ function appFixtureDone(f){
   return ['done','ft','fulltime','full_time','full-time','finished'].indexOf(st)>=0;
 }
 
+function AppSystemEffects(){
+  const [updateReg,setUpdateReg]=aState(null);
+  const [offline,setOffline]=aState(typeof navigator!=='undefined' ? !navigator.onLine : false);
+  aEffect(()=>{
+    function online(){ setOffline(false); window.wcToast&&window.wcToast('Back online. Syncing the latest scores.', 'confident'); A_S.refresh&&A_S.refresh(); }
+    function off(){ setOffline(true); window.wcToast&&window.wcToast('You are offline. Showing the last saved version.', 'neutral'); }
+    window.addEventListener('online',online);
+    window.addEventListener('offline',off);
+    return ()=>{ window.removeEventListener('online',online); window.removeEventListener('offline',off); };
+  },[]);
+  aEffect(()=>{
+    if(!('serviceWorker' in navigator)) return;
+    let cancelled=false;
+    let iv=null;
+    const controllerChange=()=>{ if(window.__wcReloading) window.location.reload(); };
+    navigator.serviceWorker.ready.then(reg=>{
+      if(cancelled) return;
+      function watch(worker){
+        if(!worker) return;
+        worker.addEventListener('statechange',()=>{
+          if(worker.state==='installed' && navigator.serviceWorker.controller) setUpdateReg(reg);
+        });
+      }
+      if(reg.waiting) setUpdateReg(reg);
+      reg.addEventListener('updatefound',()=>watch(reg.installing));
+      reg.update&&reg.update().catch(()=>{});
+      iv=setInterval(()=>{ reg.update&&reg.update().catch(()=>{}); },20*60*1000);
+      navigator.serviceWorker.addEventListener('controllerchange',controllerChange);
+    }).catch(()=>{});
+    return ()=>{
+      cancelled=true;
+      if(iv) clearInterval(iv);
+      navigator.serviceWorker.removeEventListener('controllerchange',controllerChange);
+    };
+  },[]);
+  function update(){
+    if(updateReg&&updateReg.waiting){
+      window.__wcReloading=true;
+      updateReg.waiting.postMessage({type:'SKIP_WAITING'});
+    } else window.location.reload();
+  }
+  if(!updateReg && !offline) return null;
+  return <div style={{position:'fixed',left:12,right:12,bottom:'calc(92px + env(safe-area-inset-bottom))',zIndex:140,display:'flex',justifyContent:'center',pointerEvents:'none'}}>
+    <div style={{pointerEvents:'auto',display:'flex',alignItems:'center',gap:10,maxWidth:440,width:'100%',background:updateReg?'var(--ink)':'#fff',color:updateReg?'#fff':'var(--ink)',border:'2px solid var(--ink)',borderRadius:16,padding:'10px 12px',boxShadow:'0 10px 30px rgba(0,0,0,.25)'}}>
+      <div style={{flex:1,minWidth:0,fontSize:12.5,fontWeight:800,lineHeight:1.25}}>
+        {updateReg?'New Wheesht update ready.':'Offline mode'}
+        <div style={{fontSize:11,fontWeight:650,opacity:.72,marginTop:2}}>{updateReg?'Refresh once to get the latest fixes.':'Scores and chat will sync when you reconnect.'}</div>
+      </div>
+      {updateReg&&<button onClick={update} className="wc-btn wc-btn--sm" style={{background:'var(--yellow)',boxShadow:'0 3px 0 #000',flex:'0 0 auto'}}>Update</button>}
+    </div>
+  </div>;
+}
+
 /* ---- tab icons ---- */
 function Icon(props){
   const sw=2.4;
@@ -658,35 +711,35 @@ function App(){
   // -------- onboarding / identity flow --------
   if(flow==='gate') return <React.Fragment>
     {frame(<window.AccountGate onResume={resumeAccount} onJoin={()=>{setOrganiser(false);setFlow('join');}} onCreate={()=>{setOrganiser(true);setFlow('create');}}/>)}
-    {viewToggle}<window.ToastLayer/><window.ConfettiLayer/>
+    {viewToggle}<window.ToastLayer/><window.ConfettiLayer/><AppSystemEffects/>
   </React.Fragment>;
   if(flow==='join') return <React.Fragment>
     {frame(<window.JoinLeague onBack={()=>setFlow('gate')} onCreate={()=>{setOrganiser(true);setFlow('create');}}
       onJoined={(league)=>{ setOrganiser(false); setFlow(league&&league.seeded?'oi-roster':'find'); }}/>)}
-    {viewToggle}<window.ToastLayer/><window.ConfettiLayer/>
+    {viewToggle}<window.ToastLayer/><window.ConfettiLayer/><AppSystemEffects/>
   </React.Fragment>;
   if(flow==='create') return <React.Fragment>
     {frame(<window.CreateLeague onBack={()=>setFlow('gate')} onCreated={()=>{ setOrganiser(true); setFlow('form'); }}/>)}
-    {viewToggle}<window.ToastLayer/><window.ConfettiLayer/>
+    {viewToggle}<window.ToastLayer/><window.ConfettiLayer/><AppSystemEffects/>
   </React.Fragment>;
   if(flow==='find') return <React.Fragment>
     {frame(<window.FindMyEntry onBack={()=>setFlow('gate')} onPicked={claimOI} onNew={()=>setFlow('form')}/>)}
     {signInModal}
-    {viewToggle}<window.ToastLayer/><window.ConfettiLayer/>
+    {viewToggle}<window.ToastLayer/><window.ConfettiLayer/><AppSystemEffects/>
   </React.Fragment>;
   if(flow==='form') return <React.Fragment>
     {frame(<window.OnboardingForm onBack={()=>setFlow(me?'app':'gate')} onSubmit={onboardSubmit}/>)}
-    {viewToggle}<window.ToastLayer/><window.ConfettiLayer/>
+    {viewToggle}<window.ToastLayer/><window.ConfettiLayer/><AppSystemEffects/>
   </React.Fragment>;
   if(flow==='oi-roster') return <React.Fragment>
     {frame(<window.OIRosterPicker onBack={()=>setFlow('join')} onClaim={claimOI}/>)}
     {signInModal}
-    {viewToggle}<window.ToastLayer/><window.ConfettiLayer/>
+    {viewToggle}<window.ToastLayer/><window.ConfettiLayer/><AppSystemEffects/>
   </React.Fragment>;
 
   // -------- main app --------
   const screens={
-    me:<window.MeScreen goPredictions={()=>setTab('predictions')} goGames={()=>setTab('games')}/>,
+    me:<window.MeScreen goPredictions={()=>setTab('predictions')} goGames={()=>setTab('games')} goGroup={()=>setTab('players')}/>,
     games:<window.MatchCentreScreen/>,
     players:<window.CompetitionScreen/>,
     predictions:<window.PredictionsScreen/>,
@@ -727,6 +780,7 @@ function App(){
 
     <window.ToastLayer/>
     <window.ConfettiLayer/>
+    <AppSystemEffects/>
 
     <window.TweaksPanel title="Tweaks">
       <window.TweakSection label="Atmosphere"/>
