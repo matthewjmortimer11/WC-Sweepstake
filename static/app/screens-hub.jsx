@@ -286,15 +286,23 @@ function hasPredictionPick(m, p) {
 function dynamicFixtureStatus(m) {
   return String((m && (m.fixture_status || m.fixtureStatus || m.status)) || '').toLowerCase();
 }
+function isActiveFixtureStatus(status) {
+  return ['live', 'halftime', 'half_time', 'half-time', 'inplay', 'in_play', 'in-progress', 'inprogress', 'paused'].indexOf(status) >= 0;
+}
+function isFinishedFixtureStatus(status) {
+  return ['done', 'ft', 'fulltime', 'full_time', 'full-time', 'finished'].indexOf(status) >= 0;
+}
 function liveMarketsForPerson(p) {
   const markets = window.Store && window.Store.visiblePredictions ? window.Store.visiblePredictions() : (WC.PREDICTIONS || []);
   return markets.filter(function(m) {
     if (!m || String(m.key || '').indexOf('dm_') !== 0 || !hasPredictionPick(m, p)) return false;
     const status = dynamicFixtureStatus(m);
-    return status !== 'done' && status !== 'ft' && m.answer == null;
+    if (isFinishedFixtureStatus(status)) return false;
+    if (isActiveFixtureStatus(status)) return true;
+    return m.answer == null;
   }).sort(function(a, b) {
-    const al = dynamicFixtureStatus(a) === 'live' ? 0 : 1;
-    const bl = dynamicFixtureStatus(b) === 'live' ? 0 : 1;
+    const al = isActiveFixtureStatus(dynamicFixtureStatus(a)) ? 0 : 1;
+    const bl = isActiveFixtureStatus(dynamicFixtureStatus(b)) ? 0 : 1;
     return al - bl;
   }).map(function(m) {
     return { market: m, pick: liveMarketPickLabel(m, p) };
@@ -318,8 +326,8 @@ function PersonSnapshot(props) {
   if (!p) return null;
   const t = WC.TEAMS[p.team] || { code: p.team || '?', name: p.team || 'TBD', flag: '🏳️', group: '—', alive: true };
   const fixtures = (WC.FIXTURES || []).filter(function(f){ return f.a === t.code || f.b === t.code; });
-  const upcoming = fixtures.filter(function(f){ return f.status !== 'done' && f.status !== 'live'; });
-  const previous = fixtures.filter(function(f){ return f.status === 'done'; });
+  const upcoming = fixtures.filter(function(f){ const st = dynamicFixtureStatus(f); return !isFinishedFixtureStatus(st) && !isActiveFixtureStatus(st); });
+  const previous = fixtures.filter(function(f){ return isFinishedFixtureStatus(dynamicFixtureStatus(f)); });
   const livePicks = liveMarketsForPerson(p);
   const tags = customTagChips(p);
   const shown = window.Store && window.Store.shownName ? window.Store.shownName(p) : p.name;
@@ -333,7 +341,7 @@ function PersonSnapshot(props) {
       <span className="dh" style={{ fontSize: 16, width: 42, textAlign: 'center' }}>{score}</span>
       <span style={{ fontSize: 11, fontWeight: 900, width: 34, textAlign: 'right' }}>{b.code}</span>
       <span style={{ fontSize: 18 }}>{b.flag}</span>
-      <span style={{ marginLeft: 'auto', fontSize: 10.5, fontWeight: 800, color: 'var(--ink2)' }}>{f.status === 'done' ? 'FT' : f.status === 'live' ? 'LIVE' : f.dateLabel}</span>
+      <span style={{ marginLeft: 'auto', fontSize: 10.5, fontWeight: 800, color: 'var(--ink2)' }}>{isFinishedFixtureStatus(dynamicFixtureStatus(f)) ? 'FT' : dynamicFixtureStatus(f) === 'halftime' ? 'HT' : isActiveFixtureStatus(dynamicFixtureStatus(f)) ? 'LIVE' : f.dateLabel}</span>
     </div>;
   }
   const body = (
