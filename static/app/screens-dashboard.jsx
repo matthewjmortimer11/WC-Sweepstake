@@ -11,7 +11,8 @@ const { useState: dState } = React;
 
 function money_d(n) {
   if (Sd && Sd.money) return Sd.money(n);
-  return '£' + (Math.round(Number(n || 0) * 100) / 100).toLocaleString('en-GB', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+  const cur = (WCd.meta && WCd.meta.currency) || '£';
+  return cur + (Math.round(Number(n || 0) * 100) / 100).toLocaleString('en-GB', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 }
 const PRE = () => (WCd.meta.phase === 'pre');
 function stageName(t) {

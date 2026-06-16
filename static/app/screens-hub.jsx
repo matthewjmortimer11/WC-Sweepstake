@@ -6,7 +6,11 @@ const { Card, Btn, Flag, Avatar, Chip, Stamp, ProgressRing, SegmentBar, WheeshtS
 const W = window.Wheesht;
 const { useState: uState, useMemo: uMemo } = React;
 
-function money(n){ return window.Store && window.Store.money ? window.Store.money(n) : '£' + (Math.round(Number(n || 0) * 100) / 100).toLocaleString('en-GB', { minimumFractionDigits: 0, maximumFractionDigits: 2 }); }
+function money(n){
+  if (window.Store && window.Store.money) return window.Store.money(n);
+  const cur = (WC.meta && WC.meta.currency) || '£';
+  return cur + (Math.round(Number(n || 0) * 100) / 100).toLocaleString('en-GB', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+}
 function ownerName(code){ const o = WC.ownersOf(code); return o.length ? o[0].name : 'nobody'; }
 function stageLabel(t){
   if (t.stage === 'qf') return 'Quarter-final';
@@ -181,7 +185,7 @@ function DashTeamOut(props){
 }
 
 function DashboardScreen(props){
-  const potShare = Math.round(WC.POT*0.6);
+  const potShare = (Number(WC.POT) || 0) * 0.6;
   return (
     <div className="pad">
       {props.eliminated ? <DashTeamOut goBets={props.goBets}/> : <DashTeam/>}

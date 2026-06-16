@@ -441,7 +441,10 @@ function OnboardingForm(props) {
   const ok = name.trim().length > 0 && !requiredMissing;
   const split = So.charitySplit ? So.charitySplit() : 0.5;
   const fee = WCo.FEE || 0;
-  const money = So.money || function(n){ return '£' + (Math.round(Number(n || 0) * 100) / 100).toLocaleString('en-GB', { minimumFractionDigits: 0, maximumFractionDigits: 2 }); };
+  const money = So.money || function(n){
+    const cur = (WCo.meta && WCo.meta.currency) || '£';
+    return cur + (Math.round(Number(n || 0) * 100) / 100).toLocaleString('en-GB', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+  };
   const charityPerEntry = fee * split;
   const winnerAfterEntry = (window.Store ? window.Store.pot() : WCo.POT * (1 - split)) + fee * (1 - split);
   return (

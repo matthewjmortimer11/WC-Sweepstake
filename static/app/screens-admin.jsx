@@ -232,7 +232,8 @@ function PredAdmin(props) {
 
 function moneyAdmin(n) {
    if (window.Store && window.Store.money) return window.Store.money(n);
-   return '£' + (Math.round(Number(n || 0) * 100) / 100).toLocaleString('en-GB', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+   const cur = (WCa.meta && WCa.meta.currency) || '£';
+   return cur + (Math.round(Number(n || 0) * 100) / 100).toLocaleString('en-GB', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 }
 
 function OptionsInputAdmin(props) {

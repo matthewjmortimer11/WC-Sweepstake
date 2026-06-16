@@ -6,7 +6,11 @@ const { Card: Card2, Btn: Btn2, Flag: Flag2, Avatar: Avatar2, Chip: Chip2, Stamp
 const W2 = window.Wheesht;
 const RS = React;
 
-function money2(n){ return window.Store && window.Store.money ? window.Store.money(n) : '£' + (Math.round(Number(n || 0) * 100) / 100).toLocaleString('en-GB', { minimumFractionDigits: 0, maximumFractionDigits: 2 }); }
+function money2(n){
+  if (window.Store && window.Store.money) return window.Store.money(n);
+  const cur = (WC2.meta && WC2.meta.currency) || '£';
+  return cur + (Math.round(Number(n || 0) * 100) / 100).toLocaleString('en-GB', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+}
 function ownerName2(code){ const o = WC2.ownersOf(code); return o.length ? o[0].name : 'nobody'; }
 
 /* =================== SIDE BETS =================== */
