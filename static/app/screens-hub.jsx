@@ -279,18 +279,98 @@ function liveMarketPickLabel(m, p) {
 function liveMarketsForPerson(p) {
   const markets = window.Store && window.Store.visiblePredictions ? window.Store.visiblePredictions() : (WC.PREDICTIONS || []);
   return markets.filter(function(m) {
-    return m && String(m.key || '').indexOf('dm_') === 0 && m.fixture_status === 'live';
+    return m && String(m.key || '').indexOf('dm_') === 0 && m.fixture_status === 'live' && p && p.picks && p.picks[m.key] != null;
   }).map(function(m) {
     return { market: m, pick: liveMarketPickLabel(m, p) };
   });
+}
+function customTagChips(p) {
+  const out = [], fields = window.Store && window.Store.customFields ? window.Store.customFields() : [];
+  const seen = {};
+  fields.forEach(function(f) {
+    const raw = p.customFields && p.customFields[f.key];
+    if (f.type === 'tags' && Array.isArray(raw)) raw.forEach(function(tag) { if (!seen[tag]) { seen[tag] = 1; out.push(tag); } });
+  });
+  Object.keys(p.customFields || {}).forEach(function(key) {
+    const raw = p.customFields[key];
+    if (Array.isArray(raw)) raw.forEach(function(tag) { if (!seen[tag]) { seen[tag] = 1; out.push(tag); } });
+  });
+  return out;
 }
 function PersonSnapshot(props) {
   const p = props.person;
   if (!p) return null;
   const t = WC.TEAMS[p.team] || { code: p.team || '?', name: p.team || 'TBD', flag: '🏳️', group: '—', alive: true };
   const fixtures = (WC.FIXTURES || []).filter(function(f){ return f.a === t.code || f.b === t.code; });
+  const upcoming = fixtures.filter(function(f){ return f.status !== 'done' && f.status !== 'live'; });
+  const previous = fixtures.filter(function(f){ return f.status === 'done'; });
   const livePicks = liveMarketsForPerson(p);
+  const tags = customTagChips(p);
   const shown = window.Store && window.Store.shownName ? window.Store.shownName(p) : p.name;
+  function fixtureRow(f, i, arr) {
+    const a = WC.TEAMS[f.a] || { code: f.a, name: f.a, flag: '' };
+    const b = WC.TEAMS[f.b] || { code: f.b, name: f.b, flag: '' };
+    const score = f.score && f.score[0] != null && f.score[1] != null ? f.score[0] + '–' + f.score[1] : f.time;
+    return <div key={f.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 0', borderBottom: i < arr.length - 1 ? '1.5px solid var(--line)' : 'none' }}>
+      <span style={{ fontSize: 18 }}>{a.flag}</span>
+      <span style={{ fontSize: 11, fontWeight: 900, width: 34 }}>{a.code}</span>
+      <span className="dh" style={{ fontSize: 16, width: 42, textAlign: 'center' }}>{score}</span>
+      <span style={{ fontSize: 11, fontWeight: 900, width: 34, textAlign: 'right' }}>{b.code}</span>
+      <span style={{ fontSize: 18 }}>{b.flag}</span>
+      <span style={{ marginLeft: 'auto', fontSize: 10.5, fontWeight: 800, color: 'var(--ink2)' }}>{f.status === 'done' ? 'FT' : f.status === 'live' ? 'LIVE' : f.dateLabel}</span>
+    </div>;
+  }
+  const body = (
+    <>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <Avatar person={Object.assign({}, p, { isYou: false })} size={54} />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div className="dh" style={{ fontSize: 24, lineHeight: 1 }}>{shown}</div>
+          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--ink2)', marginTop: 4 }}>{p.location || p.city || '—'}{p.department ? ' · ' + p.department : ''}</div>
+        </div>
+        <button onClick={props.onClose} className="wc-btn wc-btn--sm" style={{ background: '#fff', flex: '0 0 auto' }}>Close</button>
+      </div>
+      {tags.length > 0 && <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 10 }}>
+        {tags.map(function(tag) { return <Chip key={tag} tone="yellow">{tag}</Chip>; })}
+      </div>}
+
+      <Card bordered style={{ marginTop: 14, background: 'var(--yellow)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <Flag team={t} size={34} />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 10.5, fontWeight: 900, letterSpacing: '.06em', textTransform: 'uppercase' }}>Group {t.group}</div>
+            <div className="dh" style={{ fontSize: 21, lineHeight: 1 }}>{t.name}</div>
+          </div>
+          <Chip tone={t.alive ? 'green' : 'red'}>{t.alive ? 'Still in' : 'Out'}</Chip>
+        </div>
+      </Card>
+
+      <SectionHead aside={upcoming.length + ' left'}>Upcoming games</SectionHead>
+      <Card flat style={{ padding: '3px 13px' }}>
+        {upcoming.length ? upcoming.map(fixtureRow) : <div style={{ padding: '15px 0', textAlign: 'center', fontSize: 12.5, fontWeight: 700, color: 'var(--ink2)' }}>No upcoming games.</div>}
+      </Card>
+
+      <SectionHead aside="picked live only">Live prediction</SectionHead>
+      <Card flat style={{ padding: '4px 13px' }}>
+        {livePicks.length
+          ? livePicks.map(function(row, i) {
+              return <div key={row.market.key} style={{ padding: '10px 0', borderBottom: i < livePicks.length - 1 ? '1.5px solid var(--line)' : 'none' }}>
+                <div style={{ fontSize: 13, fontWeight: 800, lineHeight: 1.25 }}>{row.market.q}</div>
+                <div className="dh" style={{ fontSize: 17, marginTop: 3 }}>{row.pick}</div>
+              </div>;
+            })
+          : <div style={{ padding: '15px 0', textAlign: 'center', fontSize: 12.5, fontWeight: 700, color: 'var(--ink2)' }}>No live prediction showing.</div>}
+      </Card>
+
+      <SectionHead aside={previous.length + ' played'}>Previous games</SectionHead>
+      <Card flat style={{ padding: '3px 13px' }}>
+        {previous.length ? previous.map(fixtureRow) : <div style={{ padding: '15px 0', textAlign: 'center', fontSize: 12.5, fontWeight: 700, color: 'var(--ink2)' }}>No previous games yet.</div>}
+      </Card>
+    </>
+  );
+  if (props.inline) {
+    return <Card bordered style={{ margin: '8px 0 12px', background: '#fff' }}>{body}</Card>;
+  }
   const chrome = window.wcSheetChrome ? window.wcSheetChrome(72) : null;
   const wrap = chrome ? chrome.wrap : { position: 'fixed', inset: 0, zIndex: 9999 };
   const backdrop = chrome ? chrome.backdrop : { position: 'absolute', inset: 0, background: 'rgba(0,0,0,.35)' };
@@ -301,57 +381,19 @@ function PersonSnapshot(props) {
       <div onClick={props.onClose} style={backdrop} />
       <div className={cls} style={sheet}>
         {!chrome || !chrome.deck ? <div style={{ width: 44, height: 5, borderRadius: 3, background: 'var(--line)', margin: '0 auto 14px' }} /> : null}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <Avatar person={Object.assign({}, p, { isYou: false })} size={54} />
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div className="dh" style={{ fontSize: 24, lineHeight: 1 }}>{shown}</div>
-            <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--ink2)', marginTop: 4 }}>{p.location || p.city || '—'}{p.department ? ' · ' + p.department : ''}</div>
-          </div>
-          <button onClick={props.onClose} className="wc-btn wc-btn--sm" style={{ background: '#fff', flex: '0 0 auto' }}>Close</button>
-        </div>
-
-        <Card bordered style={{ marginTop: 14, background: 'var(--yellow)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <Flag team={t} size={34} />
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 10.5, fontWeight: 900, letterSpacing: '.06em', textTransform: 'uppercase' }}>Group {t.group}</div>
-              <div className="dh" style={{ fontSize: 21, lineHeight: 1 }}>{t.name}</div>
-            </div>
-            <Chip tone={t.alive ? 'green' : 'red'}>{t.alive ? 'Still in' : 'Out'}</Chip>
-          </div>
-        </Card>
-
-        <SectionHead aside={fixtures.length + ' games'}>Team games</SectionHead>
-        <Card flat style={{ padding: '3px 13px' }}>
-          {fixtures.map(function(f, i) {
-            const a = WC.TEAMS[f.a] || { code: f.a, name: f.a, flag: '' };
-            const b = WC.TEAMS[f.b] || { code: f.b, name: f.b, flag: '' };
-            const score = f.score && f.score[0] != null && f.score[1] != null ? f.score[0] + '–' + f.score[1] : f.time;
-            return <div key={f.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 0', borderBottom: i < fixtures.length - 1 ? '1.5px solid var(--line)' : 'none' }}>
-              <span style={{ fontSize: 18 }}>{a.flag}</span>
-              <span style={{ fontSize: 11, fontWeight: 900, width: 34 }}>{a.code}</span>
-              <span className="dh" style={{ fontSize: 16, width: 42, textAlign: 'center' }}>{score}</span>
-              <span style={{ fontSize: 11, fontWeight: 900, width: 34, textAlign: 'right' }}>{b.code}</span>
-              <span style={{ fontSize: 18 }}>{b.flag}</span>
-              <span style={{ marginLeft: 'auto', fontSize: 10.5, fontWeight: 800, color: 'var(--ink2)' }}>{f.status === 'done' ? 'FT' : f.status === 'live' ? 'LIVE' : f.dateLabel}</span>
-            </div>;
-          })}
-        </Card>
-
-        <SectionHead aside="live only">Live predictions</SectionHead>
-        <Card flat style={{ padding: '4px 13px' }}>
-          {livePicks.length
-            ? livePicks.map(function(row, i) {
-                return <div key={row.market.key} style={{ padding: '10px 0', borderBottom: i < livePicks.length - 1 ? '1.5px solid var(--line)' : 'none' }}>
-                  <div style={{ fontSize: 13, fontWeight: 800, lineHeight: 1.25 }}>{row.market.q}</div>
-                  <div className="dh" style={{ fontSize: 17, marginTop: 3 }}>{row.pick}</div>
-                </div>;
-              })
-            : <div style={{ padding: '18px 0', textAlign: 'center', fontSize: 12.5, fontWeight: 700, color: 'var(--ink2)' }}>No live match predictions right now.</div>}
-        </Card>
+        {body}
       </div>
     </div>
   );
+}
+
+function preservePageScroll(fn) {
+  const y = window.scrollY || document.documentElement.scrollTop || 0;
+  fn();
+  window.requestAnimationFrame(function() {
+    window.scrollTo(0, y);
+    window.requestAnimationFrame(function() { window.scrollTo(0, y); });
+  });
 }
 
 function PersonRow(props){
@@ -401,6 +443,9 @@ function TrackerScreen(){
   list.sort((a,b)=>{ if(a.id===youId)return -1; if(b.id===youId)return 1; return (WC.TEAMS[b.team]||{rounds:0}).rounds-(WC.TEAMS[a.team]||{rounds:0}).rounds; });
   const stillIn = P.filter(p=>p.alive).length;
   const filtersShown = pre ? filters.filter(f=>f[0]!=='out') : filters;
+  function selectPerson(p, open) {
+    preservePageScroll(function() { setSelected(open ? null : p); });
+  }
   return (
     <div className="pad">
       <div className="appbar" style={{padding:'2px 0 10px'}}>
@@ -492,9 +537,14 @@ function TrackerScreen(){
         </select>
       </div>}
       <Card flat style={{padding:'4px 14px'}}>
-        {list.map(p=><PersonRow key={p.id} person={p} you={p.id===youId} pre={pre} onOpen={()=>setSelected(p)}/>)}
+        {list.map(p=>{
+          const open = selected && selected.id === p.id;
+          return <React.Fragment key={p.id}>
+            <PersonRow person={p} you={p.id===youId} pre={pre} onOpen={()=>selectPerson(p, open)}/>
+            {open && <PersonSnapshot inline person={(window.Store && window.Store.getSync && window.Store.getSync(p.id)) || p} onClose={()=>preservePageScroll(function(){ setSelected(null); })} />}
+          </React.Fragment>;
+        })}
       </Card>
-      {selected && <PersonSnapshot person={(window.Store && window.Store.getSync && window.Store.getSync(selected.id)) || selected} onClose={()=>setSelected(null)} />}
     </div>
   );
 }

@@ -14,6 +14,15 @@ const Wc = window.Wheesht;
 const { Card: Cc, Btn: Bc, Flag: Fc, Avatar: Ac, Chip: Chc, Stamp: Stc, ProgressRing: PRc, WheeshtSays: Saysc, SectionHead: SHc } = window;
 const { useState: cgState } = React;
 
+function keepCompetitionScroll(fn) {
+  const y = window.scrollY || document.documentElement.scrollTop || 0;
+  fn();
+  window.requestAnimationFrame(function() {
+    window.scrollTo(0, y);
+    window.requestAnimationFrame(function() { window.scrollTo(0, y); });
+  });
+}
+
 /* ---- standings maths (client-side, results-driven) ---------------------- */
 function cmpRec(a, b) {
   if (b.Pts !== a.Pts) return b.Pts - a.Pts;
@@ -262,20 +271,21 @@ function MyGroupDashboard(props) {
                   </div>
                   <div style={{ fontSize: 10.5, fontWeight: 700, color: 'var(--ink2)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                     {o.person
-                      ? <button onClick={() => setSelectedPerson(o.person)} style={{ border: 'none', background: 'none', padding: 0, margin: 0, cursor: 'pointer', font: 'inherit', color: 'inherit', textDecoration: 'underline', textDecorationThickness: 1, textUnderlineOffset: 2 }}>
+                      ? <button onClick={() => keepCompetitionScroll(function(){ setSelectedPerson(selectedPerson && selectedPerson.id === o.person.id ? null : o.person); })} style={{ border: 'none', background: 'none', padding: 0, margin: 0, cursor: 'pointer', font: 'inherit', color: 'inherit', textDecoration: 'underline', textDecorationThickness: 1, textUnderlineOffset: 2 }}>
                           {o.mine ? 'you' : o.name}{o.extra > 0 ? ' +' + o.extra : ''}
                         </button>
                       : o.name}
                   </div>
                 </div>
                 <span style={{ width: 22, textAlign: 'center', fontSize: 12.5, fontWeight: 700, color: 'var(--ink2)' }}>{G.hasResults ? r.P : '–'}</span>
-                <span style={{ width: 28, textAlign: 'center', fontSize: 12.5, fontWeight: 700, color: 'var(--ink2)' }}>{G.hasResults ? (gd > 0 ? '+' + gd : gd) : '–'}</span>
-                <span className="dh" style={{ width: 28, textAlign: 'center', fontSize: 16, color: isMe ? 'var(--red)' : 'var(--ink)' }}>{G.hasResults ? r.Pts : '–'}</span>
-              </div>
-              {i === 1 && <div style={{ display: 'flex', alignItems: 'center', gap: 7, margin: '3px 0', padding: '0 2px' }}>
-                <div style={{ flex: 1, borderTop: '2px dashed var(--green)' }} />
-                <span style={{ fontSize: 9, fontWeight: 800, letterSpacing: '.06em', color: 'var(--green)' }}>QUALIFY ↑</span>
-              </div>}
+	                <span style={{ width: 28, textAlign: 'center', fontSize: 12.5, fontWeight: 700, color: 'var(--ink2)' }}>{G.hasResults ? (gd > 0 ? '+' + gd : gd) : '–'}</span>
+	                <span className="dh" style={{ width: 28, textAlign: 'center', fontSize: 16, color: isMe ? 'var(--red)' : 'var(--ink)' }}>{G.hasResults ? r.Pts : '–'}</span>
+	              </div>
+              {selectedPerson && o.person && selectedPerson.id === o.person.id && window.PersonSnapshot && <window.PersonSnapshot inline person={(Sc.getSync && Sc.getSync(o.person.id)) || o.person} onClose={() => keepCompetitionScroll(function(){ setSelectedPerson(null); })} />}
+	              {i === 1 && <div style={{ display: 'flex', alignItems: 'center', gap: 7, margin: '3px 0', padding: '0 2px' }}>
+	                <div style={{ flex: 1, borderTop: '2px dashed var(--green)' }} />
+	                <span style={{ fontSize: 9, fontWeight: 800, letterSpacing: '.06em', color: 'var(--green)' }}>QUALIFY ↑</span>
+	              </div>}
             </React.Fragment>
           );
         })}
@@ -318,7 +328,6 @@ function MyGroupDashboard(props) {
       <Saysc mood={status.mood} label="your group" animate>
         {status.detail}{rivalAbove && status.mustWin ? ' Beat ' + rivalAbove.team.name + ' and the maths changes fast.' : ''}
       </Saysc>
-      {selectedPerson && window.PersonSnapshot && <window.PersonSnapshot person={(Sc.getSync && Sc.getSync(selectedPerson.id)) || selectedPerson} onClose={() => setSelectedPerson(null)} />}
     </div>
   );
 }
