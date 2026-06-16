@@ -1587,10 +1587,18 @@ async def put_admin(
             raise HTTPException(status_code=404, detail="league not found")
         _require_admin(league, x_wheesht_admin_token)
         row = await session.get(AdminOverride, league.id)
+        incoming = payload.model_dump()
         if row is None:
-            session.add(AdminOverride(league_id=league.id, data=payload.model_dump(), updated_at=_now()))
+            session.add(AdminOverride(league_id=league.id, data=incoming, updated_at=_now()))
         else:
-            row.data = payload.model_dump()
+            # Older clients only know about teams/fixtures/predictions/meta.
+            # Preserve server-owned top-level keys such as dynamicMarkets so a
+            # routine settings save cannot wipe live match prediction markets.
+            existing = row.data if isinstance(row.data, dict) else {}
+            merged = dict(existing)
+            for key in ("teams", "fixtures", "predictions", "meta"):
+                merged[key] = incoming.get(key) or {}
+            row.data = merged
             row.updated_at = _now()
         await session.commit()
         return {"ok": True}

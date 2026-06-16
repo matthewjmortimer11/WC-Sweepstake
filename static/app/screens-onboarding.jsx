@@ -28,6 +28,20 @@ function Seg(p) {
   </div>;
 }
 
+function OptionsInputSetup(p) {
+  const value = (p.options || []).join(', ');
+  const [draft, setDraft] = oState(value);
+  oEffect(() => setDraft(value), [value]);
+  function commit() {
+    p.onChange(draft.split(',').map(x => x.trim()).filter(Boolean));
+  }
+  return <input style={{ ...inp, padding: '10px 12px', fontSize: 14 }} value={draft}
+    onChange={e => setDraft(e.target.value)}
+    onBlur={commit}
+    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); commit(); e.currentTarget.blur(); } }}
+    placeholder="Options, separated by commas" />;
+}
+
 function CustomFieldSetup(p) {
   const fields = p.fields || [];
   function patch(i, next) {
@@ -59,7 +73,7 @@ function CustomFieldSetup(p) {
             </div>
             <Seg value={f.type || 'text'} onChange={v => patch(i, { type: v })} options={typeOpts} />
             {(f.type === 'select' || f.type === 'suggest' || f.type === 'tags') && <div>
-              <input style={{ ...inp, padding: '10px 12px', fontSize: 14 }} value={(f.options || []).join(', ')} onChange={e => patch(i, { options: e.target.value.split(',').map(x => x.trim()).filter(Boolean) })} placeholder="Options, separated by commas" />
+              <OptionsInputSetup options={f.options || []} onChange={options => patch(i, { options })} />
               <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--ink2)', marginTop: 4 }}>{f.type === 'select' ? 'Only these answers can be saved.' : f.type === 'tags' ? 'People can pick any number of these tags.' : 'These show as suggestions, but other answers are allowed.'}</div>
             </div>}
             <button onClick={() => patch(i, { required: !f.required })} style={{ marginTop: 8, border: 'none', background: 'none', padding: 0, cursor: 'pointer', fontSize: 12, fontWeight: 800, color: f.required ? 'var(--green)' : 'var(--ink2)' }}>

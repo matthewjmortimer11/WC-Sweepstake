@@ -234,6 +234,19 @@ function moneyAdmin(n) {
    return '£' + (Math.round(Number(n || 0) * 100) / 100).toLocaleString('en-GB', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 }
 
+function OptionsInputAdmin(props) {
+   const options = props.options || [];
+   const value = options.join(', ');
+   const [draft, setDraft] = aState2(value);
+   React.useEffect(() => setDraft(value), [value]);
+   function commit() {
+      props.onChange(draft.split(',').map(x => x.trim()).filter(Boolean));
+   }
+   return <input value={draft} onChange={e => setDraft(e.target.value)} onBlur={commit} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); commit(); e.currentTarget.blur(); } }}
+     style={{ width: '100%', border: '2px solid var(--ink)', borderRadius: 11, padding: '9px 12px', fontFamily: 'var(--body)', fontWeight: 600, fontSize: 14, outline: 'none', background: '#fff', marginTop: 8 }}
+     placeholder="Options, separated by commas" />;
+}
+
 function CustomFieldsAdmin(props) {
    const fields = props.fields || [];
    function patch(i, next) {
@@ -267,9 +280,7 @@ function CustomFieldsAdmin(props) {
             </div>
             {seg(f.type || 'text', v => patch(i, { type: v }), typeOpts)}
             {(f.type === 'select' || f.type === 'suggest' || f.type === 'tags') && <div>
-               <input value={(f.options || []).join(', ')} onChange={e => patch(i, { options: e.target.value.split(',').map(x => x.trim()).filter(Boolean) })}
-                 style={{ width: '100%', border: '2px solid var(--ink)', borderRadius: 11, padding: '9px 12px', fontFamily: 'var(--body)', fontWeight: 600, fontSize: 14, outline: 'none', background: '#fff', marginTop: 8 }}
-                 placeholder="Options, separated by commas" />
+               <OptionsInputAdmin options={f.options || []} onChange={options => patch(i, { options })} />
                <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--ink2)', marginTop: 4 }}>{f.type === 'select' ? 'Only these answers can be saved.' : f.type === 'tags' ? 'People or organisers can pick multiple tags from this list.' : 'Suggestions only; other answers are allowed.'}</div>
             </div>}
             <button onClick={() => patch(i, { required: !f.required })} style={{ marginTop: 8, border: 'none', background: 'none', padding: 0, cursor: 'pointer', fontSize: 12, fontWeight: 800, color: f.required ? 'var(--green)' : 'var(--ink2)' }}>

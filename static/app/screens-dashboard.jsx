@@ -71,13 +71,23 @@ function ProfileHeader(props) {
   const includeDept = Sd.includeDepartment ? Sd.includeDepartment() : true;
   const includeLocation = Sd.includeLocation ? Sd.includeLocation() : true;
   const includeLtMember = Sd.includeLtMember ? Sd.includeLtMember() : true;
+  const customDefs = Sd.customFields ? Sd.customFields() : [];
   const fav = Sd.favTeam ? Sd.favTeam(me) : null;
   const shown = Sd.shownName ? Sd.shownName(me) : me.name;
-  const chips = [
-    includeLocation && me.location && me.location,
-    includeDept && me.department,
-    includeLtMember && me.ltMember && 'LT',
-  ].filter(Boolean);
+  const chips = [];
+  if (includeLocation && me.location) chips.push({ text: me.location });
+  if (includeDept && me.department) chips.push({ text: me.department });
+  if (includeLtMember && me.ltMember) chips.push({ text: 'LT', tone: 'yellow' });
+  customDefs.forEach(f => {
+    const raw = me.customFields && me.customFields[f.key];
+    if (f.type === 'tags') {
+      (Array.isArray(raw) ? raw : []).forEach(tag => chips.push({ text: tag, tone: 'yellow' }));
+    } else if (raw != null && String(raw).trim()) {
+      chips.push({ text: f.label + ': ' + String(raw).trim() });
+    }
+  });
+  const shownChips = chips.slice(0, 10);
+  if (chips.length > shownChips.length) shownChips.push({ text: '+' + (chips.length - shownChips.length) });
   return (
     <Cd bordered className="pop">
       <div style={{ display: 'flex', alignItems: 'center', gap: 13 }}>
@@ -90,8 +100,8 @@ function ProfileHeader(props) {
             <div className="dh" style={{ fontSize: 24, lineHeight: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{shown}</div>
             {fav && <span title={'Supports ' + fav.name} style={{ fontSize: 20, flex: '0 0 auto' }}>{fav.flag}</span>}
           </div>
-          {chips.length > 0 && <div style={{ display: 'flex', gap: 6, marginTop: 7, flexWrap: 'wrap' }}>
-            {chips.map((c, i) => <Chd key={i} tone={c === 'LT' ? 'yellow' : undefined}>{c}</Chd>)}
+          {shownChips.length > 0 && <div style={{ display: 'flex', gap: 6, marginTop: 7, flexWrap: 'wrap' }}>
+            {shownChips.map((c, i) => <Chd key={i} tone={c.tone}>{c.text}</Chd>)}
           </div>}
         </div>
         <button onClick={props.onEdit} className="wc-btn wc-btn--sm" style={{ padding: '8px 12px', boxShadow: '0 4px 0 var(--shadow)', flex: '0 0 auto' }}>Edit</button>
