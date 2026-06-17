@@ -320,6 +320,69 @@ function SaveStatusPill() {
     style={{ border: 'none', fontFamily: 'inherit' }}>{label}</button>;
 }
 
+function OrganiserChecklist() {
+  const entrants = Sa.allSync ? Sa.allSync().length : 0;
+  const withTeam = (Sa.allSync ? Sa.allSync() : []).filter(function (p) { return p.team; }).length;
+  const copy = window.WheeshtCopy || {};
+  const steps = [
+    { done: true, label: copy.checklistCreate || 'League created' },
+    { done: entrants >= 1, label: copy.checklistShare || 'Share invite link' },
+    { done: entrants >= 3, label: (copy.checklistPlayers || 'Get 3+ players').replace('{n}', String(entrants)) },
+    { done: withTeam >= 1, label: copy.checklistDraw || 'Run the team draw' },
+  ];
+  return (
+    <Ca flat style={{ marginBottom: 12 }}>
+      <div className="dh" style={{ fontSize: 17, marginBottom: 8 }}>{copy.checklistTitle || 'Launch checklist'}</div>
+      {steps.map(function (s, i) {
+        return <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 6, fontSize: 13, fontWeight: 700, color: s.done ? 'var(--green)' : 'var(--ink2)' }}>
+          <span>{s.done ? '✓' : '○'}</span><span>{s.label}</span>
+        </div>;
+      })}
+    </Ca>
+  );
+}
+
+function ProUpgradePanel() {
+  const hasPro = Sa.hasPro && Sa.hasPro();
+  const grandfathered = Sa.proGrandfathered && Sa.proGrandfathered();
+  const canUpgrade = Sa.proUpgradeAvailable && Sa.proUpgradeAvailable();
+  const copy = window.WheeshtCopy || {};
+  if (grandfathered || hasPro) return null;
+  return (
+    <Ca flat style={{ marginBottom: 12, background: 'var(--yellow)' }}>
+      <div className="dh" style={{ fontSize: 17, marginBottom: 6 }}>{copy.proTitle || 'Wheesht Pro'}</div>
+      <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--ink2)', lineHeight: 1.45, marginBottom: 10 }}>
+        {copy.proHint || 'Unlock predictions, custom fields, analytics, and CSV export. Entry fees stay offline — you collect the pot yourself.'}
+      </div>
+      {canUpgrade ? (
+        <button type="button" className="wc-btn wc-btn--sm wc-btn--ink" onClick={function () {
+          if (Sa.startProCheckout) Sa.startProCheckout({ successPath: '/', cancelPath: '/' });
+        }}>{copy.proCta || 'Upgrade this league'}</button>
+      ) : (
+        <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--ink2)' }}>Stripe Pro checkout not configured on this server yet.</div>
+      )}
+    </Ca>
+  );
+}
+
+function ProLockedAdmin(props) {
+  const copy = window.WheeshtCopy || {};
+  if (Sa.hasPro && Sa.hasPro()) return props.children;
+  return (
+    <Ca flat style={{ marginBottom: 12 }}>
+      <div className="dh" style={{ fontSize: 17, marginBottom: 6 }}>{copy.proLockedTitle || 'Pro feature'}</div>
+      <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--ink2)', lineHeight: 1.45, marginBottom: 10 }}>
+        {props.hint || copy.proLockedHint || 'Upgrade to unlock this section for your league.'}
+      </div>
+      {Sa.proUpgradeAvailable && Sa.proUpgradeAvailable() && (
+        <button type="button" className="wc-btn wc-btn--sm wc-btn--ink" onClick={function () {
+          if (Sa.startProCheckout) Sa.startProCheckout({ successPath: '/', cancelPath: '/' });
+        }}>{copy.proCta || 'Upgrade this league'}</button>
+      )}
+    </Ca>
+  );
+}
+
 function InvitePanel() {
   const league = Sa.activeLeague ? Sa.activeLeague() : null;
   const code = league && league.code;
@@ -395,7 +458,7 @@ function AnalyticsPanel() {
     <>
       <SHa>Analytics</SHa>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 12 }}>
-        {[['Entrants', String(e.total || 0)], ['With password', String(e.withPassword || 0)], ['Team drawn', String(e.withTeam || 0)], ['Chat (7d)', String(ch.last7d || 0)]].map(function (row) {
+        {[['Entrants', String(e.total || 0)], ['With team', String(e.withTeam || 0)], ['Invite views', String((data.funnel && data.funnel.invite_view) || 0)], ['Joins', String((data.funnel && data.funnel.join_success) || 0)]].map(function (row) {
           return <div key={row[0]} style={{ background: '#fff', border: '2px solid var(--line)', borderRadius: 12, padding: '9px 10px' }}>
             <div style={{ fontSize: 9.5, fontWeight: 900, letterSpacing: '.05em', textTransform: 'uppercase', color: 'var(--ink2)' }}>{row[0]}</div>
             <div className="dh" style={{ fontSize: 18, marginTop: 2 }}>{row[1]}</div>
@@ -528,8 +591,9 @@ function PrizeFundAdmin() {
    const splitPct = Math.round(split * 100);
    return (
      <>
+       <ProUpgradePanel />
        <Ca bordered style={{ background: 'var(--yellow)', marginBottom: 12 }}>
-         <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.06em', textTransform: 'uppercase' }}>Entry fee</div>
+         <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.06em', textTransform: 'uppercase' }}>Entry fee (tracked offline)</div>
          <div style={{ display: 'flex', gap: 9, alignItems: 'center', marginTop: 7 }}>
            <select value={currency} onChange={e => setCurrency(e.target.value)} style={{ ...fld, flex: '0 0 78px', fontSize: 20, paddingLeft: 9, paddingRight: 8 }}>
              {['£', '€', '$'].map(c => <option key={c} value={c}>{c}</option>)}
@@ -537,7 +601,7 @@ function PrizeFundAdmin() {
            <input type="number" min="0" step="0.5" value={fee} onChange={e => setFee(e.target.value)} style={fld} />
            <button onClick={saveFee} className="wc-btn wc-btn--sm wc-btn--ink" style={{ flex: '0 0 auto' }}>Save</button>
          </div>
-         <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--ink2)', marginTop: 9 }}>{entrants} entrants at {moneyAdmin(feeNum)} each.</div>
+         <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--ink2)', marginTop: 9 }}>{entrants} entrants at {moneyAdmin(feeNum)} each — you collect payment yourself.</div>
        </Ca>
 
        <Ca flat style={{ padding: '12px 13px', marginBottom: 12 }}>
@@ -990,7 +1054,10 @@ function AdminPanel(props) {
          <Wa mood="confident" size={44} />
          <div style={{ flex: 1 }}>
            <div className="dh" style={{ fontSize: 20, color: '#fff', lineHeight: 1 }}>Wheesht's clipboard</div>
-           <div style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--yellow)' }}>{(Sa.activeLeague && Sa.activeLeague()) ? Sa.activeLeague().name : 'Admin'} · {allPeople.length} entrants</div>
+           <div style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--yellow)', display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 4 }}>
+             <span>{(Sa.activeLeague && Sa.activeLeague()) ? Sa.activeLeague().name : 'Admin'} · {allPeople.length} entrants</span>
+             <window.ProBadge small league={Sa.activeLeague ? Sa.activeLeague() : null} />
+           </div>
          </div>
          <SaveStatusPill />
          <button onClick={props.onClose} style={{ border: 'none', background: 'rgba(255,255,255,.16)', color: '#fff', width: 34, height: 34, borderRadius: 10, fontSize: 18, fontWeight: 900, cursor: 'pointer', padding: 0 }}>✕</button>
@@ -1007,9 +1074,15 @@ function AdminPanel(props) {
            <SHa>Tournament phase</SHa>
            <PhaseSeg />
            <div style={{ height: 14 }} />
+           <OrganiserChecklist />
+           <ProUpgradePanel />
            <InvitePanel />
-           <AnalyticsPanel />
-           <DuplicateLeaguePanel />
+           <ProLockedAdmin hint="Funnel analytics are part of Wheesht Pro.">
+             <AnalyticsPanel />
+           </ProLockedAdmin>
+           <ProLockedAdmin hint="Duplicating league settings is part of Wheesht Pro.">
+             <DuplicateLeaguePanel />
+           </ProLockedAdmin>
            <SHa>Match results</SHa>
            <div style={{ display: 'flex', gap: 6, marginBottom: 12, overflowX: 'auto' }}>
              {[[0, 'All'], [1, 'MD1'], [2, 'MD2'], [3, 'MD3']].map(([k, lab]) => (
@@ -1037,24 +1110,26 @@ function AdminPanel(props) {
          </>}
 
          {sec === 'players' && <>
-           <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-             <button onClick={() => downloadCsv('entrants')} className="wc-btn wc-btn--sm wc-btn--ink" style={{ flex: 1 }}>Download entrants CSV</button>
-           </div>
+           <ProLockedAdmin hint="CSV export is part of Wheesht Pro.">
+             <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+               <button onClick={() => downloadCsv('entrants')} className="wc-btn wc-btn--sm wc-btn--ink" style={{ flex: 1 }}>Download entrants CSV</button>
+             </div>
+           </ProLockedAdmin>
            <PeopleAdmin />
          </>}
 
-         {sec === 'predict' && <>
+         {sec === 'predict' && <ProLockedAdmin hint="Prediction grading and markets are part of Wheesht Pro.">
            <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
              <button onClick={() => downloadCsv('predictions')} className="wc-btn wc-btn--sm wc-btn--ink" style={{ flex: 1 }}>Download predictions CSV</button>
            </div>
            <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--ink2)', marginBottom: 10 }}>Set the answer once it's known — every entrant's score and the league re-grade instantly.</div>
            {(WCa.predictions || Sa.PREDICTIONS).map(m => <PredAdmin key={m.key} m={m} />)}
            <MatchPredAdmin />
-         </>}
+         </ProLockedAdmin>}
 
          {sec === 'prize' && <PrizeFundAdmin />}
 
-         {sec === 'fields' && <FieldsAdmin />}
+         {sec === 'fields' && <ProLockedAdmin hint="Custom signup fields are part of Wheesht Pro."><FieldsAdmin /></ProLockedAdmin>}
 
          {sec === 'security' && <AdminHealth />}
 

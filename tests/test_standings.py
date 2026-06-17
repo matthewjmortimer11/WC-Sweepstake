@@ -57,6 +57,13 @@ def test_grade_winner_prediction_when_champion_known():
     assert graded[0]["answer"] == "WIN"
 
 
+def test_apply_pred_scores_from_graded_markets():
+    preds = [{"key": "winner", "kind": "team", "options": ["AAA", "BBB"], "answer": "AAA", "points": 10}]
+    people = [{"id": "p1", "name": "A", "picks": {"winner": "AAA"}, "predScore": 0}]
+    out = standings.apply_pred_scores(people, preds)
+    assert out[0]["predScore"] == 10
+
+
 def test_apply_to_people_mirrors_team_status():
     teams = [{**_team("SCO"), "alive": False, "stage": "out-r16"}]
     people = [{"id": "p1", "name": "Davie", "team": "SCO", "alive": True, "stage": "group"}]

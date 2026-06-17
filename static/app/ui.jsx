@@ -326,9 +326,35 @@ function wcSheetChrome(zIndex) {
   };
 }
 
+function ProBadge(props) {
+  var league = props.league;
+  var S = window.Store;
+  var hasPro = props.hasPro;
+  if (hasPro == null && league) hasPro = !!(league.hasPro || league.proStatus === 'pro');
+  if (hasPro == null && S && S.hasPro) hasPro = S.hasPro();
+  if (!hasPro) return null;
+  var small = !!props.small;
+  return <span style={{
+    display: 'inline-block',
+    marginLeft: small ? 6 : 8,
+    padding: small ? '2px 7px' : '3px 9px',
+    borderRadius: 999,
+    background: 'var(--ink)',
+    color: 'var(--yellow)',
+    fontFamily: 'var(--disp)',
+    fontWeight: 800,
+    fontSize: small ? 9 : 10,
+    letterSpacing: '.06em',
+    textTransform: 'uppercase',
+    verticalAlign: 'middle',
+    lineHeight: 1.2,
+  }}>Pro</span>;
+}
+
 Object.assign(window, {
   Card: Card, Btn: Btn, Flag: Flag, Avatar: Avatar, Chip: Chip, Stamp: Stamp,
   ProgressRing: ProgressRing, SegmentBar: SegmentBar, WheeshtSays: WheeshtSays,
   SectionHead: SectionHead, ToastLayer: ToastLayer, ConfettiLayer: ConfettiLayer,
   Badges: Badges, GoogleSignInButton: GoogleSignInButton, wcSheetChrome: wcSheetChrome,
+  ProBadge: ProBadge,
 });

@@ -13,6 +13,16 @@ function money2(n){
 }
 function ownerName2(code){ const o = WC2.ownersOf(code); return o.length ? o[0].name : 'nobody'; }
 
+function predictionMarketOptions(marketKey, limit) {
+  var m = (WC2.PREDICTIONS || []).find(function (x) { return x.key === marketKey; });
+  if (!m || !m.options) return [];
+  return m.options.slice(0, limit || 4).map(function (code) {
+    var t = WC2.TEAMS[code] || {};
+    var settled = m.answer === code ? 'Settled correct' : (m.answer ? 'Settled' : 'Your pick');
+    return { flag: t.flag || '⚽', name: t.name || code, sub: settled, odds: '—' };
+  });
+}
+
 /* =================== SIDE BETS =================== */
 function Market(props){
   const [pick,setPick]=RS.useState(null);
@@ -84,23 +94,15 @@ function SideBetsScreen(props){
         ? <Says2 mood="wounded" label="solemn" animate>{WC2.LINES.sideBets} <b>{WC2.LINES.sideBets2}</b></Says2>
         : <Says2 mood="suspicious" label="conspiratorial" animate>Ye’re still in. Smug, aren’t ye. The side game’s open already though — get yer picks in before the rest cotton on.</Says2>}
       <SH2>Your markets</SH2>
-      <Market title="Golden Boot" options={[
-        {flag:'🇫🇷',name:'K. Mbappé',sub:'France · 4 goals so far',odds:'2/1'},
-        {flag:'🇪🇸',name:'L. Yamal',sub:'Spain · 3 goals',odds:'3/1'},
-        {flag:'🇳🇴',name:'E. Haaland',sub:'Norway · 3 goals',odds:'7/2'},
-        {flag:'🇧🇷',name:'Vinícius Jr',sub:'Brazil · 2 goals',odds:'5/1'},
+      <div style={{fontSize:12,fontWeight:600,color:'var(--ink2)',margin:'-4px 0 10px',lineHeight:1.4}}>Tournament prediction markets — odds shown for fun until results land.</div>
+      <Market title="Golden Boot" options={predictionMarketOptions('goldenBoot', 4).length ? predictionMarketOptions('goldenBoot', 4) : [
+        {flag:'🏆',name:'Top scorer',sub:'Pick on Predictions tab',odds:'—'},
       ]}/>
-      <Market title="Golden Glove" options={[
-        {flag:'🇪🇸',name:'Spain’s keeper',sub:'3 clean sheets',odds:'2/1'},
-        {flag:'🇧🇷',name:'Brazil’s keeper',sub:'2 clean sheets',odds:'3/1'},
-        {flag:'🇦🇷',name:'Argentina’s keeper',sub:'2 clean sheets',odds:'4/1'},
-        {flag:'🇫🇷',name:'France’s keeper',sub:'2 clean sheets',odds:'9/2'},
+      <Market title="Golden Glove" options={predictionMarketOptions('cleanSheets', 4).length ? predictionMarketOptions('cleanSheets', 4) : [
+        {flag:'🧤',name:'Most clean sheets',sub:'Pick on Predictions tab',odds:'—'},
       ]}/>
-      <Market title="Dark horse to win it" options={[
-        {flag:'🇭🇷',name:'Croatia',sub:'the people’s pick',odds:'12/1'},
-        {flag:'🇺🇾',name:'Uruguay',sub:'quietly fancied',odds:'14/1'},
-        {flag:'🇨🇴',name:'Colombia',sub:'flair merchants',odds:'16/1'},
-        {flag:'🇯🇵',name:'Japan',sub:'the dark dark horse',odds:'22/1'},
+      <Market title="Tournament winner" options={predictionMarketOptions('winner', 4).length ? predictionMarketOptions('winner', 4) : [
+        {flag:'🌍',name:'Champion',sub:'Pick on Predictions tab',odds:'—'},
       ]}/>
       <SH2>The kitty</SH2>
       <SidePot/>

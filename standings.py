@@ -238,6 +238,67 @@ def grade_predictions(
     return out
 
 
+def _market_resolved(m: Dict[str, Any]) -> bool:
+    if not m:
+        return False
+    if str(m.get("key") or "").startswith("dm_"):
+        st = str(m.get("fixture_status") or m.get("fixtureStatus") or m.get("status") or "").lower()
+        if st not in ("done", "ft", "fulltime", "full_time", "full-time", "finished"):
+            return False
+    if m.get("kind") == "team2":
+        ans = m.get("answer")
+        return isinstance(ans, list) and len(ans) > 0 and all(x is not None for x in ans)
+    return m.get("answer") is not None
+
+
+def score_participant_picks(
+    picks: Dict[str, Any],
+    predictions: List[Dict[str, Any]],
+) -> int:
+    """Server-authoritative prediction points for one entrant."""
+    total = 0
+    picks = picks or {}
+    for m in predictions:
+        if not _market_resolved(m):
+            continue
+        pts = int(m.get("points") or 0)
+        pick = picks.get(m.get("key"))
+        if pick is None:
+            continue
+        kind = m.get("kind")
+        ans = m.get("answer")
+        if kind == "team2":
+            if (
+                isinstance(pick, list)
+                and isinstance(ans, list)
+                and len(pick) == len(ans)
+                and sorted(pick) == sorted(ans)
+            ):
+                total += pts
+        elif kind == "number":
+            try:
+                if int(pick) == int(ans):
+                    total += pts
+            except (TypeError, ValueError):
+                pass
+        elif pick == ans:
+            total += pts
+    return total
+
+
+def apply_pred_scores(
+    people: List[Dict[str, Any]],
+    predictions: List[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    """Attach server-graded predScore to each participant."""
+    out: List[Dict[str, Any]] = []
+    for p in people:
+        np = dict(p)
+        np["predScore"] = score_participant_picks(p.get("picks") or {}, predictions)
+        out.append(np)
+    return out
+
+
 def apply_to_people(
     people: List[Dict[str, Any]],
     teams: List[Dict[str, Any]],

@@ -146,7 +146,10 @@ function AppBar(props){
   return <div className="appbar" ref={ref}>
     <div className="mk" onClick={secretTap} style={{cursor:'default'}}><A_W mood="confident" size={42}/></div>
     <div style={{flex:1,minWidth:0}}>
-      <h1 onClick={eggTap} style={{cursor:'default'}}>{(A_WC.league&&A_WC.league.name)||A_WC.meta.name}</h1>
+      <h1 onClick={eggTap} style={{cursor:'default',display:'flex',alignItems:'center',flexWrap:'wrap',gap:2}}>
+        {(A_WC.league&&A_WC.league.name)||A_WC.meta.name}
+        <window.ProBadge small />
+      </h1>
       <p>{A_WC.meta.season} · {A_WC.meta.stageLabel}</p>
     </div>
     {me && <button onClick={props.onAccount} style={{border:'none',background:'none',cursor:'pointer',padding:0,marginLeft:2}}>
@@ -156,7 +159,11 @@ function AppBar(props){
 }
 
 function TabBar(props){
-  const tabs=[['me','You'],['games','Games'],['players','Group'],['predictions','Predict'],['chat','Chat'],['summary','Verdict']];
+  const hasPro = A_S.hasPro && A_S.hasPro();
+  const showProUpsell = !(A_S.proGrandfathered && A_S.proGrandfathered());
+  const tabs=[['me','You'],['games','Games'],['players','Group']].concat(
+    hasPro ? [['predictions','Predict']] : (showProUpsell ? [] : [['predictions','Predict']])
+  ).concat([['chat','Chat'],['summary','Verdict']]);
   return <div className="tabbar tabbar--6">
     {tabs.map(([k,lab])=>(
       <button key={k} className={props.tab===k?'on':''} onClick={()=>props.setTab(k)}>
@@ -329,6 +336,37 @@ function TellTheGroupSheet(props){
   </div>;
 }
 
+function ProUpgradeSheet(props){
+  const copy = window.WheeshtCopy || {};
+  const chrome = window.wcSheetChrome(82);
+  function upgrade(){
+    if (A_S.startProCheckout) A_S.startProCheckout({ successPath: '/', cancelPath: '/' });
+  }
+  return <div style={chrome.wrap}>
+    <div onClick={props.onClose} style={chrome.backdrop}/>
+    <div className={chrome.cls} style={chrome.sheet}>
+      {!chrome.deck && <div style={{width:44,height:5,borderRadius:3,background:'var(--line)',margin:'0 auto 14px'}}/>}
+      <div className="dh" style={{fontSize:22}}>{copy.proTitle || 'Upgrade to Wheesht Pro'}</div>
+      <div style={{fontSize:13,fontWeight:600,color:'var(--ink2)',marginTop:6,lineHeight:1.45}}>
+        {copy.proHint || 'Unlock predictions, custom fields, analytics, and CSV export for this league. Entry fees stay offline — we never touch the pot.'}
+      </div>
+      <ul style={{fontSize:12.5,fontWeight:600,color:'var(--ink2)',margin:'12px 0 0',paddingLeft:18,lineHeight:1.5}}>
+        <li>Tournament predictions + leaderboard</li>
+        <li>Custom signup fields</li>
+        <li>Funnel analytics + CSV export</li>
+      </ul>
+      {A_S.proUpgradeAvailable && A_S.proUpgradeAvailable() ? (
+        <button onClick={upgrade} className="wc-btn wc-btn--block wc-btn--ink" style={{marginTop:16,boxShadow:'0 4px 0 var(--ink)'}}>
+          {copy.proCta || 'Upgrade this league'}
+        </button>
+      ) : (
+        <div style={{fontSize:12,fontWeight:700,color:'var(--ink2)',marginTop:14}}>Pro checkout is not configured on this server yet.</div>
+      )}
+      <button onClick={props.onClose} style={{width:'100%',marginTop:12,border:'none',background:'none',cursor:'pointer',fontSize:12.5,fontWeight:800,color:'var(--ink2)'}}>Not now</button>
+    </div>
+  </div>;
+}
+
 function InstallNudge(props){
   const copy = window.WheeshtCopy || {};
   return <div style={{position:'fixed',bottom:72,left:12,right:12,zIndex:190,maxWidth:420,margin:'0 auto',background:'#fff',border:'2.5px solid var(--ink)',borderRadius:16,padding:'12px 14px',boxShadow:'0 6px 0 var(--ink)'}}>
@@ -365,7 +403,10 @@ function DeckWire(){
   const pot = A_S.pot ? A_S.pot() : (A_WC.POT || 0);
   const rows = (A_S.rankedByPred ? A_S.rankedByPred() : []).slice(0,6);
   return <aside className="deck-wire">
-    <div className="wire-kk">{(A_WC.league&&A_WC.league.name)||A_WC.meta.name||'The Sweepstake'}</div>
+    <div className="wire-kk" style={{display:'flex',alignItems:'center',flexWrap:'wrap',gap:4}}>
+      {(A_WC.league&&A_WC.league.name)||A_WC.meta.name||'The Sweepstake'}
+      <window.ProBadge small />
+    </div>
     <div className="wire-card">
       <div className="wire-pot">{deckMoney(pot)}</div>
       <div className="wire-pot__l">in the pot</div>
@@ -449,7 +490,10 @@ function DeckShell(props){
     <main className="deck-main">
       <div className={isChat?'deck-canvas deck-canvas--chat':'deck-canvas'} key={tab+(props.me?props.me.id:'')}>
         {head && <header className="deck-head">
-          <div className="kk">{(A_WC.league&&A_WC.league.name)||A_WC.meta.name||'Wheesht'}</div>
+          <div className="kk" style={{display:'flex',alignItems:'center',flexWrap:'wrap',gap:4}}>
+            {(A_WC.league&&A_WC.league.name)||A_WC.meta.name||'Wheesht'}
+            <window.ProBadge small />
+          </div>
           <h1>{head[0]}</h1>
           <div className="dek">{head[1]}</div>
           <div className="rule"/>
@@ -515,6 +559,7 @@ function App(){
   const [t,setTweak]=window.useTweaks(TW_DEFAULTS);
   const [tellGroup,setTellGroup]=aState(null);
   const [showInstall,setShowInstall]=aState(false);
+  const [proSheet,setProSheet]=aState(false);
   const installPromptRef=React.useRef(null);
   function refreshStore(){
     if(!A_S.refresh) return null;
@@ -526,6 +571,22 @@ function App(){
   // re-render on any store change
   aEffect(()=>A_S.subscribe(()=>tick(x=>x+1)),[]);
   aEffect(()=>{ refreshStore(); },[]);
+  aEffect(function(){
+    if (flow === 'gate' && A_S.trackEvent) A_S.trackEvent('gate_view');
+  },[flow]);
+  aEffect(function(){
+    try {
+      var u = new URL(window.location.href);
+      if (u.searchParams.get('pro') === 'success') {
+        u.searchParams.delete('pro'); u.searchParams.delete('session_id');
+        window.history.replaceState({}, '', u.pathname + (u.search || ''));
+        if (A_S.refresh) A_S.refresh().then(function(){
+          if (A_S.trackEvent) A_S.trackEvent('pro_purchase_success');
+          if (window.wcToast) window.wcToast('Wheesht Pro unlocked for this league.', 'confident');
+        });
+      }
+    } catch (e) {}
+  },[]);
   aEffect(function(){
     if (typeof window === 'undefined' || !window.matchMedia) return;
     if (window.matchMedia('(display-mode: standalone)').matches) return;
@@ -549,6 +610,10 @@ function App(){
     } catch (e) {}
   },[flow]);
   aEffect(function(){
+    if (!showInstall) return;
+    if (A_S.trackEvent) A_S.trackEvent('install_prompt_shown');
+  }, [showInstall]);
+  aEffect(function(){
     if (joinBoot.current && (joinBoot.current.join || joinBoot.current.demo)) {
       try {
         var u = new URL(window.location.href);
@@ -561,7 +626,7 @@ function App(){
   aEffect(function(){
     if (flow !== 'demo') return;
     if (A_S.enterDemoMode) {
-      A_S.enterDemoMode().then(function(){ setFlow('app'); });
+      A_S.enterDemoMode().then(function(){ if(A_S.trackEvent) A_S.trackEvent('demo_enter'); setFlow('app'); });
     } else setFlow('gate');
   },[flow]);
   aEffect(function(){
@@ -802,6 +867,12 @@ function App(){
     return unsub;
   },[flow,me&&me.id]); // eslint-disable-line
 
+  function proceedToDraw(p){
+    if(!p) return;
+    var ready=A_S.finalizeDraw?A_S.finalizeDraw(p.id):p;
+    if(A_S.trackEvent) A_S.trackEvent('draw_complete');
+    setDraw({participant:ready}); setFlow('app');
+  }
   function onboardSubmit(profile){
     const nm=(profile.name||'').trim().toLowerCase();
     const lg=A_S.activeLeague&&A_S.activeLeague();
@@ -817,7 +888,7 @@ function App(){
     if(organiser && A_S.bindAdminTokenToActive) A_S.bindAdminTokenToActive();
     setOrganiser(false);
     A_S.refresh&&A_S.refresh();
-    setDraw({participant:p}); setFlow('app');
+    proceedToDraw(p);
   }
   function resumeAccount(id){
     Promise.resolve(A_S.resumeAccount?A_S.resumeAccount(id):A_S.setActive(id)).then(()=>{ setFlow('app'); setTab('me'); });
@@ -908,7 +979,10 @@ function App(){
 
   // -------- main app --------
   const screens={
-    me:<window.MeScreen goPredictions={()=>setTab('predictions')} goGames={()=>setTab('games')} goGroup={()=>setTab('players')}/>,
+    me:<window.MeScreen goPredictions={()=>{
+      if (A_S.hasPro && A_S.hasPro()) setTab('predictions');
+      else setTab('predictions');
+    }} goGames={()=>setTab('games')} goGroup={()=>setTab('players')}/>,
     games:<window.MatchCentreScreen/>,
     players:<window.CompetitionScreen/>,
     predictions:<window.PredictionsScreen/>,
@@ -955,7 +1029,7 @@ function App(){
       onDone={()=>{ const wasReplay=draw.replay; setDraw(null); if(!wasReplay){ setTab('me'); setTimeout(()=>window.wcConfetti&&window.wcConfetti({y:.4}),200);
         setTimeout(function(){
           var lg=A_S.activeLeague&&A_S.activeLeague();
-          if(lg) setTellGroup(lg);
+            if(lg) { if(A_S.trackEvent) A_S.trackEvent('share_open'); setTellGroup(lg); }
           try {
             if (!localStorage.getItem('wheesht_install_dismissed') && installPromptRef.current && !(A_S.quietMode && A_S.quietMode())) {
               setShowInstall(true);
@@ -966,6 +1040,7 @@ function App(){
     {admin && <window.AdminGate onClose={closeAdmin}/>}
     {dev && <window.DevConsole onClose={()=>setDev(false)} onAdmin={devAdmin}/>}
     {tellGroup && <TellTheGroupSheet league={tellGroup} onClose={()=>setTellGroup(null)}/>}
+    {proSheet && <ProUpgradeSheet onClose={()=>setProSheet(false)}/>}
     {showInstall && installPromptRef.current && !(A_S.quietMode && A_S.quietMode()) && <InstallNudge
       onDismiss={function(){
         try { localStorage.setItem('wheesht_install_dismissed', '1'); } catch (e) {}

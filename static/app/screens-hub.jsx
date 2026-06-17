@@ -11,7 +11,15 @@ function money(n){
   const cur = (WC.meta && WC.meta.currency) || '£';
   return cur + (Math.round(Number(n || 0) * 100) / 100).toLocaleString('en-GB', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 }
-function ownerName(code){ const o = WC.ownersOf(code); return o.length ? o[0].name : 'nobody'; }
+function fixtureDone(f) {
+  var st = String((f && f.status) || '').toLowerCase();
+  return ['done', 'ft', 'fulltime', 'full_time', 'full-time', 'finished'].indexOf(st) >= 0;
+}
+function nextFixtureForTeam(teamCode) {
+  return (WC.FIXTURES || []).find(function (f) {
+    return (f.a === teamCode || f.b === teamCode) && !fixtureDone(f);
+  });
+}
 function stageLabel(t){
   if (t.stage === 'qf') return 'Quarter-final';
   if (t.stage === 'r16') return 'Round of 16';
@@ -66,6 +74,8 @@ function ConverterCard(props){
 function DashTeam(){
   const me = WC.YOU; const t = WC.TEAMS[me.team];
   const ring = teamProgressRing(t);
+  const nextFix = nextFixtureForTeam(me.team);
+  const opp = nextFix ? WC.TEAMS[nextFix.a === me.team ? nextFix.b : nextFix.a] : null;
   return (
     <Card bordered className="pop">
       <div style={{display:'flex',alignItems:'center',gap:14}}>
@@ -82,13 +92,20 @@ function DashTeam(){
         </div>
         <ProgressRing value={ring.value} size={56} stroke={7} color={t.alive ? 'var(--green)' : 'var(--ink2)'}><span style={{fontSize:12}}>{ring.label}</span></ProgressRing>
       </div>
-      <div style={{marginTop:14,display:'flex',alignItems:'center',gap:10,background:'var(--ink)',borderRadius:14,padding:'11px 14px',color:'#fff'}}>
-        <div style={{flex:1}}>
-          <div style={{fontSize:11,fontWeight:800,letterSpacing:'.06em',color:'var(--yellow)'}}>YOUR NEXT TIE · TONIGHT 20:00</div>
-          <div className="dh" style={{fontSize:19,marginTop:2}}>Croatia <span style={{opacity:.5}}>vs</span> Mexico 🇲🇽</div>
+      {nextFix && opp ? (
+        <div style={{marginTop:14,display:'flex',alignItems:'center',gap:10,background:'var(--ink)',borderRadius:14,padding:'11px 14px',color:'#fff'}}>
+          <div style={{flex:1}}>
+            <div style={{fontSize:11,fontWeight:800,letterSpacing:'.06em',color:'var(--yellow)'}}>YOUR NEXT TIE · {nextFix.dateLabel} · {nextFix.time}</div>
+            <div className="dh" style={{fontSize:19,marginTop:2}}>{t.name} <span style={{opacity:.5}}>vs</span> {opp.name} {opp.flag}</div>
+          </div>
+          <span className="flame" style={{fontSize:26}}>🔥</span>
         </div>
-        <span className="flame" style={{fontSize:26}}>🔥</span>
-      </div>
+      ) : !t.alive ? (
+        <div style={{marginTop:14,background:'var(--bg)',border:'2px solid var(--line)',borderRadius:14,padding:'11px 14px'}}>
+          <div style={{fontSize:11,fontWeight:800,letterSpacing:'.06em',color:'var(--ink2)'}}>ELIMINATED</div>
+          <div className="dh" style={{fontSize:17,marginTop:2}}>{stageLabel(t)}</div>
+        </div>
+      ) : null}
     </Card>
   );
 }

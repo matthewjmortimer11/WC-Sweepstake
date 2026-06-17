@@ -425,6 +425,42 @@
   var subs = [];
   function emit() { subs.forEach(function (f) { try { f(); } catch (e) {} }); }
 
+  function funnelSessionId() {
+    try {
+      var sid = localStorage.getItem('wheesht_sid');
+      if (!sid) {
+        sid = 's_' + Math.random().toString(36).slice(2) + Date.now().toString(36);
+        localStorage.setItem('wheesht_sid', sid);
+      }
+      return sid;
+    } catch (e) { return 'anon'; }
+  }
+  function utmParams() {
+    try {
+      var u = new URL(window.location.href);
+      return {
+        utmSource: u.searchParams.get('utm_source') || '',
+        utmCampaign: u.searchParams.get('utm_campaign') || '',
+      };
+    } catch (e) { return { utmSource: '', utmCampaign: '' }; }
+  }
+  function trackEvent(event, detail) {
+    if (!LIVE) return;
+    var utm = utmParams();
+    fetch('/api/events', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Wheesht-Session': funnelSessionId() },
+      body: JSON.stringify({
+        event: event,
+        sessionId: funnelSessionId(),
+        leagueCode: leagueCode(),
+        utmSource: utm.utmSource || null,
+        utmCampaign: utm.utmCampaign || null,
+        detail: detail || '',
+      }),
+    }).catch(function () {});
+  }
+
   // ---- draw (unique within the active league until all teams taken) -------
   function drawTeam(force) {
     if (force && WC.TEAMS[force]) return force;
@@ -442,6 +478,18 @@
       pool = WC.TEAM_LIST.filter(function (t) { return (taken[t.code] || 0) === min; }).map(function (t) { return t.code; });
     }
     return pool[(Math.random() * pool.length) | 0];
+  }
+
+  function finalizeDraw(id, forceTeam) {
+    var p = null;
+    for (var i = 0; i < cache.length; i++) if (cache[i].id === id) p = cache[i];
+    if (!p) return null;
+    if (p.team) return p;
+    var team = drawTeam(forceTeam);
+    var t = WC.TEAMS[team];
+    var patch = { team: team, stage: t.stage, alive: t.alive };
+    Store.update(id, patch);
+    return Store.getSync(id);
   }
 
   // ---- scoring ------------------------------------------------------------
@@ -464,6 +512,7 @@
   }
   function predScoreOf(p) {
     if (!p) return 0;
+    if (LIVE && typeof p.predScore === 'number') return p.predScore;
     if (p.picks) {
       var s = 0;
       (WC.PREDICTIONS || []).forEach(function (m) {
@@ -680,17 +729,17 @@
     create: function (profile, opts) {
       if (window.WC_DEMO_MODE) return null;
       opts = opts || {};
-      var team = drawTeam(opts.forceTeam);
-      var t = WC.TEAMS[team];
+      var team = opts.deferTeam ? '' : drawTeam(opts.forceTeam);
+      var t = team ? WC.TEAMS[team] : null;
       var name = (profile.name || '').trim() || 'Anonymous';
       var p = {
         id: uid(), name: name, initials: initials(name),
         department: profile.department || '', location: profile.location || 'London',
         city: profile.location || 'London', ltMember: !!profile.ltMember, leadership: !!profile.ltMember,
         gender: '—', team: team, color: COLORS[(Math.random() * COLORS.length) | 0],
-        stage: t.stage, alive: t.alive, isYou: false, isDemo: false,
+        stage: t ? t.stage : '', alive: t ? t.alive : true, isYou: false, isDemo: false,
         leagueCode: leagueCode(), isOrganiser: !!opts.organiser,
-        picks: {}, customFields: profile.customFields || {}, predScore: 0, joinedAt: Date.now()
+        picks: {}, customFields: profile.customFields || {}, predScore: 0, joinedAt: Date.now(),
       };
       mine = mine.concat([p]); lsSet(K.mine, mine); rebuild();
       var d = this.deviceIds(); if (d.indexOf(p.id) < 0) d.push(p.id); lsSet(K.device, d);
@@ -997,6 +1046,13 @@
         if (d && Array.isArray(d.people)) {
           window.WC_DATA = d;
           if (d.adminOverrides) admin = d.adminOverrides;
+          if (d.league) {
+            var cur = activeLeague();
+            if (cur && cur.code === d.league.code) {
+              var merged = Object.assign({}, cur, d.league);
+              setActiveLeague(merged);
+            }
+          }
           if (window.__rebuildWC) window.__rebuildWC();
           lastRefreshAt = Date.now();
           rebuild(); emit();
@@ -1046,6 +1102,29 @@
         method: 'POST', headers: adminHeaders(), body: JSON.stringify(payload || {}),
       }).then(parseJson);
     },
+    trackEvent: trackEvent,
+    hasPro: function () { return !!(WC.meta && WC.meta.hasPro); },
+    proGrandfathered: function () { return !!(WC.meta && WC.meta.proGrandfathered); },
+    proUpgradeAvailable: function () { return !!(WC.meta && WC.meta.proUpgradeAvailable); },
+    startProCheckout: function (paths) {
+      paths = paths || {};
+      if (!LIVE || !leagueCode()) return Promise.reject(new Error('Checkout requires a live league'));
+      return fetch(api('/pro/checkout'), {
+        method: 'POST',
+        headers: adminHeaders(),
+        body: JSON.stringify({
+          successPath: paths.successPath || '/',
+          cancelPath: paths.cancelPath || '/',
+        }),
+      }).then(parseJson).then(function (j) {
+        if (j && j.url) {
+          trackEvent('pro_checkout_started');
+          window.location.href = j.url;
+        }
+        return j;
+      });
+    },
+    finalizeDraw: finalizeDraw,
     fetchAnalytics: function () {
       if (!LIVE) {
         var people = cache;

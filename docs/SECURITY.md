@@ -41,7 +41,9 @@ Set these in Railway (never commit them):
 | `WC_DEV_KEY` | Master key for the hidden cross-league dev console | No committed fallback. With it unset, the dev console is disabled. |
 | `DATABASE_URL` | Postgres connection string | Contains credentials. |
 | `WC_GOOGLE_CLIENT_ID` / `WC_GOOGLE_CLIENT_SECRET` | Google Sign-In | The client id is public; the secret must never ship to the browser. |
-| `FOOTBALL_DATA_API_KEY` | Live fixture provider | Without it, the app uses the mock adapter. |
+| `FOOTBALL_DATA_API_KEY` | Live fixture provider | Without it, the app uses the mock adapter. Verify Railway logs show `Using FootballDataOrgAdapter`, not `MockAdapter`. |
+| `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET` | Wheesht Pro checkout | Optional. Organiser one-off league upgrade only — not sweepstake entry fees. See [PRO.md](PRO.md). |
+| `STRIPE_PRO_PRICE_ID` / `STRIPE_PRO_AMOUNT_PENCE` | Pro product price | Price ID preferred; amount pence fallback if unset. |
 
 ## Backups
 

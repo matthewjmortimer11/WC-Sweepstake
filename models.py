@@ -75,6 +75,9 @@ class League(Base):
     # join time instead of doing a fresh random draw.
     seeded: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    # free | pro — OI is grandfathered in app logic regardless of this column.
+    pro_status: Mapped[str] = mapped_column(String, nullable=False, default="free")
+    pro_purchased_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class Participant(Base):
@@ -124,6 +127,9 @@ class Participant(Base):
     # entries come from config and have no natural DB row to delete, so removal
     # is recorded as a row with removed=True that hides the config entry.
     removed: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+
+    # unpaid | pending | paid | refunded — only enforced when league collects payments.
+    payment_status: Mapped[str] = mapped_column(String, nullable=False, default="unpaid")
 
 
 class ChatMessage(Base):
@@ -213,6 +219,61 @@ class AdminOverride(Base):
     )
     data: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False, default=dict)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class FunnelEvent(Base):
+    """Anonymous growth funnel telemetry (no PII)."""
+
+    __tablename__ = "funnel_events"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    league_id: Mapped[Optional[str]] = mapped_column(
+        String, ForeignKey("leagues.id"), nullable=True, index=True
+    )
+    session_id: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    event: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    utm_source: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    utm_campaign: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    ts: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
+    detail: Mapped[str] = mapped_column(String, nullable=False, default="")
+
+
+class LeaguePurchase(Base):
+    """One-off organiser purchase (e.g. Wheesht Pro for a league)."""
+
+    __tablename__ = "league_purchases"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    league_id: Mapped[str] = mapped_column(
+        String, ForeignKey("leagues.id"), nullable=False, index=True
+    )
+    product: Mapped[str] = mapped_column(String, nullable=False, default="pro")
+    amount_pence: Mapped[int] = mapped_column(Integer, nullable=False)
+    currency: Mapped[str] = mapped_column(String, nullable=False, default="gbp")
+    status: Mapped[str] = mapped_column(String, nullable=False, default="pending")
+    stripe_checkout_session_id: Mapped[Optional[str]] = mapped_column(String, nullable=True, unique=True)
+    stripe_payment_intent_id: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    paid_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class Payment(Base):
+    """Legacy Stripe checkout record for entry fees (deprecated — unused)."""
+
+    __tablename__ = "payments"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    league_id: Mapped[str] = mapped_column(
+        String, ForeignKey("leagues.id"), nullable=False, index=True
+    )
+    participant_id: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    amount_pence: Mapped[int] = mapped_column(Integer, nullable=False)
+    currency: Mapped[str] = mapped_column(String, nullable=False, default="gbp")
+    status: Mapped[str] = mapped_column(String, nullable=False, default="pending")
+    stripe_checkout_session_id: Mapped[Optional[str]] = mapped_column(String, nullable=True, unique=True)
+    stripe_payment_intent_id: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    paid_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class AuditEvent(Base):

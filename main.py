@@ -27,6 +27,7 @@ import re
 import secrets
 import time
 import uuid
+from urllib.parse import quote
 
 import httpx
 from contextlib import asynccontextmanager
@@ -44,7 +45,19 @@ from sqlalchemy.exc import IntegrityError
 import standings
 import sync
 from db import AsyncSessionLocal, engine
-from models import AdminOverride, AuditEvent, Base, ChatMessage, League, Participant, Profile, ProfileAsset
+from models import (
+    AdminOverride,
+    AuditEvent,
+    Base,
+    ChatMessage,
+    FunnelEvent,
+    League,
+    LeaguePurchase,
+    Participant,
+    Payment,
+    Profile,
+    ProfileAsset,
+)
 from wc_data import _initials, generate_wc_data, get_admin_pin, get_league_seed
 
 log = logging.getLogger(__name__)
@@ -76,6 +89,22 @@ _DEV_KEY: str = os.environ.get("WC_DEV_KEY", "")
 # it is never shipped to the client and is not used for token verification
 # (we use Google's tokeninfo endpoint which needs no secret).
 _GOOGLE_CLIENT_ID: str = os.environ.get("WC_GOOGLE_CLIENT_ID", "")
+
+_STRIPE_SECRET_KEY: str = os.environ.get("STRIPE_SECRET_KEY", "")
+_STRIPE_WEBHOOK_SECRET: str = os.environ.get("STRIPE_WEBHOOK_SECRET", "")
+_STRIPE_PUBLISHABLE_KEY: str = os.environ.get("STRIPE_PUBLISHABLE_KEY", "")
+_STRIPE_PRO_PRICE_ID: str = os.environ.get("STRIPE_PRO_PRICE_ID", "")
+try:
+    _STRIPE_PRO_AMOUNT_PENCE: int = max(0, int(os.environ.get("STRIPE_PRO_AMOUNT_PENCE", "0") or "0"))
+except ValueError:
+    _STRIPE_PRO_AMOUNT_PENCE = 0
+
+_PRO_META_KEYS = frozenset({"hiddenPredictions", "predDeadline", "customFields"})
+
+_FUNNEL_EVENTS = frozenset({
+    "gate_view", "demo_enter", "join_start", "join_success", "draw_complete",
+    "share_open", "install_prompt_shown", "invite_view", "pro_checkout_started", "pro_purchase_success",
+})
 
 # Organiser PIN for the pre-seeded league. This stays server-side; clients get a
 # short-lived HMAC token after proving the code.
@@ -404,7 +433,16 @@ async def _get_admin_data(session, league: League) -> Dict[str, Any]:
 
 
 def _league_public(league: League) -> Dict[str, Any]:
-    return {"id": league.id, "code": league.code, "name": league.name, "seeded": league.seeded}
+    has_pro = _league_has_pro(league)
+    return {
+        "id": league.id,
+        "code": league.code,
+        "name": league.name,
+        "seeded": league.seeded,
+        "hasPro": has_pro,
+        "proStatus": "pro" if has_pro else "free",
+        "proGrandfathered": _league_is_grandfathered(league),
+    }
 
 
 def _participant_to_dict(p: Participant, league_code: str) -> Dict[str, Any]:
@@ -431,6 +469,7 @@ def _participant_to_dict(p: Participant, league_code: str) -> Dict[str, Any]:
         "customFields": p.custom_fields or {},
         "predScore": p.pred_score,
         "joinedAt": p.joined_at,
+        "paymentStatus": p.payment_status or "unpaid",
         # Whether this entry is locked with a password (the hash itself never
         # leaves the server). Lets the client know when to prompt for sign-in.
         "hasPassword": bool(p.password_hash),
@@ -470,6 +509,7 @@ def _league_people(
         d["hasGoogleLink"] = bool(getattr(prof, "google_id", None)) if prof else False
         # Config base entries (no DB row) are open until a row sets a password.
         d.setdefault("hasPassword", False)
+        d.setdefault("paymentStatus", "unpaid")
     return list(by_id.values())
 
 
@@ -672,6 +712,8 @@ def _resolve(league_people: List[Dict[str, Any]], admin: Dict[str, Any]):
             else:
                 m["answer"] = ans
 
+    people = standings.apply_pred_scores(people, predictions)
+
     return teams, fixtures, people, predictions, phase
 
 
@@ -721,6 +763,7 @@ def _league_state(league: League, league_people: List[Dict[str, Any]], admin: Di
     meta["customFields"] = _clean_custom_fields(list(admin_meta.get("customFields") or []))
     meta["predDeadline"] = admin_meta.get("predDeadline") or None
     meta["hiddenPredictions"] = list(admin_meta.get("hiddenPredictions") or [])
+    meta.update(_pro_meta(league))
     meta.update(_fixture_health(fixtures))
     data["meta"] = meta
     data["pot"] = len(people) * fee
@@ -910,6 +953,9 @@ async def _ensure_schema() -> None:
         "ALTER TABLE participants ADD COLUMN IF NOT EXISTS password_hash VARCHAR",
         "ALTER TABLE profiles ADD COLUMN IF NOT EXISTS google_id VARCHAR",
         "ALTER TABLE participants ADD COLUMN IF NOT EXISTS custom_fields JSON NOT NULL DEFAULT '{}'::json",
+        "ALTER TABLE participants ADD COLUMN IF NOT EXISTS payment_status VARCHAR NOT NULL DEFAULT 'unpaid'",
+        "ALTER TABLE leagues ADD COLUMN IF NOT EXISTS pro_status VARCHAR NOT NULL DEFAULT 'free'",
+        "ALTER TABLE leagues ADD COLUMN IF NOT EXISTS pro_purchased_at TIMESTAMPTZ",
         "CREATE INDEX IF NOT EXISTS ix_profiles_google_id ON profiles (google_id) WHERE google_id IS NOT NULL",
     ]
     async with engine.begin() as conn:
@@ -931,6 +977,11 @@ async def lifespan(app: FastAPI):
         await _seed_and_migrate()
     except Exception as exc:  # never let seeding crash boot
         log.error("League seed/migrate failed: %s", exc)
+
+    try:
+        await _backfill_pro_leagues()
+    except Exception as exc:
+        log.error("Pro backfill failed: %s", exc)
 
     api_key = os.environ.get("FOOTBALL_DATA_API_KEY", "")
     if api_key:
@@ -1008,6 +1059,145 @@ def _og_image_url(request: Request) -> str:
     return f"{_public_base(request)}{_OG_IMAGE_PATH}"
 
 
+def _utm_suffix(request: Request) -> str:
+    parts: List[str] = []
+    for key in ("utm_source", "utm_medium", "utm_campaign", "utm_content"):
+        val = (request.query_params.get(key) or "").strip()[:80]
+        if val:
+            parts.append(f"{key}={quote(val)}")
+    return ("&" + "&".join(parts)) if parts else ""
+
+
+def _utm_from_request(request: Request) -> Dict[str, str]:
+    out: Dict[str, str] = {}
+    for key in ("utm_source", "utm_campaign"):
+        val = (request.query_params.get(key) or "").strip()[:80]
+        if val:
+            out[key] = val
+    return out
+
+
+async def _record_funnel_event(
+    session,
+    *,
+    event: str,
+    session_id: str,
+    league_id: Optional[str] = None,
+    utm_source: Optional[str] = None,
+    utm_campaign: Optional[str] = None,
+    detail: str = "",
+) -> None:
+    if event not in _FUNNEL_EVENTS:
+        return
+    sid = (session_id or "").strip()[:64] or "anon"
+    session.add(FunnelEvent(
+        id=uuid.uuid4().hex,
+        league_id=league_id,
+        session_id=sid,
+        event=event,
+        utm_source=(utm_source or "")[:80] or None,
+        utm_campaign=(utm_campaign or "")[:80] or None,
+        ts=int(time.time() * 1000),
+        detail=(detail or "")[:200],
+    ))
+
+
+async def _funnel_counts(session, league_id: str) -> Dict[str, int]:
+    res = await session.execute(
+        select(FunnelEvent.event, func.count())
+        .where(FunnelEvent.league_id == league_id)
+        .group_by(FunnelEvent.event)
+    )
+    return {row[0]: int(row[1]) for row in res.all()}
+
+
+def _stripe_ready() -> bool:
+    return bool(_STRIPE_SECRET_KEY)
+
+
+def _stripe_client():
+    if not _stripe_ready():
+        raise HTTPException(status_code=503, detail="Payments are not configured on this server")
+    import stripe
+    stripe.api_key = _STRIPE_SECRET_KEY
+    return stripe
+
+
+def _league_is_grandfathered(league: League) -> bool:
+    return bool(league.seeded and league.code.upper() == _CONFIG_LEAGUE_CODE.upper())
+
+
+def _league_has_pro(league: League) -> bool:
+    if _league_is_grandfathered(league):
+        return True
+    return (league.pro_status or "free") == "pro"
+
+
+def _require_pro(league: League) -> None:
+    if _league_has_pro(league):
+        return
+    raise HTTPException(status_code=402, detail="pro_required")
+
+
+def _pro_meta(league: League) -> Dict[str, Any]:
+    has_pro = _league_has_pro(league)
+    grandfathered = _league_is_grandfathered(league)
+    return {
+        "proStatus": "pro" if has_pro else "free",
+        "hasPro": has_pro,
+        "proGrandfathered": grandfathered,
+        "proUpgradeAvailable": bool(_stripe_ready() and not has_pro and not grandfathered),
+    }
+
+
+def _pro_checkout_configured() -> bool:
+    return bool(_STRIPE_PRO_PRICE_ID or _STRIPE_PRO_AMOUNT_PENCE > 0)
+
+
+def _pro_line_items(league: League) -> List[Dict[str, Any]]:
+    if _STRIPE_PRO_PRICE_ID:
+        return [{"price": _STRIPE_PRO_PRICE_ID, "quantity": 1}]
+    return [{
+        "price_data": {
+            "currency": "gbp",
+            "unit_amount": _STRIPE_PRO_AMOUNT_PENCE,
+            "product_data": {"name": f"Wheesht Pro — {league.name}"},
+        },
+        "quantity": 1,
+    }]
+
+
+async def _backfill_pro_leagues() -> None:
+    """Grandfather leagues that already use Pro features before the paywall shipped."""
+    async with AsyncSessionLocal() as session:
+        leagues = list((await session.execute(select(League))).scalars().all())
+        changed = False
+        for league in leagues:
+            if _league_is_grandfathered(league) or (league.pro_status or "free") == "pro":
+                continue
+            rows = await _participant_rows(session, league)
+            has_picks = any(bool(r.picks) for r in rows)
+            admin = await _get_admin_data(session, league)
+            meta = admin.get("meta") or {}
+            if has_picks or bool(admin.get("predictions")) or bool(meta.get("customFields")):
+                league.pro_status = "pro"
+                league.pro_purchased_at = league.pro_purchased_at or _now()
+                changed = True
+        if changed:
+            await session.commit()
+            log.info("Backfilled pro_status for leagues with existing prediction activity")
+
+
+def _entry_fee_pence(admin: Dict[str, Any]) -> int:
+    fee = _wc_data["fee"]
+    try:
+        if (admin.get("meta") or {}).get("entryFee") is not None:
+            fee = max(0.0, float((admin.get("meta") or {}).get("entryFee")))
+    except (TypeError, ValueError):
+        fee = _wc_data["fee"]
+    return max(0, int(round(float(fee) * 100)))
+
+
 def _fill_join_template(
     *,
     title: str,
@@ -1057,6 +1247,15 @@ async def join_preview_page(code: str, request: Request):
         if league is None:
             return HTMLResponse(content=_join_not_found_html(request, code), status_code=404)
         league_name = league.name or "a Wheesht league"
+        await _record_funnel_event(
+            session,
+            event="invite_view",
+            session_id=request.headers.get("x-wheesht-session") or "invite",
+            league_id=league.id,
+            utm_source=_utm_from_request(request).get("utm_source"),
+            utm_campaign=_utm_from_request(request).get("utm_campaign"),
+        )
+        await session.commit()
     title = f"Join {league_name} on Wheesht"
     description = (
         f"You're invited to {league_name} — World Cup sweepstake, predictions, and gentle chaos."
@@ -1068,7 +1267,7 @@ async def join_preview_page(code: str, request: Request):
         code=code,
         canonical=f"{base}/join/{code}",
         og_image=og,
-        app_url=f"{base}/?join={code}",
+        app_url=f"{base}/?join={code}{_utm_suffix(request)}",
     )
     return HTMLResponse(content=html_body)
 
@@ -1105,6 +1304,42 @@ async def sitemap_xml(request: Request):
         body += f"  <url><loc>{html.escape(base + path)}</loc></url>\n"
     body += "</urlset>\n"
     return Response(content=body, media_type="application/xml")
+
+
+class FunnelEventPayload(BaseModel):
+    event: str
+    sessionId: str = ""
+    leagueCode: Optional[str] = None
+    utmSource: Optional[str] = None
+    utmCampaign: Optional[str] = None
+    detail: str = ""
+
+
+@app.post("/api/events")
+async def record_funnel_event(payload: FunnelEventPayload, request: Request):
+    """Anonymous growth funnel telemetry — no PII."""
+    event = (payload.event or "").strip()
+    if event not in _FUNNEL_EVENTS:
+        raise HTTPException(status_code=400, detail="Unknown event")
+    _rate_limit(request, "funnel:" + _client_key(request), 120, 10 * 60)
+    league_id: Optional[str] = None
+    code = (payload.leagueCode or "").strip().upper()
+    async with AsyncSessionLocal() as session:
+        if code:
+            league = await _get_league_by_code(session, code)
+            if league:
+                league_id = league.id
+        await _record_funnel_event(
+            session,
+            event=event,
+            session_id=(payload.sessionId or request.headers.get("x-wheesht-session") or "anon"),
+            league_id=league_id,
+            utm_source=(payload.utmSource or "")[:80] or None,
+            utm_campaign=(payload.utmCampaign or "")[:80] or None,
+            detail=(payload.detail or "")[:200],
+        )
+        await session.commit()
+    return {"ok": True}
 
 
 @app.get("/api/state")
@@ -1252,7 +1487,7 @@ async def create_league(payload: LeagueCreate, request: Request):
         "entryFee": entry_fee,
         "currency": currency,
         "charitySplit": charity_split,
-        "customFields": _clean_custom_fields(payload.customFields),
+        "customFields": [],
     }
     if not meta["locations"]:
         meta["locations"] = ["Edinburgh", "London"]
@@ -1485,6 +1720,7 @@ async def export_entrants_csv(
         if league is None:
             raise HTTPException(status_code=404, detail="league not found")
         await _require_admin(session, league, x_wheesht_admin_token)
+        _require_pro(league)
         rows = await _participant_rows(session, league)
         profile_map = await _profiles_for(session, league)
         people = _league_people(league, rows, profile_map)
@@ -1524,6 +1760,7 @@ async def export_predictions_csv(
         if league is None:
             raise HTTPException(status_code=404, detail="league not found")
         await _require_admin(session, league, x_wheesht_admin_token)
+        _require_pro(league)
         rows = await _participant_rows(session, league)
         profile_map = await _profiles_for(session, league)
         people = _league_people(league, rows, profile_map)
@@ -1575,6 +1812,7 @@ async def duplicate_league(
         if source is None:
             raise HTTPException(status_code=404, detail="league not found")
         await _require_admin(session, source, x_wheesht_admin_token)
+        _require_pro(source)
         new_code = (payload.code or "").strip().upper()
         if not re.fullmatch(r"[A-Z0-9]{2,12}", new_code):
             raise HTTPException(status_code=400, detail="Code must be 2–12 letters or numbers")
@@ -1619,6 +1857,7 @@ async def league_analytics(
         if league is None:
             raise HTTPException(status_code=404, detail="league not found")
         await _require_admin(session, league, x_wheesht_admin_token)
+        _require_pro(league)
         rows = await _participant_rows(session, league)
         profile_map = await _profiles_for(session, league)
         people = _league_people(league, rows, profile_map)
@@ -1661,15 +1900,19 @@ async def league_analytics(
             {"ts": e.ts, "action": e.action, "actor": e.actor, "detail": e.detail}
             for e in audit_res.scalars().all()
         ]
+        funnel = await _funnel_counts(session, league.id)
         return {
             "entrants": {
                 "total": len(people),
                 "withPassword": sum(1 for p in people if p.get("hasPassword")),
                 "withTeam": sum(1 for p in people if p.get("team")),
             },
+            "funnel": funnel,
             "predictions": pred_stats,
             "chat": {"total": int(chat_total), "last7d": int(chat_week)},
             "recentActivity": recent,
+            **_pro_meta(league),
+            "stripeConfigured": _stripe_ready(),
         }
 
 
@@ -1739,7 +1982,13 @@ def _apply_payload(
     row.removed = False
 
 
-async def _upsert_participant(session, league: League, payload: ParticipantPayload) -> Participant:
+async def _upsert_participant(
+    session,
+    league: League,
+    payload: ParticipantPayload,
+    *,
+    allow_admin_team: bool = False,
+) -> Participant:
     row = await session.get(Participant, payload.id)
     if row is not None and row.league_id != league.id:
         raise HTTPException(status_code=409, detail="id belongs to another league")
@@ -1748,6 +1997,8 @@ async def _upsert_participant(session, league: League, payload: ParticipantPaylo
         row = Participant(id=payload.id, league_id=league.id)
         session.add(row)
     admin = await _get_admin_data(session, league)
+    if payload.picks and dict(payload.picks) != dict(row.picks or {}):
+        _require_pro(league)
     meta = admin.get("meta") or {}
     _apply_payload(row, payload, league, _clean_custom_fields(list(meta.get("customFields") or [])))
     # First self-signup in a fresh (non-seeded) league becomes the organiser.
@@ -1808,7 +2059,7 @@ async def update_participant(
         await _guard_account_write(session, league, participant_id, x_wheesht_account_token, x_wheesht_admin_token)
         is_admin_edit = bool(x_wheesht_admin_token and _admin_token_ok(league, x_wheesht_admin_token))
         payload.id = participant_id
-        row = await _upsert_participant(session, league, payload)
+        row = await _upsert_participant(session, league, payload, allow_admin_team=is_admin_edit)
         if is_admin_edit:
             _log_audit(session, league.id, "participant_edited", "organiser", detail=(row.name or participant_id))
             await session.commit()
@@ -1855,6 +2106,169 @@ async def delete_participant(
         raise HTTPException(status_code=404, detail="participant not found")
 
 
+class ProCheckoutPayload(BaseModel):
+    successPath: str = "/"
+    cancelPath: str = "/"
+
+
+async def _complete_pro_purchase(
+    session,
+    *,
+    league_id: str,
+    amount_pence: int,
+    currency: str,
+    checkout_session_id: str,
+    payment_intent_id: Optional[str] = None,
+) -> None:
+    league = await session.get(League, league_id)
+    if league is None:
+        return
+    existing = await session.scalar(
+        select(LeaguePurchase).where(LeaguePurchase.stripe_checkout_session_id == checkout_session_id)
+    )
+    if existing and existing.status == "paid" and (league.pro_status or "free") == "pro":
+        return
+    if existing:
+        purchase = existing
+    else:
+        purchase = LeaguePurchase(
+            id=uuid.uuid4().hex,
+            league_id=league_id,
+            product="pro",
+            amount_pence=amount_pence,
+            currency=currency,
+            status="paid",
+            stripe_checkout_session_id=checkout_session_id,
+            stripe_payment_intent_id=payment_intent_id,
+            created_at=_now(),
+            paid_at=_now(),
+        )
+        session.add(purchase)
+    purchase.status = "paid"
+    purchase.paid_at = _now()
+    if payment_intent_id:
+        purchase.stripe_payment_intent_id = payment_intent_id
+    league.pro_status = "pro"
+    league.pro_purchased_at = _now()
+    _log_audit(session, league_id, "pro_purchased", "organiser", detail=str(amount_pence))
+
+
+@app.post("/api/leagues/{code}/pro/checkout")
+async def create_pro_checkout(
+    code: str,
+    payload: ProCheckoutPayload,
+    request: Request,
+    x_wheesht_admin_token: Optional[str] = Header(None, alias="X-Wheesht-Admin-Token"),
+):
+    if not _pro_checkout_configured():
+        raise HTTPException(status_code=503, detail="Pro checkout is not configured on this server")
+    stripe = _stripe_client()
+    async with AsyncSessionLocal() as session:
+        league = await _get_league_by_code(session, code.upper())
+        if league is None:
+            raise HTTPException(status_code=404, detail="league not found")
+        await _require_admin(session, league, x_wheesht_admin_token)
+        if _league_has_pro(league):
+            return {"ok": True, "alreadyPro": True}
+        base = _public_base(request)
+        success = (payload.successPath or "/").strip() or "/"
+        cancel = (payload.cancelPath or "/").strip() or "/"
+        if not success.startswith("/"):
+            success = "/" + success
+        if not cancel.startswith("/"):
+            cancel = "/" + cancel
+        checkout = stripe.checkout.Session.create(
+            mode="payment",
+            payment_method_types=["card"],
+            line_items=_pro_line_items(league),
+            success_url=f"{base}{success}?pro=success&session_id={{CHECKOUT_SESSION_ID}}",
+            cancel_url=f"{base}{cancel}?pro=cancelled",
+            metadata={
+                "purchase_type": "pro",
+                "league_id": league.id,
+                "league_code": league.code,
+            },
+        )
+        session.add(LeaguePurchase(
+            id=uuid.uuid4().hex,
+            league_id=league.id,
+            product="pro",
+            amount_pence=_STRIPE_PRO_AMOUNT_PENCE or 0,
+            currency="gbp",
+            status="pending",
+            stripe_checkout_session_id=checkout.id,
+            created_at=_now(),
+        ))
+        await session.commit()
+        return {"ok": True, "url": checkout.url, "sessionId": checkout.id}
+
+
+@app.post("/api/leagues/{code}/pro/grant")
+async def grant_pro_league(
+    code: str,
+    x_wheesht_dev_key: Optional[str] = Header(None, alias="X-Wheesht-Dev-Key"),
+):
+    if not _dev_key_ok(x_wheesht_dev_key or ""):
+        raise HTTPException(status_code=403, detail="forbidden")
+    async with AsyncSessionLocal() as session:
+        league = await _get_league_by_code(session, code.upper())
+        if league is None:
+            raise HTTPException(status_code=404, detail="league not found")
+        league.pro_status = "pro"
+        league.pro_purchased_at = _now()
+        _log_audit(session, league.id, "pro_granted", "dev", detail="Dev grant")
+        await session.commit()
+        return {"ok": True, "proStatus": "pro"}
+
+
+@app.post("/stripe/webhook")
+async def stripe_webhook(request: Request):
+    if not _STRIPE_WEBHOOK_SECRET:
+        raise HTTPException(status_code=503, detail="Webhook not configured")
+    stripe = _stripe_client()
+    payload = await request.body()
+    sig = request.headers.get("stripe-signature", "")
+    try:
+        event = stripe.Webhook.construct_event(payload, sig, _STRIPE_WEBHOOK_SECRET)
+    except Exception as exc:
+        log.warning("Stripe webhook verify failed: %s", exc)
+        raise HTTPException(status_code=400, detail="Invalid signature") from exc
+
+    if event["type"] == "checkout.session.completed":
+        sess = event["data"]["object"]
+        meta = sess.get("metadata") or {}
+        if meta.get("purchase_type") == "pro" and meta.get("league_id"):
+            amount = int(sess.get("amount_total") or 0)
+            currency = str(sess.get("currency") or "gbp")
+            async with AsyncSessionLocal() as session:
+                await _complete_pro_purchase(
+                    session,
+                    league_id=str(meta.get("league_id")),
+                    amount_pence=amount,
+                    currency=currency,
+                    checkout_session_id=str(sess.get("id") or ""),
+                    payment_intent_id=str(sess.get("payment_intent") or "") or None,
+                )
+                await session.commit()
+    elif event["type"] == "charge.refunded":
+        charge = event["data"]["object"]
+        pi = str(charge.get("payment_intent") or "")
+        if pi:
+            async with AsyncSessionLocal() as session:
+                purchase = await session.scalar(
+                    select(LeaguePurchase).where(LeaguePurchase.stripe_payment_intent_id == pi)
+                )
+                if purchase:
+                    purchase.status = "refunded"
+                    league = await session.get(League, purchase.league_id)
+                    if league and not _league_is_grandfathered(league):
+                        league.pro_status = "free"
+                        league.pro_purchased_at = None
+                    _log_audit(session, purchase.league_id, "pro_refunded", "system")
+                    await session.commit()
+    return {"received": True}
+
+
 class PickPayload(BaseModel):
     key: str
     value: Any
@@ -1872,6 +2286,7 @@ async def set_pick(
         league = await _get_league_by_code(session, code.upper())
         if league is None:
             raise HTTPException(status_code=404, detail="league not found")
+        _require_pro(league)
         await _guard_account_write(session, league, participant_id, x_wheesht_account_token, x_wheesht_admin_token)
         row = await session.get(Participant, participant_id)
         if row is None or row.league_id != league.id:
@@ -2410,8 +2825,23 @@ async def put_admin(
         if league is None:
             raise HTTPException(status_code=404, detail="league not found")
         await _require_admin(session, league, x_wheesht_admin_token)
-        row = await session.get(AdminOverride, league.id)
         incoming = payload.model_dump()
+        row = await session.get(AdminOverride, league.id)
+        existing = row.data if row and isinstance(row.data, dict) else {}
+        existing_meta = existing.get("meta") or {}
+        incoming_meta = dict(incoming.get("meta") or {})
+        if not _league_has_pro(league):
+            for key in _PRO_META_KEYS:
+                if key == "predDeadline":
+                    incoming_meta[key] = existing_meta.get(key)
+                elif key == "customFields":
+                    incoming_meta[key] = list(existing_meta.get("customFields") or [])
+                else:
+                    incoming_meta[key] = list(existing_meta.get(key) or [])
+            incoming["meta"] = incoming_meta
+            incoming["predictions"] = dict(existing.get("predictions") or {})
+        else:
+            incoming["meta"] = incoming_meta
         if row is None:
             session.add(AdminOverride(
                 league_id=league.id,

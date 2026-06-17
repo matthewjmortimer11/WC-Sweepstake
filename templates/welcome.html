@@ -58,16 +58,28 @@ a.ghost{background:#fff}
 <script>
 (function(){
   var charity = /[?&]charity=1/.test(location.search);
-  if (!charity) return;
-  document.getElementById('title').textContent = 'Wheesht for charity';
-  document.getElementById('lead').textContent = 'A friendly World Cup sweepstake where part of every entry can go to a good cause — and the rest to whoever called it best.';
-  var ogTitle = 'Wheesht for charity — World Cup sweepstake';
-  var ogDesc = 'Raise a bit for charity while arguing about VAR. Create a league or try the demo.';
-  document.querySelector('meta[property="og:title"]').setAttribute('content', ogTitle);
-  document.querySelector('meta[name="twitter:title"]').setAttribute('content', ogTitle);
-  document.querySelector('meta[property="og:description"]').setAttribute('content', ogDesc);
-  document.querySelector('meta[name="twitter:description"]').setAttribute('content', ogDesc);
-  document.title = ogTitle;
+  if (charity) {
+    document.getElementById('title').textContent = 'Wheesht for charity';
+    document.getElementById('lead').textContent = 'A friendly World Cup sweepstake where part of every entry can go to a good cause — and the rest to whoever called it best.';
+    var ogTitle = 'Wheesht for charity — World Cup sweepstake';
+    var ogDesc = 'Raise a bit for charity while arguing about VAR. Create a league or try the demo.';
+    document.querySelector('meta[property="og:title"]').setAttribute('content', ogTitle);
+    document.querySelector('meta[name="twitter:title"]').setAttribute('content', ogTitle);
+    document.querySelector('meta[property="og:description"]').setAttribute('content', ogDesc);
+    document.querySelector('meta[name="twitter:description"]').setAttribute('content', ogDesc);
+    document.title = ogTitle;
+  }
+  var utmKeys = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content'];
+  var params = new URLSearchParams(location.search);
+  var utm = '';
+  utmKeys.forEach(function (k) {
+    var v = params.get(k);
+    if (v) utm += (utm ? '&' : '?') + k + '=' + encodeURIComponent(v);
+  });
+  if (!utm) return;
+  document.querySelectorAll('a[href="/"], a[href="/?demo=1"]').forEach(function (a) {
+    a.href = a.getAttribute('href') + utm;
+  });
 })();
 </script>
 </body>

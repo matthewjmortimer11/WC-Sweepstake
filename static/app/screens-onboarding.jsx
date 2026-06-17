@@ -155,7 +155,10 @@ function AccountGate(props) {
                 <Ao person={p} size={44} />
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div className="dh" style={{ fontSize: 17 }}>{p.name}</div>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--ink2)' }}>{lg ? lg.name : (p.leagueCode || 'Sweepstake')}{t ? ' · ' + t.name : ''}</div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--ink2)', display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 4 }}>
+                    <span>{lg ? lg.name : (p.leagueCode || 'Sweepstake')}{t ? ' · ' + t.name : ''}</span>
+                    {lg && lg.hasPro && <span style={{ fontSize: 9, fontWeight: 900, letterSpacing: '.06em', background: 'var(--ink)', color: 'var(--yellow)', borderRadius: 999, padding: '2px 7px' }}>PRO</span>}
+                  </div>
                 </div>
                 {t && <Fo team={t} size={26} />}
                 <span className="dh" style={{ fontSize: 20 }}>→</span>
@@ -185,8 +188,13 @@ function JoinLeague(props) {
   const [busy, setBusy] = oState(false);
   const [preview, setPreview] = oState(null);
   const [previewBusy, setPreviewBusy] = oState(false);
+  const [pwFails, setPwFails] = oState(0);
   const ok = code.trim().length >= 2 && pw.length > 0;
   const copy = window.WheeshtCopy || {};
+
+  oEffect(function () {
+    if (window.Store && window.Store.trackEvent) window.Store.trackEvent('join_start');
+  }, []);
 
   oEffect(function () {
     var c = code.trim().toUpperCase();
@@ -205,12 +213,15 @@ function JoinLeague(props) {
     setBusy(true); setErr('');
     So.joinLeague(code.trim(), pw).then(function (res) {
       setBusy(false);
+      if (window.Store && window.Store.trackEvent) window.Store.trackEvent('join_success');
       props.onJoined(res.league);
     }).catch(function (e) {
       setBusy(false);
       var msg = (e && e.message) || 'Could not join that league.';
-      if (/wrong password/i.test(msg)) setErr(copy.joinWrongPassword || msg);
-      else if (/no league/i.test(msg)) setErr(copy.joinWrongCode || msg);
+      if (/wrong password/i.test(msg)) {
+        setPwFails(function (n) { return n + 1; });
+        setErr(copy.joinWrongPassword || msg);
+      } else if (/no league/i.test(msg)) setErr(copy.joinWrongCode || msg);
       else setErr(msg);
     });
   }
@@ -256,6 +267,14 @@ function JoinLeague(props) {
           />
         </div>
         {err && <div style={{ marginTop: 10, fontSize: 13, fontWeight: 700, color: 'var(--red)' }}>{err}</div>}
+        {pwFails >= 2 && preview && preview.name && <div style={{ marginTop: 10, fontSize: 12.5, fontWeight: 600, color: 'var(--ink2)', lineHeight: 1.4 }}>
+          {(copy.joinPasswordHelp || 'Ask your organiser for the member password. You can copy the invite link below.')}
+          {window.WheeshtShare && <button type="button" onClick={function () {
+            window.WheeshtShare.copyText(window.WheeshtShare.inviteUrl(code)).then(function () {
+              if (window.wcToast) window.wcToast('Invite link copied.', 'confident');
+            });
+          }} style={{ display: 'block', marginTop: 8, background: 'none', border: 'none', cursor: 'pointer', fontWeight: 800, color: 'var(--ink)', textDecoration: 'underline', padding: 0 }}>Copy invite link</button>}
+        </div>}
         <div style={{ marginTop: 18 }}>
           <Bo variant="ink" block onClick={submit}>{busy ? 'Checking…' : 'Join league →'}</Bo>
         </div>

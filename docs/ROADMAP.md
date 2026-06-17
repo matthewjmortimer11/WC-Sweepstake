@@ -1,4 +1,4 @@
-# Wheesht product roadmap (items 1–11)
+# Wheesht product roadmap (items 1–12)
 
 Living checklist for the WC Sweepstake app. Technical phases 0–5 live in [AUDIT_AND_ARCHITECTURE.md](AUDIT_AND_ARCHITECTURE.md).
 
@@ -10,55 +10,39 @@ Living checklist for the WC Sweepstake app. Technical phases 0–5 live in [AUDI
 | 4 | Match centre | Done |
 | 5 | Multi-league | Done |
 | 6 | Security and permissions | Done |
-| 7 | Payments (Stripe) | Skipped |
+| 7 | Pro (Stripe) | Shipped — organiser upgrade, not entry fees |
 | 8 | Make it shareable | Done |
 | 9 | Admin UX | Done |
 | 10 | Brand polish | Done |
 | 11 | Growth funnel | Done |
+| 12 | Growth iteration + matchday hygiene | Done |
 
 ---
 
-## Item 9 — Admin UX
+## Item 12 — Growth iteration + matchday hygiene
 
-- [x] 9.1 Tab restructure (League, Players, Predictions, Prize Fund, Fields, Security)
-- [x] 9.2 Save status indicator on organiser writes
-- [x] 9.3 Players tab: inline name / dept / location edit
-- [x] 9.4 CSV export (entrants + predictions)
-- [x] 9.5 Invite link panel on League tab
-- [x] 9.6 Duplicate league / template
-- [x] 9.7 Analytics API + stat cards
-- [x] 9.8 Admin tests + deploy cache bump
+- [x] 12.1 Hub `DashTeam` uses real next fixture from `FIXTURES`
+- [x] 12.2 Server-authoritative `predScore` via `standings.apply_pred_scores`
+- [x] 12.3 Side-bets screen uses prediction catalog (no fake goal counts)
+- [x] 12.4 Funnel telemetry — `POST /api/events`, organiser analytics (Pro)
+- [x] 12.5 UTM passthrough on `/join/{code}` app links
+- [x] 12.6 Join password nudge + organiser launch checklist
+- [x] 12.7 Tests + cache bump
 
-## Item 8 — Make it shareable
+## Item 7 — Wheesht Pro (Stripe)
 
-- [x] 8.1 Invite deep links (`?join=CODE`)
-- [x] 8.2 Share helpers module (`share.js`)
-- [x] 8.3 Leaderboard share image (canvas)
-- [x] 8.4 “I overtook X” share card
-- [x] 8.5 Workplace / charity landing (`/welcome`)
-- [x] 8.6 Demo league click-through (`?demo=1`)
-- [x] 8.7 Tests + deploy
-
-## Item 10 — Brand polish
-
-- [x] 10.1 Design tokens (`wheesht.css`)
-- [x] 10.2 Microcopy module (`copy.js`)
-- [x] 10.3 Matchday moments + quiet mode
-- [x] 10.4 PWA icons + splash meta
-- [x] 10.5 Visual QA checklist (manual)
-
-## Item 11 — Growth funnel
-
-- [x] 11.1 Link previews — OG tags, static image, `GET /join/{code}`
-- [x] 11.2 Gate conversion — “Try the demo league” on AccountGate
-- [x] 11.3 Join funnel — `GET /api/leagues/{code}/preview`, “Tell the group” sheet
-- [x] 11.4 Organiser share kit — templates, QR, WhatsApp copy, poster PNG
-- [x] 11.5 PWA install nudge (`beforeinstallprompt`)
-- [x] 11.6 SEO — `/robots.txt`, `/sitemap.xml`, welcome meta
-- [x] 11.7 Growth tests + cache bump `20260617-item11`
+- [x] 7.0 [PRO.md](PRO.md) runbook — software licensing, not pot collection
+- [x] 7.1 `leagues.pro_status` + `league_purchases` table
+- [x] 7.2 `POST /api/leagues/{code}/pro/checkout` (one-off organiser purchase)
+- [x] 7.3 Webhook handler + dev grant endpoint
+- [x] 7.4 Pro gates: predictions, fields, analytics, CSV, duplicate
+- [x] 7.5 OI grandfathered; entry fee display-only (offline collection)
+- [x] 7.6 Pro tests + backfill for active prediction leagues
 
 ---
 
 Deploy model: small commits to `main` → Railway auto-deploy. Bump `?v=` in `templates/index.html` and `static/sw.js` per release.
 
-**Production verify (matchday):** ensure `FOOTBALL_DATA_API_KEY` is set on Railway — without it the sync worker uses `MockAdapter` and scores stay synthetic. See [SECURITY.md](SECURITY.md).
+**Production verify (matchday):** ensure `FOOTBALL_DATA_API_KEY` is set on Railway. See [SECURITY.md](SECURITY.md).
+
+**Pro checkout:** Stripe test keys + `STRIPE_PRO_PRICE_ID` until legal sign-off. See [PRO.md](PRO.md). Wheesht never collects sweepstake entry fees.

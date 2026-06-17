@@ -5,8 +5,13 @@ import pytest
 from conftest import add_participant, make_league
 
 
-async def test_csv_export_requires_admin(client):
+async def test_csv_export_requires_admin(client, monkeypatch):
+    monkeypatch.setenv("WC_DEV_KEY", "dev-test-key")
     lg = await make_league(client)
+    await client.post(
+        f"/api/leagues/{lg['code']}/pro/grant",
+        headers={"X-Wheesht-Dev-Key": "dev-test-key"},
+    )
     await add_participant(client, lg["code"], "Alice")
     no = await client.get(f"/api/leagues/{lg['code']}/export/entrants.csv")
     assert no.status_code == 403
@@ -19,8 +24,13 @@ async def test_csv_export_requires_admin(client):
     assert "Alice" in ok.text
 
 
-async def test_analytics_requires_admin(client):
+async def test_analytics_requires_admin(client, monkeypatch):
+    monkeypatch.setenv("WC_DEV_KEY", "dev-test-key")
     lg = await make_league(client)
+    await client.post(
+        f"/api/leagues/{lg['code']}/pro/grant",
+        headers={"X-Wheesht-Dev-Key": "dev-test-key"},
+    )
     no = await client.get(f"/api/leagues/{lg['code']}/analytics")
     assert no.status_code == 403
     ok = await client.get(
@@ -33,8 +43,13 @@ async def test_analytics_requires_admin(client):
     assert "chat" in data
 
 
-async def test_duplicate_league(client):
+async def test_duplicate_league(client, monkeypatch):
+    monkeypatch.setenv("WC_DEV_KEY", "dev-test-key")
     lg = await make_league(client, name="Source League")
+    await client.post(
+        f"/api/leagues/{lg['code']}/pro/grant",
+        headers={"X-Wheesht-Dev-Key": "dev-test-key"},
+    )
     r = await client.post(
         f"/api/leagues/{lg['code']}/duplicate",
         json={"name": "Copy League", "code": "COPY1", "password": "memberpw", "organiserCode": "orgcopy"},

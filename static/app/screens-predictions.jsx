@@ -349,6 +349,20 @@ function PredictionsScreen(props) {
     return function() { clearInterval(iv); };
   }, []);
   if (!me) return null;
+  const copy = window.WheeshtCopy || {};
+  if (Sp.hasPro && !Sp.hasPro()) {
+    return <div className="pad">
+      <div className="appbar" style={{ padding: '2px 0 12px' }}>
+        <div className="dh" style={{ fontSize: 28 }}>Predictions</div>
+      </div>
+      <Cp bordered style={{ background: 'var(--yellow)' }}>
+        <div className="dh" style={{ fontSize: 20, marginBottom: 6 }}>{copy.proLockedTitle || 'Pro feature'}</div>
+        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink2)', lineHeight: 1.45 }}>
+          {copy.proLockedHint || 'Your organiser can unlock predictions for this league — tournament picks, live match markets, and a proper prediction leaderboard.'}
+        </div>
+      </Cp>
+    </div>;
+  }
   const markets = Sp.visiblePredictions ? Sp.visiblePredictions() : (WCp.predictions || Sp.PREDICTIONS).filter(m => ((WCp.meta && WCp.meta.hiddenPredictions) || []).indexOf(m.key) < 0);
   const dmTs = k => { const p = String(k).split('_'); const n = parseInt(p[p.length - 1], 10); return isFinite(n) ? n : 0; };
   const open = markets.filter(m => !isResolved(m)).sort((a, b) => {
