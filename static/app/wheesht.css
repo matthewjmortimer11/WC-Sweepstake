@@ -1,0 +1,57 @@
+/* Wheesht design tokens — spacing, radii, shadows */
+:root {
+  --wc-space-xs: 6px;
+  --wc-space-sm: 10px;
+  --wc-space-md: 16px;
+  --wc-space-lg: 22px;
+  --wc-radius-sm: 10px;
+  --wc-radius-md: 14px;
+  --wc-radius-lg: 20px;
+  --wc-shadow-sm: 0 3px 0 var(--shadow);
+  --wc-shadow-md: 0 4px 0 var(--ink);
+  --wc-shadow-lg: 0 8px 0 var(--ink);
+}
+
+.wc-save-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  padding: 5px 9px;
+  border-radius: 999px;
+  border: 2px solid rgba(255,255,255,.25);
+  background: rgba(255,255,255,.12);
+  color: #fff;
+  cursor: default;
+}
+.wc-save-pill--saving { color: var(--yellow); }
+.wc-save-pill--saved { color: #9fe8b8; border-color: rgba(159,232,184,.4); }
+.wc-save-pill--error { color: #ffb4b4; border-color: rgba(255,180,180,.45); cursor: pointer; }
+
+.wc-demo-banner {
+  background: var(--ink);
+  color: #fff;
+  padding: 10px 14px;
+  font-size: 12.5px;
+  font-weight: 700;
+  line-height: 1.35;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.wc-demo-banner button {
+  border: none;
+  border-radius: 10px;
+  background: var(--yellow);
+  color: var(--ink);
+  font-family: var(--disp);
+  font-weight: 800;
+  font-size: 12px;
+  padding: 7px 12px;
+  cursor: pointer;
+  box-shadow: var(--wc-shadow-sm);
+}

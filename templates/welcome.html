@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Wheesht — World Cup sweepstake for groups</title>
+<meta name="theme-color" content="#F5C800" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@700;800&family=Hanken+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
+<style>
+:root { --bg:#F4EEE3; --ink:#1A1A1A; --ink2:#5A554C; --yellow:#F5C800; --disp:'Bricolage Grotesque',sans-serif; --body:'Hanken Grotesk',sans-serif; }
+*{box-sizing:border-box}
+body{margin:0;font-family:var(--body);color:var(--ink);background:radial-gradient(120% 90% at 50% 0%,#2b2925 0%,#1a1916 80%);min-height:100vh;padding:32px 18px 48px}
+.wrap{max-width:720px;margin:0 auto}
+.hero{background:var(--bg);border:3px solid var(--ink);border-radius:28px;padding:36px 28px 32px;box-shadow:0 12px 0 var(--ink)}
+h1{font-family:var(--disp);font-size:clamp(32px,6vw,48px);line-height:1;margin:0 0 12px}
+.lead{font-size:17px;font-weight:600;color:var(--ink2);line-height:1.45;margin:0 0 24px}
+.steps{display:grid;gap:14px;margin:28px 0}
+.step{background:#fff;border:2.5px solid var(--ink);border-radius:18px;padding:16px 18px;box-shadow:0 5px 0 var(--ink)}
+.step strong{font-family:var(--disp);font-size:18px;display:block;margin-bottom:4px}
+.step span{font-size:14px;font-weight:600;color:var(--ink2);line-height:1.4}
+.cta{display:flex;flex-wrap:wrap;gap:12px;margin-top:24px}
+a.btn{display:inline-block;text-decoration:none;font-family:var(--disp);font-weight:800;font-size:15px;padding:14px 22px;border-radius:14px;border:2.5px solid var(--ink);box-shadow:0 5px 0 var(--ink)}
+a.primary{background:var(--yellow)}
+a.ghost{background:#fff}
+.foot{margin-top:22px;text-align:center;font-size:13px;font-weight:600;color:rgba(255,255,255,.65)}
+.foot a{color:var(--yellow)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="hero">
+    <h1 id="title">Wheesht</h1>
+    <p class="lead" id="lead">Run a World Cup sweepstake with your team — draws, predictions, chat, and a leaderboard that updates itself. Officially impartial. Constitutionally Scottish.</p>
+    <div class="steps">
+      <div class="step"><strong>1. Create</strong><span>Set your league code, entry fee, and signup fields. Wheesht handles the boring bits.</span></div>
+      <div class="step"><strong>2. Invite</strong><span>Share one link. People join, pick their name, get their team in the draw.</span></div>
+      <div class="step"><strong>3. Watch chaos</strong><span>Log results, grade predictions, moderate chat. Glory and gentle humiliation await.</span></div>
+    </div>
+    <div class="cta">
+      <a class="btn primary" href="/">Open Wheesht →</a>
+      <a class="btn ghost" href="/?demo=1">Try the demo league</a>
+    </div>
+  </div>
+  <p class="foot"><a href="/">Back to the app</a> · <a href="/?join=OI">Sample join link</a></p>
+</div>
+<script>
+(function(){
+  var charity = /[?&]charity=1/.test(location.search);
+  if (!charity) return;
+  document.getElementById('title').textContent = 'Wheesht for charity';
+  document.getElementById('lead').textContent = 'A friendly World Cup sweepstake where part of every entry can go to a good cause — and the rest to whoever called it best.';
+})();
+</script>
+</body>
+</html>

@@ -15,8 +15,10 @@ for it persist to the database like any other league.
 import asyncio
 import base64
 import binascii
+import csv
 import hashlib
 import hmac
+import io
 import json
 import logging
 import os
@@ -987,6 +989,14 @@ async def index():
     return HTMLResponse(content=_build_html())
 
 
+@app.get("/welcome", response_class=HTMLResponse)
+async def welcome_page():
+    path = Path("templates/welcome.html")
+    if not path.is_file():
+        raise HTTPException(status_code=404, detail="not found")
+    return HTMLResponse(content=path.read_text(encoding="utf-8"))
+
+
 @app.get("/api/state")
 async def get_state():
     """League-agnostic baseline (shared fixtures + tournament scaffolding)."""
@@ -1343,6 +1353,216 @@ async def export_league(
         }
 
 
+def _csv_response(filename: str, rows: List[List[str]]) -> Response:
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    for row in rows:
+        writer.writerow(row)
+    return Response(
+        content=buf.getvalue(),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@app.get("/api/leagues/{code}/export/entrants.csv")
+async def export_entrants_csv(
+    code: str,
+    x_wheesht_admin_token: Optional[str] = Header(None, alias="X-Wheesht-Admin-Token"),
+):
+    async with AsyncSessionLocal() as session:
+        league = await _get_league_by_code(session, code.upper())
+        if league is None:
+            raise HTTPException(status_code=404, detail="league not found")
+        await _require_admin(session, league, x_wheesht_admin_token)
+        rows = await _participant_rows(session, league)
+        profile_map = await _profiles_for(session, league)
+        people = _league_people(league, rows, profile_map)
+        admin = await _get_admin_data(session, league)
+        tag_fields = [
+            f for f in (admin.get("meta") or {}).get("customFields") or []
+            if isinstance(f, dict) and f.get("type") == "tags"
+        ]
+        header = ["name", "team", "department", "location", "has_password"]
+        for f in tag_fields:
+            header.append(f.get("label") or f.get("key") or "tags")
+        out = [header]
+        for p in people:
+            row = [
+                p.get("name") or "",
+                p.get("team") or "",
+                p.get("department") or "",
+                p.get("location") or p.get("city") or "",
+                "yes" if p.get("hasPassword") else "no",
+            ]
+            cf = p.get("customFields") or {}
+            for f in tag_fields:
+                key = f.get("key") or ""
+                val = cf.get(key)
+                row.append(", ".join(val) if isinstance(val, list) else str(val or ""))
+            out.append(row)
+        return _csv_response(f"wheesht-{league.code.lower()}-entrants.csv", out)
+
+
+@app.get("/api/leagues/{code}/export/predictions.csv")
+async def export_predictions_csv(
+    code: str,
+    x_wheesht_admin_token: Optional[str] = Header(None, alias="X-Wheesht-Admin-Token"),
+):
+    async with AsyncSessionLocal() as session:
+        league = await _get_league_by_code(session, code.upper())
+        if league is None:
+            raise HTTPException(status_code=404, detail="league not found")
+        await _require_admin(session, league, x_wheesht_admin_token)
+        rows = await _participant_rows(session, league)
+        profile_map = await _profiles_for(session, league)
+        people = _league_people(league, rows, profile_map)
+        admin = await _get_admin_data(session, league)
+        hidden = set((admin.get("meta") or {}).get("hiddenPredictions") or [])
+        markets = _wc_data.get("predictions") or []
+        dyn = [
+            {"key": k, "q": k}
+            for k in (admin.get("predictions") or {}).keys()
+            if str(k).startswith("dm_")
+        ]
+        for m in markets:
+            key = m.get("key") if isinstance(m, dict) else None
+            if key and key not in hidden:
+                dyn.append({"key": key, "q": m.get("q") or key})
+        header = ["participant", "market", "pick"]
+        out = [header]
+        for p in people:
+            picks = p.get("picks") or {}
+            name = p.get("name") or p.get("id") or ""
+            for m in dyn:
+                key = m["key"]
+                if key not in picks:
+                    continue
+                val = picks[key]
+                if isinstance(val, list):
+                    pick = ", ".join(str(x) for x in val)
+                else:
+                    pick = str(val)
+                out.append([name, m.get("q") or key, pick])
+        return _csv_response(f"wheesht-{league.code.lower()}-predictions.csv", out)
+
+
+class LeagueDuplicate(BaseModel):
+    name: str
+    code: str
+    password: str
+    organiserCode: Optional[str] = None
+
+
+@app.post("/api/leagues/{code}/duplicate")
+async def duplicate_league(
+    code: str,
+    payload: LeagueDuplicate,
+    x_wheesht_admin_token: Optional[str] = Header(None, alias="X-Wheesht-Admin-Token"),
+):
+    async with AsyncSessionLocal() as session:
+        source = await _get_league_by_code(session, code.upper())
+        if source is None:
+            raise HTTPException(status_code=404, detail="league not found")
+        await _require_admin(session, source, x_wheesht_admin_token)
+        new_code = (payload.code or "").strip().upper()
+        if not re.fullmatch(r"[A-Z0-9]{2,12}", new_code):
+            raise HTTPException(status_code=400, detail="Code must be 2–12 letters or numbers")
+        if await _get_league_by_code(session, new_code) is not None:
+            raise HTTPException(status_code=409, detail="That code is already taken")
+        if len(payload.password or "") < 4:
+            raise HTTPException(status_code=400, detail="Password must be at least 4 characters")
+        organiser_code = (payload.organiserCode or payload.password or "").strip()
+        if len(organiser_code) < 4:
+            raise HTTPException(status_code=400, detail="Organiser code must be at least 4 characters")
+        name = (payload.name or "").strip()[:60] or "Sweepstake"
+        src_admin = await _get_admin_data(session, source)
+        meta = dict((src_admin.get("meta") or {}))
+        meta.pop("audit", None)
+        league = League(
+            id=uuid.uuid4().hex, code=new_code, slug=_slugify(name), name=name,
+            password_hash=_hash_password(payload.password),
+            organiser_hash=_hash_password(organiser_code),
+            seeded=False, created_at=_now(),
+        )
+        session.add(league)
+        await session.flush()
+        initial_admin = _audit_event(
+            {"teams": {}, "fixtures": {}, "predictions": {}, "meta": meta},
+            "league_created",
+            "organiser",
+            f"Duplicated from {source.code}",
+        )
+        session.add(AdminOverride(league_id=league.id, data=initial_admin, updated_at=_now()))
+        _log_audit(session, source.id, "league_duplicated", "organiser", detail=f"New league {new_code}")
+        await session.commit()
+        return {"league": _league_public(league), "adminToken": _admin_token_for(league)}
+
+
+@app.get("/api/leagues/{code}/analytics")
+async def league_analytics(
+    code: str,
+    x_wheesht_admin_token: Optional[str] = Header(None, alias="X-Wheesht-Admin-Token"),
+):
+    async with AsyncSessionLocal() as session:
+        league = await _get_league_by_code(session, code.upper())
+        if league is None:
+            raise HTTPException(status_code=404, detail="league not found")
+        await _require_admin(session, league, x_wheesht_admin_token)
+        rows = await _participant_rows(session, league)
+        profile_map = await _profiles_for(session, league)
+        people = _league_people(league, rows, profile_map)
+        admin = await _get_admin_data(session, league)
+        hidden = set((admin.get("meta") or {}).get("hiddenPredictions") or [])
+        markets = [
+            m for m in (_wc_data.get("predictions") or [])
+            if isinstance(m, dict) and m.get("key") and m["key"] not in hidden
+        ]
+        for k in (admin.get("predictions") or {}):
+            if str(k).startswith("dm_") and k not in hidden:
+                markets.append({"key": k, "q": k})
+        pred_stats = []
+        total = len(people) or 1
+        for m in markets:
+            key = m.get("key")
+            filled = sum(1 for p in people if (p.get("picks") or {}).get(key) not in (None, "", []))
+            pred_stats.append({
+                "key": key,
+                "label": m.get("q") or key,
+                "completionPct": round(100 * filled / total),
+                "filled": filled,
+                "total": len(people),
+            })
+        week_ago = int((time.time() - 7 * 86400) * 1000)
+        chat_total = await session.scalar(
+            select(func.count()).select_from(ChatMessage).where(ChatMessage.league_id == league.id)
+        ) or 0
+        chat_week = await session.scalar(
+            select(func.count()).select_from(ChatMessage).where(
+                ChatMessage.league_id == league.id,
+                ChatMessage.ts >= week_ago,
+            )
+        ) or 0
+        audit_res = await session.execute(
+            select(AuditEvent).where(AuditEvent.league_id == league.id)
+            .order_by(AuditEvent.ts.desc()).limit(5)
+        )
+        recent = [
+            {"ts": e.ts, "action": e.action, "actor": e.actor, "detail": e.detail}
+            for e in audit_res.scalars().all()
+        ]
+        return {
+            "entrants": {
+                "total": len(people),
+                "withPassword": sum(1 for p in people if p.get("hasPassword")),
+                "withTeam": sum(1 for p in people if p.get("team")),
+            },
+            "predictions": pred_stats,
+            "chat": {"total": int(chat_total), "last7d": int(chat_week)},
+            "recentActivity": recent,
+        }
+
+
 @app.get("/api/leagues/{code}/state")
 async def league_state(code: str):
     async with AsyncSessionLocal() as session:
@@ -1476,8 +1696,12 @@ async def update_participant(
         if league is None:
             raise HTTPException(status_code=404, detail="league not found")
         await _guard_account_write(session, league, participant_id, x_wheesht_account_token, x_wheesht_admin_token)
+        is_admin_edit = bool(x_wheesht_admin_token and _admin_token_ok(league, x_wheesht_admin_token))
         payload.id = participant_id
         row = await _upsert_participant(session, league, payload)
+        if is_admin_edit:
+            _log_audit(session, league.id, "participant_edited", "organiser", detail=(row.name or participant_id))
+            await session.commit()
         return {
             "ok": True,
             "participant": _participant_to_dict(row, league.code),

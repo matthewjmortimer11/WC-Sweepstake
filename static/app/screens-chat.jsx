@@ -69,6 +69,7 @@ function ChatScreen() {
   }, [asWheesht, isOrganiser]);
 
   function send() {
+    if (Sch.isReadOnly && Sch.isReadOnly()) return;
     if (!text.trim() || busy || !leagueCode) return;
     if (!asWheesht && !me) return;
     if (asWheesht && !isOrganiser) return;

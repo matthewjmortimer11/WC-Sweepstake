@@ -181,6 +181,7 @@ function AccountSheet(props){
   const activeId = A_S.activeId();
   const includeDept = A_S.includeDepartment ? A_S.includeDepartment() : true;
   const showGoogle = !!window.WC_GOOGLE_CLIENT_ID && !!A_S.loginWithGoogle;
+  const [quiet,setQuiet]=aState(A_S.quietMode?A_S.quietMode():false);
   function onGoogleLoginToken(token){
     Promise.resolve(A_S.loginWithGoogle(token)).then(function(r){
       props.onClose();
@@ -222,6 +223,11 @@ function AccountSheet(props){
         <button onClick={props.onFind} className="wc-btn wc-btn--sm" style={{flex:1,boxShadow:'0 4px 0 var(--shadow)'}}>Find my entry</button>
       </div>
       <button onClick={props.onSwitch} className="wc-btn wc-btn--sm wc-btn--block" style={{marginTop:9,boxShadow:'0 4px 0 var(--shadow)'}}>Join / switch league →</button>
+      {A_S.setQuietMode && <button onClick={function(){
+        const next=!quiet; setQuiet(next); A_S.setQuietMode(next);
+        const c=window.WheeshtCopy||{};
+        window.wcToast&&window.wcToast(next?(c.quietOn||'Quiet mode on.'):(c.quietOff||'Quiet mode off.'),'neutral');
+      }} className="wc-btn wc-btn--sm wc-btn--block" style={{marginTop:9,boxShadow:'0 4px 0 var(--shadow)'}}>{quiet?'Quiet mode on':'Quiet mode off'}</button>}
       <button onClick={props.onAdmin} style={{width:'100%',marginTop:11,border:'none',background:'none',cursor:'pointer',fontSize:12.5,fontWeight:800,color:'var(--ink2)',padding:'6px 0',display:'flex',alignItems:'center',justifyContent:'center',gap:6}}>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><circle cx="12" cy="12" r="3.2"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1"/></svg>
         {isOrganiser ? 'Organiser tools' : "I'm the organiser"}
@@ -418,6 +424,14 @@ const TW_DEFAULTS = /*EDITMODE-BEGIN*/{
 }/*EDITMODE-END*/;
 
 function App(){
+  const joinBoot = React.useRef(null);
+  if (!joinBoot.current && typeof window !== 'undefined') {
+    var bootParams = new URLSearchParams(window.location.search);
+    joinBoot.current = {
+      join: (bootParams.get('join') || bootParams.get('code') || '').trim().toUpperCase(),
+      demo: bootParams.get('demo') === '1',
+    };
+  }
   const me = A_S.active();
   const [tab,_setTab]=aState('me');
   const [chatBadge,setChatBadge]=aState(null); // null | 'new' | 'wheesht'
@@ -428,7 +442,12 @@ function App(){
       try{ localStorage.setItem('wcChatSeen', String(Date.now())); }catch(e){}
     }
   }
-  const [flow,setFlow]=aState(me?'app':'gate'); // gate | find | form | app
+  const [flow,setFlow]=aState(function(){
+    if (joinBoot.current && joinBoot.current.demo) return 'demo';
+    if (joinBoot.current && joinBoot.current.join) return 'join';
+    return me ? 'app' : 'gate';
+  }); // gate | find | form | app | join | demo
+  const [joinPrefill]=aState(joinBoot.current ? joinBoot.current.join : '');
   const [draw,setDraw]=aState(null);            // {forceTeam, replay}
   const [account,setAccount]=aState(false);
   const [admin,setAdmin]=aState(false);
@@ -450,6 +469,63 @@ function App(){
   // re-render on any store change
   aEffect(()=>A_S.subscribe(()=>tick(x=>x+1)),[]);
   aEffect(()=>{ refreshStore(); },[]);
+  aEffect(function(){
+    if (joinBoot.current && (joinBoot.current.join || joinBoot.current.demo)) {
+      try {
+        var u = new URL(window.location.href);
+        u.searchParams.delete('join'); u.searchParams.delete('code'); u.searchParams.delete('demo');
+        window.history.replaceState({}, '', u.pathname + (u.search || ''));
+      } catch (e) {}
+      joinBoot.current = { join: '', demo: false };
+    }
+  },[]);
+  aEffect(function(){
+    if (flow !== 'demo') return;
+    if (A_S.enterDemoMode) {
+      A_S.enterDemoMode().then(function(){ setFlow('app'); });
+    } else setFlow('gate');
+  },[flow]);
+  aEffect(function(){
+    if (flow !== 'app' || !me) return;
+    if (A_S.snapshotPredRanks) A_S.snapshotPredRanks();
+  },[flow, me && me.id]);
+  aEffect(function(){
+    if (flow !== 'app' || !me || !me.team || A_S.quietMode && A_S.quietMode()) return;
+    var fixtures = (A_WC.FIXTURES || []);
+    var myCode = me.team;
+    var live = fixtures.filter(function(f){
+      var st = String((f && f.status) || '').toLowerCase();
+      return (f.a === myCode || f.b === myCode) && ['live','halfTime','1h','2h'].indexOf(st) >= 0;
+    });
+    if (live.length) {
+      var key = 'wc_kickoff_' + live[0].id;
+      try { if (sessionStorage.getItem(key)) return; sessionStorage.setItem(key, '1'); } catch (e) {}
+      var t = A_WC.TEAMS[myCode];
+      var copy = window.WheeshtCopy || {};
+      window.wcToast && window.wcToast((copy.kickoffToast || '{team} are kicking off.').replace('{team}', t ? t.name : myCode), 'confident');
+    }
+    var scoLive = fixtures.some(function(f){ return (f.a === 'SCO' || f.b === 'SCO') && ['live','halfTime'].indexOf(String(f.status||'').toLowerCase()) >= 0; });
+    if (scoLive) {
+      try { if (sessionStorage.getItem('wc_sco_live')) return; sessionStorage.setItem('wc_sco_live', '1'); } catch (e) {}
+      var c2 = window.WheeshtCopy || {};
+      window.wcToast && window.wcToast(c2.scotlandMoment || 'Scotland are on.', 'scottish');
+    }
+  },[flow, me && me.id, tab]);
+  aEffect(function(){
+    if (flow !== 'app' || !me || !A_S.detectOvertakes) return;
+    var overtook = A_S.detectOvertakes(me.id);
+    if (!overtook.length) return;
+    var victim = overtook[0];
+    var md = (A_WC.meta && A_WC.meta.matchday) || 0;
+    var rateKey = 'wc_overtake_' + victim.id + '_' + md;
+    try { if (localStorage.getItem(rateKey)) return; localStorage.setItem(rateKey, '1'); } catch (e) {}
+    var ranks = A_S.rankedByPred();
+    var meR = ranks.find(function(p){ return p.id === me.id; });
+    if (window.WheeshtShare && window.wcToast) {
+      window.wcToast('You\'ve gone past ' + (victim.name || 'someone') + '!', 'celebrating');
+    }
+    if (A_S.snapshotPredRanks) A_S.snapshotPredRanks();
+  },[flow, me && me.predScore]);
   aEffect(()=>{
     if(!A_S.live || !A_S.refresh) return;
     const refreshVisible=()=>{ if(!document.hidden) refreshStore(); };
@@ -718,7 +794,7 @@ function App(){
     {viewToggle}<window.ToastLayer/><window.ConfettiLayer/><AppSystemEffects/>
   </React.Fragment>;
   if(flow==='join') return <React.Fragment>
-    {frame(<window.JoinLeague onBack={()=>setFlow('gate')} onCreate={()=>{setOrganiser(true);setFlow('create');}}
+    {frame(<window.JoinLeague initialCode={joinPrefill} onBack={()=>setFlow('gate')} onCreate={()=>{setOrganiser(true);setFlow('create');}}
       onJoined={(league)=>{ setOrganiser(false); setFlow(league&&league.seeded?'oi-roster':'find'); }}/>)}
     {viewToggle}<window.ToastLayer/><window.ConfettiLayer/><AppSystemEffects/>
   </React.Fragment>;
@@ -752,6 +828,10 @@ function App(){
   };
 
   return <React.Fragment>
+    {A_S.isDemoMode && A_S.isDemoMode() && <div className="wc-demo-banner" style={{position:'fixed',top:0,left:0,right:0,zIndex:200}}>
+      <span>{(window.WheeshtCopy && window.WheeshtCopy.demoBanner) || 'Sample league — read only.'}</span>
+      <button onClick={function(){ A_S.exitDemoMode && A_S.exitDemoMode(); setFlow('gate'); }}>{(window.WheeshtCopy && window.WheeshtCopy.demoCta) || 'Start your own'}</button>
+    </div>}
     {deck
       ? <DeckShell me={me} tab={tab} setTab={setTab} chatBadge={chatBadge}
           onAccount={()=>setAccount(true)} onAdmin={()=>setAdmin(true)} onDev={()=>setDev(true)}>
@@ -777,7 +857,14 @@ function App(){
       onAdmin={()=>{setAccount(false);setAdmin(true);}}/>}
 
     {draw && <window.DrawMoment participant={draw.participant} forceTeam={draw.forceTeam}
-      onDone={()=>{ const wasReplay=draw.replay; setDraw(null); if(!wasReplay){ setTab('me'); setTimeout(()=>window.wcConfetti&&window.wcConfetti({y:.4}),200);} }}/>}
+      onDone={()=>{ const wasReplay=draw.replay; const p=draw.participant; setDraw(null); if(!wasReplay){ setTab('me'); setTimeout(()=>window.wcConfetti&&window.wcConfetti({y:.4}),200);
+        if(window.WheeshtShare&&p&&!wasReplay){
+          setTimeout(function(){
+            var lg=A_S.activeLeague&&A_S.activeLeague();
+            if(lg&&window.confirm('Tell the group about the league?')) window.WheeshtShare.shareViaWebShare({ text: window.WheeshtShare.buildInviteMessage(lg) });
+          },1200);
+        }
+      } }}/>}
     {admin && <window.AdminGate onClose={closeAdmin}/>}
     {dev && <window.DevConsole onClose={()=>setDev(false)} onAdmin={devAdmin}/>}
     {signInModal}

@@ -304,7 +304,141 @@ function CustomFieldsAdmin(props) {
    </div>;
 }
 
-function SettingsAdmin() {
+function SaveStatusPill() {
+  const [st, setSt] = aState2(Sa.saveStatus ? Sa.saveStatus() : { state: 'idle' });
+  React.useEffect(function () {
+    if (!Sa.subscribeSaveStatus) return;
+    return Sa.subscribeSaveStatus(function (s) { setSt(s); });
+  }, []);
+  if (!st || st.state === 'idle') return null;
+  const copy = window.WheeshtCopy || {};
+  const label = st.state === 'saving' ? (copy.saveSaving || 'Saving…')
+    : st.state === 'saved' ? (copy.saveSaved || 'Saved')
+    : st.state === 'error' ? (copy.saveError || 'Couldn\'t save — tap to retry') : '';
+  return <button type="button" className={'wc-save-pill wc-save-pill--' + st.state}
+    onClick={function () { if (st.state === 'error' && st.retry) st.retry(); }}
+    style={{ border: 'none', fontFamily: 'inherit' }}>{label}</button>;
+}
+
+function InvitePanel() {
+  const league = Sa.activeLeague ? Sa.activeLeague() : null;
+  const code = league && league.code;
+  const link = window.WheeshtShare && code ? window.WheeshtShare.inviteUrl(code) : '';
+  const msg = window.WheeshtShare && window.WheeshtShare.buildInviteMessage(league);
+  function copyLink() {
+    if (!link || !window.WheeshtShare) return;
+    window.WheeshtShare.copyText(link).then(function () {
+      if (window.wcToast) window.wcToast('Invite link copied.', 'confident');
+    });
+  }
+  function shareWa() {
+    if (!msg || !window.WheeshtShare) return;
+    window.open(window.WheeshtShare.whatsappUrl(msg), '_blank', 'noopener');
+  }
+  function preview() {
+    if (!link) return;
+    window.open(link, '_blank', 'noopener');
+  }
+  if (!code) return null;
+  return (
+    <Ca flat style={{ marginBottom: 12 }}>
+      <div className="dh" style={{ fontSize: 17, marginBottom: 6 }}>Invite link</div>
+      <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--ink2)', lineHeight: 1.4, marginBottom: 8 }}>Share this with players — they'll land on join with the code prefilled.</div>
+      <div style={{ wordBreak: 'break-all', fontSize: 12, fontWeight: 700, background: 'var(--bg)', border: '2px solid var(--line)', borderRadius: 11, padding: '10px 12px', marginBottom: 10 }}>{link}</div>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <button onClick={copyLink} className="wc-btn wc-btn--sm wc-btn--ink">Copy link</button>
+        <button onClick={shareWa} className="wc-btn wc-btn--sm">WhatsApp</button>
+        <button onClick={preview} className="wc-btn wc-btn--sm">Preview as new player</button>
+      </div>
+    </Ca>
+  );
+}
+
+function AnalyticsPanel() {
+  const [data, setData] = aState2(null);
+  React.useEffect(function () {
+    if (!Sa.fetchAnalytics) return;
+    var live = true;
+    Sa.fetchAnalytics().then(function (d) { if (live) setData(d); });
+    return function () { live = false; };
+  }, []);
+  if (!data) return <Ca flat style={{ padding: 16, fontSize: 13, fontWeight: 600, color: 'var(--ink2)' }}>Loading analytics…</Ca>;
+  const e = data.entrants || {};
+  const ch = data.chat || {};
+  return (
+    <>
+      <SHa>Analytics</SHa>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 12 }}>
+        {[['Entrants', String(e.total || 0)], ['With password', String(e.withPassword || 0)], ['Team drawn', String(e.withTeam || 0)], ['Chat (7d)', String(ch.last7d || 0)]].map(function (row) {
+          return <div key={row[0]} style={{ background: '#fff', border: '2px solid var(--line)', borderRadius: 12, padding: '9px 10px' }}>
+            <div style={{ fontSize: 9.5, fontWeight: 900, letterSpacing: '.05em', textTransform: 'uppercase', color: 'var(--ink2)' }}>{row[0]}</div>
+            <div className="dh" style={{ fontSize: 18, marginTop: 2 }}>{row[1]}</div>
+          </div>;
+        })}
+      </div>
+      {(data.predictions || []).length > 0 && <>
+        <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--ink2)', marginBottom: 6 }}>Prediction completion</div>
+        {(data.predictions || []).slice(0, 6).map(function (m) {
+          return <div key={m.key} style={{ marginBottom: 8 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, fontWeight: 700, marginBottom: 4 }}>
+              <span style={{ flex: 1, paddingRight: 8, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.label}</span>
+              <span>{m.completionPct}%</span>
+            </div>
+            <div style={{ height: 8, background: 'var(--line)', borderRadius: 999, overflow: 'hidden' }}>
+              <div style={{ height: '100%', width: (m.completionPct || 0) + '%', background: 'var(--green)', borderRadius: 999 }} />
+            </div>
+          </div>;
+        })}
+      </>}
+    </>
+  );
+}
+
+function DuplicateLeaguePanel() {
+  const src = Sa.activeLeague ? Sa.activeLeague() : null;
+  const [name, setName] = aState2((src && src.name ? src.name : '') + ' copy');
+  const [code, setCode] = aState2('');
+  const [pw, setPw] = aState2('');
+  const [org, setOrg] = aState2('');
+  const [busy, setBusy] = aState2(false);
+  const [err, setErr] = aState2('');
+  if (!src || src.seeded) return null;
+  function go() {
+    if (busy || !Sa.duplicateLeague) return;
+    setBusy(true); setErr('');
+      Sa.duplicateLeague({ name: name.trim(), code: code.trim(), password: pw, organiserCode: org.trim() || undefined })
+      .then(function (j) {
+        setBusy(false);
+        if (j && j.league && j.adminToken) {
+          Sa.setAdminToken(j.league.code, j.adminToken);
+          if (Sa.devEnterLeague) Sa.devEnterLeague(Object.assign({}, j.league, { adminToken: j.adminToken }));
+          if (window.wcToast) window.wcToast('League created: ' + j.league.code, 'confident');
+        }
+      })
+      .catch(function (e) { setBusy(false); setErr((e && e.message) || 'Could not duplicate'); });
+  }
+  const inp = { width: '100%', border: '2px solid var(--ink)', borderRadius: 11, padding: '9px 12px', fontFamily: 'var(--body)', fontWeight: 600, fontSize: 14, outline: 'none', marginTop: 6, background: '#fff' };
+  return (
+    <Ca flat style={{ marginTop: 12 }}>
+      <div className="dh" style={{ fontSize: 17, marginBottom: 6 }}>Start another league like this</div>
+      <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--ink2)', marginBottom: 10 }}>Copies fee, fields and prediction setup — fresh empty league, new code.</div>
+      <Lab>New league name</Lab>
+      <input style={inp} value={name} onChange={function (e) { setName(e.target.value); }} maxLength={60} />
+      <div style={{ marginTop: 10 }}><Lab>New league code</Lab>
+        <input style={Object.assign({}, inp, { textTransform: 'uppercase', letterSpacing: '.1em' })} value={code} onChange={function (e) { setCode(e.target.value); }} maxLength={12} placeholder="e.g. OFFICE27" /></div>
+      <div style={{ marginTop: 10 }}><Lab>Member password</Lab>
+        <input type="password" style={inp} value={pw} onChange={function (e) { setPw(e.target.value); }} /></div>
+      <div style={{ marginTop: 10 }}><Lab>Organiser code <span style={{ fontWeight: 600, color: 'var(--ink2)' }}>· optional</span></Lab>
+        <input type="password" style={inp} value={org} onChange={function (e) { setOrg(e.target.value); }} placeholder="Defaults to member password" /></div>
+      <button onClick={go} disabled={busy || code.trim().length < 2 || pw.length < 4} className="wc-btn wc-btn--ink wc-btn--block" style={{ marginTop: 14, opacity: busy ? 0.6 : 1 }}>{busy ? 'Creating…' : 'Create duplicate league'}</button>
+      {err && <div style={{ color: 'var(--red)', fontSize: 12, fontWeight: 800, marginTop: 8 }}>{err}</div>}
+    </Ca>
+  );
+}
+
+function Lab(p) { return <label style={{ fontWeight: 800, fontSize: 13, fontFamily: 'var(--disp)', letterSpacing: '.02em' }}>{p.children}{p.children && p.opt}</label>; }
+
+function PrizeFundAdmin() {
    const [, bump] = aState2(0);
    React.useEffect(() => Sa.subscribe(() => bump(x => x + 1)), []);
    const feeNow = Sa.entryFee ? Sa.entryFee() : WCa.FEE;
@@ -319,12 +453,6 @@ function SettingsAdmin() {
    const entrants = Sa.allSync().length;
    const split = Sa.charitySplit ? Sa.charitySplit() : 0.5;
    const purpose = Sa.purpose ? Sa.purpose() : 'work';
-   const includeDept = Sa.includeDepartment ? Sa.includeDepartment() : true;
-   const includeLocation = Sa.includeLocation ? Sa.includeLocation() : true;
-   const includeLtMember = Sa.includeLtMember ? Sa.includeLtMember() : true;
-   const customFieldsNow = Sa.customFields ? Sa.customFields() : [];
-   const [customFields, setCustomFields] = aState2(customFieldsNow);
-   React.useEffect(() => setCustomFields(customFieldsNow), [JSON.stringify(customFieldsNow)]);
    const locationsFreeText = Sa.locationsFreeText ? Sa.locationsFreeText() : false;
    const predDeadlineNow = Sa.predDeadline ? Sa.predDeadline() : null;
    const [predDeadlineInput, setPredDeadlineInput] = aState2(predDeadlineNow ? predDeadlineNow.slice(0, 16) : '');
@@ -460,7 +588,32 @@ function SettingsAdmin() {
          </div>;
        })()}
        {!predDeadlineNow && <div style={{ height: 16 }} />}
+     </>
+   );
+}
 
+function FieldsAdmin() {
+   const [, bump] = aState2(0);
+   React.useEffect(() => Sa.subscribe(() => bump(x => x + 1)), []);
+   const includeDept = Sa.includeDepartment ? Sa.includeDepartment() : true;
+   const includeLocation = Sa.includeLocation ? Sa.includeLocation() : true;
+   const includeLtMember = Sa.includeLtMember ? Sa.includeLtMember() : true;
+   const customFieldsNow = Sa.customFields ? Sa.customFields() : [];
+   const [customFields, setCustomFields] = aState2(customFieldsNow);
+   React.useEffect(() => setCustomFields(customFieldsNow), [JSON.stringify(customFieldsNow)]);
+   function toggleRow(onClick, on, title, text) {
+     return <button onClick={onClick} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 11, textAlign: 'left', border: '2px solid var(--line)', borderRadius: 13, background: '#fff', padding: '11px 12px', cursor: 'pointer', marginBottom: 8 }}>
+       <span style={{ width: 42, height: 24, borderRadius: 999, background: on ? 'var(--green)' : 'var(--line)', border: '2px solid var(--ink)', position: 'relative', flex: '0 0 auto' }}>
+         <span style={{ position: 'absolute', top: 2, left: on ? 20 : 2, width: 16, height: 16, borderRadius: '50%', background: '#fff', border: '2px solid var(--ink)' }} />
+       </span>
+       <span style={{ flex: 1, minWidth: 0 }}>
+         <span className="dh" style={{ display: 'block', fontSize: 15 }}>{title}</span>
+         <span style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--ink2)', marginTop: 2, lineHeight: 1.3 }}>{text}</span>
+       </span>
+     </button>;
+   }
+   return (
+     <>
        <SHa>Signup fields</SHa>
        {toggleRow(
          () => Sa.setIncludeDepartment(!includeDept),
@@ -485,6 +638,23 @@ function SettingsAdmin() {
        <CustomFieldsAdmin fields={customFields} onChange={setCustomFields} />
      </>
    );
+}
+
+function downloadCsv(kind) {
+  if (!Sa.exportCsv) return;
+  Sa.exportCsv(kind).then(function (text) {
+    var blob = new Blob([text], { type: 'text/csv' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    var code = (Sa.leagueCode && Sa.leagueCode()) || 'league';
+    a.href = url;
+    a.download = 'wheesht-' + code.toLowerCase() + '-' + kind + '.csv';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    if (window.wcToast) window.wcToast('CSV downloaded.', 'confident');
+  }).catch(function (e) {
+    if (window.wcToast) window.wcToast((e && e.message) || 'Export failed', 'crying');
+  });
 }
 
 function MatchPredAdmin() {
@@ -702,6 +872,8 @@ function AdminHealth() {
        password_cleared: 'Password cleared by organiser',
        admin_auth: 'Organiser signed in',
        admin_auth_failed: 'Failed organiser sign-in',
+       participant_edited: 'Entrant edited',
+       league_duplicated: 'League duplicated',
        league_deleted: 'League deleted',
      };
      return map[a.action] || a.action || 'Change';
@@ -773,7 +945,7 @@ function AdminHealth() {
 function AdminPanel(props) {
    const [, bump] = aState2(0);
    React.useEffect(() => Sa.subscribe(() => bump(x => x + 1)), []);
-   const [sec, setSec] = aState2('results');
+   const [sec, setSec] = aState2('league');
    const [mdFilter, setMdFilter] = aState2(0);
    const owned = {};
    const allPeople = Sa.allSync() || [];
@@ -784,7 +956,7 @@ function AdminPanel(props) {
    const byDate = []; const seen = {};
    fixtures.forEach(f => { if (!seen[f.dateISO]) { seen[f.dateISO] = { label: f.dateLabel, items: [] }; byDate.push(seen[f.dateISO]); } seen[f.dateISO].items.push(f); });
 
-   const secs = [['results', 'Results'], ['teams', 'Teams'], ['predict', 'Predictions'], ['people', 'People'], ['chat', 'Chat'], ['settings', 'Settings'], ['health', 'Health']];
+   const secs = [['league', 'League'], ['players', 'Players'], ['predict', 'Predictions'], ['prize', 'Prize Fund'], ['fields', 'Fields'], ['security', 'Security']];
 
    return (
      <div className="moment" style={{ background: 'var(--bg)' }}>
@@ -794,20 +966,25 @@ function AdminPanel(props) {
            <div className="dh" style={{ fontSize: 20, color: '#fff', lineHeight: 1 }}>Wheesht's clipboard</div>
            <div style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--yellow)' }}>{(Sa.activeLeague && Sa.activeLeague()) ? Sa.activeLeague().name : 'Admin'} · {allPeople.length} entrants</div>
          </div>
+         <SaveStatusPill />
          <button onClick={props.onClose} style={{ border: 'none', background: 'rgba(255,255,255,.16)', color: '#fff', width: 34, height: 34, borderRadius: 10, fontSize: 18, fontWeight: 900, cursor: 'pointer', padding: 0 }}>✕</button>
        </div>
 
        <div className="mscroll" style={{ padding: '16px 18px 30px' }}>
-         <SHa>Tournament phase</SHa>
-         <PhaseSeg />
-
-         <div style={{ display: 'flex', gap: 7, margin: '20px 0 14px', flexWrap: 'wrap' }}>
+         <div style={{ display: 'flex', gap: 7, margin: '0 0 14px', flexWrap: 'wrap' }}>
            {secs.map(([k, lab]) => (
              <button key={k} onClick={() => setSec(k)} className={'wc-chip' + (sec === k ? ' wc-chip--yellow' : '')} style={{ flex: '1 0 30%', cursor: 'pointer', textAlign: 'center', justifyContent: 'center' }}>{lab}</button>
            ))}
          </div>
 
-         {sec === 'results' && <>
+         {sec === 'league' && <>
+           <SHa>Tournament phase</SHa>
+           <PhaseSeg />
+           <div style={{ height: 14 }} />
+           <InvitePanel />
+           <AnalyticsPanel />
+           <DuplicateLeaguePanel />
+           <SHa>Match results</SHa>
            <div style={{ display: 'flex', gap: 6, marginBottom: 12, overflowX: 'auto' }}>
              {[[0, 'All'], [1, 'MD1'], [2, 'MD2'], [3, 'MD3']].map(([k, lab]) => (
                <button key={k} onClick={() => setMdFilter(k)} className={'wc-chip' + (mdFilter === k ? ' wc-chip--yellow' : '')} style={{ cursor: 'pointer', flex: '0 0 auto' }}>{lab}</button>
@@ -819,9 +996,7 @@ function AdminPanel(props) {
                {d.items.map(f => <FixtureAdminRow key={f.id} f={f} owned={owned} />)}
              </div>
            ))}
-         </>}
-
-         {sec === 'teams' && <>
+           <div style={{ marginTop: 18 }}><SHa>Teams in the draw</SHa></div>
            <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--ink2)', marginBottom: 8 }}>Knock a team out and everyone holding it flips to eliminated automatically.</div>
            {groups.map(g => {
              const ts = WCa.TEAM_LIST.filter(t => t.group === g);
@@ -831,21 +1006,31 @@ function AdminPanel(props) {
                {ts.map(t => <TeamToggle key={t.code} t={t} owners={owned[t.code] || 0} />)}
              </Ca>;
            })}
+           <div style={{ marginTop: 18 }}><SHa>Chat moderation</SHa></div>
+           <ChatAdmin />
+         </>}
+
+         {sec === 'players' && <>
+           <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+             <button onClick={() => downloadCsv('entrants')} className="wc-btn wc-btn--sm wc-btn--ink" style={{ flex: 1 }}>Download entrants CSV</button>
+           </div>
+           <PeopleAdmin />
          </>}
 
          {sec === 'predict' && <>
+           <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+             <button onClick={() => downloadCsv('predictions')} className="wc-btn wc-btn--sm wc-btn--ink" style={{ flex: 1 }}>Download predictions CSV</button>
+           </div>
            <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--ink2)', marginBottom: 10 }}>Set the answer once it's known — every entrant's score and the league re-grade instantly.</div>
            {(WCa.predictions || Sa.PREDICTIONS).map(m => <PredAdmin key={m.key} m={m} />)}
            <MatchPredAdmin />
          </>}
 
-         {sec === 'people' && <PeopleAdmin />}
+         {sec === 'prize' && <PrizeFundAdmin />}
 
-         {sec === 'chat' && <ChatAdmin />}
+         {sec === 'fields' && <FieldsAdmin />}
 
-         {sec === 'settings' && <SettingsAdmin />}
-
-         {sec === 'health' && <AdminHealth />}
+         {sec === 'security' && <AdminHealth />}
 
          <div style={{ marginTop: 22, borderTop: '2px solid var(--line)', paddingTop: 16 }}>
            <button onClick={() => { if (window.confirm('Reset ALL results, eliminations and answers back to pre-kickoff?')) Sa.adminReset(); }}
@@ -858,11 +1043,25 @@ function AdminPanel(props) {
 
 function PeopleAdmin() {
    const [q, setQ] = aState2('');
+   const [editing, setEditing] = aState2(null);
+   const [draft, setDraft] = aState2({ name: '', department: '', location: '' });
    const includeDept = Sa.includeDepartment ? Sa.includeDepartment() : true;
    const tagFields = (Sa.customFields ? Sa.customFields() : []).filter(f => f.type === 'tags' && Array.isArray(f.options) && f.options.length);
    const all = Sa.allSync().slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''));
    const list = q.trim() ? all.filter(p => (p.name || '').toLowerCase().indexOf(q.toLowerCase()) >= 0) : all;
    const fld = { width: '100%', border: '2.5px solid var(--ink)', borderRadius: 12, padding: '10px 13px', fontFamily: 'var(--body)', fontWeight: 600, fontSize: 15, outline: 'none', marginBottom: 12 };
+   const inpSm = { width: '100%', border: '2px solid var(--ink)', borderRadius: 10, padding: '7px 10px', fontFamily: 'var(--body)', fontWeight: 600, fontSize: 13, outline: 'none', background: '#fff', marginTop: 4 };
+   function startEdit(p) {
+     setEditing(p.id);
+     setDraft({ name: p.name || '', department: p.department || '', location: p.location || p.city || '' });
+   }
+   function saveEdit(p) {
+     var patch = { name: draft.name.trim() || p.name, department: draft.department.trim(), location: draft.location.trim(), city: draft.location.trim() };
+     Promise.resolve(Sa.adminUpdateParticipant(p.id, patch)).then(function () {
+       setEditing(null);
+       if (window.wcToast) window.wcToast('Entrant updated.', 'neutral');
+     });
+   }
    function remove(p) {
      if (window.confirm('Remove ' + (p.name || 'this entrant') + ' from the sweepstake? This frees their entry and adjusts the pot.')) Sa.removeParticipant(p.id);
    }
@@ -892,7 +1091,7 @@ function PeopleAdmin() {
    }
    return (
      <>
-       <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--ink2)', marginBottom: 10 }}>Remove entrants, reset passwords, or add organiser tags. Tags are optional unless you mark the field as required in Settings.</div>
+       <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--ink2)', marginBottom: 10 }}>Edit names and details, reset passwords, or add organiser tags.</div>
        <input style={fld} placeholder="Search entrants…" value={q} onChange={e => setQ(e.target.value)} />
        {list.length === 0
          ? <Ca flat style={{ textAlign: 'center', padding: '24px 14px' }}>
@@ -906,8 +1105,24 @@ function PeopleAdmin() {
                return <div key={p.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '9px 0', borderBottom: i < list.length - 1 ? '1.5px solid var(--line)' : 'none' }}>
                  {t && <Fa team={t} size={22} />}
                  <div style={{ flex: 1, minWidth: 0 }}>
+                   {editing === p.id ? <>
+                     <div style={{ fontSize: 10.5, fontWeight: 900, color: 'var(--ink2)', textTransform: 'uppercase' }}>Name</div>
+                     <input style={inpSm} value={draft.name} onChange={e => setDraft(Object.assign({}, draft, { name: e.target.value }))} />
+                     {includeDept && <>
+                       <div style={{ fontSize: 10.5, fontWeight: 900, color: 'var(--ink2)', textTransform: 'uppercase', marginTop: 8 }}>Department</div>
+                       <input style={inpSm} value={draft.department} onChange={e => setDraft(Object.assign({}, draft, { department: e.target.value }))} />
+                     </>}
+                     <div style={{ fontSize: 10.5, fontWeight: 900, color: 'var(--ink2)', textTransform: 'uppercase', marginTop: 8 }}>Location</div>
+                     <input style={inpSm} value={draft.location} onChange={e => setDraft(Object.assign({}, draft, { location: e.target.value }))} />
+                     <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                       <button onClick={() => saveEdit(p)} className="wc-btn wc-btn--sm wc-btn--ink">Save</button>
+                       <button onClick={() => setEditing(null)} className="wc-btn wc-btn--sm">Cancel</button>
+                     </div>
+                   </> : <>
                    <div style={{ fontWeight: 800, fontSize: 14, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name}{p.hasPassword ? ' 🔒' : ''}</div>
                    <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--ink2)' }}>{(p.location || p.city || '')}{includeDept && p.department ? ' · ' + p.department : ''}{t ? ' · ' + t.name : ''}</div>
+                   <button onClick={() => startEdit(p)} style={{ border: 'none', background: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 800, color: 'var(--ink2)', padding: '4px 0 0' }}>Edit details</button>
+                   </>}
                    {tagFields.map(f => {
                      const selected = Array.isArray(p.customFields && p.customFields[f.key]) ? p.customFields[f.key] : [];
                      return <div key={f.key} style={{ marginTop: 7 }}>
@@ -1014,7 +1229,18 @@ function AdminGate(props) {
 
    if (ok) return <AdminPanel onClose={props.onClose} />;
 
-   // Which code does this league expect? The seeded main league uses the
+   if (Sa.isDemoMode && Sa.isDemoMode()) {
+     return (
+       <div className="moment" style={{ background: 'var(--bg)', alignItems: 'center', justifyContent: 'center', padding: '0 26px' }}>
+         <button onClick={props.onClose} style={{ position: 'absolute', top: 16, right: 16, border: 'none', background: 'var(--ink)', color: '#fff', width: 34, height: 34, borderRadius: 10, fontSize: 18, fontWeight: 900, cursor: 'pointer' }}>✕</button>
+         <Wa mood="neutral" size={92} animate />
+         <div className="dh" style={{ fontSize: 22, marginTop: 12, textAlign: 'center' }}>Demo mode is read-only.</div>
+         <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--ink2)', marginTop: 8, textAlign: 'center', lineHeight: 1.45 }}>Start your own league to unlock the organiser clipboard.</div>
+       </div>
+     );
+   }
+
+   // Which code does this league expect?
    // organiser PIN; self-created leagues use their private organiser code.
    const league = Sa.activeLeague && Sa.activeLeague();
    const seeded = !!(league && league.seeded);

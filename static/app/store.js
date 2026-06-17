@@ -260,6 +260,27 @@
     }).filter(Boolean).slice(0, 6);
   }
 
+  var saveStatus = { state: 'idle', message: '', retry: null };
+  var saveSubs = [];
+  function setSaveStatus(state, message, retry) {
+    saveStatus = { state: state || 'idle', message: message || '', retry: retry || null };
+    saveSubs.forEach(function (fn) { try { fn(saveStatus); } catch (e) {} });
+  }
+  function trackSave(work, errMsg) {
+    setSaveStatus('saving');
+    return Promise.resolve(work())
+      .then(function (r) {
+        setSaveStatus('saved');
+        setTimeout(function () { if (saveStatus.state === 'saved') setSaveStatus('idle'); }, 2400);
+        return r;
+      })
+      .catch(function (e) {
+        var msg = (e && e.message) || errMsg || 'Could not save';
+        setSaveStatus('error', msg, function () { return trackSave(work, errMsg); });
+        throw e;
+      });
+  }
+
   function persistAdmin(nextAdmin) {
     var payload = nextAdmin || admin;
     if (LIVE) {
@@ -273,15 +294,18 @@
   }
   // After any admin edit: LIVE → push + re-pull resolved state; MOCK → apply locally.
   function commitAdmin() {
+    if (window.WC_DEMO_MODE) return Promise.resolve();
     var nextAdmin = JSON.parse(JSON.stringify(admin));
     if (LIVE) {
-      return persistAdmin(nextAdmin)
-        .then(function () { return Store.refresh(); })
-        .catch(function (e) {
-          toastError(e, 'Could not save organiser settings');
-        });
+      return trackSave(function () {
+        return persistAdmin(nextAdmin).then(function () { return Store.refresh(); });
+      }, 'Could not save organiser settings').catch(function (e) {
+        toastError(e, 'Could not save organiser settings');
+      });
     }
     applyAdmin(); persistAdmin(nextAdmin); rebuild(); emit();
+    setSaveStatus('saved');
+    setTimeout(function () { if (saveStatus.state === 'saved') setSaveStatus('idle'); }, 2400);
     return Promise.resolve();
   }
 
@@ -606,6 +630,7 @@
     },
 
     removeParticipant: function (id) {
+      if (window.WC_DEMO_MODE) return Promise.resolve({ ok: false });
       function localRemove() {
         mine = mine.filter(function (p) { return p.id !== id; });
         lsSet(K.mine, mine);
@@ -615,10 +640,11 @@
         rebuild(); emit();
       }
       if (LIVE && leagueCode()) {
-        return fetch(api('/participants/' + id), { method: 'DELETE', headers: adminHeaders({}) })
-          .then(parseJson)
-          .then(function () { localRemove(); return { ok: true }; })
-          .catch(function (e) { toastError(e, 'Could not remove entrant'); return Store.refresh(); });
+        return trackSave(function () {
+          return fetch(api('/participants/' + id), { method: 'DELETE', headers: adminHeaders({}) })
+            .then(parseJson)
+            .then(function () { localRemove(); return { ok: true }; });
+        }, 'Could not remove entrant').catch(function (e) { toastError(e, 'Could not remove entrant'); return Store.refresh(); });
       }
       localRemove();
       return Promise.resolve({ ok: true });
@@ -652,6 +678,7 @@
     },
 
     create: function (profile, opts) {
+      if (window.WC_DEMO_MODE) return null;
       opts = opts || {};
       var team = drawTeam(opts.forceTeam);
       var t = WC.TEAMS[team];
@@ -711,21 +738,25 @@
     },
 
     adminUpdateParticipant: function (id, patch) {
+      if (window.WC_DEMO_MODE) return Promise.resolve(null);
       var current = Store.getSync(id);
       if (!current) return Promise.resolve(null);
       var next = Object.assign({}, current, patch || {});
       if (patch && patch.name) next.initials = initials(patch.name);
+      if (patch && patch.location) next.city = patch.location;
       var idx = -1; mine.forEach(function (p, i) { if (p.id === id) idx = i; });
       if (idx >= 0) {
         mine[idx] = Object.assign({}, mine[idx], patch || {});
         if (patch && patch.name) mine[idx].initials = initials(patch.name);
+        if (patch && patch.location) mine[idx].city = patch.location;
         lsSet(K.mine, mine);
       }
       if (LIVE && leagueCode()) {
-        return fetch(api('/participants/' + id), { method: 'PUT', headers: acctHeaders(id), body: JSON.stringify(next) })
-          .then(parseJson)
-          .then(function () { return Store.refresh().then(function () { return next; }); })
-          .catch(function (e) { onWriteErr(id, e, 'Could not save entrant'); return Store.refresh(); });
+        return trackSave(function () {
+          return fetch(api('/participants/' + id), { method: 'PUT', headers: adminHeaders(), body: JSON.stringify(next) })
+            .then(parseJson)
+            .then(function () { return Store.refresh().then(function () { return next; }); });
+        }, 'Could not save entrant').catch(function (e) { toastError(e, 'Could not save entrant'); return Store.refresh(); });
       }
       var replaced = false;
       cache = cache.map(function (p) {
@@ -739,6 +770,7 @@
     },
 
     setPick: function (id, key, value) {
+      if (window.WC_DEMO_MODE) return;
       var p = this.getSync(id); if (!p) return;
       var picks = Object.assign({}, p.picks || {}); picks[key] = value;
       // keep a local copy if this is a device-held entry
@@ -993,6 +1025,90 @@
       var c = leagueCode();
       if (!c) return Promise.reject(new Error('Join a league first'));
       return fetch(api('/export'), { headers: adminHeaders({}), cache: 'no-store' }).then(parseJson);
+    },
+    exportCsv: function (kind) {
+      if (!LIVE) return Promise.reject(new Error('Export only works on the server'));
+      var c = leagueCode();
+      if (!c) return Promise.reject(new Error('Join a league first'));
+      var path = kind === 'predictions' ? '/export/predictions.csv' : '/export/entrants.csv';
+      return fetch(api(path), { headers: adminHeaders({}), cache: 'no-store' }).then(function (r) {
+        return r.text().then(function (text) {
+          if (!r.ok) throw new Error(text || 'Export failed');
+          return text;
+        });
+      });
+    },
+    duplicateLeague: function (payload) {
+      if (!LIVE) return Promise.reject(new Error('Duplicate only works on the server'));
+      var c = leagueCode();
+      if (!c) return Promise.reject(new Error('Join a league first'));
+      return fetch(api('/duplicate'), {
+        method: 'POST', headers: adminHeaders(), body: JSON.stringify(payload || {}),
+      }).then(parseJson);
+    },
+    fetchAnalytics: function () {
+      if (!LIVE) {
+        var people = cache;
+        return Promise.resolve({
+          entrants: { total: people.length, withPassword: people.filter(function (p) { return p.hasPassword; }).length, withTeam: people.filter(function (p) { return p.team; }).length },
+          chat: { total: 0, last7d: 0 },
+          predictions: [],
+          recentActivity: Store.adminAudit().slice(0, 5),
+        });
+      }
+      var c = leagueCode();
+      if (!c) return Promise.resolve(null);
+      return fetch(api('/analytics'), { headers: adminHeaders({}), cache: 'no-store' }).then(parseJson);
+    },
+    saveStatus: function () { return saveStatus; },
+    subscribeSaveStatus: function (fn) {
+      saveSubs.push(fn);
+      return function () { saveSubs = saveSubs.filter(function (f) { return f !== fn; }); };
+    },
+    isDemoMode: function () { return !!window.WC_DEMO_MODE; },
+    enterDemoMode: function () {
+      window.WC_DEMO_MODE = true;
+      var def = WC.league || { code: 'OI', name: 'The Office Sweepstake', seeded: true };
+      setActiveLeague(def);
+      return Store.refresh().then(function () { rebuild(); emit(); });
+    },
+    exitDemoMode: function () {
+      window.WC_DEMO_MODE = false;
+      lsSet(K.league, null);
+      lsSet(K.active, null);
+      rebuild(); emit();
+    },
+    isReadOnly: function () { return !!window.WC_DEMO_MODE; },
+    quietMode: function () {
+      try { return localStorage.getItem('wheesht_quiet') === '1'; } catch (e) { return false; }
+    },
+    setQuietMode: function (on) {
+      try { localStorage.setItem('wheesht_quiet', on ? '1' : '0'); } catch (e) {}
+      emit();
+    },
+    snapshotPredRanks: function () {
+      var snap = {};
+      rankedByPred().forEach(function (p) { snap[p.id] = p.predRank; });
+      try { lsSet('wheesht_pred_ranks', snap); } catch (e) {}
+      return snap;
+    },
+    prevPredRanks: function () {
+      try { return lsGet('wheesht_pred_ranks', {}); } catch (e) { return {}; }
+    },
+    detectOvertakes: function (meId) {
+      if (!meId) return [];
+      var prev = Store.prevPredRanks();
+      var now = rankedByPred();
+      var me = now.find(function (p) { return p.id === meId; });
+      if (!me || !prev[meId]) return [];
+      var overtook = [];
+      now.forEach(function (p) {
+        if (p.id === meId) return;
+        var was = prev[p.id];
+        if (!was) return;
+        if (was < me.predRank && p.predRank > me.predRank) overtook.push(p);
+      });
+      return overtook;
     },
     // Organiser-initiated permanent deletion of the active league. Requires the
     // organiser token (sent via adminHeaders) plus exact code + name match.

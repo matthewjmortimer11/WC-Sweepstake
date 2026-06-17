@@ -168,6 +168,7 @@ function AccountGate(props) {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           <Bo variant="ink" block onClick={props.onJoin}>Join a league →</Bo>
           <Bo variant="primary" block onClick={props.onCreate}>Create a new league →</Bo>
+          <a href="/welcome" style={{ textAlign: 'center', fontSize: 13, fontWeight: 800, color: 'var(--ink2)', textDecoration: 'underline', padding: '6px 0' }}>New here? See how it works</a>
         </div>
       </div>
     </div>
@@ -176,7 +177,8 @@ function AccountGate(props) {
 
 /* =================== JOIN A LEAGUE =================== */
 function JoinLeague(props) {
-  const [code, setCode] = oState('');
+  const [code, setCode] = oState((props.initialCode || '').toUpperCase());
+  oEffect(function () { if (props.initialCode) setCode(String(props.initialCode).toUpperCase()); }, [props.initialCode]);
   const [pw, setPw] = oState('');
   const [err, setErr] = oState('');
   const [busy, setBusy] = oState(false);

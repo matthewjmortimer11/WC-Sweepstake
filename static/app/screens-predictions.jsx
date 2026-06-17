@@ -414,6 +414,15 @@ function PredictionsScreen(props) {
       </>}
       <SHp aside="org-wide">Prediction league</SHp>
       <PredLeaderboard me={me} />
+      {window.WheeshtShare && !(Sp.isReadOnly && Sp.isReadOnly()) && <button
+        onClick={function(){
+          var rows = Sp.rankedByPred ? Sp.rankedByPred() : [];
+          var lg = Sp.activeLeague ? Sp.activeLeague() : null;
+          window.WheeshtShare.shareLeaderboard({ rows: rows, meId: me.id, leagueName: lg && lg.name });
+        }}
+        className="wc-btn wc-btn--sm wc-btn--ink"
+        style={{ width: '100%', marginTop: 10 }}
+      >{(window.WheeshtCopy && window.WheeshtCopy.shareStandings) || 'Share standings'}</button>}
       <Cp flat style={{ marginTop: 12, padding: '11px 13px', background: 'rgba(26,26,26,.04)' }}>
         <div style={{ fontSize: 10.5, fontWeight: 900, letterSpacing: '.07em', textTransform: 'uppercase', color: 'var(--ink2)' }}>Scoring</div>
         <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--ink2)', lineHeight: 1.38, marginTop: 4 }}>
