@@ -4,6 +4,17 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Wheesht — World Cup sweepstake for groups</title>
+<meta name="description" content="Run a World Cup sweepstake with your team — draws, predictions, chat, and a leaderboard that updates itself. Officially impartial. Constitutionally Scottish." />
+<link rel="canonical" href="/welcome" />
+<meta property="og:type" content="website" />
+<meta property="og:title" content="Wheesht — World Cup sweepstake for your team" />
+<meta property="og:description" content="Create a league, share one link, watch chaos unfold. Try the demo or start your own." />
+<meta property="og:image" content="/og/wheesht-og.png" />
+<meta property="og:url" content="/welcome" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="Wheesht — World Cup sweepstake" />
+<meta name="twitter:description" content="Draws, predictions, and gentle chaos for your group." />
+<meta name="twitter:image" content="/og/wheesht-og.png" />
 <meta name="theme-color" content="#F5C800" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@700;800&family=Hanken+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
@@ -42,7 +53,7 @@ a.ghost{background:#fff}
       <a class="btn ghost" href="/?demo=1">Try the demo league</a>
     </div>
   </div>
-  <p class="foot"><a href="/">Back to the app</a> · <a href="/?join=OI">Sample join link</a></p>
+  <p class="foot"><a href="/">Back to the app</a> · <a href="/join/OI">Sample join link</a></p>
 </div>
 <script>
 (function(){
@@ -50,6 +61,13 @@ a.ghost{background:#fff}
   if (!charity) return;
   document.getElementById('title').textContent = 'Wheesht for charity';
   document.getElementById('lead').textContent = 'A friendly World Cup sweepstake where part of every entry can go to a good cause — and the rest to whoever called it best.';
+  var ogTitle = 'Wheesht for charity — World Cup sweepstake';
+  var ogDesc = 'Raise a bit for charity while arguing about VAR. Create a league or try the demo.';
+  document.querySelector('meta[property="og:title"]').setAttribute('content', ogTitle);
+  document.querySelector('meta[name="twitter:title"]').setAttribute('content', ogTitle);
+  document.querySelector('meta[property="og:description"]').setAttribute('content', ogDesc);
+  document.querySelector('meta[name="twitter:description"]').setAttribute('content', ogDesc);
+  document.title = ogTitle;
 })();
 </script>
 </body>

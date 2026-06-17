@@ -5,17 +5,29 @@
   }
   function inviteUrl(code) {
     var c = (code || leagueCode() || '').trim().toUpperCase();
-    var base = location.origin + '/';
-    return base + '?join=' + encodeURIComponent(c);
+    return location.origin + '/join/' + encodeURIComponent(c);
   }
-  function buildInviteMessage(league) {
+  function appJoinUrl(code) {
+    var c = (code || leagueCode() || '').trim().toUpperCase();
+    return location.origin + '/?join=' + encodeURIComponent(c);
+  }
+  function buildInviteMessage(league, variant) {
     var L = league || (window.Store && window.Store.activeLeague && window.Store.activeLeague()) || {};
     var name = L.name || 'our sweepstake';
     var link = inviteUrl(L.code);
+    var copy = window.WheeshtCopy || {};
+    var templates = copy.inviteTemplates || {};
+    var key = variant || L.purpose || 'work';
+    var tpl = templates[key] || templates.work;
+    if (tpl) return tpl.replace(/\{name\}/g, name).replace(/\{link\}/g, link);
     return 'You\'re invited to ' + name + ' on Wheesht — World Cup sweepstake, predictions, and gentle chaos.\n\nJoin here: ' + link;
   }
   function whatsappUrl(text) {
     return 'https://wa.me/?text=' + encodeURIComponent(text || '');
+  }
+  function qrImageUrl(url, size) {
+    var s = size || 240;
+    return 'https://api.qrserver.com/v1/create-qr-code/?size=' + s + 'x' + s + '&data=' + encodeURIComponent(url || '');
   }
   function copyText(text) {
     if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -51,6 +63,74 @@
     ctx.arcTo(x, y + h, x, y, r);
     ctx.arcTo(x, y, x + w, y, r);
     ctx.closePath();
+  }
+  function loadImage(src) {
+    return new Promise(function (resolve, reject) {
+      var img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = function () { resolve(img); };
+      img.onerror = reject;
+      img.src = src;
+    });
+  }
+  function renderInvitePoster(league) {
+    var L = league || {};
+    var W = 1080, H = 1350;
+    var canvas = document.createElement('canvas');
+    canvas.width = W;
+    canvas.height = H;
+    var ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#F4EEE3';
+    ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = '#1A1A1A';
+    drawRoundedRect(ctx, 48, 48, W - 96, H - 96, 36);
+    ctx.fill();
+    ctx.fillStyle = '#F5C800';
+    ctx.font = 'bold 56px Bricolage Grotesque, sans-serif';
+    ctx.fillText('Wheesht', 88, 130);
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 64px Bricolage Grotesque, sans-serif';
+    var title = (L.name || 'Sweepstake').slice(0, 28);
+    ctx.fillText(title, 88, 240);
+    ctx.fillStyle = 'rgba(255,255,255,.75)';
+    ctx.font = '600 38px Hanken Grotesk, sans-serif';
+    ctx.fillText('World Cup sweepstake', 88, 310);
+    ctx.fillStyle = '#F5C800';
+    ctx.font = 'bold 48px Bricolage Grotesque, sans-serif';
+    ctx.fillText((L.code || '').toUpperCase(), 88, 400);
+    return { canvas: canvas, qrBox: { x: 88, y: 460, size: 360 } };
+  }
+  function shareInvitePoster(league) {
+    var rendered = renderInvitePoster(league);
+    var canvas = rendered.canvas;
+    var box = rendered.qrBox;
+    var link = inviteUrl(league && league.code);
+    return loadImage(qrImageUrl(link, box.size)).then(function (qr) {
+      var ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#fff';
+      drawRoundedRect(ctx, box.x - 12, box.y - 12, box.size + 24, box.size + 24, 16);
+      ctx.fill();
+      ctx.drawImage(qr, box.x, box.y, box.size, box.size);
+      ctx.fillStyle = 'rgba(255,255,255,.6)';
+      ctx.font = '600 32px Hanken Grotesk, sans-serif';
+      ctx.fillText('Scan to join · wheesht', 88, 920);
+      return canvasToBlob(canvas);
+    }).then(function (blob) {
+      if (!blob) throw new Error('Could not render poster');
+      var file = new File([blob], 'wheesht-invite.png', { type: 'image/png' });
+      if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+        return navigator.share({ files: [file], title: 'Join ' + (league.name || 'Wheesht') });
+      }
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url;
+      a.download = 'wheesht-invite.png';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      if (window.wcToast) window.wcToast('Poster saved.', 'confident');
+    });
   }
   function renderLeaderboardCard(opts) {
     opts = opts || {};
@@ -177,11 +257,14 @@
   }
   window.WheeshtShare = {
     inviteUrl: inviteUrl,
+    appJoinUrl: appJoinUrl,
     buildInviteMessage: buildInviteMessage,
     whatsappUrl: whatsappUrl,
+    qrImageUrl: qrImageUrl,
     copyText: copyText,
     shareViaWebShare: shareViaWebShare,
     shareLeaderboard: shareLeaderboard,
     shareOvertake: shareOvertake,
+    shareInvitePoster: shareInvitePoster,
   };
 })();

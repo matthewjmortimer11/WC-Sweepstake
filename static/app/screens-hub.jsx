@@ -19,6 +19,21 @@ function stageLabel(t){
   if (t.stage === 'out-r32') return 'Out · Round of 32';
   return 'Out · Group stage';
 }
+function teamProgressRing(t) {
+  if (!t) return { value: 0, label: '—' };
+  const ladder = (WC.meta && WC.meta.stageLadder) || ['group', 'r32', 'r16', 'qf', 'sf', 'final', 'winner'];
+  const max = Math.max(1, ladder.length - 1);
+  const short = { group: 'Grp', r32: 'R32', r16: 'R16', qf: 'QF', sf: 'SF', final: 'Fin', winner: 'W', 'out-group': 'Out', 'out-r32': 'Out', 'out-r16': 'Out' };
+  const label = short[t.stage] || String(t.stage || '').slice(0, 4).toUpperCase();
+  const value = t.alive ? Math.min(1, Math.max(0.08, (t.rounds || 0) / max)) : Math.max(0.05, (t.rounds || 0) / max);
+  return { value, label };
+}
+function winnerPotShare() {
+  const gross = Number(WC.POT) || 0;
+  const split = (window.Store && window.Store.charitySplit) ? window.Store.charitySplit()
+    : (WC.meta && WC.meta.charitySplit != null ? WC.meta.charitySplit : 0.5);
+  return gross * (1 - split);
+}
 
 /* =================== DASHBOARD =================== */
 function ConverterCard(props){
@@ -50,6 +65,7 @@ function ConverterCard(props){
 
 function DashTeam(){
   const me = WC.YOU; const t = WC.TEAMS[me.team];
+  const ring = teamProgressRing(t);
   return (
     <Card bordered className="pop">
       <div style={{display:'flex',alignItems:'center',gap:14}}>
@@ -60,11 +76,11 @@ function DashTeam(){
           </div>
           <div style={{display:'flex',gap:6,marginTop:6,flexWrap:'wrap'}}>
             <Chip tone="yellow">Group {t.group}</Chip>
-            <Chip tone="green">Still in</Chip>
+            <Chip tone={t.alive ? 'green' : 'red'}>{t.alive ? 'Still in' : 'Out'}</Chip>
             <Chip>Odds {t.odds}</Chip>
           </div>
         </div>
-        <ProgressRing value={0.6} size={56} stroke={7} color="var(--green)"><span style={{fontSize:12}}>R16</span></ProgressRing>
+        <ProgressRing value={ring.value} size={56} stroke={7} color={t.alive ? 'var(--green)' : 'var(--ink2)'}><span style={{fontSize:12}}>{ring.label}</span></ProgressRing>
       </div>
       <div style={{marginTop:14,display:'flex',alignItems:'center',gap:10,background:'var(--ink)',borderRadius:14,padding:'11px 14px',color:'#fff'}}>
         <div style={{flex:1}}>
@@ -185,7 +201,7 @@ function DashTeamOut(props){
 }
 
 function DashboardScreen(props){
-  const potShare = (Number(WC.POT) || 0) * 0.6;
+  const potShare = winnerPotShare();
   return (
     <div className="pad">
       {props.eliminated ? <DashTeamOut goBets={props.goBets}/> : <DashTeam/>}

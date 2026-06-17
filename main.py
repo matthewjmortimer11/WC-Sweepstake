@@ -18,6 +18,7 @@ import binascii
 import csv
 import hashlib
 import hmac
+import html
 import io
 import json
 import logging
@@ -35,7 +36,7 @@ from typing import Any, Dict, List, Optional
 from zoneinfo import ZoneInfo
 
 from fastapi import FastAPI, Header, HTTPException, Request
-from fastapi.responses import FileResponse, HTMLResponse, Response
+from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse, Response
 from pydantic import BaseModel, Field
 from sqlalchemy import delete, func, select, text
 from sqlalchemy.exc import IntegrityError
@@ -63,6 +64,8 @@ _ALLOWED_AVATAR_TYPES = {"image/jpeg", "image/png", "image/webp"}
 _MAX_DISPLAY_NAME = 40
 
 _HTML_TEMPLATE = Path("templates/index.html").read_text(encoding="utf-8")
+_JOIN_TEMPLATE = Path("templates/join.html").read_text(encoding="utf-8")
+_OG_IMAGE_PATH = "/og/wheesht-og.png"
 
 # Master developer key for the hidden cross-league dev console. It must come
 # from the deployment environment; there is intentionally no committed fallback.
@@ -995,6 +998,113 @@ async def welcome_page():
     if not path.is_file():
         raise HTTPException(status_code=404, detail="not found")
     return HTMLResponse(content=path.read_text(encoding="utf-8"))
+
+
+def _public_base(request: Request) -> str:
+    return str(request.base_url).rstrip("/")
+
+
+def _og_image_url(request: Request) -> str:
+    return f"{_public_base(request)}{_OG_IMAGE_PATH}"
+
+
+def _fill_join_template(
+    *,
+    title: str,
+    description: str,
+    heading: str,
+    code: str,
+    canonical: str,
+    og_image: str,
+    app_url: str,
+) -> str:
+    return (
+        _JOIN_TEMPLATE.replace("{{TITLE}}", html.escape(title))
+        .replace("{{DESCRIPTION}}", html.escape(description))
+        .replace("{{HEADING}}", html.escape(heading))
+        .replace("{{CODE}}", html.escape(code))
+        .replace("{{CANONICAL}}", html.escape(canonical))
+        .replace("{{OG_IMAGE}}", html.escape(og_image))
+        .replace("{{APP_URL}}", html.escape(app_url))
+    )
+
+
+def _join_not_found_html(request: Request, code: str) -> str:
+    base = _public_base(request)
+    title = "League not found — Wheesht"
+    description = "That invite link doesn't match a league on Wheesht. Ask your organiser for a fresh link."
+    return _fill_join_template(
+        title=title,
+        description=description,
+        heading="League not found",
+        code=code,
+        canonical=f"{base}/join/{code}",
+        og_image=_og_image_url(request),
+        app_url=f"{base}/",
+    )
+
+
+@app.get("/join/{code}", response_class=HTMLResponse)
+async def join_preview_page(code: str, request: Request):
+    """Public invite landing with OG tags for link previews (no secrets)."""
+    code = (code or "").strip().upper()
+    if not code or len(code) > 12:
+        raise HTTPException(status_code=404, detail="league not found")
+    base = _public_base(request)
+    og = _og_image_url(request)
+    async with AsyncSessionLocal() as session:
+        league = await _get_league_by_code(session, code)
+        if league is None:
+            return HTMLResponse(content=_join_not_found_html(request, code), status_code=404)
+        league_name = league.name or "a Wheesht league"
+    title = f"Join {league_name} on Wheesht"
+    description = (
+        f"You're invited to {league_name} — World Cup sweepstake, predictions, and gentle chaos."
+    )
+    html_body = _fill_join_template(
+        title=title,
+        description=description,
+        heading=league_name,
+        code=code,
+        canonical=f"{base}/join/{code}",
+        og_image=og,
+        app_url=f"{base}/?join={code}",
+    )
+    return HTMLResponse(content=html_body)
+
+
+@app.get("/api/leagues/{code}/preview")
+async def league_public_preview(code: str):
+    """Public league teaser for join funnel — name and entrant count only."""
+    code = (code or "").strip().upper()
+    async with AsyncSessionLocal() as session:
+        league = await _get_league_by_code(session, code)
+        if league is None:
+            raise HTTPException(status_code=404, detail="No league with that code")
+        rows = await _participant_rows(session, league)
+        profile_map = await _profiles_for(session, league)
+        people = _league_people(league, rows, profile_map)
+        return {"name": league.name, "entrantCount": len(people)}
+
+
+@app.get("/robots.txt", response_class=PlainTextResponse)
+async def robots_txt():
+    return PlainTextResponse(
+        "User-agent: *\nAllow: /\nDisallow: /api/\nSitemap: /sitemap.xml\n",
+        media_type="text/plain",
+    )
+
+
+@app.get("/sitemap.xml", response_class=Response)
+async def sitemap_xml(request: Request):
+    base = _public_base(request)
+    demo_code = (_CONFIG_LEAGUE_CODE or "OI").upper()
+    urls = ["/", "/welcome", f"/join/{demo_code}"]
+    body = '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+    for path in urls:
+        body += f"  <url><loc>{html.escape(base + path)}</loc></url>\n"
+    body += "</urlset>\n"
+    return Response(content=body, media_type="application/xml")
 
 
 @app.get("/api/state")
@@ -2676,6 +2786,16 @@ async def service_worker():
 @app.get("/icons/{filename:path}")
 async def pwa_icon(filename: str):
     path = _safe_static_path(_STATIC / "icons", filename)
+    return FileResponse(
+        path,
+        media_type=_JS_TYPES.get(path.suffix, "application/octet-stream"),
+        headers={"Cache-Control": "public, max-age=31536000, immutable"},
+    )
+
+
+@app.get("/og/{filename:path}")
+async def og_asset(filename: str):
+    path = _safe_static_path(_STATIC / "og", filename)
     return FileResponse(
         path,
         media_type=_JS_TYPES.get(path.suffix, "application/octet-stream"),

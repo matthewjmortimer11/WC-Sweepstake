@@ -3,10 +3,17 @@
   window.WheeshtCopy = {
     inviteCta: 'Tell the group',
     inviteHint: 'Copy the link or lob it straight into the group chat.',
+    inviteSheetTitle: 'Tell the group',
+    inviteSheetHint: 'Spread the word — they\'ll see the league name before they join.',
     demoBanner: 'You\'re browsing a sample league — start your own when you\'re ready.',
     demoCta: 'Start your own league',
+    demoGate: 'Try the demo league',
+    demoExitToast: 'Like what you saw? Create yours in two minutes.',
     quietOn: 'Quiet mode on — Wheesht will keep the drama to a minimum.',
     quietOff: 'Quiet mode off — matchday moments are back.',
+    installTitle: 'Add Wheesht to your home screen',
+    installHint: 'One tap for matchday — no app store required.',
+    installDismiss: 'Not now',
     saveSaving: 'Saving…',
     saveSaved: 'Saved',
     saveError: 'Couldn\'t save — tap to retry',
@@ -21,5 +28,14 @@
     kickoffToast: '{team} are kicking off. Wheesht is watching.',
     finalWhistle: 'Full time. Your standing may have shifted.',
     scotlandMoment: 'Scotland are on. Wheesht has feelings.',
+    joinWrongCode: 'No league with that code. Double-check with your organiser.',
+    joinWrongPassword: 'Wrong password — ask your organiser for the member password.',
+    joinPreviewLoading: 'Looking up league…',
+    joinPreviewCount: '{count} already in',
+  };
+  window.WheeshtCopy.inviteTemplates = {
+    work: 'Fancy a World Cup sweepstake without the spreadsheet shame?\n\nJoin {name} on Wheesht — draws, predictions, and a leaderboard that updates itself.\n\n{link}',
+    friends: 'World Cup sweepstake time. No spreadsheets, no arguments about the rules (well, fewer).\n\nJoin {name}: {link}',
+    charity: 'We\'re running {name} on Wheesht — sweepstake fun with a bit for charity.\n\nJoin here: {link}',
   };
 })();

@@ -1,4 +1,4 @@
-# Wheesht product roadmap (items 1–10)
+# Wheesht product roadmap (items 1–11)
 
 Living checklist for the WC Sweepstake app. Technical phases 0–5 live in [AUDIT_AND_ARCHITECTURE.md](AUDIT_AND_ARCHITECTURE.md).
 
@@ -11,9 +11,10 @@ Living checklist for the WC Sweepstake app. Technical phases 0–5 live in [AUDI
 | 5 | Multi-league | Done |
 | 6 | Security and permissions | Done |
 | 7 | Payments (Stripe) | Skipped |
-| 8 | Make it shareable | In progress |
-| 9 | Admin UX | In progress |
-| 10 | Brand polish | In progress |
+| 8 | Make it shareable | Done |
+| 9 | Admin UX | Done |
+| 10 | Brand polish | Done |
+| 11 | Growth funnel | Done |
 
 ---
 
@@ -46,6 +47,18 @@ Living checklist for the WC Sweepstake app. Technical phases 0–5 live in [AUDI
 - [x] 10.4 PWA icons + splash meta
 - [x] 10.5 Visual QA checklist (manual)
 
+## Item 11 — Growth funnel
+
+- [x] 11.1 Link previews — OG tags, static image, `GET /join/{code}`
+- [x] 11.2 Gate conversion — “Try the demo league” on AccountGate
+- [x] 11.3 Join funnel — `GET /api/leagues/{code}/preview`, “Tell the group” sheet
+- [x] 11.4 Organiser share kit — templates, QR, WhatsApp copy, poster PNG
+- [x] 11.5 PWA install nudge (`beforeinstallprompt`)
+- [x] 11.6 SEO — `/robots.txt`, `/sitemap.xml`, welcome meta
+- [x] 11.7 Growth tests + cache bump `20260617-item11`
+
 ---
 
 Deploy model: small commits to `main` → Railway auto-deploy. Bump `?v=` in `templates/index.html` and `static/sw.js` per release.
+
+**Production verify (matchday):** ensure `FOOTBALL_DATA_API_KEY` is set on Railway — without it the sync worker uses `MockAdapter` and scores stay synthetic. See [SECURITY.md](SECURITY.md).

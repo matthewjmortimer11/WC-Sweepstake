@@ -168,6 +168,7 @@ function AccountGate(props) {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           <Bo variant="ink" block onClick={props.onJoin}>Join a league →</Bo>
           <Bo variant="primary" block onClick={props.onCreate}>Create a new league →</Bo>
+          {props.onDemo && <Bo variant="ghost" block onClick={props.onDemo}>{(window.WheeshtCopy && window.WheeshtCopy.demoGate) || 'Try the demo league'}</Bo>}
           <a href="/welcome" style={{ textAlign: 'center', fontSize: 13, fontWeight: 800, color: 'var(--ink2)', textDecoration: 'underline', padding: '6px 0' }}>New here? See how it works</a>
         </div>
       </div>
@@ -182,7 +183,22 @@ function JoinLeague(props) {
   const [pw, setPw] = oState('');
   const [err, setErr] = oState('');
   const [busy, setBusy] = oState(false);
+  const [preview, setPreview] = oState(null);
+  const [previewBusy, setPreviewBusy] = oState(false);
   const ok = code.trim().length >= 2 && pw.length > 0;
+  const copy = window.WheeshtCopy || {};
+
+  oEffect(function () {
+    var c = code.trim().toUpperCase();
+    if (c.length < 2) { setPreview(null); return; }
+    var live = true;
+    setPreviewBusy(true);
+    fetch('/api/leagues/' + encodeURIComponent(c) + '/preview')
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (data) { if (live) { setPreview(data); setPreviewBusy(false); } })
+      .catch(function () { if (live) { setPreview(null); setPreviewBusy(false); } });
+    return function () { live = false; };
+  }, [code]);
 
   function submit() {
     if (!ok || busy) return;
@@ -192,7 +208,10 @@ function JoinLeague(props) {
       props.onJoined(res.league);
     }).catch(function (e) {
       setBusy(false);
-      setErr((e && e.message) || 'Could not join that league.');
+      var msg = (e && e.message) || 'Could not join that league.';
+      if (/wrong password/i.test(msg)) setErr(copy.joinWrongPassword || msg);
+      else if (/no league/i.test(msg)) setErr(copy.joinWrongCode || msg);
+      else setErr(msg);
     });
   }
 
@@ -207,6 +226,13 @@ function JoinLeague(props) {
             <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink2)', marginTop: 4 }}>Enter the league code and member password your organiser gave you.</div>
           </div>
         </div>
+        {preview && preview.name && <div style={{ marginTop: 16, background: '#fff', border: '2.5px solid var(--ink)', borderRadius: 16, padding: '12px 14px', boxShadow: '0 4px 0 var(--ink)' }}>
+          <div className="dh" style={{ fontSize: 18 }}>{preview.name}</div>
+          <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--ink2)', marginTop: 4 }}>
+            {(copy.joinPreviewCount || '{count} already in').replace('{count}', String(preview.entrantCount || 0))}
+          </div>
+        </div>}
+        {previewBusy && !preview && code.trim().length >= 2 && <div style={{ marginTop: 14, fontSize: 12.5, fontWeight: 700, color: 'var(--ink2)' }}>{copy.joinPreviewLoading || 'Looking up league…'}</div>}
         <div style={{ marginTop: 20 }}>
           <Lab>League code</Lab>
           <input

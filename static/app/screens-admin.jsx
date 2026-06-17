@@ -324,11 +324,21 @@ function InvitePanel() {
   const league = Sa.activeLeague ? Sa.activeLeague() : null;
   const code = league && league.code;
   const link = window.WheeshtShare && code ? window.WheeshtShare.inviteUrl(code) : '';
-  const msg = window.WheeshtShare && window.WheeshtShare.buildInviteMessage(league);
+  const [variant, setVariant] = aState2((league && league.purpose) || 'work');
+  const msg = window.WheeshtShare && window.WheeshtShare.buildInviteMessage(league, variant);
+  const qrSrc = link && window.WheeshtShare ? window.WheeshtShare.qrImageUrl(link, 200) : '';
+  const copy = window.WheeshtCopy || {};
+  const templates = copy.inviteTemplates || {};
   function copyLink() {
     if (!link || !window.WheeshtShare) return;
     window.WheeshtShare.copyText(link).then(function () {
       if (window.wcToast) window.wcToast('Invite link copied.', 'confident');
+    });
+  }
+  function copyWa() {
+    if (!msg || !window.WheeshtShare) return;
+    window.WheeshtShare.copyText(msg).then(function () {
+      if (window.wcToast) window.wcToast('WhatsApp message copied.', 'confident');
     });
   }
   function shareWa() {
@@ -339,16 +349,32 @@ function InvitePanel() {
     if (!link) return;
     window.open(link, '_blank', 'noopener');
   }
+  function downloadPoster() {
+    if (!window.WheeshtShare || !league) return;
+    window.WheeshtShare.shareInvitePoster(league);
+  }
   if (!code) return null;
   return (
     <Ca flat style={{ marginBottom: 12 }}>
-      <div className="dh" style={{ fontSize: 17, marginBottom: 6 }}>Invite link</div>
-      <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--ink2)', lineHeight: 1.4, marginBottom: 8 }}>Share this with players — they'll land on join with the code prefilled.</div>
+      <div className="dh" style={{ fontSize: 17, marginBottom: 6 }}>Share kit</div>
+      <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--ink2)', lineHeight: 1.4, marginBottom: 8 }}>Share this link — previews show your league name in WhatsApp and iMessage.</div>
       <div style={{ wordBreak: 'break-all', fontSize: 12, fontWeight: 700, background: 'var(--bg)', border: '2px solid var(--line)', borderRadius: 11, padding: '10px 12px', marginBottom: 10 }}>{link}</div>
+      {qrSrc && <div style={{ textAlign: 'center', marginBottom: 12 }}>
+        <img src={qrSrc} alt="QR code for invite link" width={160} height={160} style={{ border: '2.5px solid var(--ink)', borderRadius: 12, background: '#fff' }} />
+      </div>}
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
+        {Object.keys(templates).map(function (key) {
+          return <button key={key} type="button" onClick={function () { setVariant(key); }}
+            className={'wc-btn wc-btn--sm' + (variant === key ? ' wc-btn--ink' : ' wc-btn--ghost')}>{key}</button>;
+        })}
+      </div>
+      <div style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--ink2)', lineHeight: 1.45, background: 'var(--bg)', border: '2px solid var(--line)', borderRadius: 11, padding: '10px 12px', marginBottom: 10, whiteSpace: 'pre-wrap' }}>{msg}</div>
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
         <button onClick={copyLink} className="wc-btn wc-btn--sm wc-btn--ink">Copy link</button>
+        <button onClick={copyWa} className="wc-btn wc-btn--sm">Copy WhatsApp message</button>
         <button onClick={shareWa} className="wc-btn wc-btn--sm">WhatsApp</button>
-        <button onClick={preview} className="wc-btn wc-btn--sm">Preview as new player</button>
+        <button onClick={downloadPoster} className="wc-btn wc-btn--sm">Download poster</button>
+        <button onClick={preview} className="wc-btn wc-btn--sm wc-btn--ghost">Preview link</button>
       </div>
     </Ca>
   );

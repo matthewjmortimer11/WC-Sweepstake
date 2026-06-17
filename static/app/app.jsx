@@ -287,6 +287,60 @@ function AccountSignIn(props){
   </div>;
 }
 
+function TellTheGroupSheet(props){
+  const league = props.league || {};
+  const copy = window.WheeshtCopy || {};
+  const link = window.WheeshtShare ? window.WheeshtShare.inviteUrl(league.code) : '';
+  const msg = window.WheeshtShare ? window.WheeshtShare.buildInviteMessage(league) : '';
+  const chrome = window.wcSheetChrome(78);
+  function copyLink(){
+    if(!window.WheeshtShare) return;
+    window.WheeshtShare.copyText(link).then(function(){
+      window.wcToast && window.wcToast('Link copied.', 'confident');
+    });
+  }
+  function shareWa(){
+    if(!window.WheeshtShare) return;
+    window.open(window.WheeshtShare.whatsappUrl(msg), '_blank', 'noopener');
+  }
+  function shareNative(){
+    if(!window.WheeshtShare) return;
+    window.WheeshtShare.shareViaWebShare({ text: msg, url: link });
+  }
+  function shareImg(){
+    if(!window.WheeshtShare) return;
+    window.WheeshtShare.shareInvitePoster(league);
+  }
+  return <div style={chrome.wrap}>
+    <div onClick={props.onClose} style={chrome.backdrop}/>
+    <div className={chrome.cls} style={chrome.sheet}>
+      {!chrome.deck && <div style={{width:44,height:5,borderRadius:3,background:'var(--line)',margin:'0 auto 14px'}}/>}
+      <div className="dh" style={{fontSize:22}}>{copy.inviteSheetTitle || copy.inviteCta || 'Tell the group'}</div>
+      <div style={{fontSize:13,fontWeight:600,color:'var(--ink2)',marginTop:6,lineHeight:1.4}}>{copy.inviteSheetHint || copy.inviteHint}</div>
+      <div style={{wordBreak:'break-all',fontSize:12,fontWeight:700,background:'var(--bg)',border:'2px solid var(--line)',borderRadius:11,padding:'10px 12px',marginTop:14}}>{link}</div>
+      <div style={{display:'flex',flexDirection:'column',gap:8,marginTop:14}}>
+        <button onClick={copyLink} className="wc-btn wc-btn--block wc-btn--ink" style={{boxShadow:'0 4px 0 var(--ink)'}}>Copy invite link</button>
+        <button onClick={shareWa} className="wc-btn wc-btn--block">Send on WhatsApp</button>
+        <button onClick={shareNative} className="wc-btn wc-btn--block wc-btn--ghost">Share…</button>
+        <button onClick={shareImg} className="wc-btn wc-btn--block wc-btn--ghost">Share poster image</button>
+      </div>
+      <button onClick={props.onClose} style={{width:'100%',marginTop:12,border:'none',background:'none',cursor:'pointer',fontSize:12.5,fontWeight:800,color:'var(--ink2)'}}>Not now</button>
+    </div>
+  </div>;
+}
+
+function InstallNudge(props){
+  const copy = window.WheeshtCopy || {};
+  return <div style={{position:'fixed',bottom:72,left:12,right:12,zIndex:190,maxWidth:420,margin:'0 auto',background:'#fff',border:'2.5px solid var(--ink)',borderRadius:16,padding:'12px 14px',boxShadow:'0 6px 0 var(--ink)'}}>
+    <div className="dh" style={{fontSize:16}}>{copy.installTitle || 'Add Wheesht to your home screen'}</div>
+    <div style={{fontSize:12.5,fontWeight:600,color:'var(--ink2)',marginTop:4,lineHeight:1.35}}>{copy.installHint || 'One tap for matchday.'}</div>
+    <div style={{display:'flex',gap:8,marginTop:10}}>
+      <button onClick={props.onInstall} className="wc-btn wc-btn--sm wc-btn--ink" style={{flex:1}}>Install</button>
+      <button onClick={props.onDismiss} className="wc-btn wc-btn--sm wc-btn--ghost">{copy.installDismiss || 'Not now'}</button>
+    </div>
+  </div>;
+}
+
 /* ===========================================================================
    DESKTOP DECK — full-screen "matchday desk" layout. A toggle (top-right)
    flips between this and the classic floating-phone mockup. The same React
@@ -459,6 +513,9 @@ function App(){
   const [wide,setWide]=aState(wideNow);
   const [,tick]=aState(0);
   const [t,setTweak]=window.useTweaks(TW_DEFAULTS);
+  const [tellGroup,setTellGroup]=aState(null);
+  const [showInstall,setShowInstall]=aState(false);
+  const installPromptRef=React.useRef(null);
   function refreshStore(){
     if(!A_S.refresh) return null;
     const p=A_S.refresh();
@@ -469,6 +526,28 @@ function App(){
   // re-render on any store change
   aEffect(()=>A_S.subscribe(()=>tick(x=>x+1)),[]);
   aEffect(()=>{ refreshStore(); },[]);
+  aEffect(function(){
+    if (typeof window === 'undefined' || !window.matchMedia) return;
+    if (window.matchMedia('(display-mode: standalone)').matches) return;
+    function onPrompt(e){
+      e.preventDefault();
+      installPromptRef.current = e;
+      window.__wcInstallPrompt = e;
+      tick(function(x){ return x + 1; });
+    }
+    window.addEventListener('beforeinstallprompt', onPrompt);
+    return function(){ window.removeEventListener('beforeinstallprompt', onPrompt); };
+  },[]);
+  aEffect(function(){
+    if (flow !== 'app') return;
+    if (A_S.quietMode && A_S.quietMode()) return;
+    try {
+      if (localStorage.getItem('wheesht_install_dismissed') === '1') return;
+      var n = parseInt(localStorage.getItem('wheesht_visits') || '0', 10) + 1;
+      localStorage.setItem('wheesht_visits', String(n));
+      if (n >= 2 && installPromptRef.current) setShowInstall(true);
+    } catch (e) {}
+  },[flow]);
   aEffect(function(){
     if (joinBoot.current && (joinBoot.current.join || joinBoot.current.demo)) {
       try {
@@ -528,12 +607,22 @@ function App(){
   },[flow, me && me.predScore]);
   aEffect(()=>{
     if(!A_S.live || !A_S.refresh) return;
+    function pollMs(){
+      try {
+        var m = window.WC && window.WC.meta;
+        if (m && Number(m.liveFixtures || 0) > 0) return 15000;
+      } catch (e) {}
+      return 45000;
+    }
     const refreshVisible=()=>{ if(!document.hidden) refreshStore(); };
-    const timer=setInterval(refreshVisible,45000);
+    let timer=setInterval(refreshVisible, pollMs());
+    const retune=()=>{ clearInterval(timer); timer=setInterval(refreshVisible, pollMs()); };
+    const sub=A_S.subscribe && A_S.subscribe(retune);
     document.addEventListener('visibilitychange', refreshVisible);
     window.addEventListener('focus', refreshVisible);
     return ()=>{
       clearInterval(timer);
+      if(sub) sub();
       document.removeEventListener('visibilitychange', refreshVisible);
       window.removeEventListener('focus', refreshVisible);
     };
@@ -790,7 +879,7 @@ function App(){
 
   // -------- onboarding / identity flow --------
   if(flow==='gate') return <React.Fragment>
-    {frame(<window.AccountGate onResume={resumeAccount} onJoin={()=>{setOrganiser(false);setFlow('join');}} onCreate={()=>{setOrganiser(true);setFlow('create');}}/>)}
+    {frame(<window.AccountGate onResume={resumeAccount} onJoin={()=>{setOrganiser(false);setFlow('join');}} onCreate={()=>{setOrganiser(true);setFlow('create');}} onDemo={()=>setFlow('demo')}/>)}
     {viewToggle}<window.ToastLayer/><window.ConfettiLayer/><AppSystemEffects/>
   </React.Fragment>;
   if(flow==='join') return <React.Fragment>
@@ -830,7 +919,13 @@ function App(){
   return <React.Fragment>
     {A_S.isDemoMode && A_S.isDemoMode() && <div className="wc-demo-banner" style={{position:'fixed',top:0,left:0,right:0,zIndex:200}}>
       <span>{(window.WheeshtCopy && window.WheeshtCopy.demoBanner) || 'Sample league — read only.'}</span>
-      <button onClick={function(){ A_S.exitDemoMode && A_S.exitDemoMode(); setFlow('gate'); }}>{(window.WheeshtCopy && window.WheeshtCopy.demoCta) || 'Start your own'}</button>
+      <button onClick={function(){
+        A_S.exitDemoMode && A_S.exitDemoMode();
+        var c = window.WheeshtCopy || {};
+        window.wcToast && window.wcToast(c.demoExitToast || 'Like what you saw? Create yours in two minutes.', 'confident');
+        setOrganiser(true);
+        setFlow('create');
+      }}>{(window.WheeshtCopy && window.WheeshtCopy.demoCta) || 'Start your own league'}</button>
     </div>}
     {deck
       ? <DeckShell me={me} tab={tab} setTab={setTab} chatBadge={chatBadge}
@@ -857,16 +952,36 @@ function App(){
       onAdmin={()=>{setAccount(false);setAdmin(true);}}/>}
 
     {draw && <window.DrawMoment participant={draw.participant} forceTeam={draw.forceTeam}
-      onDone={()=>{ const wasReplay=draw.replay; const p=draw.participant; setDraw(null); if(!wasReplay){ setTab('me'); setTimeout(()=>window.wcConfetti&&window.wcConfetti({y:.4}),200);
-        if(window.WheeshtShare&&p&&!wasReplay){
-          setTimeout(function(){
-            var lg=A_S.activeLeague&&A_S.activeLeague();
-            if(lg&&window.confirm('Tell the group about the league?')) window.WheeshtShare.shareViaWebShare({ text: window.WheeshtShare.buildInviteMessage(lg) });
-          },1200);
-        }
+      onDone={()=>{ const wasReplay=draw.replay; setDraw(null); if(!wasReplay){ setTab('me'); setTimeout(()=>window.wcConfetti&&window.wcConfetti({y:.4}),200);
+        setTimeout(function(){
+          var lg=A_S.activeLeague&&A_S.activeLeague();
+          if(lg) setTellGroup(lg);
+          try {
+            if (!localStorage.getItem('wheesht_install_dismissed') && installPromptRef.current && !(A_S.quietMode && A_S.quietMode())) {
+              setShowInstall(true);
+            }
+          } catch (e) {}
+        },1200);
       } }}/>}
     {admin && <window.AdminGate onClose={closeAdmin}/>}
     {dev && <window.DevConsole onClose={()=>setDev(false)} onAdmin={devAdmin}/>}
+    {tellGroup && <TellTheGroupSheet league={tellGroup} onClose={()=>setTellGroup(null)}/>}
+    {showInstall && installPromptRef.current && !(A_S.quietMode && A_S.quietMode()) && <InstallNudge
+      onDismiss={function(){
+        try { localStorage.setItem('wheesht_install_dismissed', '1'); } catch (e) {}
+        setShowInstall(false);
+      }}
+      onInstall={function(){
+        var ev = installPromptRef.current;
+        if (!ev) return;
+        ev.prompt();
+        ev.userChoice.then(function(){
+          installPromptRef.current = null;
+          window.__wcInstallPrompt = null;
+          setShowInstall(false);
+        });
+      }}
+    />}
     {signInModal}
 
     <window.ToastLayer/>

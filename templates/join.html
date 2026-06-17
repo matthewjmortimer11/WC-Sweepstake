@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>{{TITLE}}</title>
+<meta name="description" content="{{DESCRIPTION}}" />
+<link rel="canonical" href="{{CANONICAL}}" />
+<meta property="og:type" content="website" />
+<meta property="og:title" content="{{TITLE}}" />
+<meta property="og:description" content="{{DESCRIPTION}}" />
+<meta property="og:image" content="{{OG_IMAGE}}" />
+<meta property="og:url" content="{{CANONICAL}}" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="{{TITLE}}" />
+<meta name="twitter:description" content="{{DESCRIPTION}}" />
+<meta name="twitter:image" content="{{OG_IMAGE}}" />
+<meta name="theme-color" content="#F5C800" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@700;800&family=Hanken+Grotesk:wght@600;700&display=swap" rel="stylesheet" />
+<style>
+:root { --bg:#F4EEE3; --ink:#1A1A1A; --ink2:#5A554C; --yellow:#F5C800; --disp:'Bricolage Grotesque',sans-serif; --body:'Hanken Grotesk',sans-serif; }
+*{box-sizing:border-box}
+body{margin:0;font-family:var(--body);color:var(--ink);background:radial-gradient(120% 90% at 50% 0%,#2b2925 0%,#1a1916 80%);min-height:100vh;padding:28px 18px 40px;display:flex;align-items:center;justify-content:center}
+.card{max-width:420px;width:100%;background:var(--bg);border:3px solid var(--ink);border-radius:24px;padding:28px 24px;box-shadow:0 10px 0 var(--ink);text-align:center}
+h1{font-family:var(--disp);font-size:28px;margin:0 0 8px;line-height:1.05}
+.lead{font-size:15px;font-weight:600;color:var(--ink2);line-height:1.45;margin:0 0 20px}
+.code{font-family:var(--disp);font-size:22px;letter-spacing:.12em;background:#fff;border:2.5px solid var(--ink);border-radius:12px;padding:10px;margin:0 0 18px}
+a.btn{display:block;text-decoration:none;font-family:var(--disp);font-weight:800;font-size:16px;padding:14px;border-radius:14px;border:2.5px solid var(--ink);box-shadow:0 5px 0 var(--ink);background:var(--yellow);color:var(--ink)}
+.hint{font-size:12px;font-weight:600;color:var(--ink2);margin-top:14px}
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>{{HEADING}}</h1>
+  <p class="lead">{{DESCRIPTION}}</p>
+  <div class="code">{{CODE}}</div>
+  <a class="btn" href="{{APP_URL}}">Join on Wheesht →</a>
+  <p class="hint">You'll need the member password from your organiser.</p>
+</div>
+</body>
+</html>
