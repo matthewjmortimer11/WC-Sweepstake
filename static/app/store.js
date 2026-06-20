@@ -785,6 +785,174 @@
       return fetch('/api/dev/leagues', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: key }) })
         .then(function (r) { return r.json().then(function (j) { if (!r.ok) throw new Error(j.detail || 'Developer access denied'); return j; }); });
     },
+    // Organiser backup: full league snapshot as JSON (no secrets). Organiser-only.
+    exportLeague: function () {
+      if (!LIVE) return Promise.reject(new Error('Export only works on the server'));
+      var c = leagueCode();
+      if (!c) return Promise.reject(new Error('Join a league first'));
+      return fetch(api('/export'), { headers: adminHeaders({}), cache: 'no-store' }).then(parseJson);
+    },
+    exportCsv: function (kind) {
+      if (!LIVE) return Promise.reject(new Error('Export only works on the server'));
+      var c = leagueCode();
+      if (!c) return Promise.reject(new Error('Join a league first'));
+      var path = kind === 'predictions' ? '/export/predictions.csv' : '/export/entrants.csv';
+      return fetch(api(path), { headers: adminHeaders({}), cache: 'no-store' }).then(function (r) {
+        return r.text().then(function (text) {
+          if (!r.ok) throw new Error(text || 'Export failed');
+          return text;
+        });
+      });
+    },
+    duplicateLeague: function (payload) {
+      if (!LIVE) return Promise.reject(new Error('Duplicate only works on the server'));
+      var c = leagueCode();
+      if (!c) return Promise.reject(new Error('Join a league first'));
+      return fetch(api('/duplicate'), {
+        method: 'POST', headers: adminHeaders(), body: JSON.stringify(payload || {}),
+      }).then(parseJson);
+    },
+    trackEvent: trackEvent,
+    hasPro: function () { return !!(WC.meta && WC.meta.hasPro); },
+    proGrandfathered: function () { return !!(WC.meta && WC.meta.proGrandfathered); },
+    proUpgradeAvailable: function () { return !!(WC.meta && WC.meta.proUpgradeAvailable); },
+    startProCheckout: function (paths) {
+      paths = paths || {};
+      if (!LIVE || !leagueCode()) return Promise.reject(new Error('Checkout requires a live league'));
+      return fetch(api('/pro/checkout'), {
+        method: 'POST',
+        headers: adminHeaders(),
+        body: JSON.stringify({
+          successPath: paths.successPath || '/',
+          cancelPath: paths.cancelPath || '/',
+        }),
+      }).then(parseJson).then(function (j) {
+        if (j && j.url) {
+          trackEvent('pro_checkout_started');
+          window.location.href = j.url;
+        }
+        return j;
+      });
+    },
+    finalizeDraw: finalizeDraw,
+    fetchAnalytics: function () {
+      if (!LIVE) {
+        var people = cache;
+        return Promise.resolve({
+          entrants: { total: people.length, withPassword: people.filter(function (p) { return p.hasPassword; }).length, withTeam: people.filter(function (p) { return p.team; }).length },
+          chat: { total: 0, last7d: 0 },
+          predictions: [],
+          recentActivity: Store.adminAudit().slice(0, 5),
+        });
+      }
+      var c = leagueCode();
+      if (!c) return Promise.resolve(null);
+      return fetch(api('/analytics'), { headers: adminHeaders({}), cache: 'no-store' }).then(parseJson);
+    },
+    saveStatus: function () { return saveStatus; },
+    subscribeSaveStatus: function (fn) {
+      saveSubs.push(fn);
+      return function () { saveSubs = saveSubs.filter(function (f) { return f !== fn; }); };
+    },
+    isDemoMode: function () { return !!window.WC_DEMO_MODE; },
+    enterDemoMode: function () {
+      window.WC_DEMO_MODE = true;
+      var def = WC.league || { code: 'OI', name: 'The Office Sweepstake', seeded: true };
+      setActiveLeague(def);
+      return Store.refresh().then(function () { rebuild(); emit(); });
+    },
+    exitDemoMode: function () {
+      window.WC_DEMO_MODE = false;
+      lsSet(K.league, null);
+      lsSet(K.active, null);
+      rebuild(); emit();
+    },
+    isReadOnly: function () { return !!window.WC_DEMO_MODE; },
+    quietMode: function () {
+      try { return localStorage.getItem('wheesht_quiet') === '1'; } catch (e) { return false; }
+    },
+    setQuietMode: function (on) {
+      try { localStorage.setItem('wheesht_quiet', on ? '1' : '0'); } catch (e) {}
+      emit();
+    },
+    snapshotPredRanks: function () {
+      var snap = {};
+      rankedByPred().forEach(function (p) { snap[p.id] = p.predRank; });
+      try { lsSet('wheesht_pred_ranks', snap); } catch (e) {}
+      return snap;
+    },
+    prevPredRanks: function () {
+      try { return lsGet('wheesht_pred_ranks', {}); } catch (e) { return {}; }
+    },
+    detectOvertakes: function (meId) {
+      if (!meId) return [];
+      var prev = Store.prevPredRanks();
+      var now = rankedByPred();
+      var me = now.find(function (p) { return p.id === meId; });
+      if (!me || !prev[meId]) return [];
+      var overtook = [];
+      now.forEach(function (p) {
+        if (p.id === meId) return;
+        var was = prev[p.id];
+        if (!was) return;
+        if (was < me.predRank && p.predRank > me.predRank) overtook.push(p);
+      });
+      return overtook;
+    },
+    // Organiser-initiated permanent deletion of the active league. Requires the
+    // organiser token (sent via adminHeaders) plus exact code + name match.
+    deleteLeague: function (confirmCode, confirmName) {
+      if (!LIVE) return Promise.reject(new Error('League deletion only works on the server'));
+      var code = leagueCode();
+      if (!code) return Promise.reject(new Error('Join a league first'));
+      return fetch(api(''), {
+        method: 'DELETE', headers: adminHeaders({}),
+        body: JSON.stringify({ confirmCode: confirmCode || '', confirmName: confirmName || '' }),
+      }).then(function (r) {
+        return r.json().then(function (j) {
+          if (!r.ok) throw new Error((j && j.detail) || 'Could not delete league');
+          lsSet(K.league, null);
+          lsSet(K.active, null);
+          rebuild(); emit();
+          return j;
+        });
+      });
+    },
+    devDeleteLeague: function (key, league, confirmCode, confirmName) {
+      if (!LIVE) return Promise.reject(new Error('League deletion only works on the server'));
+      var code = league && league.code;
+      if (!code) return Promise.reject(new Error('Pick a league first'));
+      return fetch('/api/dev/leagues/' + encodeURIComponent(code), {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key: key, confirmCode: confirmCode, confirmName: confirmName })
+      }).then(function (r) {
+        return r.json().then(function (j) {
+          if (!r.ok) throw new Error(j.detail || 'Could not delete league');
+          var active = activeLeague();
+          if (active && active.code === code) {
+            lsSet(K.league, null);
+            lsSet(K.active, null);
+            rebuild(); emit();
+          }
+          return j;
+        });
+      });
+    },
+    devGrantPro: function (key, code, revoke) {
+      if (!LIVE) return Promise.reject(new Error('Pro grant only works on the server'));
+      if (!code) return Promise.reject(new Error('No league code'));
+      var url = '/api/leagues/' + encodeURIComponent(code) + '/pro/' + (revoke ? 'revoke' : 'grant');
+      return fetch(url, {
+        method: 'POST',
+        headers: { 'X-Wheesht-Dev-Key': key },
+      }).then(function (r) {
+        return r.json().then(function (j) {
+          if (!r.ok) throw new Error(j.detail || 'Pro grant failed');
+          return j;
+        });
+      });
+    },
     // Make any league active (no password — dev only) and pull its state.
     // Passing null clears the active league. Used to enter and to restore.
     devEnterLeague: function (L) {

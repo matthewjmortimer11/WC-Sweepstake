@@ -952,6 +952,187 @@ async def delete_participant(
         raise HTTPException(status_code=404, detail="participant not found")
 
 
+class ProCheckoutPayload(BaseModel):
+    successPath: str = "/"
+    cancelPath: str = "/"
+
+
+async def _complete_pro_purchase(
+    session,
+    *,
+    league_id: str,
+    amount_pence: int,
+    currency: str,
+    checkout_session_id: str,
+    payment_intent_id: Optional[str] = None,
+) -> None:
+    league = await session.get(League, league_id)
+    if league is None:
+        return
+    existing = await session.scalar(
+        select(LeaguePurchase).where(LeaguePurchase.stripe_checkout_session_id == checkout_session_id)
+    )
+    if existing and existing.status == "paid" and (league.pro_status or "free") == "pro":
+        return
+    if existing:
+        purchase = existing
+    else:
+        purchase = LeaguePurchase(
+            id=uuid.uuid4().hex,
+            league_id=league_id,
+            product="pro",
+            amount_pence=amount_pence,
+            currency=currency,
+            status="paid",
+            stripe_checkout_session_id=checkout_session_id,
+            stripe_payment_intent_id=payment_intent_id,
+            created_at=_now(),
+            paid_at=_now(),
+        )
+        session.add(purchase)
+    purchase.status = "paid"
+    purchase.paid_at = _now()
+    if payment_intent_id:
+        purchase.stripe_payment_intent_id = payment_intent_id
+    league.pro_status = "pro"
+    league.pro_purchased_at = _now()
+    _log_audit(session, league_id, "pro_purchased", "organiser", detail=str(amount_pence))
+
+
+@app.post("/api/leagues/{code}/pro/checkout")
+async def create_pro_checkout(
+    code: str,
+    payload: ProCheckoutPayload,
+    request: Request,
+    x_wheesht_admin_token: Optional[str] = Header(None, alias="X-Wheesht-Admin-Token"),
+):
+    if not _pro_checkout_configured():
+        raise HTTPException(status_code=503, detail="Pro checkout is not configured on this server")
+    stripe = _stripe_client()
+    async with AsyncSessionLocal() as session:
+        league = await _get_league_by_code(session, code.upper())
+        if league is None:
+            raise HTTPException(status_code=404, detail="league not found")
+        await _require_admin(session, league, x_wheesht_admin_token)
+        if _league_has_pro(league):
+            return {"ok": True, "alreadyPro": True}
+        base = _public_base(request)
+        success = (payload.successPath or "/").strip() or "/"
+        cancel = (payload.cancelPath or "/").strip() or "/"
+        if not success.startswith("/"):
+            success = "/" + success
+        if not cancel.startswith("/"):
+            cancel = "/" + cancel
+        checkout = stripe.checkout.Session.create(
+            mode="payment",
+            payment_method_types=["card"],
+            line_items=_pro_line_items(league),
+            success_url=f"{base}{success}?pro=success&session_id={{CHECKOUT_SESSION_ID}}",
+            cancel_url=f"{base}{cancel}?pro=cancelled",
+            metadata={
+                "purchase_type": "pro",
+                "league_id": league.id,
+                "league_code": league.code,
+            },
+        )
+        session.add(LeaguePurchase(
+            id=uuid.uuid4().hex,
+            league_id=league.id,
+            product="pro",
+            amount_pence=_STRIPE_PRO_AMOUNT_PENCE or 0,
+            currency="gbp",
+            status="pending",
+            stripe_checkout_session_id=checkout.id,
+            created_at=_now(),
+        ))
+        await session.commit()
+        return {"ok": True, "url": checkout.url, "sessionId": checkout.id}
+
+
+@app.post("/api/leagues/{code}/pro/grant")
+async def grant_pro_league(
+    code: str,
+    x_wheesht_dev_key: Optional[str] = Header(None, alias="X-Wheesht-Dev-Key"),
+):
+    if not _dev_key_ok(x_wheesht_dev_key or ""):
+        raise HTTPException(status_code=403, detail="forbidden")
+    async with AsyncSessionLocal() as session:
+        league = await _get_league_by_code(session, code.upper())
+        if league is None:
+            raise HTTPException(status_code=404, detail="league not found")
+        league.pro_status = "pro"
+        league.pro_purchased_at = _now()
+        _log_audit(session, league.id, "pro_granted", "dev", detail="Dev grant")
+        await session.commit()
+        return {"ok": True, "proStatus": "pro"}
+
+
+@app.post("/api/leagues/{code}/pro/revoke")
+async def revoke_pro_league(
+    code: str,
+    x_wheesht_dev_key: Optional[str] = Header(None, alias="X-Wheesht-Dev-Key"),
+):
+    if not _dev_key_ok(x_wheesht_dev_key or ""):
+        raise HTTPException(status_code=403, detail="forbidden")
+    async with AsyncSessionLocal() as session:
+        league = await _get_league_by_code(session, code.upper())
+        if league is None:
+            raise HTTPException(status_code=404, detail="league not found")
+        league.pro_status = "free"
+        league.pro_purchased_at = None
+        _log_audit(session, league.id, "pro_revoked", "dev", detail="Dev revoke")
+        await session.commit()
+        return {"ok": True, "proStatus": "free"}
+
+
+@app.post("/stripe/webhook")
+async def stripe_webhook(request: Request):
+    if not _STRIPE_WEBHOOK_SECRET:
+        raise HTTPException(status_code=503, detail="Webhook not configured")
+    stripe = _stripe_client()
+    payload = await request.body()
+    sig = request.headers.get("stripe-signature", "")
+    try:
+        event = stripe.Webhook.construct_event(payload, sig, _STRIPE_WEBHOOK_SECRET)
+    except Exception as exc:
+        log.warning("Stripe webhook verify failed: %s", exc)
+        raise HTTPException(status_code=400, detail="Invalid signature") from exc
+
+    if event["type"] == "checkout.session.completed":
+        sess = event["data"]["object"]
+        meta = sess.get("metadata") or {}
+        if meta.get("purchase_type") == "pro" and meta.get("league_id"):
+            amount = int(sess.get("amount_total") or 0)
+            currency = str(sess.get("currency") or "gbp")
+            async with AsyncSessionLocal() as session:
+                await _complete_pro_purchase(
+                    session,
+                    league_id=str(meta.get("league_id")),
+                    amount_pence=amount,
+                    currency=currency,
+                    checkout_session_id=str(sess.get("id") or ""),
+                    payment_intent_id=str(sess.get("payment_intent") or "") or None,
+                )
+                await session.commit()
+    elif event["type"] == "charge.refunded":
+        charge = event["data"]["object"]
+        pi = str(charge.get("payment_intent") or "")
+        if pi:
+            async with AsyncSessionLocal() as session:
+                purchase = await session.scalar(
+                    select(LeaguePurchase).where(LeaguePurchase.stripe_payment_intent_id == pi)
+                )
+                if purchase:
+                    purchase.status = "refunded"
+                    league = await session.get(League, purchase.league_id)
+                    if league and not _league_is_grandfathered(league):
+                        league.pro_status = "free"
+                        league.pro_purchased_at = None
+                    _log_audit(session, purchase.league_id, "pro_refunded", "system")
+                    await session.commit()
+    return {"received": True}
+
+
 class PickPayload(BaseModel):
     key: str
     value: Any
