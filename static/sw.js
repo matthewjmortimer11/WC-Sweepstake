@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'wheesht-pwa-20260620-bugfix-1';
+const CACHE_VERSION = 'wheesht-pwa-20260620-bugfix-2';
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const PAGE_CACHE = `${CACHE_VERSION}-pages`;
 

@@ -15,6 +15,10 @@ function fixtureDone(f) {
   var st = String((f && f.status) || '').toLowerCase();
   return ['done', 'ft', 'fulltime', 'full_time', 'full-time', 'finished'].indexOf(st) >= 0;
 }
+function ownerName(code) {
+  var o = (WC.ownersOf && WC.ownersOf(code)) || [];
+  return o.length ? o[0].name : 'nobody';
+}
 function nextFixtureForTeam(teamCode) {
   return (WC.FIXTURES || []).find(function (f) {
     return (f.a === teamCode || f.b === teamCode) && !fixtureDone(f);
@@ -150,8 +154,8 @@ function BracketSnapshot(props){
       <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
         {WC.R16.map(tie=>{
           const A=WC.TEAMS[tie.a],B=WC.TEAMS[tie.b];
-          const aw = tie.done && tie.score[0]>tie.score[1];
-          const bw = tie.done && tie.score[1]>tie.score[0];
+          const aw = tie.done && tie.score && tie.score[0]>tie.score[1];
+          const bw = tie.done && tie.score && tie.score[1]>tie.score[0];
           return (
             <div key={tie.id} style={{border:tie.you?'2.5px solid var(--ink)':'2px solid var(--line)',borderRadius:12,padding:'7px 9px',background:tie.you?'var(--yellow)':'#fff'}}>
               <Row team={A} score={tie.done?tie.score[0]:null} lose={bw}/>

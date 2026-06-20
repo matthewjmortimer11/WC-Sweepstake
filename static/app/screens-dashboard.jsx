@@ -85,7 +85,9 @@ function overallRank(me) {
   const rows = Sd.allSync().slice().sort((a, b) => {
     const ta = dashTeam(a.team), tb = dashTeam(b.team);
     if (tb.rounds !== ta.rounds) return tb.rounds - ta.rounds;
-    return parseInt(String(ta.odds).slice(1) || '0') - parseInt(String(tb.odds).slice(1) || '0');
+    const oa = parseInt(String(ta.odds || '0').replace(/[^0-9]/g, ''), 10);
+    const ob = parseInt(String(tb.odds || '0').replace(/[^0-9]/g, ''), 10);
+    return (isFinite(oa) ? oa : 999999) - (isFinite(ob) ? ob : 999999);
   });
   const i = rows.findIndex(p => p.id === me.id);
   return { rank: i < 0 ? rows.length : i + 1, total: rows.length };

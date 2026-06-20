@@ -29,19 +29,26 @@
     var s = size || 240;
     return 'https://api.qrserver.com/v1/create-qr-code/?size=' + s + 'x' + s + '&data=' + encodeURIComponent(url || '');
   }
-  function copyText(text) {
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      return navigator.clipboard.writeText(text).then(function () { return true; });
-    }
+  function legacyCopy(text) {
     var ta = document.createElement('textarea');
     ta.value = text;
     ta.style.position = 'fixed';
     ta.style.left = '-9999px';
     document.body.appendChild(ta);
     ta.select();
-    try { document.execCommand('copy'); } catch (e) {}
+    var ok = false;
+    try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
     document.body.removeChild(ta);
-    return Promise.resolve(true);
+    return ok;
+  }
+  function copyText(text) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      // The async clipboard API rejects on permission denial / insecure context;
+      // fall back to the textarea method instead of leaking an unhandled rejection.
+      return navigator.clipboard.writeText(text).then(function () { return true; })
+        .catch(function () { return legacyCopy(text); });
+    }
+    return Promise.resolve(legacyCopy(text));
   }
   function shareViaWebShare(opts) {
     opts = opts || {};
@@ -119,7 +126,7 @@
       if (!blob) throw new Error('Could not render poster');
       var file = new File([blob], 'wheesht-invite.png', { type: 'image/png' });
       if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
-        return navigator.share({ files: [file], title: 'Join ' + (league.name || 'Wheesht') });
+        return navigator.share({ files: [file], title: 'Join ' + ((league && league.name) || 'Wheesht') });
       }
       var url = URL.createObjectURL(blob);
       var a = document.createElement('a');

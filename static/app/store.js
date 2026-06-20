@@ -293,20 +293,23 @@
     return Promise.resolve({ ok: true });
   }
   // After any admin edit: LIVE → push + re-pull resolved state; MOCK → apply locally.
+  // Resolves to true when the change was persisted, false if the save failed.
+  // Callers that announce a change in chat gate the announcement on this.
   function commitAdmin() {
-    if (window.WC_DEMO_MODE) return Promise.resolve();
+    if (window.WC_DEMO_MODE) return Promise.resolve(false);
     var nextAdmin = JSON.parse(JSON.stringify(admin));
     if (LIVE) {
       return trackSave(function () {
         return persistAdmin(nextAdmin).then(function () { return Store.refresh(); });
-      }, 'Could not save organiser settings').catch(function (e) {
+      }, 'Could not save organiser settings').then(function () { return true; }).catch(function (e) {
         toastError(e, 'Could not save organiser settings');
+        return false;
       });
     }
     applyAdmin(); persistAdmin(nextAdmin); rebuild(); emit();
     setSaveStatus('saved');
     setTimeout(function () { if (saveStatus.state === 'saved') setSaveStatus('idle'); }, 2400);
-    return Promise.resolve();
+    return Promise.resolve(true);
   }
 
   if (!LIVE) applyAdmin();
@@ -1364,8 +1367,9 @@
         delete admin.meta.predDeadline;
         chatText = ['The prediction deadline has been cleared. Picks are open until further notice. Wheesht is watching.', 'mischievous'];
       }
-      commitAdmin();
-      if (chatText) postWheeshtChat(chatText[0], chatText[1]);
+      commitAdmin().then(function (ok) {
+        if (ok && chatText) postWheeshtChat(chatText[0], chatText[1]);
+      });
     },
     hiddenPredictions: function () {
       return (admin.meta && Array.isArray(admin.meta.hiddenPredictions)) ? admin.meta.hiddenPredictions : BASE.meta.hiddenPredictions;
@@ -1378,8 +1382,8 @@
       if (idx >= 0) { hidden.splice(idx, 1); nowHidden = false; }
       else { hidden.push(key); nowHidden = true; }
       admin.meta.hiddenPredictions = hidden;
-      commitAdmin();
-      if (!nowHidden) {
+      commitAdmin().then(function (ok) {
+        if (!ok || nowHidden) return;
         var mkt = (WC.PREDICTIONS || []).find(function (m) { return m.key === key; });
         var deadline = admin.meta && admin.meta.predDeadline;
         var afterDeadline = deadline && new Date() > new Date(deadline);
@@ -1387,7 +1391,7 @@
         if (afterDeadline) msg += ' The old deadline has passed, so make the call now.';
         postWheeshtChat(msg, 'mischievous');
         if (window.wcToast) window.wcToast('Prediction opened: ' + (mkt ? mkt.q : key), 'mischievous');
-      }
+      });
     },
     setCharitySplit: function (split) {
       var n = Math.max(0, Math.min(1, Number(split)));

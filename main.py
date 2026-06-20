@@ -2092,6 +2092,20 @@ async def delete_participant(
                 row.removed = True  # tombstone, keep the row
             else:
                 await session.delete(row)
+            # Clear the entry's identity rows too, otherwise a dangling Profile keeps
+            # its google_id (blocking re-link) and its avatar stays publicly fetchable.
+            await session.execute(
+                delete(ProfileAsset).where(
+                    ProfileAsset.league_id == league.id,
+                    ProfileAsset.participant_id == participant_id,
+                )
+            )
+            await session.execute(
+                delete(Profile).where(
+                    Profile.league_id == league.id,
+                    Profile.participant_id == participant_id,
+                )
+            )
             _log_audit(session, league.id, "participant_removed", "organiser", detail=removed_name)
             await session.commit()
             return {"ok": True}

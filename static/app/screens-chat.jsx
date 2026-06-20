@@ -25,6 +25,7 @@ function ChatScreen() {
   const [asWheesht, setAsWheesht] = cState(false);
   const [mood, setMood] = cState('confident');
   const listRef = cRef(null);
+  const mountedRef = cRef(true);
   const isLive = !!window.WC_LIVE;
   const leagueCode = Sch.leagueCode && Sch.leagueCode();
   const isOrganiser = Sch.hasAdminTokenForActive ? Sch.hasAdminTokenForActive() : false;
@@ -47,19 +48,21 @@ function ChatScreen() {
         return data;
       });
     }).then(function(data) {
+      if (!mountedRef.current) return;
       var arr = Array.isArray(data) ? data : [];
       setMsgs(arr);
       setErr(false);
       if (window.__wcOnChatPoll) window.__wcOnChatPoll(arr);
-    }).catch(function() { setErr(true); });
+    }).catch(function() { if (mountedRef.current) setErr(true); });
   }
 
   cEffect(function() {
     if (!isLive || !leagueCode) return;
+    mountedRef.current = true;
     load();
     scrollBottom();
     var iv = setInterval(load, 15000);
-    return function() { clearInterval(iv); };
+    return function() { mountedRef.current = false; clearInterval(iv); };
   }, [isLive, leagueCode]);
 
   cEffect(function() { scrollBottom(); }, [msgs.length]);
@@ -96,6 +99,7 @@ function ChatScreen() {
         return msg;
       });
     }).then(function(msg) {
+      if (!mountedRef.current) return;
       if (msg && msg.id) setMsgs(function(prev) { return prev.concat([msg]); });
       setText('');
       setBusy(false);
@@ -105,6 +109,7 @@ function ChatScreen() {
       // A 403 means our session token is missing/stale — drop it so the next
       // attempt re-issues one (and a protected entry re-prompts for sign-in).
       if (e && e.status === 403 && !asWheesht && me && Sch.clearSessionToken) Sch.clearSessionToken(me.id);
+      if (!mountedRef.current) return;
       setBusy(false);
       setErr(true);
     });

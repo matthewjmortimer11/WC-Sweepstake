@@ -825,7 +825,8 @@ function App(){
     const seen=new Set((A_WC.FIXTURES||[]).filter(appFixtureDone).map(function(f){ return f.id; }));
     const unsub=A_S.subscribe(function(){
       const newDone=(A_WC.FIXTURES||[]).filter(function(f){
-        return appFixtureDone(f) && !seen.has(f.id) && (f.a===myCode||f.b===myCode);
+        return appFixtureDone(f) && f.score && f.score[0]!=null && f.score[1]!=null
+          && !seen.has(f.id) && (f.a===myCode||f.b===myCode);
       });
       newDone.forEach(function(f){
         seen.add(f.id);
