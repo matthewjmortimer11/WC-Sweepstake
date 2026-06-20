@@ -1229,6 +1229,20 @@
         });
       });
     },
+    devGrantPro: function (key, code, revoke) {
+      if (!LIVE) return Promise.reject(new Error('Pro grant only works on the server'));
+      if (!code) return Promise.reject(new Error('No league code'));
+      var url = '/api/leagues/' + encodeURIComponent(code) + '/pro/' + (revoke ? 'revoke' : 'grant');
+      return fetch(url, {
+        method: 'POST',
+        headers: { 'X-Wheesht-Dev-Key': key },
+      }).then(function (r) {
+        return r.json().then(function (j) {
+          if (!r.ok) throw new Error(j.detail || 'Pro grant failed');
+          return j;
+        });
+      });
+    },
     // Make any league active (no password — dev only) and pull its state.
     // Passing null clears the active league. Used to enter and to restore.
     devEnterLeague: function (L) {

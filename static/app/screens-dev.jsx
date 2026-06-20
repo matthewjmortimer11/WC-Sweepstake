@@ -23,6 +23,7 @@ function DevConsole(props) {
   const [deleteName, setDeleteName] = devState('');
   const [deleteBusy, setDeleteBusy] = devState(false);
   const [deleteErr, setDeleteErr] = devState('');
+  const [proBusy, setProBusy] = devState({});
 
   function authenticate() {
     if (!key.trim() || busy) return;
@@ -38,6 +39,20 @@ function DevConsole(props) {
     return Sdev.devListLeagues(key.trim()).then(function (j) {
       setLeagues((j && j.leagues) || []);
       return j;
+    });
+  }
+
+  function togglePro(L) {
+    if (proBusy[L.code]) return;
+    var revoke = L.proStatus === 'pro';
+    setProBusy(function (p) { return Object.assign({}, p, { [L.code]: true }); });
+    Sdev.devGrantPro(key.trim(), L.code, revoke).then(function (j) {
+      setLeagues(function (prev) {
+        return prev.map(function (x) { return x.code === L.code ? Object.assign({}, x, { proStatus: j.proStatus, hasPro: j.proStatus === 'pro' }) : x; });
+      });
+      setProBusy(function (p) { return Object.assign({}, p, { [L.code]: false }); });
+    }).catch(function () {
+      setProBusy(function (p) { return Object.assign({}, p, { [L.code]: false }); });
     });
   }
 
@@ -138,10 +153,19 @@ function DevConsole(props) {
                     <span className="wc-chip" style={{ fontSize: 11 }}>{L.code}</span>
                     <span style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--ink2)' }}>{L.entrants} entrant{L.entrants === 1 ? '' : 's'}</span>
                     {L.seeded && <span className="wc-chip wc-chip--yellow" style={{ fontSize: 10.5 }}>seeded</span>}
+                    {L.proStatus === 'pro' && <span className="wc-chip wc-chip--yellow" style={{ fontSize: 10.5 }}>⚡ Pro</span>}
                   </div>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 7, flex: '0 0 auto' }}>
                   <button onClick={function () { props.onAdmin(L); }} className="wc-btn wc-btn--sm wc-btn--ink">Administer →</button>
+                  <button
+                    onClick={function () { togglePro(L); }}
+                    disabled={!!proBusy[L.code]}
+                    className="wc-btn wc-btn--sm"
+                    style={{ background: L.proStatus === 'pro' ? '#fff' : 'var(--yellow)', color: 'var(--ink)', boxShadow: '0 4px 0 var(--shadow)', opacity: proBusy[L.code] ? 0.5 : 1 }}
+                  >
+                    {proBusy[L.code] ? '…' : L.proStatus === 'pro' ? 'Revoke Pro' : '⚡ Grant Pro'}
+                  </button>
                   <button onClick={function () { openDelete(L); }} className="wc-btn wc-btn--sm" style={{ background: '#fff', boxShadow: '0 4px 0 var(--shadow)', color: 'var(--red)' }}>Delete</button>
                 </div>
               </div>

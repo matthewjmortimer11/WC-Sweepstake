@@ -2221,6 +2221,24 @@ async def grant_pro_league(
         return {"ok": True, "proStatus": "pro"}
 
 
+@app.post("/api/leagues/{code}/pro/revoke")
+async def revoke_pro_league(
+    code: str,
+    x_wheesht_dev_key: Optional[str] = Header(None, alias="X-Wheesht-Dev-Key"),
+):
+    if not _dev_key_ok(x_wheesht_dev_key or ""):
+        raise HTTPException(status_code=403, detail="forbidden")
+    async with AsyncSessionLocal() as session:
+        league = await _get_league_by_code(session, code.upper())
+        if league is None:
+            raise HTTPException(status_code=404, detail="league not found")
+        league.pro_status = "free"
+        league.pro_purchased_at = None
+        _log_audit(session, league.id, "pro_revoked", "dev", detail="Dev revoke")
+        await session.commit()
+        return {"ok": True, "proStatus": "free"}
+
+
 @app.post("/stripe/webhook")
 async def stripe_webhook(request: Request):
     if not _STRIPE_WEBHOOK_SECRET:
