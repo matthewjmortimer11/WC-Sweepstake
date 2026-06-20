@@ -827,11 +827,17 @@ function MatchPredAdmin() {
       {dmList && dmList.length > 0 && <>
         <div className="dh" style={{ fontSize: 13, margin: '14px 0 7px', textTransform: 'uppercase', letterSpacing: '.04em' }}>Active match predictions</div>
         {dmList.map(function(m) {
+          var ansLabel = '';
+          if (m.answer != null) {
+            if (m.answer === 'draw') ansLabel = 'Draw';
+            else if (WCa.TEAMS[m.answer]) ansLabel = (WCa.TEAMS[m.answer].flag || '') + ' ' + WCa.TEAMS[m.answer].name;
+            else ansLabel = m.answer; // scoreline like "2-1"
+          }
           return (
             <div key={m.key} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 0', borderBottom: '1.5px solid var(--line)' }}>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontWeight: 700, fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.q}</div>
-                <div style={{ fontSize: 11, color: 'var(--ink2)', fontWeight: 600 }}>{m.points} pts · {m.answer != null ? '✓ Graded: ' + m.answer : 'Open'}</div>
+                <div style={{ fontSize: 11, color: 'var(--ink2)', fontWeight: 600 }}>{m.points} pts · {m.answer != null ? '✓ Graded: ' + ansLabel : 'Open'}</div>
               </div>
               <button onClick={function(){ remove(m.key); }} style={{ border: '2px solid var(--red)', borderRadius: 8, padding: '4px 9px', fontFamily: 'var(--disp)', fontWeight: 800, fontSize: 12, cursor: 'pointer', background: '#fff', color: 'var(--red)', flexShrink: 0 }}>Remove</button>
             </div>

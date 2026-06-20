@@ -61,16 +61,27 @@ function optLabel(m, opt) {
 }
 
 function ScorelinePicker({ pick, answer, resolved, locked, onPick }) {
-  const parts = pick ? pick.split('-') : ['', ''];
-  const home = parts[0] != null ? parts[0] : '';
-  const away = parts[1] != null ? parts[1] : '';
+  const valid = !!(pick && /^\d+-\d+$/.test(pick));
+  const [home, setHome] = pState(valid ? pick.split('-')[0] : '');
+  const [away, setAway] = pState(valid ? pick.split('-')[1] : '');
+  // Adopt an incoming complete scoreline (initial load / server refresh) but
+  // never let a null/partial prop clobber a half-typed entry on this device.
+  React.useEffect(function() {
+    if (!valid) return;
+    const p = pick.split('-');
+    if (p[0] !== home || p[1] !== away) { setHome(p[0]); setAway(p[1]); }
+  }, [pick]);
   function set(side, v) {
     if (resolved || locked) return;
     const h = side === 0 ? v : home;
     const a = side === 1 ? v : away;
-    if (h === '' && a === '') { onPick(null); return; }
-    onPick(h + '-' + a);
+    if (side === 0) setHome(v); else setAway(v);
+    // Only persist a complete scoreline; a partial like "3-" can never be graded
+    // and would just sit on the server as junk, so we keep it local until both
+    // boxes are filled.
+    onPick(h !== '' && a !== '' ? h + '-' + a : null);
   }
+  const complete = home !== '' && away !== '';
   const gotIt = answer != null && pick === answer;
   const inp = function(val, side) {
     return (
@@ -82,7 +93,7 @@ function ScorelinePicker({ pick, answer, resolved, locked, onPick }) {
     );
   };
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 4, border: '2.5px solid ' + (pick && /^\d+-\d+$/.test(pick) ? (resolved ? (gotIt ? 'var(--green)' : 'var(--red)') : 'var(--ink)') : 'var(--line)'), borderRadius: 13, background: resolved ? (gotIt ? 'rgba(26,122,68,.08)' : 'rgba(232,39,42,.06)') : (pick && /^\d+-\d+$/.test(pick) ? 'var(--yellow)' : '#fff'), padding: '4px 8px', justifyContent: 'center' }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 4, border: '2.5px solid ' + (complete ? (resolved ? (gotIt ? 'var(--green)' : 'var(--red)') : 'var(--ink)') : 'var(--line)'), borderRadius: 13, background: resolved ? (gotIt ? 'rgba(26,122,68,.08)' : 'rgba(232,39,42,.06)') : (complete ? 'var(--yellow)' : '#fff'), padding: '4px 8px', justifyContent: 'center' }}>
       {inp(home, 0)}
       <span className="dh" style={{ fontSize: 24, color: 'var(--ink2)', userSelect: 'none' }}>–</span>
       {inp(away, 1)}
