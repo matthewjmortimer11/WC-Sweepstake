@@ -52,6 +52,56 @@ _TIMER_MIN = 15
 _TIMER_MAX = 300
 _TIMER_STEP = 5
 
+# Synthetic players for dev/solo testing (id prefix devbot:).
+DEV_BOT_PREFIX = "devbot:"
+_DEV_BOT_SLOTS = (
+    ("devbot:red:spymaster", "Bot Red SM", RED, "spymaster"),
+    ("devbot:red:operative", "Bot Red OP", RED, "operative"),
+    ("devbot:blue:spymaster", "Bot Blue SM", BLUE, "spymaster"),
+    ("devbot:blue:operative", "Bot Blue OP", BLUE, "operative"),
+)
+
+
+def is_dev_bot(pid: str) -> bool:
+    return (pid or "").startswith(DEV_BOT_PREFIX)
+
+
+def _human_players(room: Room) -> list[Player]:
+    return [p for p in room.players.values() if not is_dev_bot(p.id)]
+
+
+def _slot_filled(players: list[Player], team: str, role: str) -> bool:
+    if role == "spymaster":
+        return any(p.team == team and p.role == "spymaster" for p in players)
+    return any(p.team == team and p.role == "operative" for p in players)
+
+
+def ensure_dev_bots(room: Room) -> None:
+    """Fill empty team slots with bots when dev mode is on."""
+    remove_dev_bots(room)
+    if not room.settings.dev_mode:
+        return
+    humans = _human_players(room)
+    for bid, name, team, role in _DEV_BOT_SLOTS:
+        if _slot_filled(humans, team, role):
+            continue
+        room.players[bid] = Player(
+            id=bid,
+            name=name,
+            team=team,
+            role=role,
+            color="#6b7280",
+            connected=False,
+            is_host=False,
+        )
+
+
+def remove_dev_bots(room: Room) -> None:
+    for pid in list(room.players.keys()):
+        if is_dev_bot(pid):
+            room.players.pop(pid, None)
+            room.sockets.pop(pid, None)
+
 
 def clamp_timer(seconds: int) -> int:
     """Validate/snap a turn-timer value. 0 means 'off'; anything else is
@@ -108,6 +158,7 @@ class Room:
             out.append({
                 "id": p.id, "name": p.name, "team": p.team, "role": p.role,
                 "color": p.color, "isHost": p.is_host, "connected": p.connected,
+                "isBot": is_dev_bot(p.id),
             })
         # Stable, readable ordering: red, blue, spectators; spymasters first.
         order = {"red": 0, "blue": 1, "spectator": 2}
@@ -118,7 +169,12 @@ class Room:
 
     def state_for(self, pid: str) -> dict:
         me = self.players.get(pid)
-        reveal = bool(me and me.role == "spymaster" and me.team in (RED, BLUE))
+        reveal = bool(
+            me and me.team in (RED, BLUE) and (
+                me.role == "spymaster"
+                or (self.settings.dev_mode and me.is_host)
+            )
+        )
         return {
             "type": "state",
             "room": {
@@ -138,6 +194,7 @@ class Room:
                         "noBoardWords": self.settings.house_rules.no_board_words,
                         "rhymesBanned": self.settings.house_rules.rhymes_banned,
                     },
+                    "devMode": self.settings.dev_mode,
                 },
                 "game": self.game.view(reveal_key=reveal),
                 "chat": self.chat[-60:],
@@ -286,7 +343,7 @@ class Manager:
         # race-free even if the room is reset immediately afterwards.
         if room.game.status == STATUS_ENDED and not room.persisted:
             room.persisted = True
-            if store.ENABLED:
+            if store.ENABLED and not room.settings.dev_mode:
                 snapshot = _match_snapshot(room)
                 asyncio.create_task(store.save_match(snapshot))
 

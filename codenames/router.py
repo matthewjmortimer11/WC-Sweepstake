@@ -32,7 +32,9 @@ from .manager import (
     _TIMER_STEP,
     _clean_name,
     clamp_timer,
+    ensure_dev_bots,
     manager,
+    remove_dev_bots,
 )
 from .words import PACKS, pack_meta, words_for, words_for_packs, normalize_pack_ids, pack_label
 
@@ -190,11 +192,12 @@ def _build_settings(payload: dict, current: Settings) -> Settings:
     pack_id = pack_ids[0]
     pack_name = "Custom" if custom else pack_label(pack_ids)
     house_rules = _parse_house_rules(payload.get("houseRules"), current.house_rules)
+    dev_mode = bool(payload.get("devMode", current.dev_mode))
 
     return Settings(
         board_size=size, pack_ids=pack_ids, pack_id=pack_id, custom_words=custom,
         turn_seconds=timer, assassins=assassins, pack_name=pack_name,
-        house_rules=house_rules,
+        house_rules=house_rules, dev_mode=dev_mode,
     )
 
 
@@ -286,7 +289,7 @@ async def _dispatch(room, player, mtype: str, msg: dict) -> bool:
         return True
 
     if mtype == "setTeam":
-        if game.status == "playing":
+        if game.status == "playing" and not room.settings.dev_mode:
             raise MoveError("You can't switch teams mid-game.")
         team = msg.get("team")
         if team not in (RED, BLUE, "spectator"):
@@ -297,7 +300,7 @@ async def _dispatch(room, player, mtype: str, msg: dict) -> bool:
         return True
 
     if mtype == "setRole":
-        if game.status == "playing":
+        if game.status == "playing" and not room.settings.dev_mode:
             raise MoveError("Roles are locked once the game starts.")
         role = msg.get("role")
         if role not in ("spymaster", "operative"):
@@ -314,6 +317,10 @@ async def _dispatch(room, player, mtype: str, msg: dict) -> bool:
             raise MoveError("Finish or reset the round to change settings.")
         room.settings = _build_settings(msg.get("settings", {}), room.settings)
         game.settings = room.settings
+        if room.settings.dev_mode:
+            ensure_dev_bots(room)
+        else:
+            remove_dev_bots(room)
         return True
 
     if mtype == "start" or mtype == "newGame":
@@ -322,6 +329,8 @@ async def _dispatch(room, player, mtype: str, msg: dict) -> bool:
         if "settings" in msg:
             room.settings = _build_settings(msg["settings"], room.settings)
             game.settings = room.settings
+        if room.settings.dev_mode:
+            ensure_dev_bots(room)
         _validate_teams(room)
         game.settings = room.settings
         game.new_round(_words_pool(room.settings))
@@ -333,6 +342,8 @@ async def _dispatch(room, player, mtype: str, msg: dict) -> bool:
             raise MoveError("Only the host can start a rematch.")
         if game.status != "ended":
             raise MoveError("The game hasn't ended yet.")
+        if room.settings.dev_mode:
+            ensure_dev_bots(room)
         _validate_teams(room)
         game.new_round(_words_pool(room.settings))
         room.persisted = False
@@ -401,6 +412,8 @@ async def _dispatch(room, player, mtype: str, msg: dict) -> bool:
 
 
 def _validate_teams(room) -> None:
+    if room.settings.dev_mode:
+        ensure_dev_bots(room)
     reds = [p for p in room.players.values() if p.team == RED]
     blues = [p for p in room.players.values() if p.team == BLUE]
     if not reds or not blues:

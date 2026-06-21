@@ -521,6 +521,9 @@
         grid.appendChild(main);
         grid.appendChild(sidePanel());
         root.appendChild(scoreboard());
+        if (state.room.settings.devMode && state.you && state.you.isHost) {
+          root.appendChild(devModeBar());
+        }
         root.appendChild(grid);
         fillPlayingView(main, grid);
       }
@@ -558,6 +561,43 @@
     else clueParent.appendChild(newClue);
     const oldSide = grid.querySelector(".side");
     if (oldSide) oldSide.replaceWith(sidePanel());
+    const root = $("[data-room-root]");
+    const oldDev = root && root.querySelector(".dev-bar");
+    if (state.room.settings.devMode && state.you && state.you.isHost) {
+      const dev = devModeBar();
+      if (oldDev) oldDev.replaceWith(dev);
+      else if (root) {
+        const gridEl = root.querySelector("[data-game-grid]");
+        if (gridEl) gridEl.parentElement.insertBefore(dev, gridEl);
+      }
+    } else if (oldDev) oldDev.remove();
+  }
+
+  function devModeBar() {
+    const you = state.you;
+    const el = h(`
+      <div class="dev-bar panel" role="toolbar" aria-label="Dev mode role switcher">
+        <span class="dev-bar__label">🛠 Dev</span>
+        <span class="tiny muted dev-bar__hint">Switch role anytime — you always see the key</span>
+        <div class="dev-bar__btns">
+          <button type="button" class="btn btn--sm btn--red" data-team="red" data-role="spymaster">Red SM</button>
+          <button type="button" class="btn btn--sm btn--red" data-team="red" data-role="operative">Red OP</button>
+          <button type="button" class="btn btn--sm btn--blue" data-team="blue" data-role="spymaster">Blue SM</button>
+          <button type="button" class="btn btn--sm btn--blue" data-team="blue" data-role="operative">Blue OP</button>
+          <button type="button" class="btn btn--sm" data-team="spectator" data-role="operative">Spectate</button>
+        </div>
+      </div>`);
+    el.querySelectorAll("[data-team]").forEach((b) => {
+      const team = b.dataset.team;
+      const role = b.dataset.role;
+      const active = you && you.team === team && (team === "spectator" || you.role === role);
+      if (active) b.classList.add("active");
+      b.onclick = () => {
+        send({ type: "setTeam", team });
+        if (team !== "spectator") send({ type: "setRole", role });
+      };
+    });
+    return el;
   }
 
   function patchPlayingView(turnChanged) {
@@ -649,7 +689,9 @@
     wrap.appendChild(h(`
       <div class="hint-banner">
         <span>🎯</span>
-        <span>Pick a team and a role. Each team needs a <b>spymaster</b> (gives clues) and at least one <b>operative</b> (guesses). Share the room code to invite friends.</span>
+        <span>${st.devMode
+          ? "<b>Dev mode on</b> — start solo; bots fill empty roles. Switch team/role anytime once the game begins."
+          : "Pick a team and a role. Each team needs a <b>spymaster</b> (gives clues) and at least one <b>operative</b> (guesses). Share the room code to invite friends."}</span>
       </div>`));
 
     const teams = h(`<div class="lobby-teams"></div>`);
@@ -693,6 +735,7 @@
           <span class="badge">${st.hasCustom ? "Custom words" : esc(st.packName)}</span>
           <span class="badge">${st.turnSeconds ? st.turnSeconds + "s turns" : "No timer"}</span>
           <span class="badge">${st.assassins} assassin${st.assassins > 1 ? "s" : ""}</span>
+          ${st.devMode ? `<span class="badge badge--dev">Dev mode</span>` : ""}
           ${st.houseRules && st.houseRules.compoundClues ? `<span class="badge">Compound clues</span>` : ""}
           ${st.houseRules && !st.houseRules.noBoardWords ? `<span class="badge">Board words OK</span>` : ""}
         </div>
@@ -737,6 +780,7 @@
         <span class="av" style="background:${esc(p.color)}">${esc(initials)}</span>
         <span class="nm ${p.connected ? "" : "off"}">${esc(p.name)}${isYou ? " (you)" : ""}</span>
         ${p.isHost ? `<span class="tag" title="Host">HOST</span>` : ""}
+        ${p.isBot ? `<span class="tag" title="Dev bot">BOT</span>` : ""}
         <span class="tag">${p.role === "spymaster" ? "SM" : p.team === "spectator" ? "—" : "OP"}</span>
       </div>`);
   }
@@ -774,7 +818,7 @@
     const isEmoji = packIdsIncludeEmoji(state.room.settings);
     const canGuess = you && g.status === "playing" && g.phase === "guess"
       && you.team === g.currentTeam && you.role === "operative";
-    const isSpy = you && you.role === "spymaster" && (you.team === "red" || you.team === "blue");
+    const isSpy = you && you.revealKey;
 
     const frame = h(`
       <div class="board-frame">
@@ -1013,6 +1057,7 @@
         noBoardWords: hr.noBoardWords !== false,
         rhymesBanned: !!hr.rhymesBanned,
       },
+      devMode: !!st.devMode,
     };
     state.settingsOpen = true;
     renderRoom();
@@ -1039,6 +1084,13 @@
               <label class="check-row"><input type="checkbox" id="hr-board" ${d.houseRules.noBoardWords ? "checked" : ""} /> Clue can't match a board word</label>
               <label class="check-row"><input type="checkbox" id="hr-rhyme" ${d.houseRules.rhymesBanned ? "checked" : ""} /> No rhyming clues (honour system)</label>
             </div>
+          </div>
+          <div class="field dev-mode-field">
+            <label class="check-row check-row--dev">
+              <input type="checkbox" id="devmode" ${d.devMode ? "checked" : ""} />
+              <span><b>Dev mode</b> — solo testing without four players</span>
+            </label>
+            <span class="tiny muted">Bots fill empty roles. You can switch team/role mid-game and always see the board key.</span>
           </div>
           <div class="field">
             <label for="custom">…or paste your own words (comma or line separated)</label>
@@ -1109,6 +1161,8 @@
     hrCompound.onchange = () => { d.houseRules.compoundClues = hrCompound.checked; };
     hrBoard.onchange = () => { d.houseRules.noBoardWords = hrBoard.checked; };
     hrRhyme.onchange = () => { d.houseRules.rhymesBanned = hrRhyme.checked; };
+    const devMode = modal.querySelector("#devmode");
+    devMode.onchange = () => { d.devMode = devMode.checked; };
 
     const seg = (id, key, cast) => {
       modal.querySelectorAll(`#${id} button`).forEach((b) => {
@@ -1144,7 +1198,7 @@
       send({ type: "settings", settings: {
         boardSize: d.boardSize, packIds: d.packIds, turnSeconds: d.turnSeconds,
         assassins: d.assassins, customWords: d.customWords,
-        houseRules: d.houseRules,
+        houseRules: d.houseRules, devMode: d.devMode,
       } });
       state.settingsOpen = false;
       toast("Setup saved", "ok");

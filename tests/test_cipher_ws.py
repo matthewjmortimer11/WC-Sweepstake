@@ -12,7 +12,7 @@ from starlette.testclient import TestClient
 
 import main
 from codenames.game import RED
-from codenames.manager import manager
+from codenames.manager import ensure_dev_bots, is_dev_bot, manager
 from codenames.words import words_for_packs
 
 
@@ -213,3 +213,44 @@ def test_rematch_restarts_with_same_settings(client):
         assert game.status == "playing"
         assert game.round_no == round1 + 1
         assert room.settings.pack_ids == ["classic", "movies"]
+
+
+def test_dev_mode_solo_start(client):
+    code = client.post("/play/api/rooms").json()["code"]
+    with client.websocket_connect(f"/play/ws/{code}?pid=solo&name=SoloDev") as ws:
+        ws.receive_json()  # hello
+        ws.receive_json()  # state
+        ws.send_json({"type": "setTeam", "team": "red"})
+        ws.send_json({"type": "setRole", "role": "spymaster"})
+        ws.send_json({"type": "settings", "settings": {"devMode": True}})
+        _settle()
+        ws.send_json({"type": "start"})
+        _settle()
+
+    room = manager.get(code)
+    assert room.settings.dev_mode is True
+    assert room.game.status == "playing"
+    bots = [p for p in room.players.values() if is_dev_bot(p.id)]
+    assert len(bots) == 3  # host fills red spymaster; bots fill other slots
+
+    view = room.state_for("solo")
+    assert view["you"]["revealKey"] is True
+    assert all(c["kind"] != "hidden" for c in view["room"]["game"]["cards"])
+
+
+def test_dev_mode_allows_mid_game_role_switch(client):
+    code = client.post("/play/api/rooms").json()["code"]
+    with client.websocket_connect(f"/play/ws/{code}?pid=solo&name=SoloDev") as ws:
+        ws.receive_json()
+        ws.receive_json()
+        ws.send_json({"type": "settings", "settings": {"devMode": True}})
+        ws.send_json({"type": "setTeam", "team": "red"})
+        ws.send_json({"type": "setRole", "role": "spymaster"})
+        ws.send_json({"type": "start"})
+        _settle()
+        ws.send_json({"type": "setRole", "role": "operative"})
+        _settle()
+
+    room = manager.get(code)
+    assert room.players["solo"].role == "operative"
+    assert room.game.status == "playing"

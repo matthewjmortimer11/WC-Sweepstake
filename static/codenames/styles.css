@@ -570,6 +570,16 @@ textarea.input { resize: vertical; min-height: 92px; font-size: 0.92rem; }
 }
 .scoreboard-wrap .team-score.active { transition: box-shadow 0.25s, transform 0.25s; }
 
+.dev-bar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; border-left: 3px solid var(--accent); }
+.dev-bar__label { font-family: var(--mono); font-weight: 700; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; }
+.dev-bar__hint { flex: 1; min-width: 140px; }
+.dev-bar__btns { display: flex; gap: 6px; flex-wrap: wrap; }
+.dev-bar__btns .btn.active { outline: 2px solid var(--accent); outline-offset: 1px; }
+.badge--dev { border-color: var(--accent); color: var(--accent); }
+.dev-mode-field { padding: 12px; border: 1.5px dashed var(--line-strong); border-radius: var(--radius-sm); background: var(--panel-2); }
+.check-row--dev { align-items: flex-start; }
+.check-row--dev b { color: var(--accent); }
+
 /* Toggle switch */
 .timer-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .switch { display: inline-flex; align-items: center; gap: 9px; cursor: pointer; user-select: none; position: relative; }

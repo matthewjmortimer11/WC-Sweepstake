@@ -67,6 +67,11 @@ def test_compound_clues_house_rule():
     assert g.clue_word == "two words"
 
 
+def test_dev_mode_setting_defaults_off():
+    g = Game(settings=Settings())
+    assert g.settings.dev_mode is False
+
+
 # ── distribution ─────────────────────────────────────────────────────────────
 @pytest.mark.parametrize("total,assassins,expected", [
     (25, 1, (9, 8, 7, 1)),
