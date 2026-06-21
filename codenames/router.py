@@ -19,7 +19,7 @@ import time
 import uuid
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 
 from .game import BLUE, RED, STATUS_LOBBY, MoveError, Settings
@@ -82,10 +82,24 @@ async def packs() -> JSONResponse:
 
 
 @router.post("/play/api/rooms")
-async def create_room() -> JSONResponse:
+async def create_room(request: Request) -> JSONResponse:
     manager.start()
+    # An optional packId lets the home screen spin up a room pre-tuned to a
+    # mode (e.g. "afterdark") so the choice is made upfront, not buried in
+    # settings. Unknown/missing values fall back to the classic default.
+    pack_id = "classic"
+    try:
+        body = await request.json()
+        if isinstance(body, dict) and str(body.get("packId", "")) in PACKS:
+            pack_id = str(body["packId"])
+    except Exception:
+        pass
     room = manager.create_room()
-    return JSONResponse({"code": room.code})
+    if pack_id != "classic":
+        room.settings.pack_id = pack_id
+        room.settings.pack_name = PACKS[pack_id]["name"]
+        room.game.settings = room.settings
+    return JSONResponse({"code": room.code, "packId": pack_id})
 
 
 @router.get("/play/assets/{filename:path}")

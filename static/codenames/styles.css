@@ -133,6 +133,12 @@ h1, h2, h3 { font-family: var(--display); letter-spacing: -0.02em; margin: 0; li
 .btn--blue { background: linear-gradient(135deg, var(--blue), var(--blue-deep)); color: #04121f; border-color: transparent; }
 .btn--danger { color: var(--danger); border-color: rgba(251, 113, 133, 0.4); }
 .btn--sm { padding: 0.45em 0.85em; font-size: 0.86rem; }
+.mode-dark {
+  margin-top: 10px; color: #ffd9e6; font-weight: 700;
+  background: linear-gradient(135deg, #2a0d18, #4a1029);
+  border-color: rgba(255, 93, 142, 0.5);
+}
+.mode-dark:hover { border-color: #ff5d8e; box-shadow: 0 14px 34px -16px rgba(255, 93, 142, 0.7); }
 
 .icon-btn {
   appearance: none; border: 1px solid var(--line); background: var(--panel-2);

@@ -64,6 +64,21 @@ def test_create_room_and_join_ws(client):
         assert any(p["name"] == "Alice" for p in state["room"]["players"])
 
 
+def test_create_room_with_afterdark_pack_preset(client):
+    r = client.post("/play/api/rooms", json={"packId": "afterdark"})
+    body = r.json()
+    assert body["packId"] == "afterdark"
+    code = body["code"]
+    room = manager.get(code)
+    assert room.settings.pack_id == "afterdark"
+    assert room.settings.pack_name == "After Dark"
+
+
+def test_create_room_unknown_pack_falls_back_to_classic(client):
+    r = client.post("/play/api/rooms", json={"packId": "bogus"})
+    assert r.json()["packId"] == "classic"
+
+
 def test_unknown_room_is_fatal(client):
     with client.websocket_connect("/play/ws/ZZZZ?pid=p1") as ws:
         msg = ws.receive_json()

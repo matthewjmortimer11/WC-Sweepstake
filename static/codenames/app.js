@@ -222,12 +222,14 @@
         <div class="home__actions">
           <div class="panel action-card">
             <h3>🚀 Start a new game</h3>
-            <p class="muted tiny">Create a private room and invite your crew with a 4-letter code.</p>
+            <p class="muted tiny">Pick a vibe, create a private room, invite your crew with a 4-letter code.</p>
             <div class="field">
               <label for="name1">Your name</label>
               <input class="input" id="name1" maxlength="24" placeholder="Agent…" value="${esc(getName())}" />
             </div>
             <button class="btn btn--primary btn--lg btn--block" id="create">Create game →</button>
+            <button class="btn btn--lg btn--block mode-dark" id="create-dark">🔞 After Dark game</button>
+            <p class="tiny muted" style="text-align:center; margin:0">Standard is family-friendly · After Dark is crude &amp; 18+</p>
           </div>
           <div class="panel action-card">
             <h3>🔑 Join with a code</h3>
@@ -247,7 +249,7 @@
           <span class="eyebrow">Why it's more fun</span>
           <div class="features" style="margin-top:14px">
             <div class="feature"><span class="ico">🎛️</span><h4>Fully customisable</h4><p>4×4, 5×5 or 6×6 boards, optional turn timers, 1–3 assassins.</p></div>
-            <div class="feature"><span class="ico">🃏</span><h4>Themed word packs</h4><p>Classic, Movies, Food, Sci-Fi, Emoji chaos — or paste your own list.</p></div>
+            <div class="feature"><span class="ico">🃏</span><h4>Themed word packs</h4><p>Classic, Movies, Food, Sci-Fi, Emoji chaos, <b>After Dark (18+)</b> — or paste your own.</p></div>
             <div class="feature"><span class="ico">⚡</span><h4>Instant & real-time</h4><p>Live sync over WebSockets. Reconnects automatically if you drop.</p></div>
             <div class="feature"><span class="ico">💬</span><h4>Chat & reactions</h4><p>Trash-talk, emoji bursts and a running play-by-play log.</p></div>
             <div class="feature"><span class="ico">♿</span><h4>Accessible by design</h4><p>Colour-blind glyphs, keyboard play, reduced-motion support.</p></div>
@@ -267,15 +269,28 @@
     $("#name1").oninput = (e) => { setName(e.target.value); $("#name2").value = e.target.value; };
     $("#name2").oninput = (e) => { setName(e.target.value); $("#name1").value = e.target.value; };
 
-    $("#create").onclick = async () => {
-      const btn = $("#create"); btn.disabled = true; btn.textContent = "Creating…";
+    const createGame = async (packId, btn, label) => {
+      if (packId === "afterdark" &&
+          !confirm("After Dark is an 18+ pack with crude, sexual and dark-humour content. Confirm everyone playing is 18 or over.")) {
+        return;
+      }
+      btn.disabled = true; btn.textContent = "Creating…";
       setName($("#name1").value.trim());
       try {
-        const r = await fetch("/play/api/rooms", { method: "POST" });
+        const r = await fetch("/play/api/rooms", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ packId }),
+        });
         const d = await r.json();
         location.hash = `#/room/${d.code}`;
-      } catch (e) { toast("Couldn't create a room. Try again.", "err"); btn.disabled = false; btn.textContent = "Create game →"; }
+      } catch (e) {
+        toast("Couldn't create a room. Try again.", "err");
+        btn.disabled = false; btn.textContent = label;
+      }
     };
+    $("#create").onclick = () => createGame("classic", $("#create"), "Create game →");
+    $("#create-dark").onclick = () => createGame("afterdark", $("#create-dark"), "🔞 After Dark game");
     const doJoin = () => {
       const code = ($("#joincode").value || "").trim().toUpperCase();
       if (code.length < 4) { toast("Enter a 4-letter room code.", "err"); return; }
