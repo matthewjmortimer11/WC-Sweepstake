@@ -16,17 +16,11 @@
     pid: "cipher.pid",
     name: "cipher.name",
     theme: "cipher.theme",
-    backdrop: "cipher.backdrop",
     tab: "cipher.tab",
     token: "cipher.authToken",
     user: "cipher.authUser",
     league: "cipher.league",
   };
-
-  const BACKDROPS = [
-    { id: "planning", label: "Planning room", icon: "📋" },
-    { id: "casino", label: "High roller", icon: "🎰" },
-  ];
 
   function userLabel(u) {
     if (!u) return "Agent";
@@ -290,7 +284,7 @@
     } catch (_) { return null; }
   }
 
-  // ── theme & backdrop ─────────────────────────────────────────────────────
+  // ── theme ──────────────────────────────────────────────────────────────────
   function initTheme() {
     const saved = localStorage.getItem(LS.theme) || "light";
     document.documentElement.dataset.theme = saved;
@@ -300,35 +294,7 @@
     document.documentElement.dataset.theme = next;
     localStorage.setItem(LS.theme, next);
   }
-  function getBackdrop() {
-    const id = document.documentElement.dataset.backdrop || "planning";
-    return BACKDROPS.some((b) => b.id === id) ? id : "planning";
-  }
-  function setBackdrop(id) {
-    const next = BACKDROPS.some((b) => b.id === id) ? id : "planning";
-    document.documentElement.dataset.backdrop = next;
-    localStorage.setItem(LS.backdrop, next);
-    document.querySelectorAll(".backdrop-select").forEach((el) => {
-      if (el.value !== next) el.value = next;
-    });
-  }
-  function initBackdrop() {
-    const saved = localStorage.getItem(LS.backdrop) || "planning";
-    setBackdrop(saved);
-  }
-  function backdropPickerMarkup() {
-    const cur = getBackdrop();
-    return `<select class="select select--sm backdrop-select" id="backdrop" title="Backdrop style" aria-label="Backdrop style">
-      ${BACKDROPS.map((b) => `<option value="${b.id}" ${cur === b.id ? "selected" : ""}>${b.icon} ${esc(b.label)}</option>`).join("")}
-    </select>`;
-  }
-  function wireBackdropPicker(root) {
-    const el = (root || document).querySelector("#backdrop");
-    if (!el) return;
-    el.onchange = () => setBackdrop(el.value);
-  }
   initTheme();
-  initBackdrop();
 
   // ── toasts ─────────────────────────────────────────────────────────────────
   function toast(msg, kind = "") {
@@ -1163,10 +1129,7 @@
           <div class="brand">
             <span class="brand__name"><b>Wheesht</b> · Cipher</span>
           </div>
-          <div class="topbar__right topbar__prefs">
-            ${backdropPickerMarkup()}
-            <button class="icon-btn icon-btn--txt" id="theme" title="Toggle theme" aria-label="Toggle light/dark theme">◐</button>
-          </div>
+          <button class="icon-btn icon-btn--txt" id="theme" title="Toggle theme" aria-label="Toggle light/dark theme">◐</button>
         </div>
 
         <div class="home__hero">
@@ -1222,7 +1185,6 @@
             <div class="feature"><span class="ico">🃏</span><h4>Themed word packs</h4><p>Mix &amp; match Classic, Countries, Marvel, UK Snacks, Offensive, Too Far and more — or paste your own.</p></div>
             <div class="feature"><span class="ico">⚡</span><h4>Instant & real-time</h4><p>Live sync over WebSockets. Reconnects automatically if you drop.</p></div>
             <div class="feature"><span class="ico">💬</span><h4>Chat & reactions</h4><p>Trash-talk, emoji bursts and a running play-by-play log.</p></div>
-            <div class="feature"><span class="ico">🎨</span><h4>Pick your backdrop</h4><p>Planning-room graph paper or High Roller casino vibes — roulette, chips &amp; cash.</p></div>
             <div class="feature"><span class="ico">♿</span><h4>Accessible by design</h4><p>Colour-blind glyphs, keyboard play, reduced-motion support.</p></div>
             <div class="feature"><span class="ico">📱</span><h4>Plays anywhere</h4><p>Phones to big screens. No install, no sign-up, no cost.</p></div>
           </div>
@@ -1258,7 +1220,6 @@
     }
 
     $("#theme").onclick = toggleTheme;
-    wireBackdropPicker(el);
     const syncNames = (v) => { $("#name1").value = v; $("#name2").value = v; };
     $("#name1").oninput = (e) => { setName(e.target.value); $("#name2").value = e.target.value; };
     $("#name2").oninput = (e) => { setName(e.target.value); $("#name1").value = e.target.value; };
@@ -1618,13 +1579,11 @@
         <div class="topbar__right">
           <button class="btn btn--sm" id="copy">Copy link</button>
           ${isHost ? `<button class="btn btn--sm" id="settings">Setup</button>` : ""}
-          ${backdropPickerMarkup()}
           <button class="icon-btn icon-btn--txt" id="theme" title="Toggle theme" aria-label="Toggle theme">◐</button>
         </div>
       </div>`);
     el.querySelector("#leave").onclick = () => { location.hash = ""; };
     el.querySelector("#theme").onclick = toggleTheme;
-    wireBackdropPicker(el);
     el.querySelector("#copy").onclick = copyInvite;
     const rc = el.querySelector("#roomcode");
     if (rc) rc.onclick = () => {
