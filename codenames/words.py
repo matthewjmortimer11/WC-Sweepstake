@@ -425,6 +425,41 @@ UNFILTERED = [
     "Wine drunk", "Tequila regret", "Jail", "Bail", "Public intoxication",
 ]
 
+# ── Too Far (18+) ─────────────────────────────────────────────────────────────
+# Beyond Offensive and Unfiltered — taboo, bleak and deliberately awful.
+# Still no slurs or hate targeting protected groups; no sexual content involving minors.
+TOO_FAR = [
+    "Necrophilia", "Cannibalism", "Incest", "Bestiality", "Snuff film", "Gore",
+    "Decapitation", "Dismemberment", "Flaying", "Skinning alive", "Buried alive",
+    "Drawing and quartering", "Impalement", "Crucifixion", "Stoning", "Beheading",
+    "Boiling alive", "Rat torture", "Waterboarding", "Electric shock torture",
+    "Thumbscrew", "Iron maiden", "Pear of anguish", "Breaking wheel", "Strangulation",
+    "Suffocation", "Chloroform", "Kidnapping", "Hostage", "Human trafficking",
+    "Sex trafficking", "Rape", "Gang rape", "Prison rape", "Date rape drug",
+    "Pedophile", "Child molester", "Grooming", "Epstein", "Jeffrey Epstein",
+    "Suicide", "Self-harm", "Cutting", "Overdose", "Fentanyl OD", "Jumping",
+    "Hanging", "Carbon monoxide", "Pills", "Miscarriage", "Stillbirth", "Abortion",
+    "Infanticide", "Shaken baby", "Dumpster baby", "Patricide", "Matricide",
+    "Uxoricide", "Mercy killing", "Euthanasia", "Mass grave", "Ethnic cleansing",
+    "Gas chamber", "Crematorium", "Auschwitz", "Bergen-Belsen", "Mass shooting",
+    "School shooter", "9/11", "Twin Towers", "Chernobyl", "Hiroshima", "Nagasaki",
+    "Unit 731", "Tuskegee", "MKUltra", "Human experimentation", "Forced sterilization",
+    "Eugenics", "Lynching", "Lynch mob", "Rotting", "Maggots", "Decomposition",
+    "Corpse", "Cadaver", "Morgue", "Autopsy", "Body bag", "Embalming", "Grave robbing",
+    "Coprophagia", "Urine drinking", "Vore", "Guro", "Goatse", "Two girls one cup",
+    "Painal", "Fist fucking", "Rectal prolapse", "Vaginal tearing", "Sounding",
+    "Tentacle rape", "Inbreeding", "Gangrene", "Septic shock", "Amputation",
+    "Botched surgery", "Wrongful amputation", "Solitary confinement", "Bonesaw",
+    "Arsenic", "Cyanide", "Famine", "Starvation", "Genocide", "Holocaust",
+    "Concentration camp", "War crime", "Torture", "Terror attack", "Beheading video",
+    "ISIS", "Al-Qaeda", "Serial killer", "Ted Bundy", "Jeffrey Dahmer", "Ed Gein",
+    "Charles Manson", "Jack the Ripper", "Jim Jones", "Jonestown", "Cult suicide",
+    "Rock bottom", "Relapse", "Intervention", "DUI death", "Hit and run", "Manslaughter",
+    "Wrongful death", "Blackmail tape", "Revenge porn", "Deepfake porn", "Doxxing",
+    "Swatting", "Stalking", "Obsession", "Restraining order", "Hostile takeover",
+    "Wrongful conviction", "Death row", "Lethal injection", "Electric chair", "Guillotine",
+]
+
 # Legacy alias content (kept for migration tests).
 AFTER_DARK = [
     "Booze", "Vodka", "Tequila", "Blackout", "Hangover", "Wasted", "Beer pong",
@@ -546,6 +581,9 @@ PACKS = {
     "unfiltered": {"name": "Unfiltered", "emoji": "☠️", "tier": "adult",
                    "words": _dedupe_words(UNFILTERED),
                    "blurb": "Filthier than Adult. Truly 18+. No apologies."},
+    "toofar": {"name": "Too Far", "emoji": "💀", "tier": "toofar",
+               "words": _dedupe_words(TOO_FAR),
+               "blurb": "Beyond Offensive & Unfiltered. Genuinely awful. Double-check your group."},
     # Legacy ids — still resolve for old rooms / API calls.
     "afterdark": {"name": "After Dark", "emoji": "🔞", "tier": "adult",
                   "words": _dedupe_words(AFTER_DARK),
@@ -559,7 +597,7 @@ PACKS = {
 SELECTABLE_PACK_IDS = [
     "classic", "movies", "food", "scifi", "emoji",
     "countries", "marvel", "uksnacks",
-    "drinking", "rude", "adult", "offensive", "unfiltered",
+    "drinking", "rude", "adult", "offensive", "unfiltered", "toofar",
 ]
 
 _LEGACY_PACK_MAP = {

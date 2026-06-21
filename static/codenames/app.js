@@ -307,7 +307,6 @@
   // ── tiny sound (web audio, no assets) ──────────────────────────────────────
   let actx = null;
   function beep(freq = 440, dur = 0.08, type = "sine", vol = 0.04) {
-    if (state.muted) return;
     try {
       actx = actx || new (window.AudioContext || window.webkitAudioContext)();
       const o = actx.createOscillator(), g = actx.createGain();
@@ -331,7 +330,6 @@
     tab: localStorage.getItem(LS.tab) || "players",
     settingsOpen: false,
     settingsSavePending: false,
-    muted: false,
     reconnectTimer: null,
     reconnectDelay: 800,
     lastRevealCount: 0,
@@ -659,15 +657,28 @@
     return { code, boxes, syncFilled };
   }
 
-  const ADULT_PACKS = new Set(["drinking", "rude", "adult", "offensive", "unfiltered", "afterdark", "bottomdrawer"]);
+  const ADULT_PACKS = new Set(["drinking", "rude", "adult", "offensive", "unfiltered", "toofar", "afterdark", "bottomdrawer"]);
   const MATURE_PACKS = new Set(["drinking", "rude"]);
+  const TOO_FAR_PACKS = new Set(["toofar"]);
 
   const adultConfirmPacks = (packIds) => {
     const ids = Array.isArray(packIds) ? packIds : [packIds];
     const tiers = ids.map((id) => {
       const p = state.packs.find((x) => x.id === id);
-      return p ? p.tier : (ADULT_PACKS.has(id) ? "adult" : "family");
+      if (p) return p.tier;
+      if (TOO_FAR_PACKS.has(id)) return "toofar";
+      return ADULT_PACKS.has(id) ? "adult" : "family";
     });
+    if (tiers.includes("toofar") || ids.some((id) => TOO_FAR_PACKS.has(id))) {
+      if (!confirm(
+        "You've selected the Too Far pack — taboo, bleak and genuinely awful content "
+        + "(violence, death, assault, politics and extreme filth). Everyone must be 18+ and explicitly want this."
+      )) return false;
+      return confirm(
+        "Last chance: Too Far is meant to be offensive on purpose. "
+        + "If anyone in the room might be upset, pick a lighter pack instead. Start anyway?"
+      );
+    }
     if (tiers.includes("adult") || ids.some((id) => ["offensive", "unfiltered", "adult", "afterdark", "bottomdrawer"].includes(id))) {
       return confirm(
         "You've selected 18+ packs (may include crude, sexual, political or offensive content). "
@@ -1081,7 +1092,8 @@
             </div>
             <button class="btn btn--primary btn--lg btn--block" id="create">Create game →</button>
             <button class="btn btn--lg btn--block mode-dark" id="create-dark">🔞 After Dark game</button>
-            <p class="tiny muted" style="text-align:center; margin:0">Standard is family-friendly · After Dark is crude &amp; 18+</p>
+            <button class="btn btn--lg btn--block mode-toofar" id="create-toofar">💀 Too Far game</button>
+            <p class="tiny muted" style="text-align:center; margin:0">Standard is family-friendly · After Dark is crude &amp; 18+ · Too Far is genuinely awful</p>
           </div>
           <div class="panel action-card">
             <h3>🔑 Join with a code</h3>
@@ -1109,7 +1121,7 @@
           <span class="eyebrow">Why it's more fun</span>
           <div class="features" style="margin-top:14px">
             <div class="feature"><span class="ico">🎛️</span><h4>Fully customisable</h4><p>4×4, 5×5 or 6×6 boards, optional turn timers, 1–5 assassins.</p></div>
-            <div class="feature"><span class="ico">🃏</span><h4>Themed word packs</h4><p>Mix &amp; match Classic, Countries, Marvel, UK Snacks, Drinking, Offensive and more — or paste your own.</p></div>
+            <div class="feature"><span class="ico">🃏</span><h4>Themed word packs</h4><p>Mix &amp; match Classic, Countries, Marvel, UK Snacks, Offensive, Too Far and more — or paste your own.</p></div>
             <div class="feature"><span class="ico">⚡</span><h4>Instant & real-time</h4><p>Live sync over WebSockets. Reconnects automatically if you drop.</p></div>
             <div class="feature"><span class="ico">💬</span><h4>Chat & reactions</h4><p>Trash-talk, emoji bursts and a running play-by-play log.</p></div>
             <div class="feature"><span class="ico">♿</span><h4>Accessible by design</h4><p>Colour-blind glyphs, keyboard play, reduced-motion support.</p></div>
@@ -1174,13 +1186,14 @@
     };
     $("#create").onclick = () => createGame(["classic"], $("#create"), "Create game →");
     $("#create-dark").onclick = () => createGame(["drinking", "rude", "adult"], $("#create-dark"), "🔞 After Dark game");
-    const codeInput = wireCodeBoxes($("#codeboxes"), () => doJoin());
+    $("#create-toofar").onclick = () => createGame(["toofar"], $("#create-toofar"), "💀 Too Far game");
     const doJoin = () => {
       const code = codeInput.code();
       if (code.length < 4) { toast("Enter the full 4-letter room code.", "err"); return; }
       setName($("#name2").value.trim());
       location.hash = `#/room/${code}`;
     };
+    const codeInput = wireCodeBoxes($("#codeboxes"), doJoin);
     $("#join").onclick = doJoin;
     setTimeout(() => { const n = $("#name1"); if (n && !n.value) n.focus(); }, 80);
   }
@@ -1299,16 +1312,10 @@
     return el;
   }
 
-  function updateTopbarControls() {
-    const mute = $("#mute");
-    if (mute) mute.textContent = state.muted ? "×" : "♪";
-  }
-
   function patchPlayingView(turnChanged) {
     const grid = $("[data-game-grid]");
     const main = $("[data-board-wrap]");
     if (!grid || !main) { state.roomView = null; renderRoom(); return; }
-    updateTopbarControls();
     fillPlayingView(main, grid);
     if (turnChanged) {
       const pill = $(".turn-pill");
@@ -1343,14 +1350,12 @@
         </div>
         <div class="topbar__right">
           <button class="btn btn--sm" id="copy">Copy link</button>
-          <button class="icon-btn icon-btn--txt" id="mute" title="Toggle sound" aria-label="Toggle sound">${state.muted ? "×" : "♪"}</button>
           ${isHost ? `<button class="btn btn--sm" id="settings">Setup</button>` : ""}
           <button class="icon-btn icon-btn--txt" id="theme" title="Toggle theme" aria-label="Toggle theme">◐</button>
         </div>
       </div>`);
     el.querySelector("#leave").onclick = () => { location.hash = ""; };
     el.querySelector("#theme").onclick = toggleTheme;
-    el.querySelector("#mute").onclick = () => { state.muted = !state.muted; renderRoom(); };
     el.querySelector("#copy").onclick = copyInvite;
     const rc = el.querySelector("#roomcode");
     if (rc) rc.onclick = () => {
@@ -1940,8 +1945,9 @@
     };
     state.packs.forEach((p) => {
       const on = d.packIds.includes(p.id);
-      const tier = p.tier === "adult" ? " 🔞" : p.tier === "mature" ? " 18+" : "";
-      const b = h(`<button type="button" class="pack-opt pack-opt--toggle" data-v="${p.id}" aria-pressed="${on}">
+      const tier = p.tier === "toofar" ? " 💀" : p.tier === "adult" ? " 🔞" : p.tier === "mature" ? " 18+" : "";
+      const extraCls = p.tier === "toofar" ? " pack-opt--toofar" : "";
+      const b = h(`<button type="button" class="pack-opt pack-opt--toggle${extraCls}" data-v="${p.id}" aria-pressed="${on}">
         <span class="pemoji">${p.emoji}</span><b>${esc(p.name)}${tier}</b><small>${esc(p.blurb)} · ${p.count} words</small></button>`);
       b.onclick = () => {
         const id = p.id;

@@ -35,10 +35,10 @@ def test_every_pack_has_enough_words_for_largest_board():
 def test_pack_meta_shape():
     meta = pack_meta()
     assert {m["id"] for m in meta} == set(SELECTABLE_PACK_IDS)
-    assert len(meta) == 13
+    assert len(meta) == 14
     for m in meta:
         assert m["count"] > 0
-        assert m["tier"] in ("family", "mature", "adult")
+        assert m["tier"] in ("family", "mature", "adult", "toofar")
 
 
 def test_words_for_packs_merges_and_dedupes():
@@ -389,6 +389,8 @@ def test_clamp_timer_snaps_and_clamps(raw, expected):
 def test_after_dark_pack_present_and_playable():
     assert "offensive" in PACKS
     assert "unfiltered" in PACKS
+    assert "toofar" in PACKS
+    assert PACKS["toofar"]["tier"] == "toofar"
     assert "drinking" in PACKS
     g = Game(settings=Settings(board_size=6, pack_ids=["offensive", "classic"]))
     g.new_round(words_for_packs(["offensive", "classic"]), seed=7)
@@ -396,3 +398,6 @@ def test_after_dark_pack_present_and_playable():
     g2 = Game(settings=Settings(board_size=6, pack_ids=["unfiltered"]))
     g2.new_round(words_for_packs(["unfiltered"]), seed=7)
     assert len(g2.cards) == 36
+    g3 = Game(settings=Settings(board_size=6, pack_ids=["toofar"]))
+    g3.new_round(words_for_packs(["toofar"]), seed=7)
+    assert len(g3.cards) == 36

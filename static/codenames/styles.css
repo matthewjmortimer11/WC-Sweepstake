@@ -201,6 +201,17 @@ h1, h2, h3 { margin: 0; font-family: var(--head); font-weight: 700; line-height:
 .mode-dark:hover { border-color: var(--red); background: var(--accent-soft); }
 [data-theme="dark"] .mode-dark:hover { border-color: var(--red); }
 
+.mode-toofar {
+  margin-top: 10px; color: #5c1010; background: #f8e8e8;
+  border-color: #8b1a1a;
+}
+[data-theme="dark"] .mode-toofar {
+  color: #f5d0d0; background: #1a0808;
+  border-color: #8b1a1a;
+}
+.mode-toofar:hover { border-color: #b91c1c; background: #f0d4d4; }
+[data-theme="dark"] .mode-toofar:hover { border-color: #dc2626; }
+
 .icon-btn {
   appearance: none; border: 1.5px solid var(--line-strong); background: var(--panel-2);
   color: var(--ink); width: 40px; height: 40px; border-radius: var(--radius-sm); cursor: pointer;
@@ -732,6 +743,10 @@ textarea.input { resize: vertical; min-height: 92px; font-size: 0.92rem; }
 .pack-opt b { font-family: var(--head); font-size: 0.95rem; font-weight: 700; }
 .pack-opt small { color: var(--ink-3); font-size: 0.76rem; line-height: 1.35; }
 .pack-grid--multi .pack-opt--toggle[aria-pressed="true"] { box-shadow: inset 0 0 0 1px var(--accent), var(--hard-sm); }
+.pack-opt--toofar { border-color: #8b1a1a; }
+.pack-opt--toofar:hover { border-color: #b91c1c; }
+.pack-opt--toofar[aria-pressed="true"] { border-color: #dc2626; background: rgba(220, 38, 38, 0.1); }
+[data-theme="dark"] .pack-opt--toofar[aria-pressed="true"] { background: rgba(220, 38, 38, 0.18); }
 
 .house-rules { display: grid; gap: 10px; }
 .check-row { display: flex; align-items: center; gap: 10px; font-size: 0.88rem; cursor: pointer; }
