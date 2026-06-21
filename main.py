@@ -2000,13 +2000,18 @@ async def _upsert_participant(
         raise HTTPException(status_code=409, detail="id belongs to another league")
     creating = row is None
     if creating:
+        # Build the row but do NOT add it to the session yet: _get_admin_data()
+        # below issues a query that would autoflush this still-empty row (name is
+        # NOT NULL) before _apply_payload() populates it. We add it once it's
+        # fully formed, just before the organiser-count query needs to see it.
         row = Participant(id=payload.id, league_id=league.id)
-        session.add(row)
     admin = await _get_admin_data(session, league)
     if payload.picks and dict(payload.picks) != dict(row.picks or {}):
         _require_pro(league)
     meta = admin.get("meta") or {}
     _apply_payload(row, payload, league, _clean_custom_fields(list(meta.get("customFields") or [])))
+    if creating:
+        session.add(row)
     # First self-signup in a fresh (non-seeded) league becomes the organiser.
     if creating and not league.seeded:
         existing = await session.scalar(

@@ -2,11 +2,12 @@
 
 import pytest
 
+import main
 from conftest import add_participant, make_league
 
 
 async def test_csv_export_requires_admin(client, monkeypatch):
-    monkeypatch.setenv("WC_DEV_KEY", "dev-test-key")
+    monkeypatch.setattr(main, "_DEV_KEY", "dev-test-key")
     lg = await make_league(client)
     await client.post(
         f"/api/leagues/{lg['code']}/pro/grant",
@@ -25,7 +26,7 @@ async def test_csv_export_requires_admin(client, monkeypatch):
 
 
 async def test_analytics_requires_admin(client, monkeypatch):
-    monkeypatch.setenv("WC_DEV_KEY", "dev-test-key")
+    monkeypatch.setattr(main, "_DEV_KEY", "dev-test-key")
     lg = await make_league(client)
     await client.post(
         f"/api/leagues/{lg['code']}/pro/grant",
@@ -44,7 +45,7 @@ async def test_analytics_requires_admin(client, monkeypatch):
 
 
 async def test_duplicate_league(client, monkeypatch):
-    monkeypatch.setenv("WC_DEV_KEY", "dev-test-key")
+    monkeypatch.setattr(main, "_DEV_KEY", "dev-test-key")
     lg = await make_league(client, name="Source League")
     await client.post(
         f"/api/leagues/{lg['code']}/pro/grant",

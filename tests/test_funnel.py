@@ -2,6 +2,7 @@
 
 import pytest
 
+import main
 from conftest import make_league
 
 
@@ -22,8 +23,14 @@ async def test_funnel_event_rejects_unknown(client):
     assert r.status_code == 400
 
 
-async def test_analytics_includes_funnel(client):
+async def test_analytics_includes_funnel(client, monkeypatch):
+    # Analytics is a Pro feature, so grant the league Pro via the dev key first.
+    monkeypatch.setattr(main, "_DEV_KEY", "dev-test-key")
     lg = await make_league(client)
+    await client.post(
+        f"/api/leagues/{lg['code']}/pro/grant",
+        headers={"X-Wheesht-Dev-Key": "dev-test-key"},
+    )
     await client.post("/api/events", json={
         "event": "invite_view",
         "sessionId": "s1",
