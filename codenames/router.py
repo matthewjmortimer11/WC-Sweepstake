@@ -728,6 +728,17 @@ async def _dispatch(room, player, mtype: str, msg: dict) -> bool:
             raise MoveError("That card doesn't exist.")
         if game.cards[index].revealed:
             raise MoveError("That card is already revealed.")
+        my_picks = room.near_picks.get(player.id, set())
+        if index not in my_picks:
+            card_word = game.cards[index].word
+            for other_pid, indices in room.near_picks.items():
+                if other_pid == player.id or index not in indices:
+                    continue
+                other = room.players.get(other_pid)
+                if other and other.team == player.team:
+                    raise MoveError(
+                        f"{other.name} is already on “{card_word}” — pick another card."
+                    )
         room.toggle_near_pick(player.id, index)
         return True
 

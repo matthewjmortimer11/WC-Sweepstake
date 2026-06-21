@@ -242,6 +242,50 @@ def test_near_picks_sync_to_all_players(client):
         assert room.public_near_picks()[0]["indices"] == [1]
 
 
+def test_near_pick_blocks_teammate_on_same_card(client):
+    from codenames.game import RED
+
+    code = client.post("/play/api/rooms").json()["code"]
+    with client.websocket_connect(f"/play/ws/{code}?pid=rs&name=RedSpy") as rs, \
+         client.websocket_connect(f"/play/ws/{code}?pid=r1&name=RedOne") as r1, \
+         client.websocket_connect(f"/play/ws/{code}?pid=r2&name=RedTwo") as r2, \
+         client.websocket_connect(f"/play/ws/{code}?pid=bs&name=BlueSpy") as bs, \
+         client.websocket_connect(f"/play/ws/{code}?pid=bo&name=BlueOp") as bo, \
+         client.websocket_connect(f"/play/ws/{code}?pid=b2&name=BlueTwo") as b2:
+
+        for ws, team, role in [(rs, "red", "spymaster"), (r1, "red", "operative"),
+                               (r2, "red", "operative"), (bs, "blue", "spymaster"),
+                               (bo, "blue", "operative"), (b2, "blue", "operative")]:
+            ws.receive_json()
+            ws.receive_json()
+            ws.send_json({"type": "setTeam", "team": team})
+            ws.send_json({"type": "setRole", "role": role})
+        _settle()
+        rs.send_json({"type": "start"})
+        _settle()
+
+        room = manager.get(code)
+        game = room.game
+        starting = game.current_team
+        if starting == RED:
+            spy_ws, op1_ws, op2_ws, pid1, pid2 = rs, r1, r2, "r1", "r2"
+        else:
+            spy_ws, op1_ws, op2_ws, pid1, pid2 = bs, bo, b2, "bo", "b2"
+
+        spy_ws.send_json({"type": "clue", "word": "signal", "count": 2})
+        _settle()
+
+        op1_ws.send_json({"type": "toggleNearPick", "index": 3})
+        _settle()
+
+        op2_ws.send_json({"type": "toggleNearPick", "index": 3})
+        _settle()
+
+        room = manager.get(code)
+        assert 3 in room.near_picks.get(pid1, set())
+        assert 3 not in room.near_picks.get(pid2, set())
+
+
 def test_rematch_restarts_with_same_settings(client):
     code = client.post("/play/api/rooms", json={"packIds": ["classic", "movies"]}).json()["code"]
     with client.websocket_connect(f"/play/ws/{code}?pid=rs") as rs, \
