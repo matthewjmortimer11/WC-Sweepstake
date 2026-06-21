@@ -22,6 +22,7 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 
+from . import store
 from .game import BLUE, RED, STATUS_LOBBY, MoveError, Settings
 from .manager import (
     _ALLOWED_SIZES,
@@ -79,6 +80,13 @@ async def packs() -> JSONResponse:
         "sizes": sorted(_ALLOWED_SIZES),
         "timer": {"min": _TIMER_MIN, "max": _TIMER_MAX, "step": _TIMER_STEP},
     })
+
+
+@router.get("/play/api/stats")
+async def stats() -> JSONResponse:
+    """Aggregate match stats + recent games. ``{"enabled": false}`` when no
+    database is configured (the game still runs fully in-memory)."""
+    return JSONResponse(await store.get_stats())
 
 
 @router.post("/play/api/rooms")
@@ -279,6 +287,7 @@ async def _dispatch(room, player, mtype: str, msg: dict) -> bool:
         _validate_teams(room)
         game.settings = room.settings
         game.new_round(_words_pool(room.settings))
+        room.persisted = False  # this new game can be persisted when it ends
         return True
 
     if mtype == "reset":
@@ -286,6 +295,7 @@ async def _dispatch(room, player, mtype: str, msg: dict) -> bool:
             raise MoveError("Only the host can reset.")
         from .game import Game
         room.game = Game(settings=room.settings)
+        room.persisted = False
         return True
 
     if mtype == "clue":

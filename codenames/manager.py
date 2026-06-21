@@ -20,11 +20,14 @@ import secrets
 import string
 import time
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from typing import Optional
 
+from . import store
 from .game import (
     BLUE,
     RED,
+    STATUS_ENDED,
     STATUS_LOBBY,
     STATUS_PLAYING,
     Game,
@@ -91,6 +94,9 @@ class Room:
     created: float = field(default_factory=time.time)
     last_active: float = field(default_factory=time.time)
     lock: asyncio.Lock = field(default_factory=asyncio.Lock)
+    # True once a completed game has been written to the store (one record per
+    # game). Reset when a new round starts.
+    persisted: bool = False
 
     def touch(self) -> None:
         self.last_active = time.time()
@@ -268,6 +274,46 @@ class Manager:
             room.sockets.pop(pid, None)
             if pid in room.players:
                 room.players[pid].connected = False
+        # Persist a completed game once (best-effort, off the hot path). The
+        # snapshot is built here under the room lock so the background write is
+        # race-free even if the room is reset immediately afterwards.
+        if room.game.status == STATUS_ENDED and not room.persisted:
+            room.persisted = True
+            if store.ENABLED:
+                snapshot = _match_snapshot(room)
+                asyncio.create_task(store.save_match(snapshot))
+
+
+def _match_snapshot(room: Room) -> dict:
+    """A plain, race-free record of a finished game for persistence."""
+    import uuid
+
+    g = room.game
+    s = room.settings
+    players = [
+        {"pid": p.id, "name": p.name, "team": p.team, "role": p.role,
+         "won": (p.team == g.winner)}
+        for p in room.players.values() if p.team in (RED, BLUE)
+    ]
+    return {
+        "id": uuid.uuid4().hex,
+        "room_code": room.code,
+        "created_at": datetime.fromtimestamp(room.created, tz=timezone.utc),
+        "ended_at": datetime.now(timezone.utc),
+        "board_size": s.board_size,
+        "pack_id": s.pack_id,
+        "pack_name": s.pack_name,
+        "custom_words": bool(s.custom_words),
+        "turn_seconds": s.turn_seconds,
+        "assassins": s.assassins,
+        "starting_team": g.starting_team,
+        "winner": g.winner,
+        "win_reason": g.win_reason,
+        "rounds": g.round_no,
+        "red_remaining": g.remaining(RED),
+        "blue_remaining": g.remaining(BLUE),
+        "players": players,
+    }
 
 
 def _clean_name(name: str) -> str:
