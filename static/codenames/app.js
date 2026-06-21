@@ -344,6 +344,7 @@
     roomView: null,           // lobby | play — tracks shell mode for partial render
     lastPhase: null,
     lastCurrentTeam: null,
+    lastClueKey: "",
     pendingGuess: null,
     config: null,
     authUser: null,
@@ -395,6 +396,7 @@
     state.roomView = null;
     state.lastPhase = null;
     state.lastCurrentTeam = null;
+    state.lastClueKey = "";
     state.pendingGuess = null;
     state.roomEpoch += 1;
   }
@@ -1350,7 +1352,51 @@
         if (gridEl) gridEl.parentElement.insertBefore(dev, gridEl);
       }
     } else     if (oldDev) oldDev.remove();
+    syncClueBanner();
     patchGuessUi();
+  }
+
+  function liveClueBanner() {
+    const g = state.room.game;
+    if (g.status !== "playing" || !g.clue) return null;
+    const team = g.currentTeam;
+    const you = state.you;
+    const isActiveOp = you && you.role === "operative" && you.team === team;
+    const guesses = g.guessesLeft == null
+      ? "Unlimited guesses"
+      : `${g.guessesLeft} guess${g.guessesLeft === 1 ? "" : "es"} left`;
+
+    const el = h(`
+      <div class="clue-banner clue-banner--${team}" aria-live="polite">
+        <div class="clue-banner__inner">
+          <span class="clue-banner__team">${esc(teamName(team))}</span>
+          <div class="clue-banner__main">
+            <span class="clue-banner__word">${esc(g.clue.word)}</span>
+            <span class="clue-banner__num" aria-label="Number of words">${g.clue.count === 0 ? "∞" : g.clue.count}</span>
+          </div>
+          <span class="clue-banner__meta">${esc(guesses)}</span>
+        </div>
+        ${isActiveOp ? `<div class="clue-banner__actions"><button type="button" class="btn clue-banner__pass" id="pass-banner">End turn</button></div>` : ""}
+      </div>`);
+    const p = el.querySelector("#pass-banner");
+    if (p) p.onclick = () => send({ type: "endTurn" });
+    return el;
+  }
+
+  function syncClueBanner(animate) {
+    const root = $("[data-room-root]");
+    if (!root) return;
+    const old = root.querySelector(".clue-banner");
+    const banner = liveClueBanner();
+    if (old) old.remove();
+    if (!banner) return;
+    if (animate) banner.classList.add("clue-banner--fresh");
+    const grid = root.querySelector("[data-game-grid]");
+    if (grid) root.insertBefore(banner, grid);
+    else root.appendChild(banner);
+    if (animate) {
+      setTimeout(() => banner.classList.remove("clue-banner--fresh"), 700);
+    }
   }
 
   function nearMarksForCard(nearPicks, index) {
@@ -1488,8 +1534,15 @@
     const main = $("[data-board-wrap]");
     if (!grid || !main) { state.roomView = null; renderRoom(); return; }
     fillPlayingView(main, grid);
+    const g = state.room.game;
+    const clueKey = g.clue ? `${g.clue.word}:${g.clue.count}` : "";
+    const clueChanged = clueKey !== state.lastClueKey;
+    state.lastClueKey = clueKey;
     if (turnChanged) {
       state.pendingGuess = null;
+    }
+    if (turnChanged || clueChanged) {
+      syncClueBanner(true);
       const pill = $(".turn-pill");
       if (pill) {
         pill.classList.add("turn-swap");
@@ -1915,18 +1968,7 @@
     }
 
     if (g.clue) {
-      return `
-        <div class="mission-panel__active mission-panel__active--live">
-          <div class="clue-display">
-            <span class="clue-meta">${esc(teamName(g.currentTeam))} briefing</span>
-            <div class="clue-live">
-              <span class="clue-word">${esc(g.clue.word)}</span>
-              <span class="clue-num">${g.clue.count === 0 ? "∞" : g.clue.count}</span>
-            </div>
-            <span class="guesses-left">${g.guessesLeft == null ? "Unlimited guesses" : `<b>${g.guessesLeft}</b> guess${g.guessesLeft === 1 ? "" : "es"} left`}</span>
-          </div>
-          ${isActiveOp ? `<button class="btn btn--danger btn--block" id="pass">⏭ End turn</button>` : ""}
-        </div>`;
+      return "";
     }
 
     return `<div class="mission-panel__active mission-panel__active--wait"><span class="muted">⏳ Awaiting ${esc(teamName(g.currentTeam))}'s briefing…</span></div>`;
