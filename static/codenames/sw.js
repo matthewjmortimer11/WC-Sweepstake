@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'cipher-pwa-20260621-1';
+const CACHE_VERSION = 'cipher-pwa-20260621-mobile-1';
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const PAGE_CACHE = `${CACHE_VERSION}-pages`;
 

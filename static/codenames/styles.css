@@ -153,7 +153,7 @@ body::before {
 
 .aurora, .grain { display: none; }
 
-.app { max-width: var(--maxw); margin: 0 auto; padding: clamp(16px, 3vw, 36px); min-height: 100vh; }
+.app { max-width: var(--maxw); margin: 0 auto; padding: clamp(12px, 2.5vw, 36px); padding-bottom: max(12px, env(safe-area-inset-bottom)); min-height: 100vh; min-height: 100dvh; }
 
 /* ── Typography ──────────────────────────────────────────────────────────── */
 h1, h2, h3 { margin: 0; font-family: var(--head); font-weight: 700; line-height: 1.12; letter-spacing: -0.02em; }
@@ -413,49 +413,55 @@ textarea.input { resize: vertical; min-height: 92px; font-size: 0.92rem; }
 
 /* ── Game layout ─────────────────────────────────────────────────────────── */
 .game-grid { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 16px; align-items: start; }
-@media (max-width: 920px) { .game-grid { grid-template-columns: 1fr; } }
-.board-wrap { display: grid; gap: 0; }
+@media (max-width: 920px) { .game-grid { grid-template-columns: 1fr; gap: 12px; } }
+.board-wrap { display: grid; gap: 12px; }
 
 /* ── Field index — codeword cards as worn dossier tabs ───────────────────── */
 .board-frame {
   background: var(--board-frame-bg);
   border: 1px solid var(--line-strong);
-  padding: 12px 12px 14px;
+  padding: 10px 10px 12px;
   border-radius: var(--radius);
   box-shadow: var(--hard-sm);
   position: relative;
+  width: 100%;
 }
 .board-frame::before {
   content: ""; position: absolute; inset: 8px; pointer-events: none; border-radius: var(--radius-sm);
   border: 1px dashed rgba(26, 23, 18, 0.12);
 }
 .board-frame__head {
-  display: flex; justify-content: space-between; align-items: baseline;
-  padding-bottom: 10px; margin-bottom: 10px;
+  display: flex; justify-content: space-between; align-items: center; gap: 8px;
+  padding-bottom: 8px; margin-bottom: 8px;
   border-bottom: 1px dashed var(--line);
-  font-family: var(--mono); font-size: 0.58rem; font-weight: 700;
-  letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-3);
+  font-family: var(--mono); font-size: 0.62rem; font-weight: 700;
+  letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-3);
+  flex-wrap: wrap;
 }
 .board-frame__head::before {
   content: "CLASSIFIED // ";
   color: var(--accent);
 }
+.board-frame__title { color: var(--ink-2); }
+.board-frame__title strong { color: var(--ink); font-weight: 800; font-size: 0.95rem; letter-spacing: 0.08em; }
+.board-frame__meta { margin-left: auto; }
 .board-frame__head strong { color: var(--ink-2); font-weight: 700; }
 
 .board {
-  display: grid; gap: 6px;
-  grid-template-columns: repeat(var(--cols, 5), 1fr);
-  padding: 10px;
+  display: grid; gap: 5px;
+  grid-template-columns: repeat(var(--cols, 5), minmax(0, 1fr));
+  padding: 8px;
   background: var(--card-desk);
   border: 1px solid var(--board-inner-border);
   border-radius: var(--radius-sm);
   box-shadow: var(--board-inset-shadow);
+  width: 100%;
 }
 
 .cardx {
-  position: relative; aspect-ratio: 1.32 / 1; min-height: 0;
-  padding: 16px 6px 10px; font: inherit; cursor: default;
-  display: grid; place-items: center; text-align: center;
+  position: relative; aspect-ratio: 1.08 / 1; min-height: 0; width: 100%;
+  padding: 15px 5px 9px; font: inherit; cursor: default;
+  display: flex; align-items: center; justify-content: center; text-align: center;
   border: 1px solid var(--line-strong); border-radius: var(--radius-sm);
   background: linear-gradient(165deg, var(--card-paper-hi) 0%, var(--card-paper) 55%, var(--card-paper-shadow) 100%);
   color: var(--card-ink);
@@ -483,13 +489,17 @@ textarea.input { resize: vertical; min-height: 92px; font-size: 0.92rem; }
 .cardx__mark--assassin { color: var(--red); background: #0a0a0a; border-color: var(--red-deep); }
 
 .cardx .word {
-  position: relative; z-index: 1;
-  font-family: var(--head); font-weight: 600; line-height: 1.08;
-  text-transform: uppercase; letter-spacing: 0.055em;
-  font-size: clamp(0.56rem, 1.25vw, 0.88rem);
-  word-break: break-word; hyphens: auto; padding: 0 4px;
+  position: relative; z-index: 1; width: 100%;
+  font-family: var(--head); font-weight: 700; line-height: 1.15;
+  text-transform: none; letter-spacing: 0.01em;
+  font-size: clamp(0.68rem, calc((min(100vw, var(--maxw)) - 72px) / var(--cols, 5) * 0.24), 1rem);
+  word-break: normal; overflow-wrap: anywhere; hyphens: none; padding: 0 3px;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden;
 }
-.cardx.emoji .word { font-size: clamp(1.2rem, 3.8vw, 2rem); letter-spacing: 0; text-transform: none; }
+.cardx.emoji .word {
+  font-size: clamp(1.15rem, calc((min(100vw, var(--maxw)) - 72px) / var(--cols, 5) * 0.42), 2rem);
+  letter-spacing: 0; -webkit-line-clamp: 2;
+}
 
 /* Operative view — unrevealed cards stay plain index stock (no team hints). */
 .board--blind .cardx:not(.revealed) {
@@ -587,32 +597,78 @@ textarea.input { resize: vertical; min-height: 92px; font-size: 0.92rem; }
   to { filter: none; }
 }
 
-/* ── Clue bar ────────────────────────────────────────────────────────────── */
-.cluebar { margin-top: 14px; padding: 14px 16px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-.cluebar--active { border-left: 2px solid var(--accent); }
-.clue-display { display: flex; align-items: baseline; gap: 12px; flex: 1; min-width: 0; flex-wrap: wrap; }
-.clue-display::before { display: none; }
+/* ── Mission panel (clue + recent moves) ─────────────────────────────────── */
+.mission-panel { display: grid; gap: 12px; padding: 14px 14px 12px; border-left: 3px solid var(--accent); }
+.mission-panel__label {
+  margin: 0 0 8px; font-family: var(--mono); font-size: 0.62rem; font-weight: 700;
+  letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-3);
+}
+.mission-panel__active { display: grid; gap: 10px; }
+.mission-panel__active--live { gap: 12px; }
+.mission-panel__active--ended { display: flex; flex-wrap: wrap; gap: 8px; }
+.mission-panel__active--wait { font-size: 0.95rem; }
+.mission-panel__trail-wrap { display: grid; gap: 8px; border-top: 1px dashed var(--line); padding-top: 10px; }
+.mission-panel__trail-label {
+  margin: 0; font-family: var(--mono); font-size: 0.58rem; font-weight: 700;
+  letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-3);
+}
+.mission-panel__trail-empty { margin: 0; }
+.mission-trail {
+  display: flex; gap: 8px; overflow-x: auto; padding-bottom: 2px;
+  scroll-snap-type: x proximity; -webkit-overflow-scrolling: touch;
+}
+.mission-chip {
+  flex: 0 0 auto; display: grid; gap: 2px; min-width: 88px; max-width: 150px;
+  padding: 8px 10px; border-radius: var(--radius-sm); border: 1.5px solid var(--line-strong);
+  background: var(--panel-2); scroll-snap-align: start;
+}
+.mission-chip--clue.red { border-color: var(--red-deep); background: color-mix(in srgb, var(--red) 8%, var(--panel)); }
+.mission-chip--clue.blue { border-color: var(--blue-deep); background: color-mix(in srgb, var(--blue) 8%, var(--panel)); }
+.mission-chip--guess.hit { border-color: var(--good); }
+.mission-chip--guess.wrong { border-color: var(--danger); }
+.mission-chip--guess.neutral { border-color: var(--neutral-deep); }
+.mission-chip--guess.assassin { border-color: #000; background: #1a1a1a; color: #eee; }
+.mission-chip__kind {
+  font-family: var(--mono); font-size: 0.52rem; font-weight: 700;
+  letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-3);
+}
+.mission-chip__word {
+  font-family: var(--head); font-weight: 700; font-size: 0.92rem; line-height: 1.15;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.mission-chip__num {
+  font-family: var(--mono); font-weight: 700; font-size: 0.78rem; color: var(--accent);
+}
+
+.clue-display { display: grid; gap: 8px; flex: 1; min-width: 0; }
+.clue-live { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .clue-meta {
-  font-family: var(--mono); font-size: 0.58rem; font-weight: 700;
+  font-family: var(--mono); font-size: 0.62rem; font-weight: 700;
   text-transform: uppercase; letter-spacing: 0.12em; color: var(--ink-3);
 }
 .clue-word {
-  font-family: var(--head); font-weight: 700;
-  font-size: clamp(1.1rem, 3vw, 1.6rem); letter-spacing: -0.01em;
+  font-family: var(--head); font-weight: 800;
+  font-size: clamp(1.35rem, 5.5vw, 2rem); letter-spacing: -0.02em; line-height: 1.05;
 }
 .clue-num {
-  min-width: 2.2em; height: 2.2em; padding: 0 0.35em;
-  display: grid; place-items: center; border: 1px solid var(--line-strong);
+  min-width: 2.4em; height: 2.4em; padding: 0 0.4em;
+  display: grid; place-items: center; border: 1.5px solid var(--line-strong);
   background: var(--surface-inset); color: var(--accent);
-  font-weight: 700; font-size: 1rem; border-radius: var(--radius-sm);
+  font-weight: 800; font-size: 1.05rem; border-radius: var(--radius-sm);
 }
-.clue-form { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; flex: 1; }
-.clue-form .field { flex: 1; min-width: 130px; }
-.guesses-left { color: var(--ink-3); font-size: 0.72rem; font-family: var(--mono); text-transform: uppercase; letter-spacing: 0.06em; }
-.guesses-left b { color: var(--ink); font-weight: 700; }
+.clue-form { display: grid; gap: 10px; flex: 1; min-width: 0; }
+.mission-panel__count { max-width: 140px; }
+.clue-form .field { min-width: 0; }
+.guesses-left { color: var(--ink-2); font-size: 0.82rem; font-family: var(--mono); text-transform: uppercase; letter-spacing: 0.05em; }
+.guesses-left b { color: var(--ink); font-weight: 800; font-size: 1rem; }
+
+/* Legacy cluebar selectors kept for any cached markup */
+.cluebar { margin-top: 0; padding: 14px 16px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.cluebar--active { border-left: 2px solid var(--accent); }
 
 /* ── Side panel ──────────────────────────────────────────────────────────── */
 .side { display: grid; gap: 16px; align-content: start; position: sticky; top: 16px; }
+@media (max-width: 920px) { .side { position: static; } }
 .tabs { display: flex; gap: 0; padding: 0; background: var(--surface-inset); border: 1.5px solid var(--line-strong); border-radius: var(--radius-sm); overflow: hidden; }
 .tabs button { flex: 1; appearance: none; border: 0; border-right: 1.5px solid var(--line); background: transparent; color: var(--ink-2); cursor: pointer; font: inherit; font-weight: 600; padding: 0.6em; font-size: 0.86rem; transition: 0.12s; }
 .tabs button:last-child { border-right: 0; }
@@ -913,6 +969,57 @@ input[type="range"]:disabled { background: var(--line-strong); cursor: not-allow
 .league-games { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
 .league-game { display: grid; gap: 2px; padding: 8px 10px; background: var(--panel-2); border: 1px solid var(--line); border-radius: var(--radius-sm); font-size: 0.86rem; }
 .league-game__meta { font-weight: 600; }
+
+/* ── Mobile-first play layout ─────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .topbar { margin-bottom: 10px; gap: 8px; }
+  .topbar__left, .topbar__right { gap: 8px; }
+  .room-code { font-size: 0.9rem; letter-spacing: 0.16em; }
+  .icon-btn { width: 38px; height: 38px; }
+
+  .scoreboard-wrap { margin-bottom: 10px; }
+  .mission-status::before { margin-bottom: 4px; }
+  .scoreboard { padding: 6px; gap: 6px; }
+  .team-score { padding: 8px 10px; gap: 8px; }
+  .team-score .num { font-size: 1.5rem; }
+  .team-score .meta b { font-size: 0.66rem; }
+  .turn-pill { min-width: 0; padding: 0 4px; }
+  .turn-pill .who { font-size: 0.66rem; line-height: 1.25; }
+
+  .mission-panel { padding: 12px; gap: 10px; }
+  .mission-chip { min-width: 96px; padding: 9px 11px; }
+  .mission-chip__word { font-size: 0.98rem; }
+
+  .board-frame { padding: 8px 8px 10px; }
+  .board-frame::before { inset: 6px; }
+  .board-frame__title strong { font-size: 1rem; }
+  .board { gap: 4px; padding: 5px; }
+  .cardx { padding: 11px 3px 7px; aspect-ratio: 1 / 1.02; }
+  .cardx__ref { font-size: 0.5rem; top: 4px; left: 4px; }
+  .cardx .word {
+    font-size: clamp(0.74rem, calc((100vw - 52px) / var(--cols, 5) * 0.285), 1.05rem);
+    line-height: 1.12;
+    -webkit-line-clamp: 2;
+  }
+  .cardx.emoji .word {
+    font-size: clamp(1.25rem, calc((100vw - 52px) / var(--cols, 5) * 0.46), 1.85rem);
+    -webkit-line-clamp: 2;
+  }
+
+  .dev-bar { flex-direction: column; align-items: stretch; }
+  .dev-bar__btns { display: flex; flex-wrap: wrap; gap: 6px; }
+}
+
+@media (max-width: 520px) {
+  .scoreboard {
+    grid-template-columns: 1fr 1fr;
+    grid-template-areas: "turn turn" "red blue";
+  }
+  .turn-pill { grid-area: turn; width: 100%; padding: 4px 0 8px; border-bottom: 1px dashed var(--line); }
+  .team-score--red { grid-area: red; }
+  .team-score--blue { grid-area: blue; }
+  .team-score--blue .meta { text-align: right !important; }
+}
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.05ms !important; }

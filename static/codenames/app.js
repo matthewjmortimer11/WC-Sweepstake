@@ -1322,11 +1322,14 @@
     const oldBoard = main.querySelector(".board-frame");
     if (oldBoard) oldBoard.replaceWith(board());
     else main.appendChild(board());
-    const oldClue = main.querySelector(".cluebar, .cluebar--active");
-    const clueParent = oldClue ? oldClue.parentElement : main;
-    const newClue = cluebar();
-    if (oldClue) oldClue.replaceWith(newClue);
-    else clueParent.appendChild(newClue);
+    const oldMission = main.querySelector(".mission-panel");
+    const newMission = missionPanel();
+    if (oldMission) oldMission.replaceWith(newMission);
+    else {
+      const boardEl = main.querySelector(".board-frame");
+      if (boardEl) main.insertBefore(newMission, boardEl);
+      else main.appendChild(newMission);
+    }
     const oldSide = grid.querySelector(".side");
     if (oldSide) oldSide.replaceWith(sidePanel());
     const root = $("[data-room-root]");
@@ -1674,8 +1677,8 @@
     const frame = h(`
       <div class="board-frame">
         <div class="board-frame__head">
-          <span>Ops map <strong>${g.board_size}×${g.board_size}</strong></span>
-          <span>Mission ${String(g.round || 1).padStart(2, "0")}</span>
+          <span class="board-frame__title">Ops map <strong>${g.board_size}×${g.board_size}</strong></span>
+          <span class="board-frame__meta">Mission ${String(g.round || 1).padStart(2, "0")}</span>
           ${showKey ? `<span class="board-frame__key">Key visible</span>` : ""}
         </div>
       </div>`);
@@ -1723,74 +1726,114 @@
     return { neutral: "N", assassin: "X", hidden: "" }[kind] || "";
   }
 
-  // ── clue bar ─────────────────────────────────────────────────────────────
-  function cluebar() {
+  // ── mission panel (clue + recent moves) ────────────────────────────────────
+  function missionChip(l) {
+    const team = (l.team === "red" || l.team === "blue") ? l.team : "";
+    if (l.t === "clue") {
+      return `<div class="mission-chip mission-chip--clue ${team}">
+        <span class="mission-chip__kind">Clue</span>
+        <span class="mission-chip__word">${esc(l.word || "")}</span>
+        <span class="mission-chip__num">${l.count === 0 ? "∞" : esc(String(l.count))}</span>
+      </div>`;
+    }
+    const kind = l.result || "guess";
+    const label = { hit: "Hit", wrong: "Miss", neutral: "Neutral", assassin: "💀" }[kind] || "Guess";
+    return `<div class="mission-chip mission-chip--guess mission-chip--${kind} ${team}">
+      <span class="mission-chip__kind">${label}</span>
+      <span class="mission-chip__word">${esc(l.word || "")}</span>
+    </div>`;
+  }
+
+  function missionTrailMarkup(log) {
+    const items = (log || []).filter((l) => l.t === "clue" || l.t === "guess").slice(-12);
+    if (!items.length) {
+      return `<p class="mission-panel__trail-empty tiny muted">Recent clues and guesses show up here.</p>`;
+    }
+    return `<div class="mission-trail" aria-label="Recent clues and guesses">${items.map(missionChip).join("")}</div>`;
+  }
+
+  function missionActiveMarkup() {
     const g = state.room.game;
     const you = state.you;
     if (g.status === "ended") {
-      const el = h(`<div class="panel cluebar">
-        ${you && you.isHost
-          ? `<button class="btn btn--primary" id="rematch">🔄 Rematch (same setup)</button><button class="btn" id="again">New round</button><button class="btn" id="tolobby">⚙️ Back to lobby</button>`
-          : `<span class="muted">Waiting for the host…</span>`}
-      </div>`);
-      const r = el.querySelector("#rematch"); if (r) r.onclick = () => send({ type: "rematch" });
-      const a = el.querySelector("#again"); if (a) a.onclick = () => send({ type: "start" });
-      const l = el.querySelector("#tolobby"); if (l) l.onclick = () => send({ type: "reset" });
-      return el;
+      return `
+        <div class="mission-panel__active mission-panel__active--ended">
+          ${you && you.isHost
+            ? `<button class="btn btn--primary" id="rematch">🔄 Rematch (same setup)</button><button class="btn" id="again">New round</button><button class="btn" id="tolobby">⚙️ Back to lobby</button>`
+            : `<span class="muted">Waiting for the host…</span>`}
+        </div>`;
     }
 
     const isActiveSpy = you && you.role === "spymaster" && you.team === g.currentTeam;
     const isActiveOp = you && you.role === "operative" && you.team === g.currentTeam;
 
-    // Spymaster giving a clue
     if (g.phase === "clue" && isActiveSpy) {
       const compound = state.room.settings.houseRules && state.room.settings.houseRules.compoundClues;
       const teamTotal = (g.totals && g.totals[you.team]) || 9;
       const maxClue = Math.min(9, teamTotal);
-      const el = h(`
-        <div class="panel cluebar">
+      return `
+        <div class="mission-panel__active mission-panel__active--form">
+          <p class="mission-panel__label">Your briefing</p>
           <form class="clue-form" id="clueform">
             <div class="field">
-              <label for="clueword">Your clue${compound ? "" : " (one word)"}</label>
+              <label for="clueword">Clue word${compound ? "" : " (one word)"}</label>
               <input class="input" id="clueword" maxlength="40" autocomplete="off" placeholder="${compound ? "e.g. ICE CREAM" : "e.g. OCEAN"}" />
             </div>
-            <div class="field" style="flex:0 0 110px">
+            <div class="field mission-panel__count">
               <label for="cluenum">Number <span class="tiny muted">(max ${maxClue})</span></label>
               <select class="select" id="cluenum">
                 ${Array.from({ length: maxClue + 1 }, (_, n) => `<option value="${n}">${n === 0 ? "∞ (0)" : n}</option>`).join("")}
               </select>
             </div>
-            <button class="btn btn--primary" type="submit">Give clue →</button>
+            <button class="btn btn--primary btn--block" type="submit">Give clue →</button>
           </form>
-        </div>`);
-      el.querySelector("#clueform").onsubmit = (e) => {
+        </div>`;
+    }
+
+    if (g.clue) {
+      return `
+        <div class="mission-panel__active mission-panel__active--live">
+          <div class="clue-display">
+            <span class="clue-meta">${esc(teamName(g.currentTeam))} briefing</span>
+            <div class="clue-live">
+              <span class="clue-word">${esc(g.clue.word)}</span>
+              <span class="clue-num">${g.clue.count === 0 ? "∞" : g.clue.count}</span>
+            </div>
+            <span class="guesses-left">${g.guessesLeft == null ? "Unlimited guesses" : `<b>${g.guessesLeft}</b> guess${g.guessesLeft === 1 ? "" : "es"} left`}</span>
+          </div>
+          ${isActiveOp ? `<button class="btn btn--danger btn--block" id="pass">⏭ End turn</button>` : ""}
+        </div>`;
+    }
+
+    return `<div class="mission-panel__active mission-panel__active--wait"><span class="muted">⏳ Awaiting ${esc(teamName(g.currentTeam))}'s briefing…</span></div>`;
+  }
+
+  function missionPanel() {
+    const g = state.room.game;
+    const el = h(`
+      <div class="panel mission-panel">
+        ${missionActiveMarkup()}
+        <div class="mission-panel__trail-wrap">
+          <p class="mission-panel__trail-label">Recent ops</p>
+          ${missionTrailMarkup(g.log)}
+        </div>
+      </div>`);
+
+    const r = el.querySelector("#rematch"); if (r) r.onclick = () => send({ type: "rematch" });
+    const a = el.querySelector("#again"); if (a) a.onclick = () => send({ type: "start" });
+    const l = el.querySelector("#tolobby"); if (l) l.onclick = () => send({ type: "reset" });
+    const form = el.querySelector("#clueform");
+    if (form) {
+      form.onsubmit = (e) => {
         e.preventDefault();
         const word = el.querySelector("#clueword").value.trim();
         const count = parseInt(el.querySelector("#cluenum").value, 10) || 0;
         if (!word) { toast("Enter a clue word.", "err"); return; }
         send({ type: "clue", word, count });
       };
-      return el;
     }
-
-    // Clue is shown to everyone during guessing
-    if (g.clue) {
-      const el = h(`
-        <div class="panel cluebar cluebar--active">
-          <div class="clue-display">
-            <span class="clue-meta">${esc(teamName(g.currentTeam))} briefing</span>
-            <span class="clue-word">${esc(g.clue.word)}</span>
-            <span class="clue-num">${g.clue.count === 0 ? "∞" : g.clue.count}</span>
-            <span class="guesses-left">${g.guessesLeft == null ? "unlimited guesses" : `<b>${g.guessesLeft}</b> guess${g.guessesLeft === 1 ? "" : "es"} left`}</span>
-          </div>
-          ${isActiveOp ? `<button class="btn btn--danger" id="pass">⏭ End turn</button>` : ""}
-        </div>`);
-      const p = el.querySelector("#pass"); if (p) p.onclick = () => send({ type: "endTurn" });
-      return el;
-    }
-
-    // Waiting for the other side
-    return h(`<div class="panel cluebar"><span class="muted">⏳ Awaiting ${esc(teamName(g.currentTeam))}'s briefing…</span></div>`);
+    const p = el.querySelector("#pass"); if (p) p.onclick = () => send({ type: "endTurn" });
+    return el;
   }
 
   // ── side panel ───────────────────────────────────────────────────────────
