@@ -101,12 +101,16 @@ async def _migrate_schema(conn) -> None:
             "ALTER TABLE cipher_match_player ADD COLUMN IF NOT EXISTS user_id VARCHAR",
             "ALTER TABLE cipher_user ADD COLUMN IF NOT EXISTS nickname VARCHAR NOT NULL DEFAULT ''",
             "ALTER TABLE cipher_match ADD COLUMN IF NOT EXISTS league_id VARCHAR",
+            "ALTER TABLE cipher_user ADD COLUMN IF NOT EXISTS avatar_source VARCHAR NOT NULL DEFAULT ''",
+            "ALTER TABLE cipher_user ADD COLUMN IF NOT EXISTS avatar_version INTEGER NOT NULL DEFAULT 0",
         ]
     else:
         stmts = [
             "ALTER TABLE cipher_match_player ADD COLUMN user_id VARCHAR",
             "ALTER TABLE cipher_user ADD COLUMN nickname VARCHAR NOT NULL DEFAULT ''",
             "ALTER TABLE cipher_match ADD COLUMN league_id VARCHAR",
+            "ALTER TABLE cipher_user ADD COLUMN avatar_source VARCHAR NOT NULL DEFAULT ''",
+            "ALTER TABLE cipher_user ADD COLUMN avatar_version INTEGER NOT NULL DEFAULT 0",
         ]
     for sql in stmts:
         try:
@@ -140,6 +144,8 @@ async def upsert_google_user(claims: dict) -> dict:
                 display_name=name,
                 nickname="",
                 avatar_url=avatar,
+                avatar_source="google" if avatar else "",
+                avatar_version=0,
                 created_at=now,
                 last_seen_at=now,
             )
@@ -147,8 +153,10 @@ async def upsert_google_user(claims: dict) -> dict:
         else:
             if name:
                 row.display_name = name
-            if avatar:
+            source = (getattr(row, "avatar_source", None) or "").strip()
+            if avatar and source in ("", "google"):
                 row.avatar_url = avatar
+                row.avatar_source = "google"
             row.last_seen_at = now
         await session.commit()
         return _user_public(row)
@@ -172,14 +180,27 @@ def _user_label(row) -> str:
     return (row.display_name or "Agent").strip() or "Agent"
 
 
+def _avatar_url_for_row(row) -> Optional[str]:
+    source = (getattr(row, "avatar_source", None) or "").strip()
+    version = int(getattr(row, "avatar_version", 0) or 0)
+    if source == "upload" and version > 0:
+        return f"/play/api/users/{row.id}/avatar?v={version}"
+    url = (row.avatar_url or "").strip()
+    return url or None
+
+
 def _user_public(row) -> dict:
     label = _user_label(row)
+    source = (getattr(row, "avatar_source", None) or "").strip()
+    version = int(getattr(row, "avatar_version", 0) or 0)
     return {
         "id": row.id,
         "displayName": row.display_name,
         "nickname": getattr(row, "nickname", None) or "",
         "label": label,
-        "avatarUrl": row.avatar_url or None,
+        "avatarUrl": _avatar_url_for_row(row),
+        "avatarSource": source,
+        "avatarVersion": version,
     }
 
 
@@ -209,6 +230,71 @@ async def update_nickname(user_id: str, nickname: str) -> Optional[dict]:
         row.last_seen_at = datetime.now(timezone.utc)
         await session.commit()
         return _user_public(row)
+
+
+async def save_user_avatar(user_id: str, content_type: str, data: bytes) -> Optional[dict]:
+    if not ENABLED or not user_id or not data:
+        return None
+    from .models import CipherUser, CipherUserAvatar
+    await init_models()
+    now = datetime.now(timezone.utc)
+    async with SessionLocal() as session:
+        row = await session.get(CipherUser, user_id)
+        if not row:
+            return None
+        asset = await session.get(CipherUserAvatar, user_id)
+        if asset is None:
+            asset = CipherUserAvatar(
+                user_id=user_id,
+                content_type=content_type,
+                data=data,
+                updated_at=now,
+            )
+            session.add(asset)
+        else:
+            asset.content_type = content_type
+            asset.data = data
+            asset.updated_at = now
+        row.avatar_source = "upload"
+        row.avatar_version = int(getattr(row, "avatar_version", 0) or 0) + 1
+        row.last_seen_at = now
+        await session.commit()
+        return _user_public(row)
+
+
+async def delete_user_avatar(user_id: str) -> Optional[dict]:
+    if not ENABLED or not user_id:
+        return None
+    from .models import CipherUser, CipherUserAvatar
+    await init_models()
+    async with SessionLocal() as session:
+        row = await session.get(CipherUser, user_id)
+        if not row:
+            return None
+        asset = await session.get(CipherUserAvatar, user_id)
+        if asset:
+            await session.delete(asset)
+        fallback = (row.avatar_url or "").strip()
+        row.avatar_source = "google" if fallback else ""
+        row.avatar_version = int(getattr(row, "avatar_version", 0) or 0) + 1
+        row.last_seen_at = datetime.now(timezone.utc)
+        await session.commit()
+        return _user_public(row)
+
+
+async def get_user_avatar(user_id: str) -> Optional[tuple[str, bytes]]:
+    if not ENABLED or not user_id:
+        return None
+    from .models import CipherUser, CipherUserAvatar
+    await init_models()
+    async with SessionLocal() as session:
+        row = await session.get(CipherUser, user_id)
+        if not row or (getattr(row, "avatar_source", "") or "") != "upload":
+            return None
+        asset = await session.get(CipherUserAvatar, user_id)
+        if not asset or not asset.data:
+            return None
+        return asset.content_type or "image/jpeg", bytes(asset.data)
 
 
 def _gen_league_code() -> str:

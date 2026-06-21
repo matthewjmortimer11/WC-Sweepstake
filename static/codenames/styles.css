@@ -709,9 +709,21 @@ textarea.input { resize: vertical; min-height: 92px; font-size: 0.92rem; }
 .social-panel { display: grid; gap: 16px; }
 .social-panel__head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 .social-panel__google { min-height: 44px; }
-.social-user { display: flex; align-items: center; gap: 12px; }
-.social-user__av { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; border: 1.5px solid var(--line-strong); }
-.social-user__av--ph { display: grid; place-items: center; background: var(--panel-2); font-size: 1.2rem; }
+.social-user { display: flex; align-items: flex-start; gap: 12px; }
+.social-user__av-btn {
+  appearance: none; border: 0; padding: 0; background: transparent; cursor: pointer;
+  border-radius: 50%; line-height: 0; flex: none;
+}
+.social-user__av-btn:hover .social-user__av,
+.social-user__av-btn:focus-visible .social-user__av { border-color: var(--accent); box-shadow: var(--ring); }
+.social-user__av-btn:focus-visible { outline: none; }
+.social-user__av { width: 56px; height: 56px; border-radius: 50%; object-fit: cover; border: 1.5px solid var(--line-strong); display: block; }
+.social-user__av--ph { display: grid; place-items: center; background: var(--panel-2); font-size: 1.35rem; width: 56px; height: 56px; }
+.social-user__av-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+.social-list__who { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
+.social-list__who > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.social-list__av { width: 24px; height: 24px; border-radius: 50%; object-fit: cover; border: 1px solid var(--line); flex: none; }
+.social-list__av.social-user__av--ph { font-size: 0.75rem; width: 24px; height: 24px; }
 .social-stats { display: flex; gap: 10px; flex-wrap: wrap; }
 .social-stat { flex: 1; min-width: 88px; padding: 10px; border: 1.5px solid var(--line); border-radius: var(--radius-sm); background: var(--panel-2); text-align: center; }
 .social-stat__val { display: block; font-family: var(--head); font-size: 1.15rem; font-weight: 700; }

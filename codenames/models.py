@@ -10,7 +10,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, UniqueConstraint
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, LargeBinary, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .store import CipherBase
@@ -30,8 +30,23 @@ class CipherUser(CipherBase):
     display_name: Mapped[str] = mapped_column(String, nullable=False, default="")
     nickname: Mapped[str] = mapped_column(String, nullable=False, default="")
     avatar_url: Mapped[str] = mapped_column(String, nullable=False, default="")
+    avatar_source: Mapped[str] = mapped_column(String, nullable=False, default="")
+    avatar_version: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     last_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class CipherUserAvatar(CipherBase):
+    """Uploaded profile photo bytes for a Cipher user."""
+
+    __tablename__ = "cipher_user_avatar"
+
+    user_id: Mapped[str] = mapped_column(
+        String, ForeignKey("cipher_user.id", ondelete="CASCADE"), primary_key=True,
+    )
+    content_type: Mapped[str] = mapped_column(String, nullable=False, default="image/jpeg")
+    data: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
 
 class CipherLeague(CipherBase):

@@ -1,5 +1,6 @@
 """Tests for optional Cipher login and social stats."""
 
+import base64
 import uuid
 from datetime import datetime, timedelta, timezone
 
@@ -11,6 +12,20 @@ import main
 from codenames import auth, store
 
 
+_TINY_JPEG = base64.b64decode(
+    "/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRof"
+    "Hh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/2wBDAQkJCQwLDBgNDRgyIRwh"
+    "MjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjL/wAAR"
+    "CAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAn/xAAUEAEAAAAAAAAAAAAAAAAA"
+    "AAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMB"
+    "AAIRAxEAPwCwAA//2Q=="
+)
+
+
+def _jpeg_data_url() -> str:
+    return "data:image/jpeg;base64," + base64.b64encode(_TINY_JPEG).decode("ascii")
+
+
 @pytest.fixture
 def client():
     with TestClient(main.app) as c:
@@ -20,12 +35,16 @@ def client():
 async def _reset_social_tables():
     await store.init_models()
     from codenames.models import (
-        CipherFriend, CipherMatch, CipherMatchPlayer, CipherUser,
+        CipherFriend, CipherLeague, CipherLeagueMember, CipherMatch, CipherMatchPlayer,
+        CipherUser, CipherUserAvatar,
     )
     async with store.SessionLocal() as s:
         await s.execute(delete(CipherMatchPlayer))
         await s.execute(delete(CipherMatch))
+        await s.execute(delete(CipherLeagueMember))
+        await s.execute(delete(CipherLeague))
         await s.execute(delete(CipherFriend))
+        await s.execute(delete(CipherUserAvatar))
         await s.execute(delete(CipherUser))
         await s.commit()
 
@@ -45,9 +64,62 @@ async def test_upsert_google_user_creates_profile():
         "picture": "https://example.com/av.png",
     })
     assert user["displayName"] == "Test Agent"
+    assert user["avatarUrl"] == "https://example.com/av.png"
+    assert user["avatarSource"] == "google"
     again = await store.upsert_google_user({"sub": "google-sub-1", "name": "Renamed"})
     assert again["id"] == user["id"]
     assert again["displayName"] == "Renamed"
+
+
+async def test_uploaded_avatar_not_overwritten_by_google():
+    await _reset_social_tables()
+    user = await store.upsert_google_user({
+        "sub": "google-sub-2",
+        "name": "Uploader",
+        "picture": "https://example.com/google.png",
+    })
+    updated = await store.save_user_avatar(user["id"], "image/jpeg", _TINY_JPEG)
+    assert updated["avatarSource"] == "upload"
+    assert updated["avatarUrl"].startswith("/play/api/users/")
+    again = await store.upsert_google_user({
+        "sub": "google-sub-2",
+        "name": "Uploader",
+        "picture": "https://example.com/new-google.png",
+    })
+    assert again["avatarSource"] == "upload"
+    assert again["avatarUrl"].startswith("/play/api/users/")
+
+
+async def test_avatar_upload_delete_and_serve(client):
+    await _reset_social_tables()
+    user = await store.upsert_google_user({"sub": "g-av", "name": "Photo Agent"})
+    token = auth.cipher_token_for(user["id"])
+
+    r = client.put(
+        "/play/api/me/avatar",
+        json={"dataUrl": _jpeg_data_url()},
+        headers={"X-Cipher-Token": token},
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["user"]["avatarSource"] == "upload"
+    assert body["user"]["avatarVersion"] == 1
+
+    served = client.get(f"/play/api/users/{user['id']}/avatar")
+    assert served.status_code == 200
+    assert served.content == _TINY_JPEG
+    assert served.headers["content-type"].startswith("image/jpeg")
+
+    r2 = client.delete("/play/api/me/avatar", headers={"X-Cipher-Token": token})
+    assert r2.status_code == 200
+    assert r2.json()["user"]["avatarSource"] == ""
+
+    assert client.get(f"/play/api/users/{user['id']}/avatar").status_code == 404
+
+
+def test_avatar_requires_auth(client):
+    r = client.put("/play/api/me/avatar", json={"dataUrl": _jpeg_data_url()})
+    assert r.status_code == 401
 
 
 async def test_user_stats_and_leaderboard():

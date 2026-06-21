@@ -27,6 +27,42 @@
     return (u.label || u.nickname || u.displayName || "Agent").trim() || "Agent";
   }
 
+  function avatarImg(u, cls, alt) {
+    const url = u && u.avatarUrl;
+    const c = cls || "social-user__av";
+    if (url) {
+      return `<img class="${c}" src="${esc(url)}" alt="${esc(alt || "")}" loading="lazy" decoding="async" />`;
+    }
+    return `<span class="${c} social-user__av--ph" aria-hidden="true">👤</span>`;
+  }
+
+  function resizeImageToDataUrl(file, size, cb) {
+    const s = size || 256;
+    const fr = new FileReader();
+    fr.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        canvas.width = s;
+        canvas.height = s;
+        const ctx = canvas.getContext("2d");
+        const scale = Math.max(s / img.width, s / img.height);
+        const w = img.width * scale;
+        const h = img.height * scale;
+        ctx.drawImage(img, (s - w) / 2, (s - h) / 2, w, h);
+        try { cb(canvas.toDataURL("image/jpeg", 0.82)); } catch (_) { cb(null); }
+      };
+      img.onerror = () => cb(null);
+      img.src = fr.result;
+    };
+    fr.onerror = () => cb(null);
+    fr.readAsDataURL(file);
+  }
+
+  function socialListUser(u, extra) {
+    return `<span class="social-list__who">${avatarImg(u, "social-list__av", userLabel(u))}<span>${esc(userLabel(u))}${extra || ""}</span></span>`;
+  }
+
   function getActiveLeague() {
     try {
       const raw = localStorage.getItem(LS.league);
@@ -795,27 +831,37 @@
     const leaders = (data.leaderboard && data.leaderboard.leaders) || [];
 
     const friendList = friends.length
-      ? friends.map((f) => `<li class="social-list__item"><span>${esc(userLabel(f))}</span><button class="btn btn--sm" data-unfriend="${esc(f.id)}">Remove</button></li>`).join("")
+      ? friends.map((f) => `<li class="social-list__item">${socialListUser(f)}<button class="btn btn--sm" data-unfriend="${esc(f.id)}">Remove</button></li>`).join("")
       : `<li class="tiny muted">No friends yet — add someone from recent players.</li>`;
 
     const recentList = recent.length
-      ? recent.filter((r) => r && r.user).map((r) => `<li class="social-list__item"><span>${esc(userLabel(r.user))}${r.wasTeammate ? " · teammate" : " · opponent"}</span><button class="btn btn--sm" data-addfriend="${esc(r.user.id)}">Add friend</button></li>`).join("")
+      ? recent.filter((r) => r && r.user).map((r) => `<li class="social-list__item">${socialListUser(r.user, r.wasTeammate ? " · teammate" : " · opponent")}<button class="btn btn--sm" data-addfriend="${esc(r.user.id)}">Add friend</button></li>`).join("")
       : `<li class="tiny muted">Play a logged-in match to see recent players.</li>`;
 
     const pairList = pairings.length
-      ? pairings.filter((p) => p && p.user).slice(0, 5).map((p) => `<li class="social-list__item"><span>${esc(userLabel(p.user))}</span><span class="tiny muted">${p.winsTogether}/${p.gamesTogether} wins together</span></li>`).join("")
+      ? pairings.filter((p) => p && p.user).slice(0, 5).map((p) => `<li class="social-list__item">${socialListUser(p.user)}<span class="tiny muted">${p.winsTogether}/${p.gamesTogether} wins together</span></li>`).join("")
       : `<li class="tiny muted">No pairings yet.</li>`;
 
     const leaderList = leaders.length
-      ? leaders.filter((l) => l && l.user).slice(0, 8).map((l, i) => `<li class="social-list__item"><span>${i + 1}. ${esc(userLabel(l.user))}</span><span class="tiny muted">${l.wins} wins</span></li>`).join("")
+      ? leaders.filter((l) => l && l.user).slice(0, 8).map((l, i) => `<li class="social-list__item">${socialListUser(l.user, ` · #${i + 1}`)}<span class="tiny muted">${l.wins} wins</span></li>`).join("")
       : `<li class="tiny muted">Leaderboard fills as logged-in games are played.</li>`;
 
     return `
       <div class="panel social-panel" id="social-panel">
         <div class="social-panel__head">
           <div class="social-user">
-            ${u.avatarUrl ? `<img class="social-user__av" src="${esc(u.avatarUrl)}" alt="" />` : `<span class="social-user__av social-user__av--ph">👤</span>`}
-            <div><b>${esc(userLabel(u))}</b><div class="tiny muted">Cipher profile</div></div>
+            <button type="button" class="social-user__av-btn" id="pick-av" title="Change profile photo" aria-label="Change profile photo">
+              ${avatarImg(u, "social-user__av")}
+            </button>
+            <input type="file" id="av-file" accept="image/jpeg,image/png,image/webp,image/*" hidden />
+            <div>
+              <b>${esc(userLabel(u))}</b>
+              <div class="tiny muted">Cipher profile</div>
+              <div class="social-user__av-actions">
+                <button class="btn btn--sm" id="change-av" type="button">Change photo</button>
+                ${u.avatarSource === "upload" ? `<button class="btn btn--sm btn--ghost" id="remove-av" type="button">Remove</button>` : ""}
+              </div>
+            </div>
           </div>
           <button class="btn btn--sm" id="signout">Sign out</button>
         </div>
@@ -843,6 +889,52 @@
   }
 
   function wireSocialPanel() {
+    const openAvPicker = () => {
+      const input = $("#av-file");
+      if (input) input.click();
+    };
+    const pickAv = $("#pick-av");
+    if (pickAv) pickAv.onclick = openAvPicker;
+    const changeAv = $("#change-av");
+    if (changeAv) changeAv.onclick = openAvPicker;
+    const avFile = $("#av-file");
+    if (avFile) {
+      avFile.onchange = () => {
+        const file = avFile.files && avFile.files[0];
+        avFile.value = "";
+        if (!file) return;
+        if (!file.type.startsWith("image/")) {
+          toast("Pick an image file", "err");
+          return;
+        }
+        resizeImageToDataUrl(file, 256, async (dataUrl) => {
+          if (!dataUrl) { toast("Couldn't read that image", "err"); return; }
+          const preview = pickAv && pickAv.querySelector("img");
+          if (preview) preview.src = dataUrl;
+          const r = await authFetch("/play/api/me/avatar", {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ dataUrl }),
+          });
+          const d = await r.json().catch(() => ({}));
+          if (!r.ok) { toast(d.detail || "Couldn't save photo", "err"); boot(); return; }
+          setAuth(getCipherToken(), d.user);
+          toast("Profile photo updated", "ok");
+          boot();
+        });
+      };
+    }
+    const removeAv = $("#remove-av");
+    if (removeAv) {
+      removeAv.onclick = async () => {
+        const r = await authFetch("/play/api/me/avatar", { method: "DELETE" });
+        const d = await r.json().catch(() => ({}));
+        if (!r.ok) { toast(d.detail || "Couldn't remove photo", "err"); return; }
+        setAuth(getCipherToken(), d.user);
+        toast("Profile photo removed", "ok");
+        boot();
+      };
+    }
     const savenick = $("#savenick");
     if (savenick) {
       savenick.onclick = async () => {

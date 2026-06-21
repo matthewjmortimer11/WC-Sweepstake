@@ -20,10 +20,11 @@ import uuid
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, WebSocket, WebSocketDisconnect
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 from pydantic import BaseModel
 
 from . import auth, store
+from .avatars import decode_data_url
 from .game import BLUE, RED, STATUS_LOBBY, MAX_ASSASSINS, MoveError, Settings, HouseRules
 from .manager import (
     _ALLOWED_SIZES,
@@ -78,6 +79,10 @@ class FriendBody(BaseModel):
 
 class NicknameBody(BaseModel):
     nickname: str
+
+
+class AvatarBody(BaseModel):
+    dataUrl: str
 
 
 class CreateLeagueBody(BaseModel):
@@ -170,6 +175,42 @@ async def update_me(body: NicknameBody, uid: str = Depends(get_cipher_user)) -> 
     if not profile:
         raise HTTPException(status_code=400, detail="Invalid nickname.")
     return JSONResponse({"user": profile})
+
+
+@router.put("/play/api/me/avatar")
+async def put_my_avatar(body: AvatarBody, uid: str = Depends(get_cipher_user)) -> JSONResponse:
+    ctype, raw = decode_data_url(body.dataUrl)
+    try:
+        profile = await store.save_user_avatar(uid, ctype, raw)
+    except RuntimeError:
+        raise HTTPException(status_code=503, detail="Stats storage is not available.")
+    if not profile:
+        raise HTTPException(status_code=404, detail="Account not found.")
+    return JSONResponse({"ok": True, "user": profile})
+
+
+@router.delete("/play/api/me/avatar")
+async def delete_my_avatar(uid: str = Depends(get_cipher_user)) -> JSONResponse:
+    try:
+        profile = await store.delete_user_avatar(uid)
+    except RuntimeError:
+        raise HTTPException(status_code=503, detail="Stats storage is not available.")
+    if not profile:
+        raise HTTPException(status_code=404, detail="Account not found.")
+    return JSONResponse({"ok": True, "user": profile})
+
+
+@router.get("/play/api/users/{user_id}/avatar")
+async def get_user_avatar(user_id: str) -> Response:
+    asset = await store.get_user_avatar(user_id)
+    if not asset:
+        raise HTTPException(status_code=404, detail="No avatar.")
+    ctype, raw = asset
+    return Response(
+        content=raw,
+        media_type=ctype,
+        headers={"Cache-Control": "public, max-age=86400"},
+    )
 
 
 @router.get("/play/api/me/leagues")
