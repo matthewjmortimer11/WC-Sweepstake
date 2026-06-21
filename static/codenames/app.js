@@ -1407,6 +1407,23 @@
     }
   }
 
+  function cardWordSpan(word, isEmoji, cols) {
+    const text = String(word == null ? "" : word).trim();
+    const n = Number(cols) || 5;
+    if (isEmoji) {
+      const em = Math.min(1.7, Math.max(1rem, (n <= 4 ? 1.15 : 1) * 1.35));
+      return `<span class="word word--emoji" style="font-size:${em.toFixed(2)}rem">${esc(word)}</span>`;
+    }
+    if (!/[\s-]/.test(text)) {
+      const chars = Math.max(text.length, 1);
+      const colScale = n >= 6 ? 0.86 : n <= 4 ? 1.06 : 1;
+      const size = Math.min(0.74 * colScale, Math.max(0.42 * colScale, (4.6 * colScale) / chars));
+      return `<span class="word word--single" style="--word-chars:${chars};font-size:${size.toFixed(3)}rem">${esc(word)}</span>`;
+    }
+    const multi = Math.min(0.7, 0.58 + (n <= 4 ? 0.06 : 0));
+    return `<span class="word word--multi" style="font-size:${multi.toFixed(3)}rem">${esc(word)}</span>`;
+  }
+
   function nearMarksForCard(nearPicks, index) {
     return (nearPicks || []).filter((np) => (np.indices || []).includes(index));
   }
@@ -1988,7 +2005,7 @@
           <span class="cardx__ref" aria-hidden="true">${String(c.i + 1).padStart(2, "0")}</span>
           ${c.revealed ? `<span class="cardx__status">Out</span>` : ""}
           ${mark ? `<span class="cardx__mark cardx__mark--${c.kind}" aria-hidden="true">${mark}</span>` : ""}
-          <span class="word">${esc(c.word)}</span>
+          ${cardWordSpan(c.word, isEmoji, g.board_size)}
           ${nearHtml}
         </button>`);
       applyCardPickState(btn, c, nearPicks, you, g);
