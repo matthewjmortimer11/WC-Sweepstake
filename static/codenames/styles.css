@@ -420,14 +420,73 @@ textarea.input { resize: vertical; min-height: 92px; font-size: 0.92rem; }
 }
 .cardx.emoji .word { font-size: clamp(1.2rem, 3.8vw, 2rem); letter-spacing: 0; text-transform: none; }
 
-/* Spymaster classification — edge ink only, not full wash */
-.cardx.hint-red { border-top: 2px solid var(--red); }
-.cardx.hint-blue { border-top: 2px solid var(--blue); }
-.cardx.hint-neutral { border-top: 2px solid var(--neutral-deep); }
-.cardx.hint-assassin {
-  border-top: 2px solid #000;
-  background: linear-gradient(165deg, #1a1a1a 0%, #080808 100%);
-  color: #8a8a8a;
+/* Operative view — unrevealed cards stay plain index stock (no team hints). */
+.board--blind .cardx:not(.revealed) {
+  background: linear-gradient(165deg, var(--card-paper-hi) 0%, var(--card-paper) 55%, #1e1c16 100%);
+  color: var(--card-ink);
+  border-color: #4a4638;
+}
+.board--blind .cardx:not(.revealed) .cardx__mark { display: none; }
+
+/* Spymaster key — full colour wash per designation (unrevealed). */
+.cardx.key-red {
+  background: linear-gradient(155deg, #d4564e 0%, var(--red-deep) 42%, #5c221e 100%);
+  color: var(--red-ink);
+  border-color: #3a1512;
+  box-shadow: inset 0 1px 0 rgba(255, 220, 210, 0.12), 1px 2px 0 #000;
+}
+.cardx.key-red .word { color: var(--red-ink); text-shadow: 0 1px 0 rgba(0, 0, 0, 0.35); }
+.cardx.key-red .cardx__ref { color: rgba(255, 230, 225, 0.55); }
+
+.cardx.key-blue {
+  background: linear-gradient(155deg, #6aa3ad 0%, var(--blue-deep) 42%, #1e3a40 100%);
+  color: var(--blue-ink);
+  border-color: #1a3238;
+  box-shadow: inset 0 1px 0 rgba(220, 240, 245, 0.12), 1px 2px 0 #000;
+}
+.cardx.key-blue .word { color: var(--blue-ink); text-shadow: 0 1px 0 rgba(0, 0, 0, 0.35); }
+.cardx.key-blue .cardx__ref { color: rgba(220, 240, 245, 0.55); }
+
+.cardx.key-neutral {
+  background: linear-gradient(155deg, #c4b896 0%, var(--neutral-deep) 48%, #6b6350 100%);
+  color: var(--neutral-ink);
+  border-color: #5a5342;
+  box-shadow: inset 0 1px 0 rgba(255, 250, 235, 0.1), 1px 2px 0 #000;
+}
+.cardx.key-neutral::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none; opacity: 0.35; mix-blend-mode: multiply;
+  background-image:
+    repeating-linear-gradient(108deg, transparent 0, transparent 11px, rgba(40, 35, 25, 0.14) 11px, rgba(40, 35, 25, 0.14) 12px),
+    repeating-linear-gradient(-18deg, transparent 0, transparent 17px, rgba(255, 255, 255, 0.04) 17px, rgba(255, 255, 255, 0.04) 18px);
+}
+.cardx.key-neutral .word { color: #2a2418; }
+.cardx.key-neutral .cardx__ref { color: rgba(42, 36, 24, 0.5); }
+
+.cardx.key-assassin {
+  background: linear-gradient(160deg, #1c1c1c 0%, #080808 55%, #000000 100%);
+  color: #b8b8b8;
+  border-color: #000;
+  box-shadow: inset 0 0 0 1px rgba(192, 71, 63, 0.35), 1px 2px 0 #000;
+}
+.cardx.key-assassin .word { color: #e8e8e8; }
+.cardx.key-assassin .cardx__ref { color: rgba(200, 200, 200, 0.45); }
+
+.cardx.key-red .cardx__mark,
+.cardx.key-blue .cardx__mark,
+.cardx.key-neutral .cardx__mark {
+  background: rgba(0, 0, 0, 0.22);
+  border-color: rgba(255, 255, 255, 0.35);
+  color: #fff;
+}
+.cardx.key-assassin .cardx__mark {
+  background: var(--red-deep);
+  border-color: var(--red);
+  color: var(--red-ink);
+}
+
+.board-frame__key {
+  font-family: var(--mono); font-size: 0.58rem; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.1em; color: var(--accent);
 }
 
 .cardx.clickable { cursor: pointer; }
@@ -444,10 +503,10 @@ textarea.input { resize: vertical; min-height: 92px; font-size: 0.92rem; }
   background-image: radial-gradient(rgba(0, 0, 0, 0.85) 0.6px, transparent 0.7px);
   background-size: 3px 3px; mix-blend-mode: multiply;
 }
-.cardx.kind-red { background: var(--red-deep); color: var(--red-ink); border-color: #000; }
-.cardx.kind-blue { background: var(--blue-deep); color: var(--blue-ink); border-color: #000; }
-.cardx.kind-neutral { background: var(--neutral-deep); color: var(--neutral-ink); border-color: #000; }
-.cardx.kind-assassin { background: #080808; color: #ccc; border-color: var(--red-deep); }
+.cardx.kind-red { background: linear-gradient(155deg, #c0473f 0%, var(--red-deep) 50%, #5c221e 100%); color: var(--red-ink); border-color: #000; }
+.cardx.kind-blue { background: linear-gradient(155deg, #4d8893 0%, var(--blue-deep) 50%, #1e3a40 100%); color: var(--blue-ink); border-color: #000; }
+.cardx.kind-neutral { background: linear-gradient(155deg, #b3a684 0%, var(--neutral-deep) 50%, #6b6350 100%); color: var(--neutral-ink); border-color: #000; }
+.cardx.kind-assassin { background: linear-gradient(160deg, #141414 0%, #050505 100%); color: #ccc; border-color: #000; }
 .cardx.kind-assassin .word { color: var(--red); }
 .cardx.kind-assassin .cardx__mark { color: var(--red); }
 

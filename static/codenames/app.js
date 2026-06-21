@@ -1026,32 +1026,41 @@
     const g = state.room.game;
     const you = state.you;
     const isEmoji = packIdsIncludeEmoji(state.room.settings);
+    const showKey = !!(you && you.revealKey);
     const canGuess = you && g.status === "playing" && g.phase === "guess"
       && you.team === g.currentTeam && you.role === "operative";
-    const isSpy = you && you.revealKey;
 
     const frame = h(`
       <div class="board-frame">
         <div class="board-frame__head">
           <span>Index <strong>${g.board_size}×${g.board_size}</strong></span>
           <span>Round ${String(g.round || 1).padStart(2, "0")}</span>
+          ${showKey ? `<span class="board-frame__key">Key visible</span>` : ""}
         </div>
       </div>`);
-    const grid = h(`<div class="board" style="--cols:${g.board_size}" role="grid" aria-label="Word board"></div>`);
+    const grid = h(`<div class="board ${showKey ? "board--key" : "board--blind"}" style="--cols:${g.board_size}" role="grid" aria-label="Word board"></div>`);
     const animCutoff = Date.now() - 600;
     g.cards.forEach((c) => {
       const hidden = c.kind === "hidden";
       const classes = ["cardx"];
       if (isEmoji) classes.push("emoji");
-      if (c.revealed) { classes.push("revealed", "kind-" + c.kind); }
-      else if (!hidden) { classes.push("hint-" + c.kind); }
+      if (c.revealed) {
+        classes.push("revealed", "kind-" + c.kind);
+      } else if (showKey && !hidden) {
+        classes.push("key-" + c.kind);
+      }
       if (canGuess && !c.revealed) classes.push("clickable");
       if (state.lastRevealedAt[c.i] && state.lastRevealedAt[c.i] > animCutoff) classes.push("just-revealed");
 
-      const mark = (!hidden && (isSpy || c.revealed)) ? markerFor(c.kind) : "";
+      const showMark = c.revealed || (showKey && !hidden);
+      const mark = showMark ? markerFor(c.kind) : "";
+      const ariaLabel = c.revealed
+        ? `${c.word}, ${c.kind}`
+        : (showKey && !hidden ? `${c.word}, ${c.kind}` : c.word);
+
       const btn = h(`
         <button class="${classes.join(" ")}" ${canGuess && !c.revealed ? "" : "tabindex=\"-1\""}
-          role="gridcell" aria-label="${esc(c.word)}${c.revealed ? ", " + c.kind : ""}">
+          role="gridcell" aria-label="${esc(ariaLabel)}">
           <span class="cardx__ref" aria-hidden="true">${String(c.i + 1).padStart(2, "0")}</span>
           ${mark ? `<span class="cardx__mark cardx__mark--${c.kind}" aria-hidden="true">${mark}</span>` : ""}
           <span class="word">${esc(c.word)}</span>
