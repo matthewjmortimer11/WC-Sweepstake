@@ -77,8 +77,12 @@
     reconnectTimer: null,
     reconnectDelay: 800,
     lastRevealCount: 0,
+    lastRevealedAt: {},       // card index → timestamp (for stamp animation)
     lastStatus: null,
     draftSettings: null,
+    stats: null,
+    chatSeen: 0,              // messages seen when chat tab last open
+    turnTotal: 0,             // seconds for current turn (timer bar)
   };
 
   // ── routing ────────────────────────────────────────────────────────────────
@@ -159,7 +163,13 @@
     // Sound + confetti cues from transitions.
     if (prev) {
       const revealed = g.cards.filter((c) => c.revealed).length;
-      if (revealed > state.lastRevealCount) beep(520, 0.07, "triangle");
+      if (revealed > state.lastRevealCount) {
+        beep(520, 0.07, "triangle");
+        const now = Date.now();
+        g.cards.forEach((c) => {
+          if (c.revealed && !prev.cards[c.i]?.revealed) state.lastRevealedAt[c.i] = now;
+        });
+      }
       state.lastRevealCount = revealed;
       if (g.status === "ended" && state.lastStatus !== "ended") {
         const youWin = state.you && g.winner === state.you.team;
@@ -168,6 +178,13 @@
       }
     } else {
       state.lastRevealCount = g.cards.filter((c) => c.revealed).length;
+      state.lastRevealedAt = {};
+    }
+    if (g.turnDeadline && g.status === "playing") {
+      const left = Math.max(0, Math.round((g.turnDeadline - Date.now()) / 1000));
+      if (!state.turnTotal || left > state.turnTotal) state.turnTotal = left;
+    } else {
+      state.turnTotal = 0;
     }
     state.lastStatus = g.status;
     renderRoom();
@@ -190,12 +207,61 @@
   async function ensurePacks() {
     if (state.packs.length) return;
     try {
-      const r = await fetch("/play/api/packs");
-      const d = await r.json();
+      const [packsR, statsR] = await Promise.all([
+        fetch("/play/api/packs"),
+        fetch("/play/api/stats"),
+      ]);
+      const d = await packsR.json();
       state.packs = d.packs || [];
       state.sizes = d.sizes || [5];
       state.timer = d.timer || { min: 15, max: 300, step: 5 };
+      try { state.stats = await statsR.json(); } catch (_) { state.stats = null; }
     } catch (_) { state.packs = []; }
+  }
+
+  function statsRibbon() {
+    const s = state.stats;
+    if (!s || !s.enabled || !s.totalGames) return "";
+    const redW = (s.wins && s.wins.red) || 0;
+    const blueW = (s.wins && s.wins.blue) || 0;
+    return `
+      <div class="stats-ribbon" aria-label="Community stats">
+        <div class="stats-ribbon__item"><span class="stats-ribbon__val">${s.totalGames}</span><span class="stats-ribbon__lbl">Games played</span></div>
+        <div class="stats-ribbon__item"><span class="stats-ribbon__val">${redW}</span><span class="stats-ribbon__lbl">Red wins</span></div>
+        <div class="stats-ribbon__item"><span class="stats-ribbon__val">${blueW}</span><span class="stats-ribbon__lbl">Blue wins</span></div>
+        ${s.assassinLosses ? `<div class="stats-ribbon__item"><span class="stats-ribbon__val">${s.assassinLosses}</span><span class="stats-ribbon__lbl">Assassin hits</span></div>` : ""}
+      </div>`;
+  }
+
+  function wireCodeBoxes(container, onComplete) {
+    const boxes = [...container.querySelectorAll(".code-box")];
+    const syncFilled = () => boxes.forEach((b) => b.classList.toggle("filled", !!b.value));
+    const code = () => boxes.map((b) => b.value).join("");
+    boxes.forEach((box, i) => {
+      box.addEventListener("input", (e) => {
+        const v = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(-1);
+        e.target.value = v;
+        syncFilled();
+        if (v && i < boxes.length - 1) boxes[i + 1].focus();
+        if (code().length >= 4) onComplete();
+      });
+      box.addEventListener("keydown", (e) => {
+        if (e.key === "Backspace" && !box.value && i > 0) { boxes[i - 1].focus(); boxes[i - 1].value = ""; syncFilled(); }
+        if (e.key === "Enter") onComplete();
+        if (e.key === "ArrowLeft" && i > 0) boxes[i - 1].focus();
+        if (e.key === "ArrowRight" && i < boxes.length - 1) boxes[i + 1].focus();
+      });
+      box.addEventListener("paste", (e) => {
+        e.preventDefault();
+        const text = (e.clipboardData.getData("text") || "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 4);
+        text.split("").forEach((ch, j) => { if (boxes[j]) boxes[j].value = ch; });
+        syncFilled();
+        const next = boxes[Math.min(text.length, boxes.length - 1)];
+        if (next) next.focus();
+        if (text.length >= 4) onComplete();
+      });
+    });
+    return { code, boxes, syncFilled };
   }
 
   // ============================================================================
@@ -239,11 +305,18 @@
               <input class="input" id="name2" maxlength="24" placeholder="Agent…" value="${esc(getName())}" />
             </div>
             <div class="join-row">
-              <input class="input code-input" id="joincode" maxlength="6" placeholder="ABCD" aria-label="Room code" />
+              <div class="code-boxes" id="codeboxes" aria-label="Room code">
+                <input class="input code-box" maxlength="1" inputmode="text" autocomplete="off" aria-label="Code letter 1" />
+                <input class="input code-box" maxlength="1" inputmode="text" autocomplete="off" aria-label="Code letter 2" />
+                <input class="input code-box" maxlength="1" inputmode="text" autocomplete="off" aria-label="Code letter 3" />
+                <input class="input code-box" maxlength="1" inputmode="text" autocomplete="off" aria-label="Code letter 4" />
+              </div>
               <button class="btn btn--lg" id="join">Join</button>
             </div>
           </div>
         </div>
+
+        ${statsRibbon()}
 
         <div class="panel">
           <span class="eyebrow">Why it's more fun</span>
@@ -291,15 +364,15 @@
     };
     $("#create").onclick = () => createGame("classic", $("#create"), "Create game →");
     $("#create-dark").onclick = () => createGame("afterdark", $("#create-dark"), "🔞 After Dark game");
+    const codeInput = wireCodeBoxes($("#codeboxes"), () => doJoin());
     const doJoin = () => {
-      const code = ($("#joincode").value || "").trim().toUpperCase();
-      if (code.length < 4) { toast("Enter a 4-letter room code.", "err"); return; }
+      const code = codeInput.code();
+      if (code.length < 4) { toast("Enter the full 4-letter room code.", "err"); return; }
       setName($("#name2").value.trim());
       location.hash = `#/room/${code}`;
     };
     $("#join").onclick = doJoin;
-    $("#joincode").addEventListener("keydown", (e) => { if (e.key === "Enter") doJoin(); });
-    $("#joincode").oninput = (e) => { e.target.value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ""); };
+    setTimeout(() => { const n = $("#name1"); if (n && !n.value) n.focus(); }, 80);
   }
 
   // ============================================================================
@@ -307,7 +380,12 @@
   // ============================================================================
   function renderRoomShell() {
     app.innerHTML = "";
-    app.appendChild(h(`<div class="empty" style="padding-top:30vh">Connecting to room <b>${esc(state.code)}</b>…</div>`));
+    app.appendChild(h(`
+      <div class="loader">
+        <span class="loader__stamp">Secure channel</span>
+        <span class="loader__code">${esc(state.code)}</span>
+        <span class="loader__status">Establishing link<span class="loader__dots"></span></span>
+      </div>`));
   }
 
   function renderRoom() {
@@ -347,7 +425,7 @@
         <div class="topbar__left">
           <button class="icon-btn" id="leave" title="Back to home" aria-label="Leave room">←</button>
           <span class="brand__mark">🕵️</span>
-          <span class="room-code"><small>ROOM</small>${esc(state.room.code)}</span>
+          <span class="room-code" id="roomcode" title="Click to copy code"><small>ROOM</small>${esc(state.room.code)}</span>
           <span class="conn" id="conn"><span class="dot"></span><span class="lbl">Live</span></span>
         </div>
         <div class="topbar__right">
@@ -361,6 +439,14 @@
     el.querySelector("#theme").onclick = toggleTheme;
     el.querySelector("#mute").onclick = () => { state.muted = !state.muted; renderRoom(); };
     el.querySelector("#copy").onclick = copyInvite;
+    const rc = el.querySelector("#roomcode");
+    if (rc) rc.onclick = () => {
+      const code = state.room.code;
+      const done = () => toast("Room code copied", "ok");
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(code).then(done).catch(() => fallbackCopy(code, done));
+      } else { fallbackCopy(code, done); }
+    };
     const s = el.querySelector("#settings"); if (s) s.onclick = openSettings;
     return el;
   }
@@ -487,24 +573,26 @@
   function scoreboard() {
     const g = state.room.game;
     const active = g.status === "playing" ? g.currentTeam : null;
-    const el = h(`
-      <div class="scoreboard">
-        <div class="team-score team-score--red ${active === "red" ? "active" : ""}">
-          <span class="num">${g.remaining.red}</span>
-          <div class="meta"><b>Red</b><span class="tiny muted">agents left</span></div>
+    return h(`
+      <div class="scoreboard-wrap">
+        <div class="scoreboard">
+          <div class="team-score team-score--red ${active === "red" ? "active" : ""}">
+            <span class="num">${g.remaining.red}</span>
+            <div class="meta"><b>Red</b><span class="tiny muted">agents left</span></div>
+          </div>
+          <div class="turn-pill">
+            ${g.status === "ended"
+              ? `<span class="who">Game over</span>`
+              : `<span class="who" style="color:${g.currentTeam === "red" ? "var(--red)" : "var(--blue)"}">${g.currentTeam === "red" ? "Red" : "Blue"} to ${g.phase === "clue" ? "clue" : "guess"}</span>`}
+            <span class="timer" id="timer"></span>
+          </div>
+          <div class="team-score team-score--blue ${active === "blue" ? "active" : ""}">
+            <div class="meta" style="text-align:right"><b>Blue</b><span class="tiny muted">agents left</span></div>
+            <span class="num">${g.remaining.blue}</span>
+          </div>
         </div>
-        <div class="turn-pill">
-          ${g.status === "ended"
-            ? `<span class="who">Game over</span>`
-            : `<span class="who" style="color:${g.currentTeam === "red" ? "var(--red)" : "var(--blue)"}">${g.currentTeam === "red" ? "Red" : "Blue"} to ${g.phase === "clue" ? "clue" : "guess"}</span>`}
-          <span class="timer" id="timer"></span>
-        </div>
-        <div class="team-score team-score--blue ${active === "blue" ? "active" : ""}">
-          <div class="meta" style="text-align:right"><b>Blue</b><span class="tiny muted">agents left</span></div>
-          <span class="num">${g.remaining.blue}</span>
-        </div>
+        <div class="timer-bar" id="timerbar" hidden><div class="timer-bar__fill" id="timerfill"></div></div>
       </div>`);
-    return el;
   }
 
   // ── board ────────────────────────────────────────────────────────────────
@@ -516,6 +604,7 @@
       && you.team === g.currentTeam && you.role === "operative";
 
     const grid = h(`<div class="board" style="--cols:${g.board_size}" role="grid" aria-label="Word board"></div>`);
+    const animCutoff = Date.now() - 600;
     g.cards.forEach((c) => {
       const hidden = c.kind === "hidden";
       const classes = ["cardx"];
@@ -523,6 +612,7 @@
       if (c.revealed) { classes.push("revealed", "kind-" + c.kind); }
       else if (!hidden) { classes.push("hint-" + c.kind); } // spymaster view
       if (canGuess && !c.revealed) classes.push("clickable");
+      if (state.lastRevealedAt[c.i] && state.lastRevealedAt[c.i] > animCutoff) classes.push("just-revealed");
 
       const glyph = !c.revealed && !hidden ? glyphFor(c.kind) : (c.revealed ? glyphFor(c.kind) : "");
       const btn = h(`
@@ -594,7 +684,7 @@
     // Clue is shown to everyone during guessing
     if (g.clue) {
       const el = h(`
-        <div class="panel cluebar">
+        <div class="panel cluebar cluebar--active">
           <div class="clue-display">
             <span class="tiny muted">${g.currentTeam === "red" ? "Red" : "Blue"} clue</span>
             <span class="clue-word">${esc(g.clue.word)}</span>
@@ -614,17 +704,24 @@
 
   // ── side panel ───────────────────────────────────────────────────────────
   function sidePanel() {
+    const chatLen = (state.room.chat || []).length;
+    const unread = state.tab !== "chat" && chatLen > state.chatSeen;
     const el = h(`
       <div class="side">
         <div class="tabs" role="tablist">
           <button role="tab" data-tab="players" aria-selected="${state.tab === "players"}">Teams</button>
           <button role="tab" data-tab="log" aria-selected="${state.tab === "log"}">Log</button>
-          <button role="tab" data-tab="chat" aria-selected="${state.tab === "chat"}">Chat</button>
+          <button role="tab" data-tab="chat" aria-selected="${state.tab === "chat"}">Chat${unread ? `<span class="tab-badge">${chatLen - state.chatSeen}</span>` : ""}</button>
         </div>
         <div class="panel" id="tabbody"></div>
       </div>`);
     el.querySelectorAll("[data-tab]").forEach((b) => {
-      b.onclick = () => { state.tab = b.dataset.tab; localStorage.setItem(LS.tab, state.tab); renderRoom(); };
+      b.onclick = () => {
+        state.tab = b.dataset.tab;
+        localStorage.setItem(LS.tab, state.tab);
+        if (state.tab === "chat") state.chatSeen = (state.room.chat || []).length;
+        renderRoom();
+      };
     });
     const body = el.querySelector("#tabbody");
     if (state.tab === "players") body.appendChild(playersTab());
@@ -832,12 +929,25 @@
   // ── timer tick ─────────────────────────────────────────────────────────────
   setInterval(() => {
     const t = $("#timer");
+    const bar = $("#timerbar");
+    const fill = $("#timerfill");
     if (!t || !state.room) return;
     const g = state.room.game;
-    if (g.status !== "playing" || !g.turnDeadline) { t.textContent = ""; return; }
+    if (g.status !== "playing" || !g.turnDeadline) {
+      t.textContent = "";
+      if (bar) bar.hidden = true;
+      return;
+    }
     const left = Math.max(0, Math.round((g.turnDeadline - Date.now()) / 1000));
+    const total = state.turnTotal || left || 1;
     t.textContent = `⏱ ${left}s`;
     t.classList.toggle("low", left <= 10);
+    if (bar && fill) {
+      bar.hidden = false;
+      const pct = Math.max(0, Math.min(1, left / total));
+      fill.style.transform = `scaleX(${pct})`;
+      fill.classList.toggle("low", left <= 10);
+    }
   }, 250);
 
   // ── keyboard escape to close settings ──────────────────────────────────────
@@ -852,9 +962,9 @@
     const ctx = cvs.getContext("2d");
     const dpr = window.devicePixelRatio || 1;
     cvs.width = innerWidth * dpr; cvs.height = innerHeight * dpr; ctx.scale(dpr, dpr);
-    const colors = team === "red" ? ["#ff5d5d", "#c2304a", "#ffd0d0"]
-      : team === "blue" ? ["#4cc4ff", "#2a6ed6", "#d0f0ff"]
-      : ["#b8a6ff", "#ffd166", "#06d6a0"];
+    const colors = team === "red" ? ["#c0473f", "#7e2b27", "#f3e3df"]
+      : team === "blue" ? ["#4d8893", "#2c545c", "#e4f0f1"]
+      : ["#c8a13a", "#b3a684", "#8aa24a"];
     const parts = Array.from({ length: 160 }, () => ({
       x: Math.random() * innerWidth, y: -20 - Math.random() * innerHeight * 0.5,
       r: 4 + Math.random() * 6, c: colors[(Math.random() * colors.length) | 0],
