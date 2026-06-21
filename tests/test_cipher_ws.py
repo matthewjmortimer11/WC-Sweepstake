@@ -47,6 +47,24 @@ def test_assets_served(client):
     assert client.get("/play/assets/styles.css").status_code == 200
 
 
+def test_cipher_pwa_files(client):
+    manifest = client.get("/play/manifest.webmanifest")
+    assert manifest.status_code == 200
+    body = manifest.json()
+    assert body["name"] == "Wheesht · Cipher"
+    assert body["start_url"].startswith("/play")
+    assert body["scope"] == "/play/"
+
+    page = client.get("/play")
+    assert page.status_code == 200
+    assert 'rel="manifest" href="/play/manifest.webmanifest"' in page.text
+    assert "/play/assets/app.js" in page.text
+
+    sw = client.get("/play/sw.js")
+    assert sw.status_code == 200
+    assert "cipher-pwa-" in sw.text
+
+
 def test_stats_endpoint(client):
     r = client.get("/play/api/stats")
     assert r.status_code == 200

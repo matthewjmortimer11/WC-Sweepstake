@@ -1,0 +1,40 @@
+{
+  "id": "/play",
+  "name": "Wheesht · Cipher",
+  "short_name": "Cipher",
+  "description": "Planning-room word-spy ops — free real-time party game for your crew.",
+  "start_url": "/play?source=pwa",
+  "scope": "/play/",
+  "display": "standalone",
+  "display_override": ["standalone", "window-controls-overlay", "browser"],
+  "orientation": "any",
+  "background_color": "#f4f0e6",
+  "theme_color": "#c8a13a",
+  "categories": ["games", "entertainment", "social"],
+  "icons": [
+    {
+      "src": "/icons/icon-192.png?v=cipher",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512.png?v=cipher",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/maskable-192.png?v=cipher",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icons/maskable-512.png?v=cipher",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

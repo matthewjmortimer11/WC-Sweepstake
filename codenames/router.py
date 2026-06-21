@@ -7,6 +7,8 @@ tiny — almost everything happens over the socket.
 
 Routes
     GET  /play                     → the game SPA
+    GET  /play/manifest.webmanifest → PWA manifest (scoped to /play/)
+    GET  /play/sw.js               → PWA service worker (scoped to /play/)
     GET  /play/api/packs           → built-in word-pack metadata
     POST /play/api/rooms           → create a room, returns its code
     GET  /play/assets/{file}       → JS/CSS for the SPA
@@ -73,7 +75,7 @@ _PLAY_CSP = (
     "connect-src 'self' ws: wss: https://accounts.google.com https://oauth2.googleapis.com; "
     "frame-src https://accounts.google.com; "
     "base-uri 'self'; form-action 'self'; object-src 'none'; "
-    "frame-ancestors 'none'"
+    "frame-ancestors 'none'; manifest-src 'self'; worker-src 'self'"
 )
 
 
@@ -127,6 +129,30 @@ async def play_page() -> HTMLResponse:
     return HTMLResponse(
         _TEMPLATE.read_text(encoding="utf-8"),
         headers={"Content-Security-Policy": _PLAY_CSP},
+    )
+
+
+@router.get("/play/manifest.webmanifest")
+async def play_manifest() -> FileResponse:
+    path = _ASSETS / "manifest.webmanifest"
+    if not path.is_file():
+        raise HTTPException(status_code=404)
+    return FileResponse(
+        path,
+        media_type="application/manifest+json",
+        headers={"Cache-Control": "public, max-age=300"},
+    )
+
+
+@router.get("/play/sw.js")
+async def play_service_worker() -> FileResponse:
+    path = _ASSETS / "sw.js"
+    if not path.is_file():
+        raise HTTPException(status_code=404)
+    return FileResponse(
+        path,
+        media_type="application/javascript",
+        headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
     )
 
 

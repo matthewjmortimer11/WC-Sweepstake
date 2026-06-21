@@ -212,6 +212,13 @@ h1, h2, h3 { margin: 0; font-family: var(--head); font-weight: 700; line-height:
 .mode-toofar:hover { border-color: #b91c1c; background: #f0d4d4; }
 [data-theme="dark"] .mode-toofar:hover { border-color: #dc2626; }
 
+.pwa-install {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  flex-wrap: wrap; border-color: var(--accent); background: var(--accent-soft);
+}
+.pwa-install__copy { display: grid; gap: 4px; }
+.pwa-install__actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
 .icon-btn {
   appearance: none; border: 1.5px solid var(--line-strong); background: var(--panel-2);
   color: var(--ink); width: 40px; height: 40px; border-radius: var(--radius-sm); cursor: pointer;

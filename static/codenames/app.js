@@ -533,6 +533,57 @@
     renderRoom();
   }
 
+  // ── PWA (install + offline shell) ───────────────────────────────────────────
+  let installPrompt = null;
+
+  function registerCipherPwa() {
+    if (!window.isSecureContext || !("serviceWorker" in navigator)) return;
+    navigator.serviceWorker.register("/play/sw.js", { scope: "/play/" }).catch(() => {});
+  }
+
+  window.addEventListener("beforeinstallprompt", (e) => {
+    e.preventDefault();
+    installPrompt = e;
+    if (state.route === "home") boot();
+  });
+
+  function pwaInstallBanner() {
+    if (!installPrompt || sessionStorage.getItem("cipher.pwa.dismiss")) return "";
+    return `
+      <div class="panel pwa-install" id="pwa-install">
+        <div class="pwa-install__copy">
+          <b>Install Wheesht · Cipher</b>
+          <p class="tiny muted">Add to your home screen for one-tap access — opens straight into the game.</p>
+        </div>
+        <div class="pwa-install__actions">
+          <button type="button" class="btn btn--sm" id="pwa-dismiss">Not now</button>
+          <button type="button" class="btn btn--sm btn--primary" id="pwa-install-btn">Install</button>
+        </div>
+      </div>`;
+  }
+
+  function wirePwaInstall() {
+    const dismiss = $("#pwa-dismiss");
+    const install = $("#pwa-install-btn");
+    if (dismiss) {
+      dismiss.onclick = () => {
+        sessionStorage.setItem("cipher.pwa.dismiss", "1");
+        const el = $("#pwa-install");
+        if (el) el.remove();
+      };
+    }
+    if (install) {
+      install.onclick = async () => {
+        if (!installPrompt) return;
+        installPrompt.prompt();
+        try { await installPrompt.userChoice; } catch (_) { /* ignore */ }
+        installPrompt = null;
+        const el = $("#pwa-install");
+        if (el) el.remove();
+      };
+    }
+  }
+
   // ── boot / render dispatch ───────────────────────────────────────────────────
   async function boot() {
     try {
@@ -1081,6 +1132,8 @@
           <p class="lede">Spread out around the planning table: <b>Field Crew</b> vs <b>The Desk</b>. One spymaster gives a single-word clue and a number; teammates guess which index cards are theirs. Hit every agent before the other side — or the assassin — ends the mission. Custom word packs, private rooms, no install.</p>
         </div>
 
+        ${pwaInstallBanner()}
+
         <div id="league-mount"></div>
 
         <div class="home__actions">
@@ -1136,6 +1189,8 @@
         </div>
       </div>`);
     app.appendChild(el);
+
+    wirePwaInstall();
 
     const leagueMount = $("#league-mount");
     if (leagueMount) {
@@ -2102,6 +2157,7 @@
   }
 
   // ── go ──────────────────────────────────────────────────────────────────────
+  registerCipherPwa();
   parseRoute();
   boot();
 })();
