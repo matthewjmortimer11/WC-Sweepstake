@@ -1362,6 +1362,9 @@
     const team = g.currentTeam;
     const you = state.you;
     const isActiveOp = you && you.role === "operative" && you.team === team;
+    const clueWord = g.clue.word || "";
+    const isSingle = !/\s/.test(clueWord.trim());
+    const wordCls = isSingle ? "clue-banner__word clue-banner__word--single" : "clue-banner__word clue-banner__word--compound";
     const guesses = g.guessesLeft == null
       ? "Unlimited guesses"
       : `${g.guessesLeft} guess${g.guessesLeft === 1 ? "" : "es"} left`;
@@ -1371,7 +1374,7 @@
         <div class="clue-banner__inner">
           <span class="clue-banner__team">${esc(teamName(team))}</span>
           <div class="clue-banner__main">
-            <span class="clue-banner__word">${esc(g.clue.word)}</span>
+            <span class="${wordCls}" style="--clue-chars:${clueWord.length || 1}">${esc(clueWord)}</span>
             <span class="clue-banner__num" aria-label="Number of words">${g.clue.count === 0 ? "∞" : g.clue.count}</span>
           </div>
           <span class="clue-banner__meta">${esc(guesses)}</span>

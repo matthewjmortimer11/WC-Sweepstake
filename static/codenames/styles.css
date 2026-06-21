@@ -342,8 +342,8 @@ textarea.input { resize: vertical; min-height: 92px; font-size: 0.92rem; }
 /* Split room-code input */
 .code-boxes { display: flex; gap: 8px; flex: 1; min-width: 0; }
 .code-box {
-  flex: 1; max-width: 56px; aspect-ratio: 1; text-align: center;
-  font-family: var(--mono); font-weight: 700; font-size: 1.35rem;
+  flex: 1; max-width: 50px; aspect-ratio: 1; text-align: center;
+  font-family: var(--mono); font-weight: 700; font-size: 1.1rem;
   text-transform: uppercase; color: var(--accent); letter-spacing: 0;
   padding: 0; caret-color: var(--accent);
 }
@@ -355,9 +355,9 @@ textarea.input { resize: vertical; min-height: 92px; font-size: 0.92rem; }
    ========================================================================== */
 .topbar { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-bottom: 20px; flex-wrap: wrap; }
 .topbar__left, .topbar__right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.room-code { font-family: var(--mono); font-weight: 700; letter-spacing: 0.22em; font-size: 1rem; color: var(--accent); cursor: pointer; transition: opacity 0.15s; }
+.room-code { font-family: var(--mono); font-weight: 700; letter-spacing: 0.18em; font-size: 0.88rem; color: var(--accent); cursor: pointer; transition: opacity 0.15s; }
 .room-code:hover { opacity: 0.8; }
-.room-code small { color: var(--ink-3); letter-spacing: 0.2em; font-weight: 700; margin-right: 8px; }
+.room-code small { color: var(--ink-3); letter-spacing: 0.14em; font-weight: 700; margin-right: 6px; font-size: 0.72rem; }
 .room-code.copied { color: var(--good); }
 
 .conn { display: inline-flex; align-items: center; gap: 6px; font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.08em; color: var(--ink-3); text-transform: uppercase; }
@@ -501,8 +501,8 @@ textarea.input { resize: vertical; min-height: 92px; font-size: 0.92rem; }
   position: relative; z-index: 1; width: 100%;
   font-family: var(--head); font-weight: 700; line-height: 1.15;
   text-transform: none; letter-spacing: 0.01em;
-  font-size: clamp(0.68rem, calc((min(100vw, var(--maxw)) - 72px) / var(--cols, 5) * 0.24), 1rem);
-  word-break: normal; overflow-wrap: anywhere; hyphens: none; padding: 0 3px;
+  font-size: clamp(0.66rem, calc((min(100vw, var(--maxw)) - 72px) / var(--cols, 5) * 0.23), 0.95rem);
+  hyphens: none; word-break: keep-all; overflow-wrap: break-word; padding: 0 3px;
   display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden;
 }
 .cardx.emoji .word {
@@ -634,8 +634,8 @@ textarea.input { resize: vertical; min-height: 92px; font-size: 0.92rem; }
   margin-bottom: 12px;
   border-radius: var(--radius);
   overflow: hidden;
-  box-shadow: var(--hard-sm), 0 10px 28px -16px rgba(0, 0, 0, 0.35);
-  border: 2px solid rgba(0, 0, 0, 0.2);
+  box-shadow: var(--hard-sm), 0 8px 24px -14px rgba(0, 0, 0, 0.28);
+  border: 1.5px solid rgba(0, 0, 0, 0.16);
 }
 .clue-banner--red {
   background: linear-gradient(180deg, #b84a42 0%, var(--red-deep) 52%, #4a1816 100%);
@@ -646,33 +646,49 @@ textarea.input { resize: vertical; min-height: 92px; font-size: 0.92rem; }
   color: var(--blue-ink);
 }
 .clue-banner__inner {
-  display: grid; justify-items: center; gap: 8px;
-  padding: 20px 16px 14px; text-align: center;
+  display: grid; justify-items: center; gap: 7px;
+  padding: 16px 14px 12px; text-align: center;
 }
 .clue-banner__team {
-  font-family: var(--mono); font-size: 0.64rem; font-weight: 700;
-  letter-spacing: 0.16em; text-transform: uppercase; opacity: 0.88;
+  font-family: var(--mono); font-size: 0.6rem; font-weight: 700;
+  letter-spacing: 0.14em; text-transform: uppercase; opacity: 0.9;
+  padding: 3px 10px; border-radius: 999px;
+  background: rgba(0, 0, 0, 0.12);
 }
 .clue-banner__main {
   display: flex; align-items: center; justify-content: center;
-  gap: clamp(14px, 4vw, 24px); flex-wrap: wrap; width: 100%;
-  max-width: 100%;
+  gap: clamp(10px, 3vw, 18px); flex-wrap: nowrap; width: 100%;
+  max-width: 100%; min-width: 0;
 }
 .clue-banner__word {
   font-family: var(--head); font-weight: 800;
-  font-size: clamp(2.4rem, 11vw, 4.25rem);
-  line-height: 0.95; letter-spacing: 0.03em;
+  font-size: clamp(1.65rem, 7.5vw, 3rem);
+  line-height: 1; letter-spacing: 0.02em;
   text-transform: uppercase;
-  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.18);
-  overflow-wrap: anywhere;
-  max-width: 100%;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.16);
+  hyphens: none; word-break: keep-all; overflow-wrap: normal;
+  max-width: 100%; min-width: 0;
+}
+.clue-banner__word--single {
+  white-space: nowrap;
+  font-size: clamp(
+    1.35rem,
+    calc((min(100vw, var(--maxw)) - 108px) / max(var(--clue-chars, 6), 4) * 1.05),
+    2.65rem
+  );
+}
+.clue-banner__word--compound {
+  white-space: normal;
+  overflow-wrap: break-word;
+  line-height: 1.05;
+  text-wrap: balance;
 }
 .clue-banner__num {
   flex: none;
-  min-width: 1.25em; height: 1.25em; padding: 0 0.2em;
+  min-width: 1.15em; height: 1.15em; padding: 0 0.18em;
   display: grid; place-items: center;
   font-family: var(--head); font-weight: 800;
-  font-size: clamp(2.1rem, 9vw, 3.6rem);
+  font-size: clamp(1.55rem, 6.5vw, 2.65rem);
   line-height: 1;
   border-radius: 14px;
   background: rgba(255, 255, 255, 0.2);
@@ -1056,8 +1072,8 @@ input[type="range"]:disabled { background: var(--line-strong); cursor: not-allow
 }
 .loader__stamp { display: none; }
 .loader__code {
-  font-family: var(--mono); font-size: clamp(1.6rem, 5vw, 2.2rem);
-  letter-spacing: 0.32em; color: var(--ink-2); font-weight: 700;
+  font-family: var(--mono); font-size: clamp(1.35rem, 4.5vw, 1.85rem);
+  letter-spacing: 0.24em; color: var(--ink-2); font-weight: 700;
 }
 .loader__status {
   font-family: var(--mono); font-size: 0.68rem; letter-spacing: 0.14em;
@@ -1082,7 +1098,7 @@ input[type="range"]:disabled { background: var(--line-strong); cursor: not-allow
 .league-panel { display: grid; gap: 16px; }
 .league-panel__head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 .league-panel__actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
-.league-code { font-family: var(--mono); letter-spacing: 0.12em; color: var(--accent); }
+.league-code { font-family: var(--mono); letter-spacing: 0.1em; color: var(--accent); font-size: 0.92em; }
 .league-forms { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 @media (max-width: 720px) { .league-forms { grid-template-columns: 1fr; } }
 .league-form { display: grid; gap: 12px; padding: 14px; }
@@ -1101,7 +1117,7 @@ input[type="range"]:disabled { background: var(--line-strong); cursor: not-allow
 @media (max-width: 768px) {
   .topbar { margin-bottom: 10px; gap: 8px; }
   .topbar__left, .topbar__right { gap: 8px; }
-  .room-code { font-size: 0.9rem; letter-spacing: 0.16em; }
+  .room-code { font-size: 0.82rem; letter-spacing: 0.14em; }
   .icon-btn { width: 38px; height: 38px; }
 
   .scoreboard-wrap { margin-bottom: 10px; }
@@ -1124,7 +1140,7 @@ input[type="range"]:disabled { background: var(--line-strong); cursor: not-allow
   .cardx { padding: 11px 3px 7px; aspect-ratio: 1 / 1.02; }
   .cardx__ref { font-size: 0.5rem; top: 4px; left: 4px; }
   .cardx .word {
-    font-size: clamp(0.74rem, calc((100vw - 52px) / var(--cols, 5) * 0.285), 1.05rem);
+    font-size: clamp(0.7rem, calc((100vw - 52px) / var(--cols, 5) * 0.27), 0.98rem);
     line-height: 1.12;
     -webkit-line-clamp: 2;
   }
@@ -1141,9 +1157,16 @@ input[type="range"]:disabled { background: var(--line-strong); cursor: not-allow
   body.guess-confirm-open .app { padding-bottom: calc(128px + env(safe-area-inset-bottom)); }
 
   .clue-banner { margin-bottom: 10px; }
-  .clue-banner__inner { padding: 16px 12px 12px; gap: 6px; }
-  .clue-banner__word { font-size: clamp(2.1rem, 12vw, 3.4rem); max-width: 100%; }
-  .clue-banner__num { font-size: clamp(1.9rem, 10vw, 3rem); border-radius: 12px; }
+  .clue-banner__inner { padding: 14px 10px 10px; gap: 5px; }
+  .clue-banner__word { font-size: clamp(1.45rem, 7vw, 2.5rem); }
+  .clue-banner__word--single {
+    font-size: clamp(
+      1.2rem,
+      calc((100vw - 88px) / max(var(--clue-chars, 6), 4) * 1.02),
+      2.35rem
+    );
+  }
+  .clue-banner__num { font-size: clamp(1.35rem, 6vw, 2.2rem); border-radius: 10px; }
 
   .dev-bar { flex-direction: column; align-items: stretch; }
   .dev-bar__btns { display: flex; flex-wrap: wrap; gap: 6px; }
