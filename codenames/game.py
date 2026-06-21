@@ -33,6 +33,9 @@ NEUTRAL = "neutral"
 ASSASSIN = "assassin"
 
 MAX_ASSASSINS = 5
+MAX_TEAM_NAME = 20
+DEFAULT_TEAM_RED = "Field Crew"
+DEFAULT_TEAM_BLUE = "The Desk"
 
 # Phases within a turn.
 PHASE_CLUE = "clue"     # waiting for the active spymaster to give a clue
@@ -77,6 +80,24 @@ class Settings:
     league_id: Optional[str] = None
     league_code: Optional[str] = None
     league_name: Optional[str] = None
+    team_red_name: str = DEFAULT_TEAM_RED
+    team_blue_name: str = DEFAULT_TEAM_BLUE
+
+
+def clean_team_name(name: str, fallback: str) -> str:
+    name = (name or "").strip()
+    name = " ".join(name.split())
+    name = "".join(ch for ch in name if ch.isprintable())
+    name = name[:MAX_TEAM_NAME]
+    return name or fallback
+
+
+def team_display_name(settings: Settings, team: str) -> str:
+    if team == RED:
+        return clean_team_name(settings.team_red_name, DEFAULT_TEAM_RED)
+    if team == BLUE:
+        return clean_team_name(settings.team_blue_name, DEFAULT_TEAM_BLUE)
+    return team
 
 
 def effective_assassins(total: int, assassins: int) -> int:
@@ -198,7 +219,7 @@ class Game:
         return sum(1 for c in self.cards if c.kind == team)
 
     def _team_label(self, team: str) -> str:
-        return "Red" if team == RED else "Blue"
+        return team_display_name(self.settings, team)
 
     def _other(self, team: str) -> str:
         return BLUE if team == RED else RED

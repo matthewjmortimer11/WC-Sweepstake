@@ -197,6 +197,15 @@ def test_clue_count_scales_down_on_small_board():
     assert g.clue_count == 6
 
 
+def test_team_display_name_uses_settings():
+    from codenames.game import DEFAULT_TEAM_BLUE, DEFAULT_TEAM_RED, Settings, clean_team_name, team_display_name
+    s = Settings(team_red_name="Black Bag", team_blue_name="Whitehall")
+    assert team_display_name(s, "red") == "Black Bag"
+    assert team_display_name(s, "blue") == "Whitehall"
+    assert clean_team_name("", DEFAULT_TEAM_RED) == DEFAULT_TEAM_RED
+    assert clean_team_name("  Night  Shift  ", DEFAULT_TEAM_RED) == "Night Shift"
+
+
 def test_give_clue_sets_phase_and_guesses():
     g = _new_game()
     g.give_clue(g.current_team, "ocean", 2)

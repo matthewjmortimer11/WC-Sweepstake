@@ -26,7 +26,14 @@ from pydantic import BaseModel
 from . import auth, store
 from .avatars import decode_data_url
 from .game import BLUE, RED, STATUS_LOBBY, MAX_ASSASSINS, MoveError, Settings, HouseRules
-from .game import distribution_preview, effective_assassins, max_assassins_for_board
+from .game import (
+    DEFAULT_TEAM_BLUE,
+    DEFAULT_TEAM_RED,
+    clean_team_name,
+    distribution_preview,
+    effective_assassins,
+    max_assassins_for_board,
+)
 from .manager import (
     _ALLOWED_SIZES,
     _MAX_CHAT,
@@ -438,6 +445,15 @@ def _build_settings(payload: dict, current: Settings) -> Settings:
     house_rules = _parse_house_rules(payload.get("houseRules"), current.house_rules)
     dev_mode = bool(payload.get("devMode", current.dev_mode))
 
+    team_names = payload.get("teamNames")
+    team_red = current.team_red_name
+    team_blue = current.team_blue_name
+    if isinstance(team_names, dict):
+        if "red" in team_names:
+            team_red = clean_team_name(str(team_names["red"]), DEFAULT_TEAM_RED)
+        if "blue" in team_names:
+            team_blue = clean_team_name(str(team_names["blue"]), DEFAULT_TEAM_BLUE)
+
     return Settings(
         board_size=size, pack_ids=pack_ids, pack_id=pack_id, custom_words=custom,
         turn_seconds=timer, assassins=assassins, pack_name=pack_name,
@@ -445,6 +461,8 @@ def _build_settings(payload: dict, current: Settings) -> Settings:
         league_id=current.league_id,
         league_code=current.league_code,
         league_name=current.league_name,
+        team_red_name=team_red,
+        team_blue_name=team_blue,
     )
 
 
@@ -555,6 +573,25 @@ async def _dispatch(room, player, mtype: str, msg: dict) -> bool:
 
     if mtype == "rename":
         player.name = _clean_name(msg.get("name", "")) or player.name
+        return True
+
+    if mtype == "setTeamName":
+        if game.status == "playing":
+            raise MoveError("Unit names are locked once the mission begins.")
+        team = msg.get("team")
+        if team not in (RED, BLUE):
+            raise MoveError("Unknown unit.")
+        if not (player.is_host or player.team == team):
+            raise MoveError("Only that unit or the handler can rename it.")
+        name = clean_team_name(
+            str(msg.get("name", "")),
+            DEFAULT_TEAM_RED if team == RED else DEFAULT_TEAM_BLUE,
+        )
+        if team == RED:
+            room.settings.team_red_name = name
+        else:
+            room.settings.team_blue_name = name
+        game.settings = room.settings
         return True
 
     if mtype == "setTeam":

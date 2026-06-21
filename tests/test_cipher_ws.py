@@ -336,3 +336,32 @@ def test_dev_mode_allows_mid_game_role_switch(client):
     room = manager.get(code)
     assert room.players["solo"].role == "operative"
     assert room.game.status == "playing"
+
+
+def test_team_names_in_state_and_settable(client):
+    code = client.post("/play/api/rooms").json()["code"]
+    with client.websocket_connect(f"/play/ws/{code}?pid=host&name=Handler") as host:
+        host.receive_json()
+        state = host.receive_json()
+        names = state["room"]["settings"]["teamNames"]
+        assert names["red"] == "Field Crew"
+        assert names["blue"] == "The Desk"
+
+        host.send_json({"type": "setTeam", "team": "red"})
+        host.send_json({"type": "setTeamName", "team": "red", "name": "Black Bag Unit"})
+        _settle()
+
+    room = manager.get(code)
+    assert room.settings.team_red_name == "Black Bag Unit"
+
+    with client.websocket_connect(f"/play/ws/{code}?pid=guest&name=Agent") as guest:
+        guest.receive_json()
+        state = guest.receive_json()
+        assert state["room"]["settings"]["teamNames"]["red"] == "Black Bag Unit"
+
+        guest.send_json({"type": "setTeam", "team": "blue"})
+        guest.send_json({"type": "setTeamName", "team": "blue", "name": "Whitehall Desk"})
+        _settle()
+
+    room = manager.get(code)
+    assert room.settings.team_blue_name == "Whitehall Desk"

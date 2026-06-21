@@ -27,6 +27,33 @@
     return (u.label || u.nickname || u.displayName || "Agent").trim() || "Agent";
   }
 
+  const DEFAULT_TEAM_NAMES = { red: "Field Crew", blue: "The Desk" };
+
+  function teamNamesMap() {
+    const st = state.room && state.room.settings;
+    const n = (st && st.teamNames) || DEFAULT_TEAM_NAMES;
+    return {
+      red: ((n.red || DEFAULT_TEAM_NAMES.red).trim()) || DEFAULT_TEAM_NAMES.red,
+      blue: ((n.blue || DEFAULT_TEAM_NAMES.blue).trim()) || DEFAULT_TEAM_NAMES.blue,
+    };
+  }
+
+  function teamName(team) {
+    const n = teamNamesMap();
+    if (team === "red") return n.red;
+    if (team === "blue") return n.blue;
+    return team;
+  }
+
+  function teamMark(team) {
+    return teamName(team).trim().slice(0, 1).toUpperCase() || "?";
+  }
+
+  function canEditTeamName(team, you) {
+    if (!you || !state.room || state.room.game.status !== "lobby") return false;
+    return you.isHost || you.team === team;
+  }
+
   function avatarImg(u, cls, alt) {
     const url = u && u.avatarUrl;
     const c = cls || "social-user__av";
@@ -595,8 +622,8 @@
     return `
       <div class="stats-ribbon" aria-label="Community stats">
         <div class="stats-ribbon__item"><span class="stats-ribbon__val">${s.totalGames}</span><span class="stats-ribbon__lbl">Games played</span></div>
-        <div class="stats-ribbon__item"><span class="stats-ribbon__val">${redW}</span><span class="stats-ribbon__lbl">Red wins</span></div>
-        <div class="stats-ribbon__item"><span class="stats-ribbon__val">${blueW}</span><span class="stats-ribbon__lbl">Blue wins</span></div>
+        <div class="stats-ribbon__item"><span class="stats-ribbon__val">${redW}</span><span class="stats-ribbon__lbl">Field wins</span></div>
+        <div class="stats-ribbon__item"><span class="stats-ribbon__val">${blueW}</span><span class="stats-ribbon__lbl">Desk wins</span></div>
         ${s.assassinLosses ? `<div class="stats-ribbon__item"><span class="stats-ribbon__val">${s.assassinLosses}</span><span class="stats-ribbon__lbl">Assassin hits</span></div>` : ""}
       </div>`;
   }
@@ -1037,9 +1064,9 @@
         </div>
 
         <div class="home__hero">
-          <span class="eyebrow">Real-time word-spy party game</span>
-          <h1>Two spymasters.<br/>One grid of <span class="grad">secret agents</span>.<br/>Infinite mischief.</h1>
-          <p class="lede">Cipher is a free, no-download take on the word-association classic — reimagined to be more customisable and more fun. Make a room, share the code, and out-clue your rivals.</p>
+          <span class="eyebrow">Planning-room word-spy ops</span>
+          <h1>The heist crew.<br/>The intelligence desk.<br/>One <span class="grad">classified map</span>.</h1>
+          <p class="lede">Cipher plays like a mission briefing in a worn planning room — field operatives vs the desk, custom word packs, and a board that feels like stolen index cards. Create a room, name your unit, run the op.</p>
         </div>
 
         <div id="league-mount"></div>
@@ -1252,10 +1279,10 @@
         <span class="dev-bar__label">🛠 Dev</span>
         <span class="tiny muted dev-bar__hint">Switch role anytime — you always see the key</span>
         <div class="dev-bar__btns">
-          <button type="button" class="btn btn--sm btn--red" data-team="red" data-role="spymaster">Red SM</button>
-          <button type="button" class="btn btn--sm btn--red" data-team="red" data-role="operative">Red OP</button>
-          <button type="button" class="btn btn--sm btn--blue" data-team="blue" data-role="spymaster">Blue SM</button>
-          <button type="button" class="btn btn--sm btn--blue" data-team="blue" data-role="operative">Blue OP</button>
+          <button type="button" class="btn btn--sm btn--red" data-team="red" data-role="spymaster">${esc(teamName("red"))} SM</button>
+          <button type="button" class="btn btn--sm btn--red" data-team="red" data-role="operative">${esc(teamName("red"))} OP</button>
+          <button type="button" class="btn btn--sm btn--blue" data-team="blue" data-role="spymaster">${esc(teamName("blue"))} SM</button>
+          <button type="button" class="btn btn--sm btn--blue" data-team="blue" data-role="operative">${esc(teamName("blue"))} OP</button>
           <button type="button" class="btn btn--sm" data-team="spectator" data-role="operative">Spectate</button>
         </div>
       </div>`);
@@ -1375,10 +1402,10 @@
       <div class="lobby-status panel" aria-live="polite">
         <div class="lobby-status__title">Who's playing what</div>
         <div class="lobby-status__grid">
-          ${item("Red spymaster", !!redSm, redSm ? redSm.name : "pick someone")}
-          ${item("Red operatives", redOps > 0, redOps ? `${redOps} ready` : "need at least 1")}
-          ${item("Blue spymaster", !!blueSm, blueSm ? blueSm.name : "pick someone")}
-          ${item("Blue operatives", blueOps > 0, blueOps ? `${blueOps} ready` : "need at least 1")}
+          ${item(`${esc(teamName("red"))} spymaster`, !!redSm, redSm ? redSm.name : "pick someone")}
+          ${item(`${esc(teamName("red"))} operatives`, redOps > 0, redOps ? `${redOps} ready` : "need at least 1")}
+          ${item(`${esc(teamName("blue"))} spymaster`, !!blueSm, blueSm ? blueSm.name : "pick someone")}
+          ${item(`${esc(teamName("blue"))} operatives`, blueOps > 0, blueOps ? `${blueOps} ready` : "need at least 1")}
         </div>
       </div>`);
   }
@@ -1418,12 +1445,12 @@
         <span>🎯</span>
         <span>${st.devMode
           ? "<b>Dev mode on</b> — start solo; bots fill empty roles. Switch team/role anytime once the game begins."
-          : "Pick a team and a role. Each team needs a <b>spymaster</b> (gives clues) and at least one <b>operative</b> (guesses). Share the room code to invite friends."}</span>
+          : "Pick a unit and role. <b>Field Crew</b> runs the op; <b>The Desk</b> briefs from the planning room. Each unit needs a spymaster and at least one operative. Name your unit before you start."}</span>
       </div>${st.leagueName ? `<div class="hint-banner hint-banner--league"><span>🏆</span><span>League game — <b>${esc(st.leagueName)}</b>${st.leagueCode ? ` <span class="tiny muted">(${esc(st.leagueCode)})</span>` : ""}. This match counts toward your league standings.</span></div>` : ""}`));
 
     const teams = h(`<div class="lobby-teams"></div>`);
-    teams.appendChild(teamCard("red", "🔴 Red Team", reds, you));
-    teams.appendChild(teamCard("blue", "🔵 Blue Team", blues, you));
+    teams.appendChild(teamCard("red", reds, you));
+    teams.appendChild(teamCard("blue", blues, you));
     wrap.appendChild(teams);
 
     // Spectators + your name
@@ -1479,15 +1506,28 @@
     return wrap;
   }
 
-  function teamCard(team, title, members, you) {
+  function teamCard(team, members, you) {
+    const label = teamName(team);
     const onTeam = you && you.team === team;
+    const canName = canEditTeamName(team, you);
     const card = h(`
-      <div class="panel team-card ${team}">
-        <h3>${title} <span class="tiny muted">${members.length}</span></h3>
+      <div class="panel team-card ${team} dossier-card">
+        <div class="team-card__head">
+          <span class="team-card__sigil" aria-hidden="true">${team === "red" ? "⬤" : "◆"}</span>
+          <div class="team-card__title">
+            ${canName
+    ? `<label class="tiny muted" for="teamname-${team}">Unit designation</label>
+               <div class="team-name-row">
+                 <input class="input team-name-input" id="teamname-${team}" maxlength="20" value="${esc(label)}" placeholder="${esc(DEFAULT_TEAM_NAMES[team])}" />
+                 <button type="button" class="btn btn--sm" data-save-team="${team}">Set</button>
+               </div>`
+    : `<h3>${esc(label)}</h3><span class="tiny muted">${team === "red" ? "Field unit" : "Desk unit"} · ${members.length} agent${members.length === 1 ? "" : "s"}</span>`}
+          </div>
+        </div>
         ${roleSlotsMarkup(team, members)}
-        <div class="roster" aria-label="${team} team roster"></div>
+        <div class="roster" aria-label="${esc(label)} roster"></div>
         <div class="ctas">
-          <button class="btn btn--sm btn--${team}" data-act="join">Join ${team}</button>
+          <button class="btn btn--sm btn--${team}" data-act="join">Join ${esc(label)}</button>
           <button class="btn btn--sm" data-act="spy" ${onTeam ? "" : "disabled"}>🎩 Spymaster</button>
           <button class="btn btn--sm" data-act="op" ${onTeam ? "" : "disabled"}>🔍 Operative</button>
         </div>
@@ -1504,6 +1544,20 @@
     joinBtn.onclick = () => send({ type: "setTeam", team });
     spyBtn.onclick = () => send({ type: "setRole", role: "spymaster" });
     opBtn.onclick = () => send({ type: "setRole", role: "operative" });
+    const saveTeam = card.querySelector(`[data-save-team="${team}"]`);
+    const nameInput = card.querySelector(`#teamname-${team}`);
+    if (saveTeam && nameInput) {
+      const commitName = () => {
+        const v = nameInput.value.trim();
+        if (!v) { toast("Enter a unit name", "err"); return; }
+        send({ type: "setTeamName", team, name: v });
+        toast("Unit name updated", "ok");
+      };
+      saveTeam.onclick = commitName;
+      nameInput.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") { e.preventDefault(); commitName(); }
+      });
+    }
     return card;
   }
 
@@ -1526,20 +1580,20 @@
     const g = state.room.game;
     const active = g.status === "playing" ? g.currentTeam : null;
     return h(`
-      <div class="scoreboard-wrap">
-        <div class="scoreboard">
+      <div class="scoreboard-wrap mission-status">
+        <div class="scoreboard mission-status__bar">
           <div class="team-score team-score--red ${active === "red" ? "active" : ""}">
             ${teamScoreNum("red", g)}
-            <div class="meta"><b>Red</b><span class="tiny muted">left to win</span></div>
+            <div class="meta"><b>${esc(teamName("red"))}</b><span class="tiny muted">agents left</span></div>
           </div>
           <div class="turn-pill">
             ${g.status === "ended"
               ? `<span class="who">Game over</span>`
-              : `<span class="who" style="color:${g.currentTeam === "red" ? "var(--red)" : "var(--blue)"}">${g.currentTeam === "red" ? "Red" : "Blue"} to ${g.phase === "clue" ? "clue" : "guess"}</span>`}
+              : `<span class="who" style="color:${g.currentTeam === "red" ? "var(--red)" : "var(--blue)"}">${esc(teamName(g.currentTeam))} — ${g.phase === "clue" ? "briefing" : "in the field"}</span>`}
             <span class="timer" id="timer"></span>
           </div>
           <div class="team-score team-score--blue ${active === "blue" ? "active" : ""}">
-            <div class="meta" style="text-align:right"><b>Blue</b><span class="tiny muted">left to win</span></div>
+            <div class="meta" style="text-align:right"><b>${esc(teamName("blue"))}</b><span class="tiny muted">agents left</span></div>
             ${teamScoreNum("blue", g)}
           </div>
         </div>
@@ -1559,8 +1613,8 @@
     const frame = h(`
       <div class="board-frame">
         <div class="board-frame__head">
-          <span>Index <strong>${g.board_size}×${g.board_size}</strong></span>
-          <span>Round ${String(g.round || 1).padStart(2, "0")}</span>
+          <span>Ops map <strong>${g.board_size}×${g.board_size}</strong></span>
+          <span>Mission ${String(g.round || 1).padStart(2, "0")}</span>
           ${showKey ? `<span class="board-frame__key">Key visible</span>` : ""}
         </div>
       </div>`);
@@ -1603,7 +1657,9 @@
   }
 
   function markerFor(kind) {
-    return { red: "R", blue: "B", neutral: "N", assassin: "X", hidden: "" }[kind] || "";
+    if (kind === "red") return teamMark("red");
+    if (kind === "blue") return teamMark("blue");
+    return { neutral: "N", assassin: "X", hidden: "" }[kind] || "";
   }
 
   // ── clue bar ─────────────────────────────────────────────────────────────
@@ -1661,7 +1717,7 @@
       const el = h(`
         <div class="panel cluebar cluebar--active">
           <div class="clue-display">
-            <span class="clue-meta">${g.currentTeam === "red" ? "Red" : "Blue"} field</span>
+            <span class="clue-meta">${esc(teamName(g.currentTeam))} briefing</span>
             <span class="clue-word">${esc(g.clue.word)}</span>
             <span class="clue-num">${g.clue.count === 0 ? "∞" : g.clue.count}</span>
             <span class="guesses-left">${g.guessesLeft == null ? "unlimited guesses" : `<b>${g.guessesLeft}</b> guess${g.guessesLeft === 1 ? "" : "es"} left`}</span>
@@ -1673,8 +1729,7 @@
     }
 
     // Waiting for the other side
-    const waitFor = g.currentTeam === "red" ? "Red" : "Blue";
-    return h(`<div class="panel cluebar"><span class="muted">⏳ Waiting for the ${waitFor} spymaster's clue…</span></div>`);
+    return h(`<div class="panel cluebar"><span class="muted">⏳ Awaiting ${esc(teamName(g.currentTeam))}'s briefing…</span></div>`);
   }
 
   // ── side panel ───────────────────────────────────────────────────────────
@@ -1711,10 +1766,10 @@
     const players = state.room.players;
     const you = state.you;
     const wrap = h(`<div style="display:grid; gap:16px"></div>`);
-    [["red", "🔴 Red"], ["blue", "🔵 Blue"]].forEach(([team, label]) => {
+    [["red", "red"], ["blue", "blue"]].forEach(([team]) => {
       const members = players.filter((p) => p.team === team)
         .sort((a, b) => (a.role === "spymaster" ? 0 : 1) - (b.role === "spymaster" ? 0 : 1));
-      const col = h(`<div class="team-col"><div class="team-head ${team}"><h3>${label}</h3></div><div class="roster"></div></div>`);
+      const col = h(`<div class="team-col dossier-card team-col--${team}"><div class="team-head ${team}"><h3>${esc(teamName(team))}</h3></div><div class="roster"></div></div>`);
       const r = col.querySelector(".roster");
       if (members.length) members.forEach((p) => r.appendChild(playerChip(p, you)));
       else r.appendChild(h(`<div class="empty">Nobody</div>`));
@@ -1782,9 +1837,9 @@
     const youWin = state.you && state.you.team === w;
     return h(`
       <div class="panel win-banner ${w}">
-        <p class="win-banner__label">File closed</p>
-        <h2>${w === "red" ? "Red" : "Blue"}</h2>
-        <p class="muted">${g.winReason === "assassin" ? "Assassin contact." : "All agents accounted for."}${youWin ? " Your side." : ""}</p>
+        <p class="win-banner__label">Mission closed</p>
+        <h2>${esc(teamName(w))}</h2>
+        <p class="muted">${g.winReason === "assassin" ? "Assassin contact — operation blown." : "All agents accounted for."}${youWin ? " Your unit." : ""}</p>
       </div>`);
   }
 

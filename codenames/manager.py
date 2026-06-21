@@ -222,6 +222,10 @@ class Room:
                     "leagueId": self.settings.league_id,
                     "leagueCode": self.settings.league_code,
                     "leagueName": self.settings.league_name,
+                    "teamNames": {
+                        "red": self.settings.team_red_name,
+                        "blue": self.settings.team_blue_name,
+                    },
                 },
                 "game": self.game.view(reveal_key=reveal),
                 "chat": self.chat[-60:],
