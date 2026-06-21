@@ -29,7 +29,9 @@ async def test_free_league_pick_requires_pro(client):
 
 
 async def test_granted_league_allows_picks(client, monkeypatch):
-    monkeypatch.setenv("WC_DEV_KEY", "dev-test-key")
+    # _DEV_KEY is read once at import, so patch the resolved value directly
+    # rather than the environment variable.
+    monkeypatch.setattr(main, "_DEV_KEY", "dev-test-key")
     lg = await make_league(client)
     grant = await client.post(
         f"/api/leagues/{lg['code']}/pro/grant",

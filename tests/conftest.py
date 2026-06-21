@@ -40,9 +40,19 @@ from httpx import ASGITransport, AsyncClient  # noqa: E402
 
 @pytest_asyncio.fixture
 async def client():
-    """A fresh schema per test, driving the ASGI app in-process."""
+    """A fresh schema per test, driving the ASGI app in-process.
+
+    The fixture mirrors production startup closely: it seeds the configured
+    "office" (OI) league the way the app's lifespan does, and clears the
+    process-global rate-limit buckets so one test's failed-auth attempts can't
+    leak a 429 into the next (the ASGI transport never runs the real lifespan).
+    """
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+    # Reset the in-memory rate limiter for test isolation.
+    main._RATE_BUCKETS.clear()
+    # Seed the config league (no network; legacy JSON files are absent in CI).
+    await main._seed_and_migrate()
     transport = ASGITransport(app=main.app)
     async with AsyncClient(transport=transport, base_url="http://testserver") as c:
         yield c
