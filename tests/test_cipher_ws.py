@@ -37,7 +37,8 @@ def test_packs_endpoint(client):
     body = r.json()
     assert body["packs"]
     assert 5 in body["sizes"]
-    assert 0 in body["timers"]
+    assert {"min", "max", "step"} <= set(body["timer"])
+    assert body["timer"]["min"] >= 1
 
 
 def test_assets_served(client):

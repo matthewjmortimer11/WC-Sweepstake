@@ -70,7 +70,7 @@
     connected: false,
     room: null,             // server room snapshot
     you: null,
-    packs: [], sizes: [5], timers: [0],
+    packs: [], sizes: [5], timer: { min: 15, max: 300, step: 5 },
     tab: localStorage.getItem(LS.tab) || "players",
     settingsOpen: false,
     muted: false,
@@ -194,7 +194,7 @@
       const d = await r.json();
       state.packs = d.packs || [];
       state.sizes = d.sizes || [5];
-      state.timers = d.timers || [0];
+      state.timer = d.timer || { min: 15, max: 300, step: 5 };
     } catch (_) { state.packs = []; }
   }
 
@@ -736,10 +736,21 @@
             </div>
           </div>
           <div class="field">
-            <label>Turn timer</label>
-            <div class="segmented" id="timers">
-              ${state.timers.map((t) => `<button data-v="${t}" aria-pressed="${t === d.turnSeconds}">${t === 0 ? "Off" : t + "s"}</button>`).join("")}
+            <div class="timer-head">
+              <label for="timerrange">Turn timer</label>
+              <label class="switch">
+                <input type="checkbox" id="timeron" ${d.turnSeconds > 0 ? "checked" : ""} />
+                <span class="track"><span class="thumb"></span></span>
+                <span class="switch-lbl" id="timerstate">${d.turnSeconds > 0 ? "On" : "Off"}</span>
+              </label>
             </div>
+            <div class="slider-row" id="sliderrow" ${d.turnSeconds > 0 ? "" : "data-disabled=\"1\""}>
+              <input type="range" id="timerrange" min="${state.timer.min}" max="${state.timer.max}" step="${state.timer.step}"
+                value="${d.turnSeconds > 0 ? d.turnSeconds : 60}" ${d.turnSeconds > 0 ? "" : "disabled"}
+                aria-label="Seconds per turn" />
+              <output class="slider-val" id="timerval">${d.turnSeconds > 0 ? d.turnSeconds + "s" : "Off"}</output>
+            </div>
+            <span class="tiny muted">No timer means relaxed, turn-when-you're-ready play. Slide to set seconds per turn.</span>
           </div>
           <div class="field">
             <label>Assassins</label>
@@ -766,8 +777,24 @@
       });
     };
     seg("sizes", "boardSize", Number);
-    seg("timers", "turnSeconds", Number);
     seg("assassins", "assassins", Number);
+
+    // Optional turn timer: a toggle that enables a seconds slider.
+    const timerOn = modal.querySelector("#timeron");
+    const range = modal.querySelector("#timerrange");
+    const valOut = modal.querySelector("#timerval");
+    const stateLbl = modal.querySelector("#timerstate");
+    const sliderRow = modal.querySelector("#sliderrow");
+    const syncTimer = () => {
+      const on = timerOn.checked;
+      range.disabled = !on;
+      sliderRow.toggleAttribute("data-disabled", !on);
+      stateLbl.textContent = on ? "On" : "Off";
+      d.turnSeconds = on ? Number(range.value) : 0;
+      valOut.textContent = on ? range.value + "s" : "Off";
+    };
+    timerOn.onchange = syncTimer;
+    range.oninput = syncTimer;
 
     const close = () => { state.settingsOpen = false; renderRoom(); };
     modal.querySelector("#closeset").onclick = close;

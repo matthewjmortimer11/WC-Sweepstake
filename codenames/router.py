@@ -25,9 +25,12 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from .game import BLUE, RED, STATUS_LOBBY, MoveError, Settings
 from .manager import (
     _ALLOWED_SIZES,
-    _ALLOWED_TIMERS,
     _MAX_CHAT,
+    _TIMER_MAX,
+    _TIMER_MIN,
+    _TIMER_STEP,
     _clean_name,
+    clamp_timer,
     manager,
 )
 from .words import PACKS, pack_meta, words_for
@@ -74,7 +77,7 @@ async def packs() -> JSONResponse:
     return JSONResponse({
         "packs": pack_meta(),
         "sizes": sorted(_ALLOWED_SIZES),
-        "timers": sorted(_ALLOWED_TIMERS),
+        "timer": {"min": _TIMER_MIN, "max": _TIMER_MAX, "step": _TIMER_STEP},
     })
 
 
@@ -100,8 +103,9 @@ def _build_settings(payload: dict, current: Settings) -> Settings:
     size = int(payload.get("boardSize", current.board_size))
     if size not in _ALLOWED_SIZES:
         raise MoveError("Unsupported board size.")
-    timer = int(payload.get("turnSeconds", current.turn_seconds))
-    if timer not in _ALLOWED_TIMERS:
+    try:
+        timer = clamp_timer(int(payload.get("turnSeconds", current.turn_seconds)))
+    except (TypeError, ValueError):
         raise MoveError("Unsupported timer.")
     assassins = int(payload.get("assassins", current.assassins))
     if assassins < 1 or assassins > 3:

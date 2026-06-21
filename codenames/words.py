@@ -138,6 +138,33 @@ def _clean_emoji_pack(pack):
     return seen
 
 
+# ── After Dark (18+) ──────────────────────────────────────────────────────────
+# Crude, raunchy, dark-humour adult fare in the spirit of a certain card game:
+# booze, bad decisions, bodily betrayals and dad-bod despair. Deliberately edgy,
+# but kept to taboo/gross-out comedy — no slurs or content targeting protected
+# groups. (Want something sharper for your group? Use the custom word list.)
+AFTER_DARK = [
+    "Booze", "Vodka", "Tequila", "Blackout", "Hangover", "Wasted", "Beer pong",
+    "Keg stand", "Shotgun", "Wine mom", "Day drinking", "Hair of the dog",
+    "Vomit", "Fart", "Diarrhea", "Skid mark", "Dutch oven", "Morning breath",
+    "Food baby", "Beer belly", "Dad bod", "Man boobs", "Plumber crack",
+    "Camel toe", "Wedgie", "Muffin top", "Back fat", "Nose hair", "Nipple",
+    "Booty", "Twerk", "Thirst trap", "Nudes", "Sexting", "Tinder", "Ghosting",
+    "Catfish", "Sugar daddy", "Booty call", "One night stand", "Walk of shame",
+    "Side piece", "Wingman", "Friend zone", "Simp", "Situationship", "Ick",
+    "Condom", "Viagra", "Blue balls", "Morning wood", "Wet dream", "Cougar",
+    "MILF", "OnlyFans", "Stripper", "Lap dance", "Pole dance", "Strip club",
+    "Bachelor party", "Regerts", "Divorce", "Alimony", "Midlife crisis",
+    "Therapy", "Daddy issues", "Toxic ex", "Restraining order", "Group chat",
+    "Drunk text", "Snack", "Bong", "Edibles", "Munchies", "Couch lock",
+    "Mooning", "Streaking", "Speedo", "Mankini", "Crocs", "Cargo shorts",
+    "Fanny pack", "Tramp stamp", "Mullet", "Comb over", "Toupee", "Spray tan",
+    "Botox", "Manscaping", "Swamp ass", "Pit stains", "Hemorrhoids",
+    "Colonoscopy", "Vasectomy", "Prostate", "Menopause", "Prune juice",
+    "Adult diaper", "Karaoke", "Cringe", "Clout", "Karen", "Boomer",
+]
+
+
 PACKS = {
     "classic": {"name": "Classic", "emoji": "🕵️", "words": CLASSIC,
                 "blurb": "The all-rounder. Concrete, evocative nouns."},
@@ -149,6 +176,8 @@ PACKS = {
               "blurb": "Wizards, warp drives and wormholes."},
     "emoji": {"name": "Emoji Chaos", "emoji": "😎", "words": _clean_emoji_pack(EMOJI),
               "blurb": "No words at all — pure picture mayhem."},
+    "afterdark": {"name": "After Dark", "emoji": "🔞", "words": AFTER_DARK,
+                  "blurb": "Crude, rude, NSFW. Not for grandma. 18+."},
 }
 
 

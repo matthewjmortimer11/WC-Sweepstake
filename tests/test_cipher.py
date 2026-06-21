@@ -274,3 +274,19 @@ def test_timeout_in_guess_phase_passes_turn():
     g.on_timeout()
     assert g.current_team != team
     assert g.phase == PHASE_CLUE
+
+
+@pytest.mark.parametrize("raw,expected", [
+    (0, 0), (-10, 0), (5, 15), (15, 15), (62, 60), (63, 65),
+    (300, 300), (9999, 300),
+])
+def test_clamp_timer_snaps_and_clamps(raw, expected):
+    from codenames.manager import clamp_timer
+    assert clamp_timer(raw) == expected
+
+
+def test_after_dark_pack_present_and_playable():
+    assert "afterdark" in PACKS
+    g = Game(settings=Settings(board_size=6, pack_id="afterdark"))
+    g.new_round(words_for("afterdark"), seed=7)
+    assert len(g.cards) == 36

@@ -43,7 +43,22 @@ _MAX_NAME = 24
 _MAX_CHAT = 300
 
 _ALLOWED_SIZES = {4, 5, 6}
-_ALLOWED_TIMERS = {0, 30, 60, 90, 120, 180}
+# Turn timer is optional (0 = off) and otherwise a free value on a slider,
+# clamped to this inclusive range and snapped to the step.
+_TIMER_MIN = 15
+_TIMER_MAX = 300
+_TIMER_STEP = 5
+
+
+def clamp_timer(seconds: int) -> int:
+    """Validate/snap a turn-timer value. 0 means 'off'; anything else is
+    clamped to [_TIMER_MIN, _TIMER_MAX] and snapped to _TIMER_STEP."""
+    if seconds <= 0:
+        return 0
+    seconds = max(_TIMER_MIN, min(_TIMER_MAX, seconds))
+    return int(round(seconds / _TIMER_STEP) * _TIMER_STEP)
+
+
 _PALETTE = ["#f97316", "#22d3ee", "#a78bfa", "#f472b6", "#34d399",
             "#facc15", "#60a5fa", "#fb7185", "#4ade80", "#c084fc"]
 
