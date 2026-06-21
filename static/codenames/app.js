@@ -433,7 +433,7 @@
           <span class="eyebrow">Why it's more fun</span>
           <div class="features" style="margin-top:14px">
             <div class="feature"><span class="ico">🎛️</span><h4>Fully customisable</h4><p>4×4, 5×5 or 6×6 boards, optional turn timers, 1–5 assassins.</p></div>
-            <div class="feature"><span class="ico">🃏</span><h4>10 themed word packs</h4><p>Mix &amp; match Classic, Movies, Drinking, Rude, Offensive, Unfiltered and more — or paste your own.</p></div>
+            <div class="feature"><span class="ico">🃏</span><h4>Themed word packs</h4><p>Mix &amp; match Classic, Countries, Marvel, UK Snacks, Drinking, Offensive and more — or paste your own.</p></div>
             <div class="feature"><span class="ico">⚡</span><h4>Instant & real-time</h4><p>Live sync over WebSockets. Reconnects automatically if you drop.</p></div>
             <div class="feature"><span class="ico">💬</span><h4>Chat & reactions</h4><p>Trash-talk, emoji bursts and a running play-by-play log.</p></div>
             <div class="feature"><span class="ico">♿</span><h4>Accessible by design</h4><p>Colour-blind glyphs, keyboard play, reduced-motion support.</p></div>

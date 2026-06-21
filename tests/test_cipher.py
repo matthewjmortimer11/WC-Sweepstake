@@ -32,7 +32,7 @@ def test_every_pack_has_enough_words_for_largest_board():
 def test_pack_meta_shape():
     meta = pack_meta()
     assert {m["id"] for m in meta} == set(SELECTABLE_PACK_IDS)
-    assert len(meta) == 10
+    assert len(meta) == 13
     for m in meta:
         assert m["count"] > 0
         assert m["tier"] in ("family", "mature", "adult")

@@ -167,6 +167,99 @@ EMOJI = [
 ]
 
 
+# ── Countries ─────────────────────────────────────────────────────────────────
+COUNTRIES = [
+    "Afghanistan", "Albania", "Algeria", "Argentina", "Armenia", "Australia",
+    "Austria", "Azerbaijan", "Bahrain", "Bangladesh", "Belarus", "Belgium",
+    "Belize", "Benin", "Bhutan", "Bolivia", "Bosnia", "Botswana", "Brazil",
+    "Brunei", "Bulgaria", "Burkina Faso", "Burundi", "Cambodia", "Cameroon",
+    "Canada", "Chad", "Chile", "China", "Colombia", "Congo", "Costa Rica",
+    "Croatia", "Cuba", "Cyprus", "Czechia", "Denmark", "Djibouti", "Dominica",
+    "Ecuador", "Egypt", "El Salvador", "England", "Eritrea", "Estonia",
+    "Ethiopia", "Fiji", "Finland", "France", "Gabon", "Gambia", "Georgia",
+    "Germany", "Ghana", "Greece", "Grenada", "Guatemala", "Guinea", "Guyana",
+    "Haiti", "Honduras", "Hungary", "Iceland", "India", "Indonesia", "Iran",
+    "Iraq", "Ireland", "Israel", "Italy", "Jamaica", "Japan", "Jordan",
+    "Kazakhstan", "Kenya", "Kiribati", "Kosovo", "Kuwait", "Kyrgyzstan", "Laos",
+    "Latvia", "Lebanon", "Lesotho", "Liberia", "Libya", "Liechtenstein",
+    "Lithuania", "Luxembourg", "Madagascar", "Malawi", "Malaysia", "Maldives",
+    "Mali", "Malta", "Mauritania", "Mauritius", "Mexico", "Moldova", "Monaco",
+    "Mongolia", "Montenegro", "Morocco", "Mozambique", "Myanmar", "Namibia",
+    "Nepal", "Netherlands", "New Zealand", "Nicaragua", "Niger", "Nigeria",
+    "North Korea", "Norway", "Oman", "Pakistan", "Palau", "Palestine", "Panama",
+    "Paraguay", "Peru", "Philippines", "Poland", "Portugal", "Qatar", "Romania",
+    "Russia", "Rwanda", "Samoa", "Scotland", "Senegal", "Serbia", "Seychelles",
+    "Singapore", "Slovakia", "Slovenia", "Somalia", "South Africa", "South Korea",
+    "Spain", "Sri Lanka", "Sudan", "Suriname", "Sweden", "Switzerland", "Syria",
+    "Taiwan", "Tajikistan", "Tanzania", "Thailand", "Togo", "Tonga", "Tunisia",
+    "Turkey", "Turkmenistan", "Uganda", "Ukraine", "United Arab Emirates",
+    "United Kingdom", "United States", "Uruguay", "Uzbekistan", "Vanuatu",
+    "Vatican", "Venezuela", "Vietnam", "Wales", "Yemen", "Zambia", "Zimbabwe",
+    "Andorra", "Angola", "Antigua", "Bahamas", "Barbados", "Comoros", "Dominican Republic",
+    "Equatorial Guinea", "Eswatini", "Guinea-Bissau", "Ivory Coast", "North Macedonia",
+    "Papua New Guinea", "Saint Lucia", "San Marino", "Sao Tome", "Sierra Leone",
+    "Solomon Islands", "South Sudan", "Timor-Leste", "Trinidad", "Vatican City",
+]
+
+# ── Marvel ────────────────────────────────────────────────────────────────────
+MARVEL = [
+    "Avengers", "Iron Man", "Captain America", "Thor", "Hulk", "Black Widow",
+    "Hawkeye", "Spider-Man", "Doctor Strange", "Black Panther", "Ant-Man",
+    "Wasp", "Captain Marvel", "Scarlet Witch", "Vision", "Falcon", "Winter Soldier",
+    "War Machine", "Nick Fury", "Loki", "Thanos", "Ultron", "Red Skull", "Venom",
+    "Deadpool", "Wolverine", "Storm", "Cyclops", "Jean Grey", "Professor X",
+    "Magneto", "Mystique", "Gambit", "Rogue", "Beast", "Nightcrawler", "Colossus",
+    "Silver Surfer", "Galactus", "Daredevil", "Punisher", "Luke Cage", "Jessica Jones",
+    "Iron Fist", "She-Hulk", "Moon Knight", "Blade", "Ghost Rider", "Namor",
+    "Fantastic Four", "Mister Fantastic", "Invisible Woman", "Human Torch", "Thing",
+    "Doctor Doom", "Green Goblin", "Doc Ock", "Sandman", "Vulture", "Mysterio",
+    "Kingpin", "Electro", "Rhino", "Shang-Chi", "Ms Marvel", "America Chavez",
+    "Star-Lord", "Gamora", "Drax", "Rocket", "Groot", "Nebula", "Mantis",
+    "Yondu", "Ego", "Ronan", "Korath", "Kree", "Skrull", "Nova Corps",
+    "Asgard", "Wakanda", "Sokovia", "New York", "Sanctum", "Tesseract", "Infinity Stone",
+    "Mjolnir", "Stormbreaker", "Vibranium", "Arc Reactor", "Shield", "Cape",
+    "Suit", "Helmet", "Gauntlet", "Portal", "Bifrost", "Quinjet", "Helicarrier",
+    "Stark Tower", "Avengers Tower", "Xavier School", "Oscorp", "Latveria",
+    "Kamar-Taj", "Quantum Realm", "Multiverse", "Variant", "Kang", "Celestial",
+    "Eternals", "Sersi", "Ikaris", "Kingo", "Phastos", "Makkari", "Sprite",
+    "Arishem", "Deviant", "Symbiote", "Gamma", "Super soldier", "Mutant", "Inhuman",
+    "Hydra", "SHIELD", "AIM", "Roxxon", "Ten Rings", "Ravager", "Collector",
+    "Grandmaster", "Watcher", "Howard the Duck", "Howard Stark", "Peggy Carter",
+    "Maria Hill", "Happy Hogan", "Ned Leeds", "MJ", "Aunt May", "Uncle Ben",
+    "J Jonah Jameson", "Daily Bugle", "Oscorp", "Stark Expo", "Pym Particle",
+]
+
+# ── UK Snacks ─────────────────────────────────────────────────────────────────
+UK_SNACKS = [
+    "Crisps", "Walkers", "Quavers", "Wotsits", "Monster Munch", "Skips", "Hula Hoops",
+    "Nik Naks", "Squares", "Pom-Bear", "McCoy's", "Kettle Chips", "Tyrrells",
+    "Salt and vinegar", "Cheese and onion", "Ready salted", "Prawn cocktail",
+    "Biscuit", "Digestive", "Hobnob", "Rich Tea", "Custard Cream", "Bourbon",
+    "Jammie Dodger", "Party Ring", "Ginger Nut", "Shortbread", "Malted Milk",
+    "Chocolate Digestive", "Fig Roll", "Garibaldi", "Viennese Whirl", "Caramel Wafer",
+    "Tunnock's Teacake", "Tunnock's Caramel Log", "Club", "Penguin", "KitKat",
+    "Twirl", "Flake", "Crunchie", "Boost", "Double Decker", "Yorkie", "Wispa",
+    "Mars Bar", "Snickers", "Bounty", "Galaxy", "Dairy Milk", "Creme Egg",
+    "Mini Egg", "Buttons", "Freddo", "Milkybar", "Aero", "Maltesers", "Minstrels",
+    "Revels", "Wine Gums", "Jelly Babies", "Percy Pig", "Cola Bottles", "Fizzy Cola",
+    "Haribo", "Starmix", "Tangfastics", "Love Hearts", "Refreshers", "Drumstick",
+    "Sherbet Fountain", "Dib Dab", "Parma Violets", "Flying Saucer", "Bonbon",
+    "Pick and mix", "Liquorice Allsorts", "Pontefract Cake", "Bassett's", "Maynards",
+    "Sweets", "Chippy", "Chippy chips", "Chip butty", "Scotch egg", "Pork pie",
+    "Sausage roll", "Greggs", "Cornish pasty", "Cheese straw", "Cheese puff",
+    "Pork scratchings", "Flapjack", "Millionaire shortbread", "Eccles cake",
+    "Bakewell tart", "Cherry Bakewell", "Victoria sponge", "Scone", "Clotted cream",
+    "Jam", "Marmite", "Bovril", "Branston Pickle", "HP Sauce", "Brown sauce",
+    "Tomato sauce", "Piccalilli", "Chutney", "Pickled onion", "Gherkin", "Rollmop",
+    "Irn-Bru", "Lucozade", "Ribena", "Robinsons", "Squash", "Tizer", "Dandelion and burdock",
+    "Ginger beer", "Shandy", "Lilt", "Oasis", "Capri-Sun", "Fruit Shoot",
+    "Yorkshire Tea", "PG Tips", "Typhoo", "Builder's tea", "Milk two sugars",
+    "Fish and chips", "Curry sauce", "Gravy", "Mushy peas", "Mint sauce",
+    "Pasty", "Pie", "Steak bake", "Sausage bean melt", "Bacon bap", "Full English",
+    "Black pudding", "White pudding", "Bubble and squeak", "Toad in the hole",
+]
+
+
 def _clean_emoji_pack(pack):
     # Normalise to a de-duplicated list of distinct single glyphs.
     seen = []
@@ -429,6 +522,15 @@ PACKS = {
     "emoji": {"name": "Emoji Chaos", "emoji": "😎", "tier": "family",
               "words": _clean_emoji_pack(EMOJI),
               "blurb": "No words at all — pure picture mayhem."},
+    "countries": {"name": "Countries", "emoji": "🌍", "tier": "family",
+                  "words": _dedupe_words(COUNTRIES),
+                  "blurb": "Nations, states and geography from every continent."},
+    "marvel": {"name": "Marvel", "emoji": "🦸", "tier": "family",
+               "words": _dedupe_words(MARVEL),
+               "blurb": "Heroes, villains, places and MCU lore."},
+    "uksnacks": {"name": "UK Snacks", "emoji": "🇬🇧", "tier": "family",
+                 "words": _dedupe_words(UK_SNACKS),
+                 "blurb": "Crisps, biscuits, sweets and Greggs classics."},
     "drinking": {"name": "Drinking", "emoji": "🍻", "tier": "mature",
                  "words": _dedupe_words(DRINKING),
                  "blurb": "Bars, booze and bad decisions. 18+."},
@@ -456,6 +558,7 @@ PACKS = {
 # Packs shown in the lobby toggle UI (excludes legacy aliases).
 SELECTABLE_PACK_IDS = [
     "classic", "movies", "food", "scifi", "emoji",
+    "countries", "marvel", "uksnacks",
     "drinking", "rude", "adult", "offensive", "unfiltered",
 ]
 
