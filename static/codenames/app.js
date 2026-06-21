@@ -63,6 +63,44 @@
     return `<span class="social-list__who">${avatarImg(u, "social-list__av", userLabel(u))}<span>${esc(userLabel(u))}${extra || ""}</span></span>`;
   }
 
+  function agentCounts(boardSize, assassins) {
+    const bs = String(boardSize);
+    const a = String(assassins);
+    if (state.agentPreviews && state.agentPreviews[bs] && state.agentPreviews[bs][a]) {
+      return state.agentPreviews[bs][a];
+    }
+    const total = boardSize * boardSize;
+    const maxAss = Math.min(5, Math.max(1, total - 4));
+    const eff = Math.max(1, Math.min(assassins, maxAss));
+    const field = total - eff;
+    const base = Math.floor(field / 3);
+    const starting = base + 1;
+    const second = base;
+    return {
+      startingTeamAgents: starting,
+      otherTeamAgents: second,
+      neutral: field - starting - second,
+      assassins: eff,
+    };
+  }
+
+  function maxAssassinsForBoard(boardSize) {
+    const v = state.maxAssassins && state.maxAssassins[String(boardSize)];
+    return v || Math.min(5, Math.max(1, boardSize * boardSize - 4));
+  }
+
+  function agentCountsLabel(counts) {
+    if (!counts) return "";
+    const pl = counts.assassins === 1 ? "" : "s";
+    return `${counts.startingTeamAgents} vs ${counts.otherTeamAgents} agents (+1 to starting team) · ${counts.neutral} neutral · ${counts.assassins} assassin${pl}`;
+  }
+
+  function teamScoreNum(team, g) {
+    const rem = g.remaining[team];
+    const tot = (g.totals && g.totals[team]) || rem;
+    return `<span class="num">${rem}<span class="score-denom">/${tot}</span></span>`;
+  }
+
   function getActiveLeague() {
     try {
       const raw = localStorage.getItem(LS.league);
@@ -262,6 +300,7 @@
     room: null,             // server room snapshot
     you: null,
     packs: [], sizes: [5], timer: { min: 15, max: 300, step: 5 },
+    agentPreviews: null, maxAssassins: null,
     tab: localStorage.getItem(LS.tab) || "players",
     settingsOpen: false,
     settingsSavePending: false,
@@ -536,6 +575,8 @@
         state.packs = d.packs || [];
         state.sizes = d.sizes || [5];
         state.timer = d.timer || { min: 15, max: 300, step: 5 };
+        state.agentPreviews = d.agentPreviews || null;
+        state.maxAssassins = d.maxAssassins || null;
       } catch (_) { state.packs = []; }
     }
     if (state.stats === null) {
@@ -1418,6 +1459,7 @@
         </div>
         <div style="display:flex; gap:8px; flex-wrap:wrap">
           <span class="badge">${st.boardSize}×${st.boardSize} board</span>
+          ${st.agentCounts ? `<span class="badge badge--agents" title="${esc(agentCountsLabel(st.agentCounts))}">Win: ${st.agentCounts.startingTeamAgents} vs ${st.agentCounts.otherTeamAgents}</span>` : ""}
           <span class="badge">${st.hasCustom ? "Custom words" : esc(st.packName)}</span>
           <span class="badge">${st.turnSeconds ? st.turnSeconds + "s turns" : "No timer"}</span>
           <span class="badge">${st.assassins} assassin${st.assassins > 1 ? "s" : ""}</span>
@@ -1487,8 +1529,8 @@
       <div class="scoreboard-wrap">
         <div class="scoreboard">
           <div class="team-score team-score--red ${active === "red" ? "active" : ""}">
-            <span class="num">${g.remaining.red}</span>
-            <div class="meta"><b>Red</b><span class="tiny muted">remaining</span></div>
+            ${teamScoreNum("red", g)}
+            <div class="meta"><b>Red</b><span class="tiny muted">left to win</span></div>
           </div>
           <div class="turn-pill">
             ${g.status === "ended"
@@ -1497,8 +1539,8 @@
             <span class="timer" id="timer"></span>
           </div>
           <div class="team-score team-score--blue ${active === "blue" ? "active" : ""}">
-            <div class="meta" style="text-align:right"><b>Blue</b><span class="tiny muted">remaining</span></div>
-            <span class="num">${g.remaining.blue}</span>
+            <div class="meta" style="text-align:right"><b>Blue</b><span class="tiny muted">left to win</span></div>
+            ${teamScoreNum("blue", g)}
           </div>
         </div>
         <div class="timer-bar" id="timerbar" hidden><div class="timer-bar__fill" id="timerfill"></div></div>
@@ -1586,6 +1628,8 @@
     // Spymaster giving a clue
     if (g.phase === "clue" && isActiveSpy) {
       const compound = state.room.settings.houseRules && state.room.settings.houseRules.compoundClues;
+      const teamTotal = (g.totals && g.totals[you.team]) || 9;
+      const maxClue = Math.min(9, teamTotal);
       const el = h(`
         <div class="panel cluebar">
           <form class="clue-form" id="clueform">
@@ -1594,9 +1638,9 @@
               <input class="input" id="clueword" maxlength="40" autocomplete="off" placeholder="${compound ? "e.g. ICE CREAM" : "e.g. OCEAN"}" />
             </div>
             <div class="field" style="flex:0 0 110px">
-              <label for="cluenum">Number</label>
+              <label for="cluenum">Number <span class="tiny muted">(max ${maxClue})</span></label>
               <select class="select" id="cluenum">
-                ${[0,1,2,3,4,5,6,7,8,9].map((n) => `<option value="${n}">${n === 0 ? "∞ (0)" : n}</option>`).join("")}
+                ${Array.from({ length: maxClue + 1 }, (_, n) => `<option value="${n}">${n === 0 ? "∞ (0)" : n}</option>`).join("")}
               </select>
             </div>
             <button class="btn btn--primary" type="submit">Give clue →</button>
@@ -1805,6 +1849,7 @@
             <div class="segmented" id="sizes">
               ${state.sizes.map((s) => `<button data-v="${s}" aria-pressed="${s === d.boardSize}">${s}×${s}</button>`).join("")}
             </div>
+            <p class="tiny muted setup-preview" id="setup-preview">${esc(agentCountsLabel(agentCounts(d.boardSize, d.assassins)))}</p>
           </div>
           <div class="field">
             <div class="timer-head">
@@ -1825,9 +1870,7 @@
           </div>
           <div class="field">
             <label>Assassins</label>
-            <div class="segmented" id="assassins">
-              ${[1, 2, 3, 4, 5].map((a) => `<button data-v="${a}" aria-pressed="${a === d.assassins}">${a}</button>`).join("")}
-            </div>
+            <div class="segmented" id="assassins"></div>
           </div>
           <button class="btn btn--primary btn--lg btn--block" id="applyset">Save setup</button>
         </div>
@@ -1867,13 +1910,39 @@
     const devMode = modal.querySelector("#devmode");
     devMode.onchange = () => { d.devMode = devMode.checked; };
 
+    const preview = modal.querySelector("#setup-preview");
+    const assassinWrap = modal.querySelector("#assassins");
+    const syncSetupPreview = () => {
+      if (preview) preview.textContent = agentCountsLabel(agentCounts(d.boardSize, d.assassins));
+    };
+    const renderAssassinBtns = () => {
+      const maxA = maxAssassinsForBoard(d.boardSize);
+      if (d.assassins > maxA) d.assassins = maxA;
+      assassinWrap.innerHTML = "";
+      for (let a = 1; a <= maxA; a += 1) {
+        const b = h(`<button type="button" data-v="${a}" aria-pressed="${a === d.assassins}">${a}</button>`);
+        b.onclick = () => {
+          d.assassins = a;
+          renderAssassinBtns();
+          syncSetupPreview();
+        };
+        assassinWrap.appendChild(b);
+      }
+    };
+    renderAssassinBtns();
+
     const seg = (id, key, cast) => {
       modal.querySelectorAll(`#${id} button`).forEach((b) => {
-        b.onclick = () => { d[key] = cast(b.dataset.v); modal.querySelectorAll(`#${id} button`).forEach((x) => x.setAttribute("aria-pressed", cast(x.dataset.v) === d[key])); };
+        b.onclick = () => {
+          d[key] = cast(b.dataset.v);
+          modal.querySelectorAll(`#${id} button`).forEach((x) => x.setAttribute("aria-pressed", cast(x.dataset.v) === d[key]));
+          if (key === "boardSize") renderAssassinBtns();
+          syncSetupPreview();
+        };
       });
     };
     seg("sizes", "boardSize", Number);
-    seg("assassins", "assassins", Number);
+    syncSetupPreview();
 
     // Optional turn timer: a toggle that enables a seconds slider.
     const timerOn = modal.querySelector("#timeron");

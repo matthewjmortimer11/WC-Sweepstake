@@ -79,19 +79,43 @@ class Settings:
     league_name: Optional[str] = None
 
 
+def effective_assassins(total: int, assassins: int) -> int:
+    """Clamp assassin count so the board still has room for both teams."""
+    return max(1, min(assassins, MAX_ASSASSINS, max(1, total - 4)))
+
+
+def max_assassins_for_board(board_size: int) -> int:
+    return effective_assassins(board_size * board_size, MAX_ASSASSINS)
+
+
 def _distribution(total: int, assassins: int) -> tuple[int, int, int, int]:
     """Return (starting, second, neutral, assassins) agent counts.
 
     Generalises the classic 9/8/7/1 (for 25 cards) to any board size: the field
     is split roughly into thirds with the starting team given one extra agent.
     """
-    assassins = max(1, min(assassins, MAX_ASSASSINS, max(1, total - 4)))
+    assassins = effective_assassins(total, assassins)
     field = total - assassins
     base = field // 3
     starting = base + 1
     second = base
     neutral = field - starting - second
     return starting, second, neutral, assassins
+
+
+def distribution_preview(board_size: int, assassins: int) -> dict:
+    """Public agent-count breakdown for a board size (lobby / settings UI)."""
+    total = board_size * board_size
+    eff = effective_assassins(total, assassins)
+    start, second, neutral, ass = _distribution(total, eff)
+    return {
+        "total": total,
+        "startingTeamAgents": start,
+        "otherTeamAgents": second,
+        "neutral": neutral,
+        "assassins": ass,
+        "effectiveAssassins": eff,
+    }
 
 
 @dataclass
@@ -156,7 +180,12 @@ class Game:
         self.turn_deadline = None
         self.log = [{
             "t": "round", "team": self.starting_team,
-            "text": f"New round dealt — {self._team_label(self.starting_team)} starts.",
+            "text": (
+                f"New round dealt — {self._team_label(self.starting_team)} starts "
+                f"({start_n} agents vs {second_n}; "
+                f"{neutral_n} neutral, {assassin_n} assassin"
+                f"{'' if assassin_n == 1 else 's'})."
+            ),
             "ts": time.time(),
         }]
         self._arm_timer()
@@ -216,8 +245,9 @@ class Game:
             norm = word.casefold()
             if any(c.word.casefold() == norm for c in self.cards):
                 raise MoveError("That clue matches a word on the board.")
-        if count < 0 or count > 9:
-            raise MoveError("Pick a number from 0 to 9.")
+        max_clue = min(9, self.total_for(team))
+        if count < 0 or count > max_clue:
+            raise MoveError(f"Pick a number from 0 to {max_clue}.")
 
         self.clue_word = word
         self.clue_count = count

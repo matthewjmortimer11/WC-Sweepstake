@@ -26,6 +26,7 @@ from pydantic import BaseModel
 from . import auth, store
 from .avatars import decode_data_url
 from .game import BLUE, RED, STATUS_LOBBY, MAX_ASSASSINS, MoveError, Settings, HouseRules
+from .game import distribution_preview, effective_assassins, max_assassins_for_board
 from .manager import (
     _ALLOWED_SIZES,
     _MAX_CHAT,
@@ -124,10 +125,19 @@ async def play_page() -> HTMLResponse:
 
 @router.get("/play/api/packs")
 async def packs() -> JSONResponse:
+    previews = {
+        str(n): {
+            str(a): distribution_preview(n, a)
+            for a in range(1, max_assassins_for_board(n) + 1)
+        }
+        for n in sorted(_ALLOWED_SIZES)
+    }
     return JSONResponse({
         "packs": pack_meta(),
         "sizes": sorted(_ALLOWED_SIZES),
         "timer": {"min": _TIMER_MIN, "max": _TIMER_MAX, "step": _TIMER_STEP},
+        "maxAssassins": {str(n): max_assassins_for_board(n) for n in sorted(_ALLOWED_SIZES)},
+        "agentPreviews": previews,
     })
 
 
@@ -398,8 +408,13 @@ def _build_settings(payload: dict, current: Settings) -> Settings:
     except (TypeError, ValueError):
         raise MoveError("Unsupported timer.")
     assassins = int(payload.get("assassins", current.assassins))
-    if assassins < 1 or assassins > MAX_ASSASSINS:
-        raise MoveError(f"Pick 1–{MAX_ASSASSINS} assassins.")
+    total = size * size
+    if assassins < 1:
+        raise MoveError("Pick at least 1 assassin.")
+    eff_max = max_assassins_for_board(size)
+    if assassins > eff_max:
+        raise MoveError(f"Pick 1–{eff_max} assassins on a {size}×{size} board.")
+    assassins = effective_assassins(total, assassins)
 
     custom_raw = payload.get("customWords")
     custom = None

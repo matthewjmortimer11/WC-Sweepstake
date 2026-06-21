@@ -33,6 +33,7 @@ from .game import (
     Game,
     MoveError,
     Settings,
+    distribution_preview,
 )
 from .words import PACKS, words_for, words_for_packs, normalize_pack_ids, pack_label
 
@@ -207,6 +208,9 @@ class Room:
                     "packName": self.settings.pack_name,
                     "turnSeconds": self.settings.turn_seconds,
                     "assassins": self.settings.assassins,
+                    "agentCounts": distribution_preview(
+                        self.settings.board_size, self.settings.assassins,
+                    ),
                     "hasCustom": bool(self.settings.custom_words),
                     "customWords": ", ".join(self.settings.custom_words or []),
                     "houseRules": {

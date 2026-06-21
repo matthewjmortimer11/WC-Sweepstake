@@ -16,6 +16,9 @@ from codenames.game import (
     MoveError,
     Settings,
     _distribution,
+    distribution_preview,
+    effective_assassins,
+    max_assassins_for_board,
 )
 from codenames.words import PACKS, pack_meta, words_for, words_for_packs, normalize_pack_ids, SELECTABLE_PACK_IDS
 
@@ -95,6 +98,22 @@ def test_distribution_five_assassins_on_classic_board():
     assert (start, second, neutral, ass) == (7, 6, 7, 5)
 
 
+def test_distribution_preview_matches_deal():
+    preview = distribution_preview(4, 1)
+    g = Game(settings=Settings(board_size=4, assassins=1))
+    g.new_round(words_for("classic"), seed=0)
+    assert preview["startingTeamAgents"] == g.total_for(g.starting_team)
+    assert preview["otherTeamAgents"] == g.total_for(
+        BLUE if g.starting_team == RED else RED,
+    )
+
+
+def test_max_assassins_scales_with_board():
+    assert max_assassins_for_board(4) == 5
+    assert max_assassins_for_board(5) == 5
+    assert effective_assassins(16, 99) == 5
+
+
 # ── board dealing ────────────────────────────────────────────────────────────
 def _new_game(size=5, seed=0):
     g = Game(settings=Settings(board_size=size))
@@ -112,6 +131,22 @@ def test_new_round_deals_correct_counts():
     assert g.remaining(other) == 8
     assert sum(1 for c in g.cards if c.kind == NEUTRAL) == 7
     assert sum(1 for c in g.cards if c.kind == ASSASSIN) == 1
+
+
+@pytest.mark.parametrize("size,start_n,other_n,neutral_n,ass_n", [
+    (4, 6, 5, 4, 1),
+    (5, 9, 8, 7, 1),
+    (6, 12, 11, 12, 1),
+])
+def test_new_round_scales_agent_counts_by_board(size, start_n, other_n, neutral_n, ass_n):
+    g = _new_game(size=size, seed=0)
+    assert len(g.cards) == size * size
+    start = g.starting_team
+    other = BLUE if start == RED else RED
+    assert g.total_for(start) == start_n
+    assert g.total_for(other) == other_n
+    assert sum(1 for c in g.cards if c.kind == NEUTRAL) == neutral_n
+    assert sum(1 for c in g.cards if c.kind == ASSASSIN) == ass_n
 
 
 def test_round_is_deterministic_with_seed():
@@ -152,6 +187,14 @@ def test_clue_count_capped_at_nine():
     g = _new_game()
     with pytest.raises(MoveError, match="0 to 9"):
         g.give_clue(g.current_team, "ocean", 10)
+
+
+def test_clue_count_scales_down_on_small_board():
+    g = _new_game(size=4)
+    with pytest.raises(MoveError, match="0 to 6"):
+        g.give_clue(g.current_team, "ocean", 7)
+    g.give_clue(g.current_team, "ocean", 6)
+    assert g.clue_count == 6
 
 
 def test_give_clue_sets_phase_and_guesses():
