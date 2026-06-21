@@ -26,6 +26,7 @@ from typing import Optional
 from . import store
 from .game import (
     BLUE,
+    PHASE_GUESS,
     RED,
     STATUS_ENDED,
     STATUS_LOBBY,
@@ -168,9 +169,49 @@ class Room:
     # game). Reset when a new round starts.
     persisted: bool = False
     match_persisting: bool = False
+    near_picks: dict = field(default_factory=dict)   # pid -> set[int]
 
     def touch(self) -> None:
         self.last_active = time.time()
+
+    def clear_near_picks(self) -> None:
+        self.near_picks.clear()
+
+    def prune_near_picks(self, index: int) -> None:
+        for pid in list(self.near_picks):
+            self.near_picks[pid].discard(index)
+            if not self.near_picks[pid]:
+                del self.near_picks[pid]
+
+    def toggle_near_pick(self, pid: str, index: int) -> None:
+        picks = self.near_picks.setdefault(pid, set())
+        if index in picks:
+            picks.discard(index)
+            if not picks:
+                del self.near_picks[pid]
+        else:
+            picks.add(index)
+
+    def public_near_picks(self) -> list[dict]:
+        g = self.game
+        if g.status != STATUS_PLAYING or g.phase != PHASE_GUESS:
+            return []
+        out: list[dict] = []
+        for pid, indices in self.near_picks.items():
+            if not indices:
+                continue
+            p = self.players.get(pid)
+            if not p or p.role != "operative" or p.team != g.current_team:
+                continue
+            out.append({
+                "id": pid,
+                "name": p.name,
+                "color": p.color,
+                "team": p.team,
+                "indices": sorted(indices),
+            })
+        out.sort(key=lambda x: x["name"].lower())
+        return out
 
     # ── snapshots ──────────────────────────────────────────────────────────────
     def public_players(self) -> list[dict]:
@@ -196,6 +237,8 @@ class Room:
                 or (self.settings.dev_mode and me.is_host)
             )
         )
+        game_view = self.game.view(reveal_key=reveal)
+        game_view["nearPicks"] = self.public_near_picks()
         return {
             "type": "state",
             "room": {
@@ -227,7 +270,7 @@ class Room:
                         "blue": self.settings.team_blue_name,
                     },
                 },
-                "game": self.game.view(reveal_key=reveal),
+                "game": game_view,
                 "chat": self.chat[-60:],
             },
             "you": {

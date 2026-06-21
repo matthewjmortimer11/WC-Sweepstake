@@ -344,6 +344,7 @@
     roomView: null,           // lobby | play — tracks shell mode for partial render
     lastPhase: null,
     lastCurrentTeam: null,
+    pendingGuess: null,
     config: null,
     authUser: null,
     social: null,
@@ -394,6 +395,7 @@
     state.roomView = null;
     state.lastPhase = null;
     state.lastCurrentTeam = null;
+    state.pendingGuess = null;
     state.roomEpoch += 1;
   }
 
@@ -489,6 +491,9 @@
 
     // Sound + confetti cues from transitions.
     if (prev) {
+      if (prev.phase !== g.phase || prev.currentTeam !== g.currentTeam) {
+        state.pendingGuess = null;
+      }
       const revealed = g.cards.filter((c) => c.revealed).length;
       if (prev.round !== g.round) {
         state.lastRevealCount = 0;
@@ -1306,7 +1311,10 @@
     state.lastPhase = g.phase;
     state.lastCurrentTeam = g.currentTeam;
     renderConnState();
-    requestAnimationFrame(() => restoreUiState(saved));
+    requestAnimationFrame(() => {
+      restoreUiState(saved);
+      patchGuessUi();
+    });
   }
 
   function fillPlayingView(main, grid) {
@@ -1341,7 +1349,111 @@
         const gridEl = root.querySelector("[data-game-grid]");
         if (gridEl) gridEl.parentElement.insertBefore(dev, gridEl);
       }
-    } else if (oldDev) oldDev.remove();
+    } else     if (oldDev) oldDev.remove();
+    patchGuessUi();
+  }
+
+  function nearMarksForCard(nearPicks, index) {
+    return (nearPicks || []).filter((np) => (np.indices || []).includes(index));
+  }
+
+  function myNearIndices(nearPicks) {
+    const you = state.you;
+    if (!you) return [];
+    const mine = (nearPicks || []).find((np) => np.id === you.id);
+    return mine ? mine.indices : [];
+  }
+
+  function syncCardGuessClasses() {
+    const g = state.room && state.room.game;
+    if (!g) return;
+    const nearPicks = g.nearPicks || [];
+    document.querySelectorAll(".cardx[data-idx]").forEach((btn) => {
+      const i = Number(btn.dataset.idx);
+      const marks = nearMarksForCard(nearPicks, i);
+      btn.classList.toggle("cardx--near", marks.length > 0);
+      btn.classList.toggle("cardx--pending", state.pendingGuess === i);
+      btn.classList.toggle("cardx--near-mine", marks.some((m) => state.you && m.id === state.you.id));
+      let layer = btn.querySelector(".cardx__near");
+      if (!marks.length) {
+        if (layer) layer.remove();
+      } else {
+        if (!layer) {
+          layer = document.createElement("div");
+          layer.className = "cardx__near";
+          btn.appendChild(layer);
+        }
+        layer.innerHTML = marks.map((m) => (
+          `<span class="cardx__near-tag" style="--pick-color:${esc(m.color)}" title="${esc(m.name)}">${esc((m.name || "?").trim().slice(0, 1).toUpperCase())}</span>`
+        )).join("");
+      }
+    });
+    document.body.classList.toggle("guess-confirm-open", !!$("#guess-confirm"));
+  }
+
+  function patchGuessUi() {
+    const root = $("[data-room-root]");
+    if (!root) return;
+    const existing = $("#guess-confirm");
+    if (existing) existing.remove();
+    const bar = guessConfirmBar();
+    if (bar) root.appendChild(bar);
+    syncCardGuessClasses();
+  }
+
+  function onOperativeCardTap(index) {
+    const g = state.room.game;
+    const myIndices = myNearIndices(g.nearPicks);
+    const isMine = myIndices.includes(index);
+
+    if (isMine && state.pendingGuess === index) {
+      send({ type: "toggleNearPick", index });
+      state.pendingGuess = null;
+      patchGuessUi();
+      return;
+    }
+
+    if (!isMine) {
+      send({ type: "toggleNearPick", index });
+    }
+    state.pendingGuess = index;
+    patchGuessUi();
+  }
+
+  function guessConfirmBar() {
+    if (state.pendingGuess == null || !state.room) return null;
+    const g = state.room.game;
+    const card = g.cards[state.pendingGuess];
+    if (!card || card.revealed) {
+      state.pendingGuess = null;
+      return null;
+    }
+    const you = state.you;
+    const canGuess = you && g.status === "playing" && g.phase === "guess"
+      && you.team === g.currentTeam && you.role === "operative";
+    if (!canGuess) return null;
+
+    const el = h(`
+      <div class="guess-confirm" id="guess-confirm" role="region" aria-label="Confirm contact">
+        <div class="guess-confirm__main">
+          <span class="guess-confirm__label">Confirm contact</span>
+          <strong class="guess-confirm__word">${esc(card.word)}</strong>
+          <span class="guess-confirm__hint tiny muted">Tap other cards to mark more options — everyone sees them</span>
+        </div>
+        <div class="guess-confirm__actions">
+          <button type="button" class="btn" id="guess-cancel">Change</button>
+          <button type="button" class="btn btn--primary" id="guess-commit">Reveal →</button>
+        </div>
+      </div>`);
+    el.querySelector("#guess-cancel").onclick = () => {
+      state.pendingGuess = null;
+      patchGuessUi();
+    };
+    el.querySelector("#guess-commit").onclick = () => {
+      send({ type: "guess", index: state.pendingGuess });
+      state.pendingGuess = null;
+    };
+    return el;
   }
 
   function devModeBar() {
@@ -1377,6 +1489,7 @@
     if (!grid || !main) { state.roomView = null; renderRoom(); return; }
     fillPlayingView(main, grid);
     if (turnChanged) {
+      state.pendingGuess = null;
       const pill = $(".turn-pill");
       if (pill) {
         pill.classList.add("turn-swap");
@@ -1683,6 +1796,7 @@
         </div>
       </div>`);
     const grid = h(`<div class="board ${showKey ? "board--key" : "board--blind"}" style="--cols:${g.board_size}" role="grid" aria-label="Word board"></div>`);
+    const nearPicks = g.nearPicks || [];
     const animCutoff = Date.now() - 600;
     g.cards.forEach((c) => {
       const hidden = c.kind === "hidden";
@@ -1695,22 +1809,32 @@
       }
       if (canGuess && !c.revealed) classes.push("clickable");
       if (state.lastRevealedAt[c.i] && state.lastRevealedAt[c.i] > animCutoff) classes.push("just-revealed");
+      const marks = nearMarksForCard(nearPicks, c.i);
+      if (marks.length) classes.push("cardx--near");
+      if (marks.some((m) => you && m.id === you.id)) classes.push("cardx--near-mine");
+      if (state.pendingGuess === c.i) classes.push("cardx--pending");
 
       const showMark = c.revealed || (showKey && !hidden);
       const mark = showMark ? markerFor(c.kind) : "";
       const ariaLabel = c.revealed
         ? `${c.word}, ${c.kind}`
         : (showKey && !hidden ? `${c.word}, ${c.kind}` : c.word);
+      const nearHtml = marks.length
+        ? `<div class="cardx__near">${marks.map((m) => (
+          `<span class="cardx__near-tag" style="--pick-color:${esc(m.color)}" title="${esc(m.name)}">${esc((m.name || "?").trim().slice(0, 1).toUpperCase())}</span>`
+        )).join("")}</div>`
+        : "";
 
       const btn = h(`
-        <button class="${classes.join(" ")}" ${canGuess && !c.revealed ? "" : "tabindex=\"-1\""}
+        <button class="${classes.join(" ")}" data-idx="${c.i}" ${canGuess && !c.revealed ? "" : "tabindex=\"-1\""}
           role="gridcell" aria-label="${esc(ariaLabel)}">
           <span class="cardx__ref" aria-hidden="true">${String(c.i + 1).padStart(2, "0")}</span>
           ${mark ? `<span class="cardx__mark cardx__mark--${c.kind}" aria-hidden="true">${mark}</span>` : ""}
           <span class="word">${esc(c.word)}</span>
+          ${nearHtml}
         </button>`);
       if (canGuess && !c.revealed) {
-        btn.onclick = () => send({ type: "guess", index: c.i });
+        btn.onclick = () => onOperativeCardTap(c.i);
       } else if (!canGuess) {
         btn.disabled = true;
       }

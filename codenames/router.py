@@ -669,6 +669,7 @@ async def _dispatch(room, player, mtype: str, msg: dict) -> bool:
         _validate_teams(room)
         game.settings = room.settings
         game.new_round(_words_pool(room.settings))
+        room.clear_near_picks()
         room.persisted = False  # this new game can be persisted when it ends
         return True
 
@@ -682,6 +683,7 @@ async def _dispatch(room, player, mtype: str, msg: dict) -> bool:
             ensure_dev_bots(room)
         _validate_teams(room)
         game.new_round(_words_pool(room.settings))
+        room.clear_near_picks()
         room.persisted = False
         return True
 
@@ -690,6 +692,7 @@ async def _dispatch(room, player, mtype: str, msg: dict) -> bool:
             raise MoveError("Only the host can reset.")
         from .game import Game
         room.game = Game(settings=room.settings)
+        room.clear_near_picks()
         room.persisted = False
         return True
 
@@ -701,6 +704,27 @@ async def _dispatch(room, player, mtype: str, msg: dict) -> bool:
         except (TypeError, ValueError):
             raise MoveError("Clue count must be a number.")
         game.give_clue(player.team, str(msg.get("word", "")), count)
+        room.clear_near_picks()
+        return True
+
+    if mtype == "toggleNearPick":
+        if player.team not in (RED, BLUE):
+            raise MoveError("Spectators can't mark cards.")
+        if player.role != "operative":
+            raise MoveError("Only operatives mark possible contacts.")
+        if player.team != game.current_team:
+            raise MoveError("Wait for your team's turn.")
+        if game.phase != "guess":
+            raise MoveError("Mark cards during the field phase.")
+        try:
+            index = int(msg.get("index"))
+        except (TypeError, ValueError):
+            raise MoveError("Invalid card.")
+        if index < 0 or index >= len(game.cards):
+            raise MoveError("That card doesn't exist.")
+        if game.cards[index].revealed:
+            raise MoveError("That card is already revealed.")
+        room.toggle_near_pick(player.id, index)
         return True
 
     if mtype == "guess":
@@ -713,12 +737,16 @@ async def _dispatch(room, player, mtype: str, msg: dict) -> bool:
         except (TypeError, ValueError):
             raise MoveError("Invalid card.")
         game.guess(player.team, index)
+        room.prune_near_picks(index)
+        if game.phase != "guess":
+            room.clear_near_picks()
         return True
 
     if mtype == "endTurn":
         if player.team not in (RED, BLUE) or player.role != "operative":
             raise MoveError("Only operatives on the active team can pass.")
         game.end_turn(player.team)
+        room.clear_near_picks()
         return True
 
     if mtype == "chat":

@@ -200,6 +200,48 @@ def test_full_round_playable_over_state(client):
         assert game.cards[own].revealed is True
 
 
+def test_near_picks_sync_to_all_players(client):
+    code = client.post("/play/api/rooms").json()["code"]
+    with client.websocket_connect(f"/play/ws/{code}?pid=rs&name=RedSpy") as rs, \
+         client.websocket_connect(f"/play/ws/{code}?pid=ro&name=RedOp") as ro, \
+         client.websocket_connect(f"/play/ws/{code}?pid=bs&name=BlueSpy") as bs, \
+         client.websocket_connect(f"/play/ws/{code}?pid=bo&name=BlueOp") as bo:
+
+        for ws, team, role in [(rs, "red", "spymaster"), (ro, "red", "operative"),
+                               (bs, "blue", "spymaster"), (bo, "blue", "operative")]:
+            ws.send_json({"type": "setTeam", "team": team})
+            ws.send_json({"type": "setRole", "role": role})
+        _settle()
+        rs.send_json({"type": "start"})
+        _settle()
+
+        room = manager.get(code)
+        game = room.game
+        starting = game.current_team
+        spy_ws = rs if starting == RED else bs
+        op_ws = ro if starting == RED else bo
+        op_pid = "ro" if starting == RED else "bo"
+
+        spy_ws.send_json({"type": "clue", "word": "signal", "count": 2})
+        _settle()
+
+        op_ws.send_json({"type": "toggleNearPick", "index": 0})
+        op_ws.send_json({"type": "toggleNearPick", "index": 1})
+        _settle()
+
+        picks = room.public_near_picks()
+        assert len(picks) == 1
+        assert picks[0]["id"] == op_pid
+        assert picks[0]["indices"] == [0, 1]
+
+        spy_state = room.state_for("rs" if starting == RED else "bs")
+        assert spy_state["room"]["game"]["nearPicks"] == picks
+
+        op_ws.send_json({"type": "toggleNearPick", "index": 0})
+        _settle()
+        assert room.public_near_picks()[0]["indices"] == [1]
+
+
 def test_rematch_restarts_with_same_settings(client):
     code = client.post("/play/api/rooms", json={"packIds": ["classic", "movies"]}).json()["code"]
     with client.websocket_connect(f"/play/ws/{code}?pid=rs") as rs, \
