@@ -135,9 +135,11 @@ body::before {
   background:
     linear-gradient(var(--grid-line) 1px, transparent 1px),
     linear-gradient(90deg, var(--grid-line) 1px, transparent 1px),
-    radial-gradient(90% 70% at 50% -20%, rgba(122, 92, 40, 0.08) 0%, transparent 55%),
-    radial-gradient(70% 50% at 100% 100%, rgba(47, 79, 95, 0.06) 0%, transparent 50%);
-  background-size: 28px 28px, 28px 28px, auto, auto;
+    radial-gradient(90% 70% at 50% -20%, rgba(122, 92, 40, 0.1) 0%, transparent 55%),
+    radial-gradient(70% 50% at 100% 100%, rgba(47, 79, 95, 0.07) 0%, transparent 50%),
+    radial-gradient(120% 90% at 50% 110%, rgba(42, 38, 32, 0.06) 0%, transparent 45%);
+  background-size: 28px 28px, 28px 28px, auto, auto, auto;
+  transition: background 0.45s var(--ease);
 }
 [data-theme="dark"] {
   --grid-line: rgba(236, 230, 216, 0.04);
@@ -149,6 +151,192 @@ body::before {
     radial-gradient(120% 100% at 50% -10%, #17160f 0%, transparent 55%),
     radial-gradient(140% 120% at 50% 120%, #050504 0%, transparent 60%);
   background-size: 28px 28px, 28px 28px, auto, auto;
+}
+
+/* ── Optional scene backdrops ───────────────────────────────────────────── */
+.scene {
+  position: fixed; inset: 0; z-index: -3; pointer-events: none; overflow: hidden;
+  opacity: 0; visibility: hidden; transition: opacity 0.5s var(--ease), visibility 0.5s;
+}
+[data-backdrop="casino"] .scene {
+  opacity: 1; visibility: visible;
+}
+[data-backdrop="casino"] body::before {
+  background:
+    radial-gradient(ellipse 80% 55% at 50% -8%, rgba(212, 175, 55, 0.14) 0%, transparent 58%),
+    radial-gradient(ellipse 60% 45% at 12% 88%, rgba(0, 0, 0, 0.35) 0%, transparent 55%),
+    radial-gradient(ellipse 50% 40% at 92% 78%, rgba(0, 0, 0, 0.28) 0%, transparent 50%),
+    repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 3px,
+      rgba(0, 0, 0, 0.03) 3px,
+      rgba(0, 0, 0, 0.03) 4px
+    ),
+    linear-gradient(165deg, #0f3d2e 0%, #082a20 38%, #041a14 72%, #020e0b 100%);
+  background-size: auto, auto, auto, auto, auto;
+}
+[data-backdrop="casino"][data-theme="light"] {
+  --bg: #0e3428;
+  --bg-2: #0a281f;
+  --panel: rgba(248, 242, 228, 0.96);
+  --panel-solid: #f5efe0;
+  --panel-2: rgba(236, 228, 210, 0.94);
+  --panel-3: #e0d6c0;
+  --line: #b8a888;
+  --line-strong: #8f7d58;
+  --ink: #1a1712;
+  --ink-2: #4a4338;
+  --ink-3: #736a5c;
+  --accent: #b8922a;
+  --accent-2: #8f6f18;
+  --accent-soft: rgba(184, 146, 42, 0.16);
+  --surface-inset: #e8dcc4;
+  --surface-raised: #faf6ee;
+  --grid-line: rgba(255, 255, 255, 0.03);
+}
+[data-backdrop="casino"][data-theme="dark"] {
+  --bg: #061612;
+  --bg-2: #081c18;
+  --panel: rgba(24, 36, 32, 0.94);
+  --panel-solid: #1a2824;
+  --panel-2: rgba(30, 44, 40, 0.92);
+  --accent: #d4af37;
+  --accent-2: #b8922a;
+  --accent-soft: rgba(212, 175, 55, 0.14);
+  --grid-line: rgba(212, 175, 55, 0.04);
+}
+[data-backdrop="casino"] .panel {
+  box-shadow: var(--hard-sm), 0 12px 40px -24px rgba(0, 0, 0, 0.35);
+}
+[data-backdrop="casino"] .panel,
+[data-backdrop="casino"] .mission-status__bar,
+[data-backdrop="casino"] .board-frame {
+  backdrop-filter: blur(6px);
+}
+
+.scene__glow {
+  position: absolute; inset: 0;
+  background:
+    radial-gradient(circle at 78% 8%, rgba(212, 175, 55, 0.22) 0%, transparent 28%),
+    radial-gradient(circle at 18% 92%, rgba(0, 0, 0, 0.2) 0%, transparent 35%);
+}
+.scene__roulette {
+  position: absolute;
+  top: -14%;
+  right: -11%;
+  width: min(54vmin, 460px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 50% 50%, #4a3020 0 11%, #2a1a10 11% 14%, transparent 14.5%),
+    radial-gradient(circle at 50% 50%, transparent 0 62%, rgba(0, 0, 0, 0.25) 62% 100%),
+    conic-gradient(
+      from -90deg,
+      #c62828 0deg 20deg, #121212 20deg 40deg,
+      #c62828 40deg 60deg, #121212 60deg 80deg,
+      #c62828 80deg 100deg, #121212 100deg 120deg,
+      #c62828 120deg 140deg, #121212 140deg 160deg,
+      #c62828 160deg 180deg, #121212 180deg 200deg,
+      #c62828 200deg 220deg, #121212 220deg 240deg,
+      #c62828 240deg 260deg, #121212 260deg 280deg,
+      #c62828 280deg 300deg, #121212 300deg 320deg,
+      #c62828 320deg 340deg, #121212 340deg 360deg
+    );
+  border: 12px solid #c9a227;
+  box-shadow:
+    0 0 0 5px #5c4010,
+    0 0 0 8px rgba(201, 162, 39, 0.35),
+    0 28px 90px rgba(0, 0, 0, 0.5),
+    inset 0 0 50px rgba(0, 0, 0, 0.35);
+  opacity: 0.48;
+  animation: roulette-spin 120s linear infinite;
+}
+.scene__roulette::after {
+  content: "";
+  position: absolute; inset: 22%;
+  border-radius: 50%;
+  border: 2px dashed rgba(255, 255, 255, 0.12);
+  box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.4);
+}
+@keyframes roulette-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.scene__money { position: absolute; inset: 0; }
+.scene__bill {
+  position: absolute;
+  display: grid; place-items: center; gap: 2px;
+  width: clamp(72px, 14vw, 110px);
+  aspect-ratio: 2.2 / 1;
+  border-radius: 4px;
+  font-family: var(--mono);
+  font-weight: 800;
+  color: #1a3d28;
+  background: linear-gradient(145deg, #e8f5e0 0%, #b8d4a8 45%, #8fbf78 100%);
+  border: 1.5px solid rgba(26, 61, 40, 0.35);
+  box-shadow: 2px 6px 18px rgba(0, 0, 0, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.45);
+  opacity: 0.55;
+  animation: money-float 18s ease-in-out infinite;
+}
+.scene__bill i {
+  font-style: normal; font-size: 1.1em; line-height: 1;
+  color: #0d2818;
+}
+.scene__bill b {
+  font-size: 0.62em; letter-spacing: 0.08em; opacity: 0.75;
+}
+.scene__bill--1 { left: 6%; top: 62%; --r: -18deg; animation-delay: 0s; }
+.scene__bill--2 { left: 72%; top: 58%; --r: 14deg; animation-delay: -4s; }
+.scene__bill--3 { left: 38%; top: 78%; --r: -6deg; animation-delay: -9s; width: clamp(64px, 12vw, 96px); }
+
+.scene__chip {
+  position: absolute;
+  width: clamp(34px, 7vw, 52px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  border: 4px dashed rgba(255, 255, 255, 0.55);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35), inset 0 2px 4px rgba(255, 255, 255, 0.2);
+  opacity: 0.5;
+  animation: money-float 22s ease-in-out infinite;
+}
+.scene__chip--1 { left: 18%; top: 28%; background: radial-gradient(circle at 35% 30%, #e85d5d, #9c1f1f); animation-delay: -2s; }
+.scene__chip--2 { left: 84%; top: 42%; background: radial-gradient(circle at 35% 30%, #4d8893, #1e3a40); animation-delay: -11s; }
+.scene__chip--3 { left: 8%; top: 82%; background: radial-gradient(circle at 35% 30%, #d4af37, #8f6f18); animation-delay: -6s; }
+
+.scene__coin {
+  position: absolute;
+  width: clamp(28px, 5vw, 40px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  display: grid; place-items: center;
+  font-family: var(--mono); font-weight: 800; font-size: 0.72rem;
+  color: #3d2e08;
+  background: radial-gradient(circle at 32% 28%, #f5e6a8, #c9a227 55%, #8f6f18 100%);
+  border: 2px solid #5c4010;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.3);
+  opacity: 0.45;
+  animation: money-float 16s ease-in-out infinite;
+}
+.scene__coin--1 { left: 58%; top: 18%; --r: 0deg; animation-delay: -3s; }
+.scene__coin--2 { left: 28%; top: 48%; --r: 12deg; animation-delay: -13s; }
+
+@keyframes money-float {
+  0%, 100% { transform: translateY(0) rotate(var(--r, 0deg)); }
+  50% { transform: translateY(-10px) rotate(calc(var(--r, 0deg) + 4deg)); }
+}
+
+.topbar__prefs { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.backdrop-select {
+  max-width: 168px; min-width: 0; padding: 0.42em 0.65em;
+  font-size: 0.78rem; font-weight: 600;
+}
+.select--sm { padding: 0.42em 0.65em; font-size: 0.82rem; }
+
+@media (prefers-reduced-motion: reduce) {
+  .scene__roulette { animation: none; }
+  .scene__bill, .scene__chip, .scene__coin { animation: none; }
 }
 
 .aurora, .grain { display: none; }
@@ -1118,7 +1306,8 @@ input[type="range"]:disabled { background: var(--line-strong); cursor: not-allow
   .topbar { margin-bottom: 10px; gap: 8px; }
   .topbar__left, .topbar__right { gap: 8px; }
   .room-code { font-size: 0.82rem; letter-spacing: 0.14em; }
-  .icon-btn { width: 38px; height: 38px; }
+  .topbar__prefs { gap: 6px; }
+  .backdrop-select { max-width: 132px; font-size: 0.72rem; padding: 0.38em 0.5em; }
 
   .scoreboard-wrap { margin-bottom: 10px; }
   .mission-status::before { margin-bottom: 4px; }
