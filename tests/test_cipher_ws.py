@@ -46,6 +46,14 @@ def test_assets_served(client):
     assert client.get("/play/assets/styles.css").status_code == 200
 
 
+def test_stats_endpoint(client):
+    r = client.get("/play/api/stats")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["enabled"] is True          # SQLite test DB is configured
+    assert "totalGames" in body and "wins" in body and "recent" in body
+
+
 def test_assets_path_traversal_blocked(client):
     r = client.get("/play/assets/..%2Frouter.py")
     assert r.status_code in (400, 404)
