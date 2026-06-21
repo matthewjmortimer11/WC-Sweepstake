@@ -1069,15 +1069,16 @@
       <div class="home">
         <div class="topbar">
           <div class="brand">
-            <span class="brand__name"><b>CIPHER</b></span>
+            <span class="brand__name"><b>Wheesht</b> · Cipher</span>
           </div>
           <button class="icon-btn icon-btn--txt" id="theme" title="Toggle theme" aria-label="Toggle light/dark theme">◐</button>
         </div>
 
         <div class="home__hero">
-          <span class="eyebrow">Planning-room word-spy ops</span>
-          <h1>The heist crew.<br/>The intelligence desk.<br/>One <span class="grad">classified map</span>.</h1>
-          <p class="lede">Cipher plays like a mission briefing in a worn planning room — field operatives vs the desk, custom word packs, and a board that feels like stolen index cards. Create a room, name your unit, run the op.</p>
+          <span class="eyebrow">Wheesht · Cipher · planning-room word-spy</span>
+          <h1>Two teams. One clue.<br/>Find your agents on a <span class="grad">classified map</span>.</h1>
+          <p class="hero-kicker">The free online word game — like Codenames, but you run the op.</p>
+          <p class="lede">Spread out around the planning table: <b>Field Crew</b> vs <b>The Desk</b>. One spymaster gives a single-word clue and a number; teammates guess which index cards are theirs. Hit every agent before the other side — or the assassin — ends the mission. Custom word packs, private rooms, no install.</p>
         </div>
 
         <div id="league-mount"></div>
