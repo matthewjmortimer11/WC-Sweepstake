@@ -23,7 +23,7 @@ from fastapi import APIRouter, HTTPException, Request, WebSocket, WebSocketDisco
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 
 from . import store
-from .game import BLUE, RED, STATUS_LOBBY, MoveError, Settings
+from .game import BLUE, RED, STATUS_LOBBY, MAX_ASSASSINS, MoveError, Settings
 from .manager import (
     _ALLOWED_SIZES,
     _MAX_CHAT,
@@ -130,8 +130,8 @@ def _build_settings(payload: dict, current: Settings) -> Settings:
     except (TypeError, ValueError):
         raise MoveError("Unsupported timer.")
     assassins = int(payload.get("assassins", current.assassins))
-    if assassins < 1 or assassins > 3:
-        raise MoveError("Pick 1–3 assassins.")
+    if assassins < 1 or assassins > MAX_ASSASSINS:
+        raise MoveError(f"Pick 1–{MAX_ASSASSINS} assassins.")
 
     custom_raw = payload.get("customWords")
     custom = None

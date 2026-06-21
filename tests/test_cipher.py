@@ -46,10 +46,15 @@ def test_distribution_classic_ratios(total, assassins, expected):
 
 def test_distribution_sums_to_total():
     for n in (4, 5, 6):
-        for a in (1, 2, 3):
+        for a in range(1, 6):
             start, second, neutral, ass = _distribution(n * n, a)
             assert start + second + neutral + ass == n * n
             assert start == second + 1  # starting team always +1
+
+
+def test_distribution_five_assassins_on_classic_board():
+    start, second, neutral, ass = _distribution(25, 5)
+    assert (start, second, neutral, ass) == (7, 6, 7, 5)
 
 
 # ── board dealing ────────────────────────────────────────────────────────────
@@ -293,6 +298,10 @@ def test_clamp_timer_snaps_and_clamps(raw, expected):
 
 def test_after_dark_pack_present_and_playable():
     assert "afterdark" in PACKS
+    assert "bottomdrawer" in PACKS
     g = Game(settings=Settings(board_size=6, pack_id="afterdark"))
     g.new_round(words_for("afterdark"), seed=7)
     assert len(g.cards) == 36
+    g2 = Game(settings=Settings(board_size=6, pack_id="bottomdrawer"))
+    g2.new_round(words_for("bottomdrawer"), seed=7)
+    assert len(g2.cards) == 36

@@ -307,9 +307,21 @@
     return { code, boxes, syncFilled };
   }
 
-  // ============================================================================
-  //  HOME
-  // ============================================================================
+  const adultConfirm = (packId) => {
+    if (packId === "bottomdrawer") {
+      return confirm(
+        "Bottom Drawer is 18+ with explicit sexual and gross-out content. "
+        + "Confirm everyone playing is 18 or over and actually wants this."
+      );
+    }
+    if (packId === "afterdark") {
+      return confirm(
+        "After Dark is an 18+ pack with crude, sexual and dark-humour content. "
+        + "Confirm everyone playing is 18 or over."
+      );
+    }
+    return true;
+  };
   function renderHome() {
     app.innerHTML = "";
     const el = h(`
@@ -363,8 +375,8 @@
         <div class="panel">
           <span class="eyebrow">Why it's more fun</span>
           <div class="features" style="margin-top:14px">
-            <div class="feature"><span class="ico">🎛️</span><h4>Fully customisable</h4><p>4×4, 5×5 or 6×6 boards, optional turn timers, 1–3 assassins.</p></div>
-            <div class="feature"><span class="ico">🃏</span><h4>Themed word packs</h4><p>Classic, Movies, Food, Sci-Fi, Emoji chaos, <b>After Dark (18+)</b> — or paste your own.</p></div>
+            <div class="feature"><span class="ico">🎛️</span><h4>Fully customisable</h4><p>4×4, 5×5 or 6×6 boards, optional turn timers, 1–5 assassins.</p></div>
+            <div class="feature"><span class="ico">🃏</span><h4>Themed word packs</h4><p>Classic, Movies, Food, Sci-Fi, Emoji chaos, <b>After Dark</b> &amp; <b>Bottom Drawer</b> (18+) — or paste your own.</p></div>
             <div class="feature"><span class="ico">⚡</span><h4>Instant & real-time</h4><p>Live sync over WebSockets. Reconnects automatically if you drop.</p></div>
             <div class="feature"><span class="ico">💬</span><h4>Chat & reactions</h4><p>Trash-talk, emoji bursts and a running play-by-play log.</p></div>
             <div class="feature"><span class="ico">♿</span><h4>Accessible by design</h4><p>Colour-blind glyphs, keyboard play, reduced-motion support.</p></div>
@@ -385,10 +397,7 @@
     $("#name2").oninput = (e) => { setName(e.target.value); $("#name1").value = e.target.value; };
 
     const createGame = async (packId, btn, label) => {
-      if (packId === "afterdark" &&
-          !confirm("After Dark is an 18+ pack with crude, sexual and dark-humour content. Confirm everyone playing is 18 or over.")) {
-        return;
-      }
+      if (!adultConfirm(packId)) return;
       btn.disabled = true; btn.textContent = "Creating…";
       setName($("#name1").value.trim());
       try {
@@ -922,7 +931,7 @@
           <div class="field">
             <label>Assassins</label>
             <div class="segmented" id="assassins">
-              ${[1,2,3].map((a) => `<button data-v="${a}" aria-pressed="${a === d.assassins}">${a}</button>`).join("")}
+              ${[1, 2, 3, 4, 5].map((a) => `<button data-v="${a}" aria-pressed="${a === d.assassins}">${a}</button>`).join("")}
             </div>
           </div>
           <button class="btn btn--primary btn--lg btn--block" id="applyset">Save setup</button>
@@ -968,6 +977,7 @@
     scrim.onclick = (e) => { if (e.target === scrim) close(); };
     modal.querySelector("#custom").oninput = (e) => { d.customWords = e.target.value; };
     modal.querySelector("#applyset").onclick = () => {
+      if (!adultConfirm(d.packId)) return;
       send({ type: "settings", settings: {
         boardSize: d.boardSize, packId: d.packId, turnSeconds: d.turnSeconds,
         assassins: d.assassins, customWords: d.customWords,

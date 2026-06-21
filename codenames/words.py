@@ -61,6 +61,31 @@ CLASSIC = [
     "Trunk", "Tube", "Turkey", "Undertaker", "Unicorn", "Vacuum", "Van", "Vet",
     "Wake", "Wall", "War", "Washer", "Washington", "Watch", "Water", "Wave",
     "Web", "Well", "Whale", "Whip", "Wind", "Witch", "Worm", "Yard",
+    "Anchor", "Badge", "Battery", "Blanket", "Bubble", "Bucket", "Bulb",
+    "Cabin", "Cactus", "Cage", "Candle", "Canyon", "Carpet", "Castle",
+    "Cave", "Chain", "Chalk", "Chimney", "Circus", "Closet", "Coast",
+    "Compass", "Coral", "Couch", "Crab", "Creek", "Crib", "Crowd",
+    "Curtain", "Dagger", "Daisy", "Desert", "Dome", "Donkey", "Dune",
+    "Echo", "Feather", "Fence", "Ferry", "Flame", "Flamingo", "Flash",
+    "Fog", "Fossil", "Fountain", "Frost", "Fungus", "Furnace", "Geyser",
+    "Glacier", "Glove", "Goose", "Guitar", "Harbor", "Harvest", "Hay",
+    "Hedge", "Helmet", "Herb", "Hive", "Hornet", "Igloo", "Ink", "Insect",
+    "Island", "Jacket", "Jar", "Jeep", "Jungle", "Kite", "Ladder", "Lagoon",
+    "Lantern", "Laundry", "Lava", "Lawn", "Leaf", "Leash", "Lens", "Lighthouse",
+    "Lily", "Lizard", "Luggage", "Magnet", "Meadow", "Meteor", "Moss", "Motel",
+    "Motor", "Mud", "Museum", "Nectar", "Nest", "Oar", "Oasis", "Otter",
+    "Oyster", "Paddle", "Pebble", "Pepper", "Pier", "Pillow", "Pirate",
+    "Pocket", "Pond", "Porch", "Prairie", "Puddle", "Puppet", "Quilt", "Radar",
+    "Rain", "Raven", "Reef", "Rifle", "River", "Roof", "Rope", "Ruin",
+    "Saddle", "Sail", "Saw", "Scarf", "Scissors", "Seagull", "Seashell",
+    "Seed", "Shed", "Shell", "Sheriff", "Shovel", "Shrine", "Sign", "Silk",
+    "Siren", "Skull", "Sled", "Sleeve", "Snail", "Snowflake", "Soap", "Spear",
+    "Spoon", "Spray", "Squirrel", "Stamp", "Statue", "Steam", "Storm", "Stove",
+    "Strawberry", "Summit", "Sunset", "Swamp", "Sweater", "Sword", "Tent",
+    "Thorn", "Thunder", "Ticket", "Tide", "Tissue", "Tomb", "Tornado", "Trail",
+    "Treasure", "Trench", "Trophy", "Tunnel", "Turtle", "Twig", "Valley", "Vase",
+    "Vine", "Volcano", "Wagon", "Wallet", "Weasel", "Weed", "Wheel", "Willow",
+    "Window", "Wolf", "Wool", "Wrench", "Zebra",
 ]
 
 # ── Movies & TV ──────────────────────────────────────────────────────────────
@@ -76,6 +101,19 @@ MOVIES = [
     "Trailer", "Twist", "Villain", "Voiceover", "Western", "Wrap", "Zoom",
     "Binge", "Channel", "Episode", "Finale", "Pilot", "Ratings", "Remote",
     "Season", "Series", "Show", "Sitcom", "Streaming", "Spinoff", "Network",
+    "Antagonist", "Arc", "Audience", "Backdrop", "Backlot", "Ballad", "Banter",
+    "Binge-watch", "Biopic", "Boom mic", "Breakdown", "Broadway", "Bromance",
+    "Cameo", "Casting", "Cliché", "Cliffhanger", "Cold open", "Confessional",
+    "Crossover", "Cue card", "Deadpan", "Debut", "Dialogue", "Docuseries",
+    "Dub", "Ensemble", "Expose", "Fan theory", "Fandom", "Flash mob", "Flop",
+    "Foreshadow", "Green screen", "Guest star", "Heist", "Improv", "Interval",
+    "Laugh track", "Lead", "MacGuffin", "Melodrama", "Monologue", "Narrator",
+    "Oscar bait", "Outtake", "Parody", "Plot hole", "Post-credits", "Protagonist",
+    "Reboot", "Red carpet", "Review", "Ripoff", "Rom-com", "Satire", "Saga",
+    "Satire", "Screen test", "Selfie", "Soap opera", "Solo", "Soundstage",
+    "Spoiler", "Stand-in", "Stinger", "Storyboard", "Subplot", "Supercut",
+    "Teaser", "Trope", "Understudy", "Unreliable narrator", "Villain arc",
+    "Voice actor", "Walk-on", "Whodunit",
 ]
 
 # ── Food & Drink ─────────────────────────────────────────────────────────────
@@ -162,22 +200,82 @@ AFTER_DARK = [
     "Botox", "Manscaping", "Swamp ass", "Pit stains", "Hemorrhoids",
     "Colonoscopy", "Vasectomy", "Prostate", "Menopause", "Prune juice",
     "Adult diaper", "Karaoke", "Cringe", "Clout", "Karen", "Boomer",
+    "Hickey", "Walk-in", "Thin walls", "Roommate", "Landlord", "Overdraft",
+    "Hangxiety", "Pre-game", "Afters", "Jagerbomb", "Fireball", "Malort",
+    "Tequila shot", "Body shot", "Beer funnel", "Power hour", "Last call",
+    "Disco nap", "Uber home", "Drunk dial", "Screenshot", "Read receipt",
+    "Block", "Unfollow", "Ex", "Rebound", "Hall pass", "Open relationship",
+    "Poly", "Throuple", "Safe word", "Plan B", "Pullout", "Rawdog",
+    "STD", "Clinic", "Urinal", "Queef", "Gagging", "Brazilian", "Waxing",
+    "Ingrown", "Bacne", "Jock itch", "Toe fungus", "Crop dusting", "Shart",
+    "Code brown", "Debt", "Credit score", "BNPL", "Beige flag", "Red flag",
+    "Gaslight", "Love bombing", "Dry spell", "Body count", "Main character",
+    "NPC", "Delulu", "Rizz", "Down bad", "Edge", "Edging", "Finsta",
+    "Office crush", "HR meeting", "PIP", "Quiet firing", "Bare minimum Monday",
+    "Jagerbomb", "Fireball", "Malort", "Body shot", "Beer funnel", "Power hour",
+    "Disco nap", "Drunk dial", "Screenshot", "Read receipt", "Hall pass",
+    "Open relationship", "Rebound", "Hickey", "Walk-in", "Thin walls",
+]
+
+# ── Bottom Drawer (18+) ───────────────────────────────────────────────────────
+# Filthier than After Dark — more sexual, bleak, and bodily. Still no slurs or
+# hate; use a custom list if you want zero guardrails.
+BOTTOM_DRAWER = [
+    "Anal", "Oral", "Facial", "Creampie", "Bukkake", "Pegging", "Strap-on",
+    "Dildo", "Butt plug", "Lube", "Spit", "Choke", "Choking", "Spanking",
+    "Bondage", "Handcuffs", "Blindfold", "Fetish", "Kink", "Sub", "Dom",
+    "Switch", "Aftercare", "Post nut clarity", "Whiskey dick", "Limp dick",
+    "Premature", "Performance anxiety", "Dead bedroom", "Stealthing", "Raw",
+    "Finish inside", "Money shot", "Glory hole", "Deep throat", "Gag reflex",
+    "Morning after", "Plan B", "Pregnancy scare", "STD test", "Burning",
+    "Itching", "Discharge", "Smegma", "Yeast infection", "UTI",
+    "Period sex", "Tampon", "Pad", "Panty liner", "Skid marks", "Streak",
+    "Brown star", "Rusty trombone", "Blumpkin", "Cleveland steamer", "Alabama hot pocket",
+    "Space dock", "Mung", "Santorum", "Felching", "Snowball", "Rusty hook",
+    "Donkey punch", "Dirty sanchez", "Cincinnati bowtie", "Alaskan pipeline",
+    "Hot carl", "Hot lunch", "Motorboat", "Tea bag", "Hummer", "Rusty anchor",
+    "Prolapse", "Hemorrhoid", "Fistula", "Colon blow", "Explosive diarrhea",
+    "Public bathroom", "Gas station toilet", "Porta potty", "Wet fart",
+    "Mystery stain", "Crusty sock", "Cum sock", "Incognito mode", "Browser history",
+    "OnlyFans leak", "Sextape", "Tape", "Blackmail",
+    "Sugar baby", "Findom", "Humiliation", "Degradation", "Objectify", "Thirst trap DM",
+    "Bathroom selfie", "Mirror pic", "Bad angle", "Double chin", "Muffin top pic",
+    "Ex's new partner", "Instagram official", "Soft launch", "Hard launch", "Cheating",
+    "Affair", "Emotional affair", "Work spouse", "Office affair", "HR complaint",
+    "Hostile workplace", "Wrongful termination", "Severance", "Alimony", "Child support",
+    "DUI", "Mugshot", "Breathalyzer", "Ankle monitor", "Community service",
+    "Intervention", "Rock bottom", "Relapse", "Dry drunk", "Functioning alcoholic",
+    "Wine drunk", "Tequila regret", "Jail", "Bail", "Public intoxication",
 ]
 
 
+def _dedupe_words(words: list[str]) -> list[str]:
+    """Preserve order, drop blanks and duplicates (case-sensitive)."""
+    seen: set[str] = set()
+    out: list[str] = []
+    for w in words:
+        w = (w or "").strip()
+        if w and w not in seen:
+            seen.add(w)
+            out.append(w)
+    return out
+
+
 PACKS = {
-    "classic": {"name": "Classic", "emoji": "🕵️", "words": CLASSIC,
+    "classic": {"name": "Classic", "emoji": "🕵️", "words": _dedupe_words(CLASSIC),
                 "blurb": "The all-rounder. Concrete, evocative nouns."},
-    "movies": {"name": "Movies & TV", "emoji": "🎬", "words": MOVIES,
+    "movies": {"name": "Movies & TV", "emoji": "🎬", "words": _dedupe_words(MOVIES),
                "blurb": "Lights, camera, association."},
-    "food": {"name": "Food & Drink", "emoji": "🍜", "words": FOOD,
+    "food": {"name": "Food & Drink", "emoji": "🍜", "words": _dedupe_words(FOOD),
              "blurb": "A delicious tangle of clues."},
-    "scifi": {"name": "Sci-Fi & Fantasy", "emoji": "🚀", "words": SCIFI,
+    "scifi": {"name": "Sci-Fi & Fantasy", "emoji": "🚀", "words": _dedupe_words(SCIFI),
               "blurb": "Wizards, warp drives and wormholes."},
     "emoji": {"name": "Emoji Chaos", "emoji": "😎", "words": _clean_emoji_pack(EMOJI),
               "blurb": "No words at all — pure picture mayhem."},
-    "afterdark": {"name": "After Dark", "emoji": "🔞", "words": AFTER_DARK,
+    "afterdark": {"name": "After Dark", "emoji": "🔞", "words": _dedupe_words(AFTER_DARK),
                   "blurb": "Crude, rude, NSFW. Not for grandma. 18+."},
+    "bottomdrawer": {"name": "Bottom Drawer", "emoji": "☠️", "words": _dedupe_words(BOTTOM_DRAWER),
+                     "blurb": "Filthier than After Dark. Truly 18+. No apologies."},
 }
 
 

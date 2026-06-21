@@ -32,6 +32,8 @@ BLUE = "blue"
 NEUTRAL = "neutral"
 ASSASSIN = "assassin"
 
+MAX_ASSASSINS = 5
+
 # Phases within a turn.
 PHASE_CLUE = "clue"     # waiting for the active spymaster to give a clue
 PHASE_GUESS = "guess"   # operatives are revealing cards
@@ -70,7 +72,7 @@ def _distribution(total: int, assassins: int) -> tuple[int, int, int, int]:
     Generalises the classic 9/8/7/1 (for 25 cards) to any board size: the field
     is split roughly into thirds with the starting team given one extra agent.
     """
-    assassins = max(1, min(assassins, max(1, total - 4)))
+    assassins = max(1, min(assassins, MAX_ASSASSINS, max(1, total - 4)))
     field = total - assassins
     base = field // 3
     starting = base + 1
