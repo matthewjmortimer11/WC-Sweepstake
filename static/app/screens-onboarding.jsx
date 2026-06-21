@@ -198,14 +198,16 @@ function JoinLeague(props) {
 
   oEffect(function () {
     var c = code.trim().toUpperCase();
-    if (c.length < 2) { setPreview(null); return; }
+    if (c.length < 2) { setPreview(null); setPreviewBusy(false); return; }
     var live = true;
-    setPreviewBusy(true);
-    fetch('/api/leagues/' + encodeURIComponent(c) + '/preview')
-      .then(function (r) { return r.ok ? r.json() : null; })
-      .then(function (data) { if (live) { setPreview(data); setPreviewBusy(false); } })
-      .catch(function () { if (live) { setPreview(null); setPreviewBusy(false); } });
-    return function () { live = false; };
+    var timer = setTimeout(function () {
+      setPreviewBusy(true);
+      fetch('/api/leagues/' + encodeURIComponent(c) + '/preview')
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (data) { if (live) { setPreview(data); setPreviewBusy(false); } })
+        .catch(function () { if (live) { setPreview(null); setPreviewBusy(false); } });
+    }, 320);
+    return function () { live = false; clearTimeout(timer); };
   }, [code]);
 
   function submit() {
@@ -276,7 +278,7 @@ function JoinLeague(props) {
           }} style={{ display: 'block', marginTop: 8, background: 'none', border: 'none', cursor: 'pointer', fontWeight: 800, color: 'var(--ink)', textDecoration: 'underline', padding: 0 }}>Copy invite link</button>}
         </div>}
         <div style={{ marginTop: 18 }}>
-          <Bo variant="ink" block onClick={submit}>{busy ? 'Checking…' : 'Join league →'}</Bo>
+          <Bo variant="ink" block disabled={busy || !ok} onClick={submit}>{busy ? 'Checking…' : 'Join league →'}</Bo>
         </div>
         <button onClick={props.onCreate} style={{ width: '100%', marginTop: 12, background: 'none', border: 'none', cursor: 'pointer', fontSize: 13.5, fontWeight: 800, color: 'var(--ink2)', textDecoration: 'underline', padding: '4px 0' }}>No league yet? Create one</button>
       </div>
@@ -411,7 +413,7 @@ function CreateLeague(props) {
         </div>
         {err && <div style={{ marginTop: 10, fontSize: 13, fontWeight: 700, color: 'var(--red)' }}>{err}</div>}
         <div style={{ marginTop: 18 }}>
-          <Bo variant="ink" block onClick={() => ok && submit()}>{busy ? 'Creating…' : 'Create & continue →'}</Bo>
+          <Bo variant="ink" block disabled={busy || !ok} onClick={submit}>{busy ? 'Creating…' : 'Create & continue →'}</Bo>
         </div>
       </div>
     </div>
@@ -685,7 +687,19 @@ function DrawMoment(props) {
             </div>
           </div>
           <div style={{ marginTop: 18, display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <Bo variant="primary" block onClick={() => window.wcToast && window.wcToast('Draw shared. The banter starts now.', 'mischievous')}>Share your draw</Bo>
+            <Bo variant="primary" block onClick={function () {
+              var shareText = 'I drew ' + t.name + ' ' + t.flag + ' in the sweepstake!';
+              var shareUrl = window.WheeshtShare ? window.WheeshtShare.inviteUrl(WCo.meta && WCo.meta.code) : window.location.href;
+              if (navigator.share) {
+                navigator.share({ title: WCo.meta.name || 'Wheesht sweepstake', text: shareText, url: shareUrl }).catch(function () {});
+              } else if (window.WheeshtShare && window.WheeshtShare.copyText) {
+                window.WheeshtShare.copyText(shareUrl).then(function () {
+                  window.wcToast && window.wcToast('Invite link copied — send it to the group!', 'mischievous');
+                });
+              } else {
+                window.wcToast && window.wcToast('Draw shared. The banter starts now.', 'mischievous');
+              }
+            }}>Share your draw</Bo>
             <Bo variant="ghost" block onClick={props.onDone} style={{ background: 'transparent', color: '#fff', boxShadow: '0 4px 0 rgba(255,255,255,.25)' }}>Into my dashboard →</Bo>
           </div>
         </div>}

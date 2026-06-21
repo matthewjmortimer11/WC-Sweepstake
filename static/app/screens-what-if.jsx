@@ -153,7 +153,7 @@ function WiGoalStepper(props) {
     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
       {btn('−', -1, props.value <= 0)}
       <span className="dh" style={{ fontSize: 22, width: 18, textAlign: 'center' }}>{props.value}</span>
-      {btn('+', 1, false)}
+      {btn('+', 1, props.value >= 20)}
     </div>
   );
 }

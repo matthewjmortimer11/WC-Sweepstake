@@ -125,9 +125,9 @@ function ProfileHeader(props) {
   return (
     <Cd bordered className="pop">
       <div style={{ display: 'flex', alignItems: 'center', gap: 13 }}>
-        <button onClick={props.onEdit} style={{ position: 'relative', border: 'none', background: 'none', padding: 0, cursor: 'pointer', borderRadius: '50%', flex: '0 0 auto' }}>
+        <button onClick={props.onEdit} aria-label="Edit profile" style={{ position: 'relative', border: 'none', background: 'none', padding: 0, cursor: 'pointer', borderRadius: '50%', flex: '0 0 auto' }}>
           <Ad person={Object.assign({}, me, { isYou: false })} size={56} />
-          <span style={{ position: 'absolute', right: -2, bottom: -2, width: 22, height: 22, borderRadius: '50%', background: 'var(--ink)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid var(--bg)', fontSize: 11 }}>✎</span>
+          <span aria-hidden="true" style={{ position: 'absolute', right: -2, bottom: -2, width: 22, height: 22, borderRadius: '50%', background: 'var(--ink)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid var(--bg)', fontSize: 11 }}>✎</span>
         </button>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
@@ -140,9 +140,9 @@ function ProfileHeader(props) {
         </div>
         <button onClick={props.onEdit} className="wc-btn wc-btn--sm" style={{ padding: '8px 12px', boxShadow: '0 4px 0 var(--shadow)', flex: '0 0 auto' }}>Edit</button>
       </div>
-      <div style={{ marginTop: 12 }}>
+      {window.Badges && <div style={{ marginTop: 12 }}>
         <window.Badges person={me} max={4} />
-      </div>
+      </div>}
     </Cd>
   );
 }
