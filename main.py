@@ -1007,6 +1007,12 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Wheesht — World Cup Sweepstake 2026", lifespan=lifespan)
 
+# Cipher — a customisable, real-time word-association party game served from
+# /play. Fully self-contained (in-memory rooms + WebSockets); see codenames/.
+from codenames import router as cipher_router  # noqa: E402
+
+app.include_router(cipher_router)
+
 
 # Content Security Policy. Tuned to exactly what the app loads: React/Babel from
 # unpkg, Google Identity, and Google Fonts. 'unsafe-eval' is required because
