@@ -76,6 +76,19 @@ class FriendBody(BaseModel):
     userId: str
 
 
+class NicknameBody(BaseModel):
+    nickname: str
+
+
+class CreateLeagueBody(BaseModel):
+    name: str
+
+
+class JoinLeagueBody(BaseModel):
+    code: str
+    nickname: str
+
+
 def _cipher_user_id(
     authorization: str | None = None,
     x_cipher_token: str | None = None,
@@ -151,6 +164,71 @@ async def me(uid: str = Depends(get_cipher_user)) -> JSONResponse:
     return JSONResponse({"user": profile})
 
 
+@router.patch("/play/api/me")
+async def update_me(body: NicknameBody, uid: str = Depends(get_cipher_user)) -> JSONResponse:
+    profile = await store.update_nickname(uid, body.nickname)
+    if not profile:
+        raise HTTPException(status_code=400, detail="Invalid nickname.")
+    return JSONResponse({"user": profile})
+
+
+@router.get("/play/api/me/leagues")
+async def my_leagues(uid: str = Depends(get_cipher_user)) -> JSONResponse:
+    return JSONResponse(await store.list_user_leagues(uid))
+
+
+@router.post("/play/api/leagues")
+async def create_league_route(
+    body: CreateLeagueBody, uid: str = Depends(get_cipher_user),
+) -> JSONResponse:
+    try:
+        league = await store.create_league(uid, body.name)
+    except RuntimeError:
+        raise HTTPException(status_code=503, detail="Stats storage is not available.")
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    return JSONResponse({"ok": True, "league": league})
+
+
+@router.post("/play/api/leagues/join")
+async def join_league_route(
+    body: JoinLeagueBody, uid: str = Depends(get_cipher_user),
+) -> JSONResponse:
+    try:
+        result = await store.join_league(uid, body.code, body.nickname)
+    except RuntimeError:
+        raise HTTPException(status_code=503, detail="Stats storage is not available.")
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    if not result.get("ok"):
+        raise HTTPException(status_code=404, detail=result.get("error", "Could not join league."))
+    return JSONResponse(result)
+
+
+@router.get("/play/api/leagues/{code}")
+async def league_info(code: str) -> JSONResponse:
+    league = await store.get_league_by_code(code)
+    if not league:
+        raise HTTPException(status_code=404, detail="League not found.")
+    return JSONResponse({"league": league})
+
+
+@router.get("/play/api/leagues/{code}/standings")
+async def league_standings(code: str) -> JSONResponse:
+    league = await store.get_league_by_code(code)
+    if not league:
+        raise HTTPException(status_code=404, detail="League not found.")
+    return JSONResponse(await store.get_league_standings(league["id"]))
+
+
+@router.get("/play/api/leagues/{code}/games")
+async def league_games(code: str) -> JSONResponse:
+    league = await store.get_league_by_code(code)
+    if not league:
+        raise HTTPException(status_code=404, detail="League not found.")
+    return JSONResponse(await store.get_league_games(league["id"]))
+
+
 @router.get("/play/api/me/stats")
 async def my_stats(uid: str = Depends(get_cipher_user)) -> JSONResponse:
     return JSONResponse(await store.get_user_stats(uid))
@@ -198,6 +276,7 @@ async def create_room(request: Request) -> JSONResponse:
     # settings. Unknown/missing values fall back to the classic default.
     pack_id = "classic"
     pack_ids: list[str] | None = None
+    league_code = ""
     try:
         body = await request.json()
         if isinstance(body, dict):
@@ -207,9 +286,17 @@ async def create_room(request: Request) -> JSONResponse:
             elif str(body.get("packId", "")) in PACKS:
                 pack_id = str(body["packId"])
                 pack_ids = normalize_pack_ids([pack_id])
+            league_code = str(body.get("leagueCode", "") or "").strip().upper()
     except Exception:
         pass
     room = manager.create_room()
+    if league_code:
+        league = await store.get_league_by_code(league_code)
+        if league:
+            room.settings.league_id = league["id"]
+            room.settings.league_code = league["code"]
+            room.settings.league_name = league["name"]
+            room.game.settings = room.settings
     if pack_ids:
         room.settings.pack_ids = pack_ids
         room.settings.pack_id = pack_ids[0]
@@ -225,6 +312,8 @@ async def create_room(request: Request) -> JSONResponse:
         "code": room.code,
         "packId": room.settings.pack_id,
         "packIds": room.settings.pack_ids,
+        "leagueCode": room.settings.league_code,
+        "leagueName": room.settings.league_name,
     })
 
 
@@ -297,6 +386,9 @@ def _build_settings(payload: dict, current: Settings) -> Settings:
         board_size=size, pack_ids=pack_ids, pack_id=pack_id, custom_words=custom,
         turn_seconds=timer, assassins=assassins, pack_name=pack_name,
         house_rules=house_rules, dev_mode=dev_mode,
+        league_id=current.league_id,
+        league_code=current.league_code,
+        league_name=current.league_name,
     )
 
 
@@ -321,6 +413,17 @@ async def game_socket(ws: WebSocket, code: str) -> None:
     pid = (ws.query_params.get("pid") or "").strip()[:64] or uuid.uuid4().hex
     name = ws.query_params.get("name") or ""
     cipher_uid = auth.user_id_from_token(ws.query_params.get("cipherToken"))
+    if cipher_uid:
+        if room.settings.league_id:
+            league_nick = await store.league_nickname_for_user(
+                room.settings.league_id, cipher_uid,
+            )
+            if league_nick:
+                name = league_nick
+        if not name.strip():
+            profile = await store.get_user(cipher_uid)
+            if profile and profile.get("label"):
+                name = profile["label"]
 
     displaced_ws = None
     async with room.lock:

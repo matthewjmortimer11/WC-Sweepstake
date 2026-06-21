@@ -74,6 +74,9 @@ class Settings:
     pack_name: str = "Classic"
     house_rules: HouseRules = field(default_factory=HouseRules)
     dev_mode: bool = False           # solo testing: bots fill roles, host sees key
+    league_id: Optional[str] = None
+    league_code: Optional[str] = None
+    league_name: Optional[str] = None
 
 
 def _distribution(total: int, assassins: int) -> tuple[int, int, int, int]:
