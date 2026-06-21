@@ -195,7 +195,7 @@ class Game:
             raise MoveError("That clue is too long.")
         if " " in word and self.settings.pack_id != "emoji":
             raise MoveError("Clues must be a single word.")
-        if count < 0 or count > 25:
+        if count < 0 or count > 9:
             raise MoveError("Pick a number from 0 to 9.")
 
         self.clue_word = word

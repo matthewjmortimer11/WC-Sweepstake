@@ -105,6 +105,12 @@ def test_clue_must_be_single_word():
         g.give_clue(g.current_team, "two words", 2)
 
 
+def test_clue_count_capped_at_nine():
+    g = _new_game()
+    with pytest.raises(MoveError, match="0 to 9"):
+        g.give_clue(g.current_team, "ocean", 10)
+
+
 def test_give_clue_sets_phase_and_guesses():
     g = _new_game()
     g.give_clue(g.current_team, "ocean", 2)

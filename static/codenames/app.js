@@ -83,9 +83,30 @@
     stats: null,
     chatSeen: 0,              // messages seen when chat tab last open
     turnTotal: 0,             // seconds for current turn (timer bar)
+    lastTurnDeadline: null,   // ms deadline for active turn (timer bar sync)
+    roomEpoch: 0,             // bumps when entering a room (reset per-room UI)
   };
 
-  // ── routing ────────────────────────────────────────────────────────────────
+  function resetRoomUiState() {
+    state.lastRevealCount = 0;
+    state.lastRevealedAt = {};
+    state.lastStatus = null;
+    state.chatSeen = 0;
+    state.turnTotal = 0;
+    state.lastTurnDeadline = null;
+    state.roomEpoch += 1;
+  }
+
+  function chatUnreadCount() {
+    const chat = state.room && state.room.chat ? state.room.chat : [];
+    // Reactions are ambient noise — only count real messages as unread.
+    const seen = Math.min(state.chatSeen, chat.length);
+    let unread = 0;
+    for (let i = seen; i < chat.length; i++) {
+      if (chat[i].kind !== "reaction") unread++;
+    }
+    return unread;
+  }
   function parseRoute() {
     const m = location.hash.match(/^#\/room\/([A-Za-z0-9]+)/);
     if (m) { state.route = "room"; state.code = m[1].toUpperCase(); }
@@ -163,11 +184,16 @@
     // Sound + confetti cues from transitions.
     if (prev) {
       const revealed = g.cards.filter((c) => c.revealed).length;
+      if (prev.round !== g.round) {
+        state.lastRevealCount = 0;
+        state.lastRevealedAt = {};
+      }
       if (revealed > state.lastRevealCount) {
         beep(520, 0.07, "triangle");
         const now = Date.now();
         g.cards.forEach((c) => {
-          if (c.revealed && !prev.cards[c.i]?.revealed) state.lastRevealedAt[c.i] = now;
+          const was = prev.cards.find((x) => x.i === c.i);
+          if (c.revealed && !(was && was.revealed)) state.lastRevealedAt[c.i] = now;
         });
       }
       state.lastRevealCount = revealed;
@@ -181,10 +207,16 @@
       state.lastRevealedAt = {};
     }
     if (g.turnDeadline && g.status === "playing") {
-      const left = Math.max(0, Math.round((g.turnDeadline - Date.now()) / 1000));
-      if (!state.turnTotal || left > state.turnTotal) state.turnTotal = left;
+      if (g.turnDeadline !== state.lastTurnDeadline) {
+        state.lastTurnDeadline = g.turnDeadline;
+        state.turnTotal = Math.max(1, Math.round((g.turnDeadline - Date.now()) / 1000));
+      }
     } else {
       state.turnTotal = 0;
+      state.lastTurnDeadline = null;
+    }
+    if (state.tab === "chat") {
+      state.chatSeen = (state.room.chat || []).length;
     }
     state.lastStatus = g.status;
     renderRoom();
@@ -194,10 +226,18 @@
   async function boot() {
     if (state.route === "home") {
       closeSocket();
-      state.room = null; state.you = null; state.lastStatus = null;
+      state.room = null; state.you = null;
+      resetRoomUiState();
       await ensurePacks();
       renderHome();
     } else {
+      if (state.room && state.room.code !== state.code) {
+        state.room = null;
+        state.you = null;
+        resetRoomUiState();
+      } else if (!state.room) {
+        resetRoomUiState();
+      }
       await ensurePacks();
       if (!state.room) renderRoomShell();
       connect();
@@ -205,18 +245,21 @@
   }
 
   async function ensurePacks() {
-    if (state.packs.length) return;
-    try {
-      const [packsR, statsR] = await Promise.all([
-        fetch("/play/api/packs"),
-        fetch("/play/api/stats"),
-      ]);
-      const d = await packsR.json();
-      state.packs = d.packs || [];
-      state.sizes = d.sizes || [5];
-      state.timer = d.timer || { min: 15, max: 300, step: 5 };
-      try { state.stats = await statsR.json(); } catch (_) { state.stats = null; }
-    } catch (_) { state.packs = []; }
+    if (!state.packs.length) {
+      try {
+        const r = await fetch("/play/api/packs");
+        const d = await r.json();
+        state.packs = d.packs || [];
+        state.sizes = d.sizes || [5];
+        state.timer = d.timer || { min: 15, max: 300, step: 5 };
+      } catch (_) { state.packs = []; }
+    }
+    if (state.stats === null) {
+      try {
+        const r = await fetch("/play/api/stats");
+        state.stats = await r.json();
+      } catch (_) { state.stats = { enabled: false }; }
+    }
   }
 
   function statsRibbon() {
@@ -243,7 +286,7 @@
         e.target.value = v;
         syncFilled();
         if (v && i < boxes.length - 1) boxes[i + 1].focus();
-        if (code().length >= 4) onComplete();
+        if (code().length === boxes.length) onComplete();
       });
       box.addEventListener("keydown", (e) => {
         if (e.key === "Backspace" && !box.value && i > 0) { boxes[i - 1].focus(); boxes[i - 1].value = ""; syncFilled(); }
@@ -258,7 +301,7 @@
         syncFilled();
         const next = boxes[Math.min(text.length, boxes.length - 1)];
         if (next) next.focus();
-        if (text.length >= 4) onComplete();
+        if (text.length === boxes.length) onComplete();
       });
     });
     return { code, boxes, syncFilled };
@@ -355,7 +398,10 @@
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ packId }),
         });
-        const d = await r.json();
+        const d = await r.json().catch(() => ({}));
+        if (!r.ok || !d.code) {
+          throw new Error(d.detail || d.message || "create failed");
+        }
         location.hash = `#/room/${d.code}`;
       } catch (e) {
         toast("Couldn't create a room. Try again.", "err");
@@ -704,14 +750,13 @@
 
   // ── side panel ───────────────────────────────────────────────────────────
   function sidePanel() {
-    const chatLen = (state.room.chat || []).length;
-    const unread = state.tab !== "chat" && chatLen > state.chatSeen;
+    const unread = state.tab !== "chat" ? chatUnreadCount() : 0;
     const el = h(`
       <div class="side">
         <div class="tabs" role="tablist">
           <button role="tab" data-tab="players" aria-selected="${state.tab === "players"}">Teams</button>
           <button role="tab" data-tab="log" aria-selected="${state.tab === "log"}">Log</button>
-          <button role="tab" data-tab="chat" aria-selected="${state.tab === "chat"}">Chat${unread ? `<span class="tab-badge">${chatLen - state.chatSeen}</span>` : ""}</button>
+          <button role="tab" data-tab="chat" aria-selected="${state.tab === "chat"}">Chat${unread ? `<span class="tab-badge">${unread}</span>` : ""}</button>
         </div>
         <div class="panel" id="tabbody"></div>
       </div>`);
@@ -726,7 +771,10 @@
     const body = el.querySelector("#tabbody");
     if (state.tab === "players") body.appendChild(playersTab());
     else if (state.tab === "log") body.appendChild(logTab());
-    else body.appendChild(chatTab());
+    else {
+      state.chatSeen = (state.room.chat || []).length;
+      body.appendChild(chatTab());
+    }
     return el;
   }
 
