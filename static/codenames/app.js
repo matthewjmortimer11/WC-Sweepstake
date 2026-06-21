@@ -17,6 +17,8 @@
     name: "cipher.name",
     theme: "cipher.theme",
     tab: "cipher.tab",
+    token: "cipher.authToken",
+    user: "cipher.authUser",
   };
 
   // ── persistent identity ────────────────────────────────────────────────────
@@ -40,6 +42,97 @@
     if (fromUrl && !getName()) setName(fromUrl);
   }
   initNameFromUrl();
+
+  const getCipherToken = () => localStorage.getItem(LS.token) || "";
+  function setAuth(token, user) {
+    if (token) localStorage.setItem(LS.token, token);
+    else localStorage.removeItem(LS.token);
+    if (user) localStorage.setItem(LS.user, JSON.stringify(user));
+    else localStorage.removeItem(LS.user);
+    state.authUser = user || null;
+  }
+  function loadAuthUser() {
+    try {
+      const raw = localStorage.getItem(LS.user);
+      state.authUser = raw ? JSON.parse(raw) : null;
+    } catch (_) { state.authUser = null; }
+  }
+  loadAuthUser();
+
+  async function authFetch(path, opts = {}) {
+    const headers = Object.assign({}, opts.headers || {});
+    const tok = getCipherToken();
+    if (tok) headers["X-Cipher-Token"] = tok;
+    return fetch(path, Object.assign({}, opts, { headers }));
+  }
+
+  function formatSecs(s) {
+    if (s == null || s === undefined) return "—";
+    const n = Number(s);
+    if (!Number.isFinite(n)) return "—";
+    const m = Math.floor(n / 60);
+    const sec = Math.round(n % 60);
+    return m > 0 ? `${m}m ${sec}s` : `${sec}s`;
+  }
+
+  async function ensureConfig() {
+    if (state.config) return state.config;
+    try {
+      const r = await fetch("/play/api/config");
+      state.config = await r.json();
+    } catch (_) { state.config = { authEnabled: false }; }
+    return state.config;
+  }
+
+  async function initGoogleSignIn() {
+    const cfg = await ensureConfig();
+    if (!cfg.authEnabled || !cfg.googleClientId) return false;
+    if (!window.google || !window.google.accounts) {
+      await new Promise((resolve, reject) => {
+        const s = document.createElement("script");
+        s.src = "https://accounts.google.com/gsi/client";
+        s.async = true;
+        s.onload = resolve;
+        s.onerror = reject;
+        document.head.appendChild(s);
+      });
+    }
+    window.google.accounts.id.initialize({
+      client_id: cfg.googleClientId,
+      callback: async (resp) => {
+        try {
+          const r = await fetch("/play/api/auth/google", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ idToken: resp.credential }),
+          });
+          const d = await r.json().catch(() => ({}));
+          if (!r.ok) throw new Error(d.detail || "Sign-in failed");
+          setAuth(d.token, d.user);
+          if (d.user && d.user.displayName) setName(d.user.displayName);
+          toast(`Welcome, ${d.user.displayName}`, "ok");
+          boot();
+        } catch (e) {
+          toast(e.message || "Sign-in failed", "err");
+        }
+      },
+    });
+    return true;
+  }
+
+  async function fetchSocialData() {
+    if (!getCipherToken()) return null;
+    try {
+      const [stats, recent, pairings, friends, leaderboard] = await Promise.all([
+        authFetch("/play/api/me/stats").then((r) => r.json()),
+        authFetch("/play/api/me/recent").then((r) => r.json()),
+        authFetch("/play/api/me/pairings").then((r) => r.json()),
+        authFetch("/play/api/me/friends").then((r) => r.json()),
+        fetch("/play/api/leaderboard").then((r) => r.json()),
+      ]);
+      return { stats, recent, pairings, friends, leaderboard };
+    } catch (_) { return null; }
+  }
 
   // ── theme ──────────────────────────────────────────────────────────────────
   function initTheme() {
@@ -101,6 +194,9 @@
     roomView: null,           // lobby | play — tracks shell mode for partial render
     lastPhase: null,
     lastCurrentTeam: null,
+    config: null,
+    authUser: null,
+    social: null,
   };
 
   function captureUiState() {
@@ -163,8 +259,10 @@
     if (!state.code) return;
     closeSocket();
     const proto = location.protocol === "https:" ? "wss" : "ws";
+    const tok = getCipherToken();
     const url = `${proto}://${location.host}/play/ws/${encodeURIComponent(state.code)}`
-      + `?pid=${encodeURIComponent(pid())}&name=${encodeURIComponent(getName())}`;
+      + `?pid=${encodeURIComponent(pid())}&name=${encodeURIComponent(getName())}`
+      + (tok ? `&cipherToken=${encodeURIComponent(tok)}` : "");
     let ws;
     try { ws = new WebSocket(url); } catch (e) { scheduleReconnect(); return; }
     state.ws = ws;
@@ -273,7 +371,9 @@
       state.room = null; state.you = null;
       resetRoomUiState();
       await ensurePacks();
-      renderHome();
+      await ensureConfig();
+      state.social = await fetchSocialData();
+      await renderHome();
     } else {
       if (state.room && state.room.code !== state.code) {
         state.room = null;
@@ -379,7 +479,102 @@
     const ids = st.packIds || (st.packId ? [st.packId] : ["classic"]);
     return ids.includes("emoji") && !st.hasCustom;
   };
-  function renderHome() {
+  function socialPanelMarkup() {
+    const cfg = state.config;
+    if (!cfg || !cfg.authEnabled) return "";
+
+    if (!state.authUser) {
+      return `
+        <div class="panel social-panel" id="social-panel">
+          <div class="social-panel__head">
+            <h3>Stats &amp; friends <span class="tiny muted">optional</span></h3>
+          </div>
+          <p class="muted tiny">Sign in to track wins, fastest games, best pairings and friends. Guest play still works — this is separate from sweepstake leagues.</p>
+          <div id="google-signin" class="social-panel__google"></div>
+        </div>`;
+    }
+
+    const u = state.authUser;
+    const data = state.social || {};
+    const st = data.stats || {};
+    const friends = (data.friends && data.friends.friends) || [];
+    const recent = (data.recent && data.recent.players) || [];
+    const pairings = (data.pairings && data.pairings.pairings) || [];
+    const leaders = (data.leaderboard && data.leaderboard.leaders) || [];
+
+    const friendList = friends.length
+      ? friends.map((f) => `<li class="social-list__item"><span>${esc(f.displayName)}</span><button class="btn btn--sm" data-unfriend="${esc(f.id)}">Remove</button></li>`).join("")
+      : `<li class="tiny muted">No friends yet — add someone from recent players.</li>`;
+
+    const recentList = recent.length
+      ? recent.map((r) => `<li class="social-list__item"><span>${esc(r.user.displayName)}${r.wasTeammate ? " · teammate" : " · opponent"}</span><button class="btn btn--sm" data-addfriend="${esc(r.user.id)}">Add friend</button></li>`).join("")
+      : `<li class="tiny muted">Play a logged-in match to see recent players.</li>`;
+
+    const pairList = pairings.length
+      ? pairings.slice(0, 5).map((p) => `<li class="social-list__item"><span>${esc(p.user.displayName)}</span><span class="tiny muted">${p.winsTogether}/${p.gamesTogether} wins together</span></li>`).join("")
+      : `<li class="tiny muted">No pairings yet.</li>`;
+
+    const leaderList = leaders.length
+      ? leaders.slice(0, 8).map((l, i) => `<li class="social-list__item"><span>${i + 1}. ${esc(l.user.displayName)}</span><span class="tiny muted">${l.wins} wins</span></li>`).join("")
+      : `<li class="tiny muted">Leaderboard fills as logged-in games are played.</li>`;
+
+    return `
+      <div class="panel social-panel" id="social-panel">
+        <div class="social-panel__head">
+          <div class="social-user">
+            ${u.avatarUrl ? `<img class="social-user__av" src="${esc(u.avatarUrl)}" alt="" />` : `<span class="social-user__av social-user__av--ph">👤</span>`}
+            <div><b>${esc(u.displayName)}</b><div class="tiny muted">Cipher profile</div></div>
+          </div>
+          <button class="btn btn--sm" id="signout">Sign out</button>
+        </div>
+        <div class="social-stats">
+          <div class="social-stat"><span class="social-stat__val">${st.wins || 0}</span><span class="social-stat__lbl">Wins</span></div>
+          <div class="social-stat"><span class="social-stat__val">${st.losses || 0}</span><span class="social-stat__lbl">Losses</span></div>
+          <div class="social-stat"><span class="social-stat__val">${st.games ? Math.round((st.winRate || 0) * 100) + "%" : "—"}</span><span class="social-stat__lbl">Win rate</span></div>
+          <div class="social-stat"><span class="social-stat__val">${formatSecs(st.quickestWinSecs)}</span><span class="social-stat__lbl">Quickest win</span></div>
+          <div class="social-stat"><span class="social-stat__val">${formatSecs(st.quickestLossSecs)}</span><span class="social-stat__lbl">Quickest loss</span></div>
+        </div>
+        <div class="social-cols">
+          <div><h4>Best pairings</h4><ul class="social-list">${pairList}</ul></div>
+          <div><h4>Recent players</h4><ul class="social-list">${recentList}</ul></div>
+          <div><h4>Friends</h4><ul class="social-list">${friendList}</ul></div>
+          <div><h4>Leaderboard</h4><ul class="social-list">${leaderList}</ul></div>
+        </div>
+      </div>`;
+  }
+
+  function wireSocialPanel() {
+    const signout = $("#signout");
+    if (signout) {
+      signout.onclick = () => { setAuth(null, null); state.social = null; boot(); };
+    }
+    document.querySelectorAll("[data-addfriend]").forEach((btn) => {
+      btn.onclick = async () => {
+        const id = btn.dataset.addfriend;
+        const r = await authFetch("/play/api/me/friends", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ userId: id }),
+        });
+        const d = await r.json().catch(() => ({}));
+        if (!r.ok) { toast(d.detail || "Couldn't add friend", "err"); return; }
+        toast("Friend added", "ok");
+        state.social = await fetchSocialData();
+        boot();
+      };
+    });
+    document.querySelectorAll("[data-unfriend]").forEach((btn) => {
+      btn.onclick = async () => {
+        const id = btn.dataset.unfriend;
+        await authFetch(`/play/api/me/friends/${encodeURIComponent(id)}`, { method: "DELETE" });
+        toast("Friend removed", "ok");
+        state.social = await fetchSocialData();
+        boot();
+      };
+    });
+  }
+
+  async function renderHome() {
     app.innerHTML = "";
     const el = h(`
       <div class="home">
@@ -428,6 +623,7 @@
         </div>
 
         ${statsRibbon()}
+        <div id="social-mount"></div>
 
         <div class="panel">
           <span class="eyebrow">Why it's more fun</span>
@@ -447,6 +643,20 @@
         </div>
       </div>`);
     app.appendChild(el);
+
+    const socialMount = $("#social-mount");
+    if (socialMount && socialPanelMarkup()) {
+      socialMount.appendChild(h(socialPanelMarkup()));
+      wireSocialPanel();
+      if (!state.authUser && state.config && state.config.authEnabled) {
+        initGoogleSignIn().then((ok) => {
+          const gsi = $("#google-signin");
+          if (ok && gsi && window.google && window.google.accounts) {
+            window.google.accounts.id.renderButton(gsi, { theme: "outline", size: "large", width: 300 });
+          }
+        }).catch(() => {});
+      }
+    }
 
     $("#theme").onclick = toggleTheme;
     const syncNames = (v) => { $("#name1").value = v; $("#name2").value = v; };

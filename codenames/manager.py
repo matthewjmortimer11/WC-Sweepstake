@@ -130,6 +130,7 @@ class Player:
     is_host: bool = False
     connected: bool = False
     last_seen: float = field(default_factory=time.time)
+    cipher_user_id: Optional[str] = None
 
 
 @dataclass
@@ -288,13 +289,16 @@ class Manager:
         blues = sum(1 for p in room.players.values() if p.team == BLUE)
         return RED if reds <= blues else BLUE
 
-    def join(self, room: Room, pid: str, name: str) -> Player:
+    def join(self, room: Room, pid: str, name: str,
+             cipher_user_id: Optional[str] = None) -> Player:
         name = _clean_name(name)
         existing = room.players.get(pid)
         if existing:
             existing.name = name or existing.name
             existing.connected = True
             existing.last_seen = time.time()
+            if cipher_user_id:
+                existing.cipher_user_id = cipher_user_id
             return existing
         if len(room.players) >= _MAX_PLAYERS:
             raise MoveError("This room is full.")
@@ -308,6 +312,7 @@ class Manager:
             color=color,
             connected=True,
             is_host=(room.host_id is None),
+            cipher_user_id=cipher_user_id,
         )
         if room.host_id is None:
             room.host_id = pid
@@ -356,8 +361,9 @@ def _match_snapshot(room: Room) -> dict:
     s = room.settings
     players = [
         {"pid": p.id, "name": p.name, "team": p.team, "role": p.role,
-         "won": (p.team == g.winner)}
-        for p in room.players.values() if p.team in (RED, BLUE)
+         "won": (p.team == g.winner), "user_id": p.cipher_user_id}
+        for p in room.players.values()
+        if p.team in (RED, BLUE) and not is_dev_bot(p.id)
     ]
     return {
         "id": uuid.uuid4().hex,

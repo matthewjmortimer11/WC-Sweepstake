@@ -19,10 +19,11 @@ import time
 import uuid
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException, Request, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Depends, Header, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
+from pydantic import BaseModel
 
-from . import store
+from . import auth, store
 from .game import BLUE, RED, STATUS_LOBBY, MAX_ASSASSINS, MoveError, Settings, HouseRules
 from .manager import (
     _ALLOWED_SIZES,
@@ -55,14 +56,41 @@ _REACTIONS = {"🎉", "😂", "😱", "🔥", "🧠", "💀", "👏", "🤔", "�
 # covering the WS scheme — plus Google Fonts, while staying strict elsewhere.
 _PLAY_CSP = (
     "default-src 'self'; "
-    "script-src 'self'; "
+    "script-src 'self' https://accounts.google.com; "
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
     "font-src 'self' https://fonts.gstatic.com; "
-    "img-src 'self' data:; "
-    "connect-src 'self' ws: wss:; "
+    "img-src 'self' data: https:; "
+    "connect-src 'self' ws: wss: https://accounts.google.com https://oauth2.googleapis.com; "
+    "frame-src https://accounts.google.com; "
     "base-uri 'self'; form-action 'self'; object-src 'none'; "
     "frame-ancestors 'none'"
 )
+
+
+class GoogleAuthBody(BaseModel):
+    idToken: str
+
+
+class FriendBody(BaseModel):
+    userId: str
+
+
+def _cipher_user_id(
+    authorization: str | None = None,
+    x_cipher_token: str | None = None,
+) -> str:
+    token = auth.token_from_header(authorization, x_cipher_token)
+    uid = auth.user_id_from_token(token)
+    if not uid:
+        raise HTTPException(status_code=401, detail="Sign in required.")
+    return uid
+
+
+def get_cipher_user(
+    authorization: str | None = Header(None),
+    x_cipher_token: str | None = Header(None, alias="X-Cipher-Token"),
+) -> str:
+    return _cipher_user_id(authorization, x_cipher_token)
 
 
 @router.get("/play", response_class=HTMLResponse)
@@ -89,6 +117,76 @@ async def stats() -> JSONResponse:
     """Aggregate match stats + recent games. ``{"enabled": false}`` when no
     database is configured (the game still runs fully in-memory)."""
     return JSONResponse(await store.get_stats())
+
+
+@router.get("/play/api/config")
+async def play_config() -> JSONResponse:
+    cid = auth.google_client_id()
+    return JSONResponse({
+        "googleClientId": cid or None,
+        "authEnabled": auth.auth_enabled(),
+    })
+
+
+@router.post("/play/api/auth/google")
+async def auth_google(body: GoogleAuthBody) -> JSONResponse:
+    if not auth.auth_enabled():
+        raise HTTPException(status_code=503, detail="Google sign-in is not configured.")
+    claims = await auth.verify_google_token(body.idToken)
+    try:
+        user = await store.upsert_google_user(claims)
+    except RuntimeError:
+        raise HTTPException(status_code=503, detail="Stats storage is not available.")
+    token = auth.cipher_token_for(user["id"])
+    return JSONResponse({"token": token, "user": user})
+
+
+@router.get("/play/api/me")
+async def me(uid: str = Depends(get_cipher_user)) -> JSONResponse:
+    profile = await store.get_user(uid)
+    if not profile:
+        raise HTTPException(status_code=401, detail="Account not found.")
+    await store.touch_user(uid)
+    return JSONResponse({"user": profile})
+
+
+@router.get("/play/api/me/stats")
+async def my_stats(uid: str = Depends(get_cipher_user)) -> JSONResponse:
+    return JSONResponse(await store.get_user_stats(uid))
+
+
+@router.get("/play/api/me/recent")
+async def my_recent(uid: str = Depends(get_cipher_user)) -> JSONResponse:
+    return JSONResponse(await store.get_recent_players(uid))
+
+
+@router.get("/play/api/me/pairings")
+async def my_pairings(uid: str = Depends(get_cipher_user)) -> JSONResponse:
+    return JSONResponse(await store.get_pairings(uid))
+
+
+@router.get("/play/api/me/friends")
+async def my_friends(uid: str = Depends(get_cipher_user)) -> JSONResponse:
+    return JSONResponse(await store.list_friends(uid))
+
+
+@router.post("/play/api/me/friends")
+async def add_friend_route(body: FriendBody, uid: str = Depends(get_cipher_user)) -> JSONResponse:
+    result = await store.add_friend(uid, body.userId.strip())
+    if not result.get("ok"):
+        raise HTTPException(status_code=400, detail=result.get("error", "Could not add friend."))
+    return JSONResponse(result)
+
+
+@router.delete("/play/api/me/friends/{friend_id}")
+async def delete_friend_route(friend_id: str, uid: str = Depends(get_cipher_user)) -> JSONResponse:
+    await store.remove_friend(uid, friend_id)
+    return JSONResponse({"ok": True})
+
+
+@router.get("/play/api/leaderboard")
+async def leaderboard() -> JSONResponse:
+    return JSONResponse(await store.get_leaderboard())
 
 
 @router.post("/play/api/rooms")
@@ -221,10 +319,11 @@ async def game_socket(ws: WebSocket, code: str) -> None:
     await ws.accept()
     pid = (ws.query_params.get("pid") or "").strip()[:64] or uuid.uuid4().hex
     name = ws.query_params.get("name") or ""
+    cipher_uid = auth.user_id_from_token(ws.query_params.get("cipherToken"))
 
     async with room.lock:
         try:
-            player = manager.join(room, pid, name)
+            player = manager.join(room, pid, name, cipher_user_id=cipher_uid)
         except MoveError as exc:
             await ws.send_json({"type": "fatal", "message": str(exc)})
             await ws.close()
