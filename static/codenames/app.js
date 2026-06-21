@@ -316,10 +316,9 @@
       <div class="home">
         <div class="topbar">
           <div class="brand">
-            <span class="brand__mark">🕵️</span>
             <span class="brand__name"><b>CIPHER</b></span>
           </div>
-          <button class="icon-btn" id="theme" title="Toggle theme" aria-label="Toggle light/dark theme">🌓</button>
+          <button class="icon-btn icon-btn--txt" id="theme" title="Toggle theme" aria-label="Toggle light/dark theme">◐</button>
         </div>
 
         <div class="home__hero">
@@ -428,9 +427,8 @@
     app.innerHTML = "";
     app.appendChild(h(`
       <div class="loader">
-        <span class="loader__stamp">Secure channel</span>
         <span class="loader__code">${esc(state.code)}</span>
-        <span class="loader__status">Establishing link<span class="loader__dots"></span></span>
+        <span class="loader__status">Connecting<span class="loader__dots"></span></span>
       </div>`));
   }
 
@@ -470,15 +468,14 @@
       <div class="topbar">
         <div class="topbar__left">
           <button class="icon-btn" id="leave" title="Back to home" aria-label="Leave room">←</button>
-          <span class="brand__mark">🕵️</span>
           <span class="room-code" id="roomcode" title="Click to copy code"><small>ROOM</small>${esc(state.room.code)}</span>
           <span class="conn" id="conn"><span class="dot"></span><span class="lbl">Live</span></span>
         </div>
         <div class="topbar__right">
-          <button class="btn btn--sm" id="copy">🔗 Invite</button>
-          <button class="icon-btn" id="mute" title="Toggle sound" aria-label="Toggle sound">${state.muted ? "🔇" : "🔊"}</button>
-          ${isHost ? `<button class="btn btn--sm" id="settings">⚙️ Settings</button>` : ""}
-          <button class="icon-btn" id="theme" title="Toggle theme" aria-label="Toggle theme">🌓</button>
+          <button class="btn btn--sm" id="copy">Copy link</button>
+          <button class="icon-btn icon-btn--txt" id="mute" title="Toggle sound" aria-label="Toggle sound">${state.muted ? "×" : "♪"}</button>
+          ${isHost ? `<button class="btn btn--sm" id="settings">Setup</button>` : ""}
+          <button class="icon-btn icon-btn--txt" id="theme" title="Toggle theme" aria-label="Toggle theme">◐</button>
         </div>
       </div>`);
     el.querySelector("#leave").onclick = () => { location.hash = ""; };
@@ -610,8 +607,8 @@
       <div class="player-chip ${p.role === "spymaster" ? "spy" : ""} ${isYou ? "you" : ""}">
         <span class="av" style="background:${esc(p.color)}">${esc(initials)}</span>
         <span class="nm ${p.connected ? "" : "off"}">${esc(p.name)}${isYou ? " (you)" : ""}</span>
-        ${p.isHost ? `<span class="tag" title="Host">👑</span>` : ""}
-        <span class="tag">${p.role === "spymaster" ? "🎩 Spy" : "🔍 Op"}</span>
+        ${p.isHost ? `<span class="tag" title="Host">HOST</span>` : ""}
+        <span class="tag">${p.role === "spymaster" ? "SM" : p.team === "spectator" ? "—" : "OP"}</span>
       </div>`);
   }
 
@@ -624,7 +621,7 @@
         <div class="scoreboard">
           <div class="team-score team-score--red ${active === "red" ? "active" : ""}">
             <span class="num">${g.remaining.red}</span>
-            <div class="meta"><b>Red</b><span class="tiny muted">agents left</span></div>
+            <div class="meta"><b>Red</b><span class="tiny muted">remaining</span></div>
           </div>
           <div class="turn-pill">
             ${g.status === "ended"
@@ -633,7 +630,7 @@
             <span class="timer" id="timer"></span>
           </div>
           <div class="team-score team-score--blue ${active === "blue" ? "active" : ""}">
-            <div class="meta" style="text-align:right"><b>Blue</b><span class="tiny muted">agents left</span></div>
+            <div class="meta" style="text-align:right"><b>Blue</b><span class="tiny muted">remaining</span></div>
             <span class="num">${g.remaining.blue}</span>
           </div>
         </div>
@@ -648,7 +645,15 @@
     const isEmoji = state.room.settings.packId === "emoji" && !state.room.settings.hasCustom;
     const canGuess = you && g.status === "playing" && g.phase === "guess"
       && you.team === g.currentTeam && you.role === "operative";
+    const isSpy = you && you.role === "spymaster" && (you.team === "red" || you.team === "blue");
 
+    const frame = h(`
+      <div class="board-frame">
+        <div class="board-frame__head">
+          <span>Index <strong>${g.board_size}×${g.board_size}</strong></span>
+          <span>Round ${String(g.round || 1).padStart(2, "0")}</span>
+        </div>
+      </div>`);
     const grid = h(`<div class="board" style="--cols:${g.board_size}" role="grid" aria-label="Word board"></div>`);
     const animCutoff = Date.now() - 600;
     g.cards.forEach((c) => {
@@ -656,29 +661,31 @@
       const classes = ["cardx"];
       if (isEmoji) classes.push("emoji");
       if (c.revealed) { classes.push("revealed", "kind-" + c.kind); }
-      else if (!hidden) { classes.push("hint-" + c.kind); } // spymaster view
+      else if (!hidden) { classes.push("hint-" + c.kind); }
       if (canGuess && !c.revealed) classes.push("clickable");
       if (state.lastRevealedAt[c.i] && state.lastRevealedAt[c.i] > animCutoff) classes.push("just-revealed");
 
-      const glyph = !c.revealed && !hidden ? glyphFor(c.kind) : (c.revealed ? glyphFor(c.kind) : "");
+      const mark = (!hidden && (isSpy || c.revealed)) ? markerFor(c.kind) : "";
       const btn = h(`
         <button class="${classes.join(" ")}" ${canGuess && !c.revealed ? "" : "tabindex=\"-1\""}
           role="gridcell" aria-label="${esc(c.word)}${c.revealed ? ", " + c.kind : ""}">
-          ${glyph ? `<span class="glyph">${glyph}</span>` : ""}
+          <span class="cardx__ref" aria-hidden="true">${String(c.i + 1).padStart(2, "0")}</span>
+          ${mark ? `<span class="cardx__mark cardx__mark--${c.kind}" aria-hidden="true">${mark}</span>` : ""}
           <span class="word">${esc(c.word)}</span>
         </button>`);
       if (canGuess && !c.revealed) {
         btn.onclick = () => send({ type: "guess", index: c.i });
       } else if (!canGuess) {
-        btn.disabled = true; btn.style.cursor = "default";
+        btn.disabled = true;
       }
       grid.appendChild(btn);
     });
-    return grid;
+    frame.appendChild(grid);
+    return frame;
   }
 
-  function glyphFor(kind) {
-    return { red: "🔴", blue: "🔵", neutral: "⚪", assassin: "💀", hidden: "" }[kind] || "";
+  function markerFor(kind) {
+    return { red: "R", blue: "B", neutral: "N", assassin: "X", hidden: "" }[kind] || "";
   }
 
   // ── clue bar ─────────────────────────────────────────────────────────────
@@ -732,7 +739,7 @@
       const el = h(`
         <div class="panel cluebar cluebar--active">
           <div class="clue-display">
-            <span class="tiny muted">${g.currentTeam === "red" ? "Red" : "Blue"} clue</span>
+            <span class="clue-meta">${g.currentTeam === "red" ? "Red" : "Blue"} field</span>
             <span class="clue-word">${esc(g.clue.word)}</span>
             <span class="clue-num">${g.clue.count === 0 ? "∞" : g.clue.count}</span>
             <span class="guesses-left">${g.guessesLeft == null ? "unlimited guesses" : `<b>${g.guessesLeft}</b> guess${g.guessesLeft === 1 ? "" : "es"} left`}</span>
@@ -853,9 +860,9 @@
     const youWin = state.you && state.you.team === w;
     return h(`
       <div class="panel win-banner ${w}">
-        <div class="trophy">${g.winReason === "assassin" ? "💀" : "🏆"}</div>
-        <h2>${w === "red" ? "Red" : "Blue"} wins!</h2>
-        <p class="muted">${g.winReason === "assassin" ? "The enemy struck the assassin." : "All their agents were found."} ${youWin ? "That's your team — nice work, agent. 🎉" : ""}</p>
+        <p class="win-banner__label">File closed</p>
+        <h2>${w === "red" ? "Red" : "Blue"}</h2>
+        <p class="muted">${g.winReason === "assassin" ? "Assassin contact." : "All agents accounted for."}${youWin ? " Your side." : ""}</p>
       </div>`);
   }
 
