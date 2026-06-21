@@ -309,8 +309,22 @@ class Manager:
         return RED if reds <= blues else BLUE
 
     def join(self, room: Room, pid: str, name: str,
-             cipher_user_id: Optional[str] = None) -> Player:
+             cipher_user_id: Optional[str] = None) -> tuple[Player, Optional[str]]:
+        """Join or reconnect. Returns (player, displaced_pid) when an account resumes elsewhere."""
         name = _clean_name(name)
+        displaced_pid: Optional[str] = None
+
+        if cipher_user_id:
+            for old_pid, p in list(room.players.items()):
+                if is_dev_bot(old_pid) or p.cipher_user_id != cipher_user_id:
+                    continue
+                if old_pid == pid:
+                    break
+                displaced_pid = self._resume_account_slot(
+                    room, old_pid, pid, name, cipher_user_id,
+                )
+                return room.players[pid], displaced_pid
+
         existing = room.players.get(pid)
         if existing:
             existing.name = name or existing.name
@@ -318,7 +332,7 @@ class Manager:
             existing.last_seen = time.time()
             if cipher_user_id:
                 existing.cipher_user_id = cipher_user_id
-            return existing
+            return existing, None
         if len(room.players) >= _MAX_PLAYERS:
             raise MoveError("This room is full.")
         used = {p.color for p in room.players.values()}
@@ -336,7 +350,47 @@ class Manager:
         if room.host_id is None:
             room.host_id = pid
         room.players[pid] = player
-        return player
+        return player, None
+
+    def _resume_account_slot(
+        self,
+        room: Room,
+        old_pid: str,
+        new_pid: str,
+        name: str,
+        cipher_user_id: str,
+    ) -> str:
+        """Move a logged-in player's seat to the connecting device."""
+        old = room.players.get(old_pid)
+        if old is None:
+            return old_pid
+
+        if new_pid in room.players and new_pid != old_pid:
+            room.players.pop(new_pid, None)
+            room.sockets.pop(new_pid, None)
+
+        room.players[new_pid] = Player(
+            id=new_pid,
+            name=name or old.name,
+            team=old.team,
+            role=old.role,
+            color=old.color,
+            is_host=old.is_host,
+            connected=True,
+            cipher_user_id=cipher_user_id,
+            last_seen=time.time(),
+        )
+        room.players.pop(old_pid, None)
+        # Socket left for router to close after the new connection is registered.
+
+        if room.host_id == old_pid:
+            room.host_id = new_pid
+
+        for msg in room.chat:
+            if msg.get("id") == old_pid:
+                msg["id"] = new_pid
+
+        return old_pid
 
     def _ensure_host(self, room: Room) -> None:
         """Make sure a connected player holds the host role."""

@@ -118,7 +118,8 @@
           setAuth(d.token, d.user);
           if (d.user && d.user.displayName) setName(d.user.displayName);
           toast(`Welcome, ${d.user.displayName}`, "ok");
-          boot();
+          if (state.route === "room" && state.code) connect();
+          else boot();
         } catch (e) {
           toast(e.message || "Sign-in failed", "err");
         }
@@ -154,7 +155,7 @@
 
   // ── theme ──────────────────────────────────────────────────────────────────
   function initTheme() {
-    const saved = localStorage.getItem(LS.theme) || "dark";
+    const saved = localStorage.getItem(LS.theme) || "light";
     document.documentElement.dataset.theme = saved;
   }
   function toggleTheme() {
@@ -332,7 +333,9 @@
   function handleMessage(msg) {
     switch (msg.type) {
       case "hello":
-        state.code = msg.code; break;
+        state.code = msg.code;
+        if (msg.resumed) toast("Picked up your game on this device", "ok");
+        break;
       case "state":
         applyState(msg); break;
       case "error":

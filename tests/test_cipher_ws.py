@@ -281,6 +281,45 @@ def test_start_rejected_mid_game(client):
         assert after.game.round_no == round_no
 
 
+def test_account_resume_on_second_device(client):
+    """Same Cipher account on a new device should take over the in-room seat."""
+    from codenames import auth
+
+    uid = "acct-user-1"
+    token = auth.cipher_token_for(uid)
+    code = client.post("/play/api/rooms").json()["code"]
+
+    with client.websocket_connect(
+        f"/play/ws/{code}?pid=phone&name=Alice&cipherToken={token}"
+    ) as phone:
+        phone.receive_json()  # hello
+        phone.receive_json()  # state
+        phone.send_json({"type": "setTeam", "team": "red"})
+        phone.send_json({"type": "setRole", "role": "spymaster"})
+        _settle()
+
+        room = manager.get(code)
+        assert room.players["phone"].team == "red"
+        assert room.players["phone"].role == "spymaster"
+        assert room.players["phone"].cipher_user_id == uid
+
+        with client.websocket_connect(
+            f"/play/ws/{code}?pid=laptop&name=Alice&cipherToken={token}"
+        ) as laptop:
+            hello = laptop.receive_json()
+            assert hello["type"] == "hello"
+            assert hello.get("resumed") is True
+            laptop.receive_json()  # broadcast state
+            _settle()
+
+        room = manager.get(code)
+        assert "phone" not in room.players
+        assert room.players["laptop"].team == "red"
+        assert room.players["laptop"].role == "spymaster"
+        assert room.players["laptop"].cipher_user_id == uid
+        assert room.host_id == "laptop"
+
+
 def test_dev_mode_allows_mid_game_role_switch(client):
     code = client.post("/play/api/rooms").json()["code"]
     with client.websocket_connect(f"/play/ws/{code}?pid=solo&name=SoloDev") as ws:
