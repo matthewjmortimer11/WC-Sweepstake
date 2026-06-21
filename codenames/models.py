@@ -28,9 +28,47 @@ class CipherUser(CipherBase):
     id: Mapped[str] = mapped_column(String, primary_key=True, default=_uuid)
     google_sub: Mapped[str | None] = mapped_column(String, unique=True, nullable=True, index=True)
     display_name: Mapped[str] = mapped_column(String, nullable=False, default="")
+    nickname: Mapped[str] = mapped_column(String, nullable=False, default="")
     avatar_url: Mapped[str] = mapped_column(String, nullable=False, default="")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     last_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class CipherLeague(CipherBase):
+    """Friend-group league — tracks Cipher games played together (not sweepstake leagues)."""
+
+    __tablename__ = "cipher_league"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=_uuid)
+    code: Mapped[str] = mapped_column(String, unique=True, nullable=False, index=True)
+    name: Mapped[str] = mapped_column(String, nullable=False, default="")
+    created_by: Mapped[str | None] = mapped_column(
+        String, ForeignKey("cipher_user.id", ondelete="SET NULL"), nullable=True, index=True,
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+    members: Mapped[list["CipherLeagueMember"]] = relationship(
+        back_populates="league", cascade="all, delete-orphan",
+    )
+
+
+class CipherLeagueMember(CipherBase):
+    """Membership in a Cipher league with a chosen nickname."""
+
+    __tablename__ = "cipher_league_member"
+    __table_args__ = (UniqueConstraint("league_id", "user_id", name="uq_cipher_league_member"),)
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=_uuid)
+    league_id: Mapped[str] = mapped_column(
+        String, ForeignKey("cipher_league.id", ondelete="CASCADE"), nullable=False, index=True,
+    )
+    user_id: Mapped[str] = mapped_column(
+        String, ForeignKey("cipher_user.id", ondelete="CASCADE"), nullable=False, index=True,
+    )
+    nickname: Mapped[str] = mapped_column(String, nullable=False, default="")
+    joined_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+    league: Mapped["CipherLeague"] = relationship(back_populates="members")
 
 
 class CipherFriend(CipherBase):
@@ -56,6 +94,9 @@ class CipherMatch(CipherBase):
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=_uuid)
     room_code: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    league_id: Mapped[str | None] = mapped_column(
+        String, ForeignKey("cipher_league.id", ondelete="SET NULL"), nullable=True, index=True,
+    )
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     ended_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)

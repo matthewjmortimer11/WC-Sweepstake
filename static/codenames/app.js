@@ -19,7 +19,25 @@
     tab: "cipher.tab",
     token: "cipher.authToken",
     user: "cipher.authUser",
+    league: "cipher.league",
   };
+
+  function userLabel(u) {
+    if (!u) return "Agent";
+    return (u.label || u.nickname || u.displayName || "Agent").trim() || "Agent";
+  }
+
+  function getActiveLeague() {
+    try {
+      const raw = localStorage.getItem(LS.league);
+      return raw ? JSON.parse(raw) : null;
+    } catch (_) { return null; }
+  }
+  function setActiveLeague(league) {
+    if (league && league.code) localStorage.setItem(LS.league, JSON.stringify(league));
+    else localStorage.removeItem(LS.league);
+    state.activeLeague = league || null;
+  }
 
   // ── persistent identity ────────────────────────────────────────────────────
   function pid() {
@@ -108,8 +126,9 @@
           const d = await r.json().catch(() => ({}));
           if (!r.ok) throw new Error(d.detail || "Sign-in failed");
           setAuth(d.token, d.user);
-          if (d.user && d.user.displayName) setName(d.user.displayName);
-          toast(`Welcome, ${d.user.displayName}`, "ok");
+          const label = userLabel(d.user);
+          if (label) setName(label);
+          toast(`Welcome, ${label}`, "ok");
           boot();
         } catch (e) {
           toast(e.message || "Sign-in failed", "err");
@@ -117,6 +136,17 @@
       },
     });
     return true;
+  }
+
+  async function fetchLeagueData(code) {
+    if (!code) return null;
+    try {
+      const [standings, games] = await Promise.all([
+        fetch(`/play/api/leagues/${encodeURIComponent(code)}/standings`).then((r) => (r.ok ? r.json() : null)),
+        fetch(`/play/api/leagues/${encodeURIComponent(code)}/games`).then((r) => (r.ok ? r.json() : null)),
+      ]);
+      return { standings, games };
+    } catch (_) { return null; }
   }
 
   async function fetchSocialData() {
@@ -196,6 +226,8 @@
     config: null,
     authUser: null,
     social: null,
+    activeLeague: getActiveLeague(),
+    leagueData: null,
   };
   loadAuthUser();
 
@@ -374,6 +406,23 @@
         await ensurePacks();
         await ensureConfig();
         state.social = await fetchSocialData();
+        if (state.activeLeague && state.activeLeague.code) {
+          state.leagueData = await fetchLeagueData(state.activeLeague.code);
+        } else {
+          state.leagueData = null;
+          if (state.authUser && getCipherToken()) {
+            try {
+              const lr = await authFetch("/play/api/me/leagues");
+              if (lr.ok) {
+                const ld = await lr.json();
+                if (ld.leagues && ld.leagues.length === 1) {
+                  setActiveLeague(ld.leagues[0]);
+                  state.leagueData = await fetchLeagueData(ld.leagues[0].code);
+                }
+              }
+            } catch (_) { /* optional */ }
+          }
+        }
         await renderHome();
       } else {
         if (state.room && state.room.code !== state.code) {
@@ -497,6 +546,183 @@
     const ids = st.packIds || (st.packId ? [st.packId] : ["classic"]);
     return ids.includes("emoji") && !st.hasCustom;
   };
+  function leaguePanelMarkup() {
+    const lg = state.activeLeague;
+    const data = state.leagueData || {};
+    const standings = (data.standings && data.standings.standings) || [];
+    const games = (data.games && data.games.games) || [];
+    const signedIn = !!state.authUser;
+
+    if (lg && lg.code) {
+      const standRows = standings.length
+        ? standings.map((s, i) => `
+          <tr>
+            <td>${i + 1}</td>
+            <td><b>${esc(s.label)}</b></td>
+            <td>${s.wins}</td>
+            <td>${s.losses}</td>
+            <td>${s.games}</td>
+          </tr>`).join("")
+        : `<tr><td colspan="5" class="tiny muted">No league games yet — start one below.</td></tr>`;
+      const gameRows = games.length
+        ? games.slice(0, 8).map((g) => `
+          <li class="league-game">
+            <span class="league-game__meta">${esc(g.winner || "?")} won · ${esc(g.pack || "")} · ${formatSecs(g.durationSecs)}</span>
+            <span class="tiny muted">${esc((g.players || []).map((p) => p.name).join(", "))}</span>
+          </li>`).join("")
+        : `<li class="tiny muted">Finished games show up here automatically.</li>`;
+      return `
+        <div class="panel league-panel" id="league-panel">
+          <div class="league-panel__head">
+            <div>
+              <h3>🏆 ${esc(lg.name || "Your league")}</h3>
+              <p class="tiny muted">League code <b class="league-code">${esc(lg.code)}</b> — share with your crew</p>
+            </div>
+            <button class="btn btn--sm" id="leave-league" type="button">Leave</button>
+          </div>
+          <div class="league-panel__actions">
+            <button class="btn btn--primary btn--lg" id="league-game" type="button">▶ Start league game</button>
+            <button class="btn btn--sm" id="refresh-league" type="button">Refresh stats</button>
+          </div>
+          <div class="league-grid">
+            <div>
+              <h4>Standings</h4>
+              <table class="league-table">
+                <thead><tr><th>#</th><th>Player</th><th>W</th><th>L</th><th>G</th></tr></thead>
+                <tbody>${standRows}</tbody>
+              </table>
+            </div>
+            <div>
+              <h4>Recent games</h4>
+              <ul class="league-games">${gameRows}</ul>
+            </div>
+          </div>
+        </div>`;
+    }
+
+    if (!signedIn) {
+      return `
+        <div class="panel league-panel" id="league-panel">
+          <h3>🏆 Friend league</h3>
+          <p class="muted tiny">Sign in with Google to create a league that tracks every game with your regular crew. Guests can still join rooms — use nicknames in-game.</p>
+          <div id="google-signin-league" class="social-panel__google"></div>
+        </div>`;
+    }
+
+    const nick = userLabel(state.authUser);
+    return `
+      <div class="panel league-panel" id="league-panel">
+        <h3>🏆 Start a friend league</h3>
+        <p class="muted tiny">Create a league for your group — every game you start from here is tracked. Pick a nickname your friends will recognise.</p>
+        <div class="league-forms">
+          <div class="league-form panel" style="background:var(--panel-2)">
+            <h4>Create</h4>
+            <div class="field">
+              <label for="league-name">League name</label>
+              <input class="input" id="league-name" maxlength="32" placeholder="Friday crew" value="Game night" />
+            </div>
+            <button class="btn btn--primary btn--block" id="create-league" type="button">Create league</button>
+          </div>
+          <div class="league-form panel" style="background:var(--panel-2)">
+            <h4>Join with code</h4>
+            <div class="field">
+              <label for="join-league-code">League code</label>
+              <input class="input" id="join-league-code" maxlength="6" placeholder="ABC123" style="text-transform:uppercase;letter-spacing:0.15em;font-weight:700" />
+            </div>
+            <div class="field">
+              <label for="join-league-nick">Your nickname</label>
+              <input class="input" id="join-league-nick" maxlength="24" placeholder="Agent…" value="${esc(nick)}" />
+            </div>
+            <button class="btn btn--block" id="join-league" type="button">Join league</button>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  function wireLeaguePanel() {
+    const leave = $("#leave-league");
+    if (leave) {
+      leave.onclick = () => {
+        setActiveLeague(null);
+        state.leagueData = null;
+        boot();
+      };
+    }
+    const refresh = $("#refresh-league");
+    if (refresh) {
+      refresh.onclick = async () => {
+        if (!state.activeLeague) return;
+        state.leagueData = await fetchLeagueData(state.activeLeague.code);
+        boot();
+      };
+    }
+    const startLeague = $("#league-game");
+    if (startLeague) {
+      startLeague.onclick = () => {
+        setName($("#name1") ? $("#name1").value.trim() : getName());
+        const btn = $("#create");
+        if (btn) createGame(["classic"], btn, "Create game →", true);
+      };
+    }
+    const createLeague = $("#create-league");
+    if (createLeague) {
+      createLeague.onclick = async () => {
+        const name = ($("#league-name") && $("#league-name").value.trim()) || "Game night";
+        createLeague.disabled = true;
+        try {
+          const r = await authFetch("/play/api/leagues", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ name }),
+          });
+          const d = await r.json().catch(() => ({}));
+          if (!r.ok) throw new Error(d.detail || "Couldn't create league");
+          setActiveLeague(d.league);
+          toast(`League created — code ${d.league.code}`, "ok");
+          boot();
+        } catch (e) {
+          toast(e.message || "Couldn't create league", "err");
+          createLeague.disabled = false;
+        }
+      };
+    }
+    const joinLeague = $("#join-league");
+    if (joinLeague) {
+      joinLeague.onclick = async () => {
+        const code = ($("#join-league-code") && $("#join-league-code").value.trim().toUpperCase()) || "";
+        const nickname = ($("#join-league-nick") && $("#join-league-nick").value.trim()) || "";
+        if (code.length < 4) { toast("Enter the league code", "err"); return; }
+        if (!nickname) { toast("Pick a nickname", "err"); return; }
+        joinLeague.disabled = true;
+        try {
+          const r = await authFetch("/play/api/leagues/join", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ code, nickname }),
+          });
+          const d = await r.json().catch(() => ({}));
+          if (!r.ok) throw new Error(d.detail || "Couldn't join league");
+          setActiveLeague(d.league);
+          setName(nickname);
+          setAuth(getCipherToken(), Object.assign({}, state.authUser, { nickname, label: nickname }));
+          toast(`Joined ${d.league.name}`, "ok");
+          boot();
+        } catch (e) {
+          toast(e.message || "Couldn't join league", "err");
+          joinLeague.disabled = false;
+        }
+      };
+    }
+    if (!state.authUser && state.config && state.config.authEnabled) {
+      initGoogleSignIn().then((ok) => {
+        const gsi = $("#google-signin-league");
+        if (ok && gsi && window.google && window.google.accounts) {
+          window.google.accounts.id.renderButton(gsi, { theme: "outline", size: "large", width: 300 });
+        }
+      }).catch(() => {});
+    }
+  }
+
   function socialPanelMarkup() {
     const cfg = state.config;
     if (!cfg || !cfg.authEnabled) return "";
@@ -513,7 +739,7 @@
     }
 
     const u = state.authUser;
-    if (!u || !u.displayName) {
+    if (!u || !u.id) {
       setAuth(null, null);
       return `
         <div class="panel social-panel" id="social-panel">
@@ -532,19 +758,19 @@
     const leaders = (data.leaderboard && data.leaderboard.leaders) || [];
 
     const friendList = friends.length
-      ? friends.map((f) => `<li class="social-list__item"><span>${esc(f.displayName)}</span><button class="btn btn--sm" data-unfriend="${esc(f.id)}">Remove</button></li>`).join("")
+      ? friends.map((f) => `<li class="social-list__item"><span>${esc(userLabel(f))}</span><button class="btn btn--sm" data-unfriend="${esc(f.id)}">Remove</button></li>`).join("")
       : `<li class="tiny muted">No friends yet — add someone from recent players.</li>`;
 
     const recentList = recent.length
-      ? recent.filter((r) => r && r.user).map((r) => `<li class="social-list__item"><span>${esc(r.user.displayName)}${r.wasTeammate ? " · teammate" : " · opponent"}</span><button class="btn btn--sm" data-addfriend="${esc(r.user.id)}">Add friend</button></li>`).join("")
+      ? recent.filter((r) => r && r.user).map((r) => `<li class="social-list__item"><span>${esc(userLabel(r.user))}${r.wasTeammate ? " · teammate" : " · opponent"}</span><button class="btn btn--sm" data-addfriend="${esc(r.user.id)}">Add friend</button></li>`).join("")
       : `<li class="tiny muted">Play a logged-in match to see recent players.</li>`;
 
     const pairList = pairings.length
-      ? pairings.filter((p) => p && p.user).slice(0, 5).map((p) => `<li class="social-list__item"><span>${esc(p.user.displayName)}</span><span class="tiny muted">${p.winsTogether}/${p.gamesTogether} wins together</span></li>`).join("")
+      ? pairings.filter((p) => p && p.user).slice(0, 5).map((p) => `<li class="social-list__item"><span>${esc(userLabel(p.user))}</span><span class="tiny muted">${p.winsTogether}/${p.gamesTogether} wins together</span></li>`).join("")
       : `<li class="tiny muted">No pairings yet.</li>`;
 
     const leaderList = leaders.length
-      ? leaders.filter((l) => l && l.user).slice(0, 8).map((l, i) => `<li class="social-list__item"><span>${i + 1}. ${esc(l.user.displayName)}</span><span class="tiny muted">${l.wins} wins</span></li>`).join("")
+      ? leaders.filter((l) => l && l.user).slice(0, 8).map((l, i) => `<li class="social-list__item"><span>${i + 1}. ${esc(userLabel(l.user))}</span><span class="tiny muted">${l.wins} wins</span></li>`).join("")
       : `<li class="tiny muted">Leaderboard fills as logged-in games are played.</li>`;
 
     return `
@@ -552,9 +778,16 @@
         <div class="social-panel__head">
           <div class="social-user">
             ${u.avatarUrl ? `<img class="social-user__av" src="${esc(u.avatarUrl)}" alt="" />` : `<span class="social-user__av social-user__av--ph">👤</span>`}
-            <div><b>${esc(u.displayName)}</b><div class="tiny muted">Cipher profile</div></div>
+            <div><b>${esc(userLabel(u))}</b><div class="tiny muted">Cipher profile</div></div>
           </div>
           <button class="btn btn--sm" id="signout">Sign out</button>
+        </div>
+        <div class="field" style="max-width:360px">
+          <label for="mynick">Nickname</label>
+          <div class="join-row">
+            <input class="input" id="mynick" maxlength="24" value="${esc(u.nickname || u.label || "")}" placeholder="How friends see you" />
+            <button class="btn btn--sm" id="savenick" type="button">Save</button>
+          </div>
         </div>
         <div class="social-stats">
           <div class="social-stat"><span class="social-stat__val">${st.wins || 0}</span><span class="social-stat__lbl">Wins</span></div>
@@ -573,6 +806,23 @@
   }
 
   function wireSocialPanel() {
+    const savenick = $("#savenick");
+    if (savenick) {
+      savenick.onclick = async () => {
+        const nickname = ($("#mynick") && $("#mynick").value.trim()) || "";
+        if (!nickname) { toast("Enter a nickname", "err"); return; }
+        const r = await authFetch("/play/api/me", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ nickname }),
+        });
+        const d = await r.json().catch(() => ({}));
+        if (!r.ok) { toast(d.detail || "Couldn't save nickname", "err"); return; }
+        setAuth(getCipherToken(), d.user);
+        setName(userLabel(d.user));
+        toast("Nickname saved", "ok");
+      };
+    }
     const signout = $("#signout");
     if (signout) {
       signout.onclick = () => { setAuth(null, null); state.social = null; boot(); };
@@ -620,12 +870,14 @@
           <p class="lede">Cipher is a free, no-download take on the word-association classic — reimagined to be more customisable and more fun. Make a room, share the code, and out-clue your rivals.</p>
         </div>
 
+        <div id="league-mount"></div>
+
         <div class="home__actions">
           <div class="panel action-card">
             <h3>🚀 Start a new game</h3>
             <p class="muted tiny">Pick a vibe, create a private room, invite your crew with a 4-letter code.</p>
             <div class="field">
-              <label for="name1">Your name</label>
+              <label for="name1">Your nickname</label>
               <input class="input" id="name1" maxlength="24" placeholder="Agent…" value="${esc(getName())}" />
             </div>
             <button class="btn btn--primary btn--lg btn--block" id="create">Create game →</button>
@@ -673,6 +925,12 @@
       </div>`);
     app.appendChild(el);
 
+    const leagueMount = $("#league-mount");
+    if (leagueMount) {
+      leagueMount.appendChild(h(leaguePanelMarkup()));
+      wireLeaguePanel();
+    }
+
     const socialMount = $("#social-mount");
     if (socialMount && socialPanelMarkup()) {
       socialMount.appendChild(h(socialPanelMarkup()));
@@ -692,15 +950,18 @@
     $("#name1").oninput = (e) => { setName(e.target.value); $("#name2").value = e.target.value; };
     $("#name2").oninput = (e) => { setName(e.target.value); $("#name1").value = e.target.value; };
 
-    const createGame = async (packIds, btn, label) => {
+    const createGame = async (packIds, btn, label, forceLeague) => {
       if (!adultConfirmPacks(packIds)) return;
       btn.disabled = true; btn.textContent = "Creating…";
       setName($("#name1").value.trim());
       try {
+        const body = { packIds: Array.isArray(packIds) ? packIds : [packIds] };
+        const lg = state.activeLeague || getActiveLeague();
+        if ((forceLeague || lg) && lg && lg.code) body.leagueCode = lg.code;
         const r = await fetch("/play/api/rooms", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ packIds: Array.isArray(packIds) ? packIds : [packIds] }),
+          body: JSON.stringify(body),
         });
         const d = await r.json().catch(() => ({}));
         if (!r.ok || !d.code) {
@@ -931,7 +1192,7 @@
         <span>${st.devMode
           ? "<b>Dev mode on</b> — start solo; bots fill empty roles. Switch team/role anytime once the game begins."
           : "Pick a team and a role. Each team needs a <b>spymaster</b> (gives clues) and at least one <b>operative</b> (guesses). Share the room code to invite friends."}</span>
-      </div>`));
+      </div>${st.leagueName ? `<div class="hint-banner hint-banner--league"><span>🏆</span><span>League game — <b>${esc(st.leagueName)}</b>${st.leagueCode ? ` <span class="tiny muted">(${esc(st.leagueCode)})</span>` : ""}. This match counts toward your league standings.</span></div>` : ""}`));
 
     const teams = h(`<div class="lobby-teams"></div>`);
     teams.appendChild(teamCard("red", "🔴 Red Team", reds, you));
@@ -945,7 +1206,7 @@
           <button class="btn btn--sm" id="spec">Spectate</button></div>
         <div class="roster" id="specroster"></div>
         <div class="field" style="max-width:320px">
-          <label for="myname">Your name</label>
+          <label for="myname">Your nickname</label>
           <div class="join-row">
             <input class="input" id="myname" maxlength="24" value="${esc(you ? you.name : "")}" />
             <button class="btn btn--sm" id="savename">Save</button>

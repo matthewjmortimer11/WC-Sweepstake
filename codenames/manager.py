@@ -196,6 +196,9 @@ class Room:
                         "rhymesBanned": self.settings.house_rules.rhymes_banned,
                     },
                     "devMode": self.settings.dev_mode,
+                    "leagueId": self.settings.league_id,
+                    "leagueCode": self.settings.league_code,
+                    "leagueName": self.settings.league_name,
                 },
                 "game": self.game.view(reveal_key=reveal),
                 "chat": self.chat[-60:],
@@ -384,6 +387,7 @@ def _match_snapshot(room: Room) -> dict:
         "red_remaining": g.remaining(RED),
         "blue_remaining": g.remaining(BLUE),
         "players": players,
+        "league_id": s.league_id,
     }
 
 

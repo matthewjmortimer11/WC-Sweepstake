@@ -736,6 +736,25 @@ input[type="range"]:disabled { background: var(--line-strong); cursor: not-allow
 
 .empty { text-align: center; color: var(--ink-3); padding: 24px; font-size: 0.85rem; font-family: var(--mono); text-transform: uppercase; letter-spacing: 0.06em; }
 .hint-banner { display: flex; align-items: center; gap: 10px; padding: 11px 14px; border-radius: var(--radius-sm); background: var(--panel-2); border: 1.5px dashed var(--line-strong); color: var(--ink-2); font-size: 0.88rem; margin-bottom: 14px; }
+.hint-banner--league { border-style: solid; border-color: var(--accent); background: var(--accent-soft); color: var(--ink); }
+
+.league-panel { display: grid; gap: 16px; }
+.league-panel__head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.league-panel__actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.league-code { font-family: var(--mono); letter-spacing: 0.12em; color: var(--accent); }
+.league-forms { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+@media (max-width: 720px) { .league-forms { grid-template-columns: 1fr; } }
+.league-form { display: grid; gap: 12px; padding: 14px; }
+.league-form h4 { margin: 0; font-size: 0.95rem; }
+.league-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+@media (max-width: 800px) { .league-grid { grid-template-columns: 1fr; } }
+.league-grid h4 { margin: 0 0 8px; font-size: 0.9rem; color: var(--ink-2); }
+.league-table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+.league-table th, .league-table td { padding: 6px 8px; text-align: left; border-bottom: 1px solid var(--line); }
+.league-table th { color: var(--ink-3); font-weight: 600; font-size: 0.75rem; }
+.league-games { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.league-game { display: grid; gap: 2px; padding: 8px 10px; background: var(--panel-2); border: 1px solid var(--line); border-radius: var(--radius-sm); font-size: 0.86rem; }
+.league-game__meta { font-weight: 600; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.05ms !important; }
