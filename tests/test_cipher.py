@@ -156,11 +156,14 @@ def test_round_is_deterministic_with_seed():
     assert [c.kind for c in a.cards] == [c.kind for c in b.cards]
 
 
-def test_starting_team_alternates_each_round():
-    g = _new_game(seed=1)
-    first = g.starting_team
-    g.new_round(words_for("classic"), seed=1)
-    assert g.starting_team != first
+def test_starting_team_is_seeded_random():
+    a = _new_game(seed=1)
+    b = _new_game(seed=1)
+    assert a.starting_team == b.starting_team
+    assert a.starting_team in (RED, BLUE)
+    # Different seeds can pick either team.
+    teams = {_new_game(seed=s).starting_team for s in range(20)}
+    assert teams == {RED, BLUE}
 
 
 def test_not_enough_words_raises():

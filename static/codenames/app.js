@@ -1351,7 +1351,7 @@
         const gridEl = root.querySelector("[data-game-grid]");
         if (gridEl) gridEl.parentElement.insertBefore(dev, gridEl);
       }
-    } else     if (oldDev) oldDev.remove();
+    } else if (oldDev) oldDev.remove();
     syncClueBanner();
     patchGuessUi();
   }
@@ -1611,6 +1611,17 @@
   }
 
   // ── lobby ────────────────────────────────────────────────────────────────
+  function lobbyTeamsReady(players, devMode) {
+    if (devMode) return true;
+    const ready = (team) => {
+      const members = players.filter((p) => p.team === team);
+      if (!members.length) return false;
+      if (members.filter((p) => p.role === "spymaster").length !== 1) return false;
+      return members.some((p) => p.role === "operative");
+    };
+    return ready("red") && ready("blue");
+  }
+
   function roleLabel(role, team) {
     if (team === "spectator") return "Spectating";
     return role === "spymaster" ? "Spymaster" : "Operative";
@@ -1619,10 +1630,15 @@
   function lobbyStatusBar(players) {
     const reds = players.filter((p) => p.team === "red");
     const blues = players.filter((p) => p.team === "blue");
-    const redSm = reds.find((p) => p.role === "spymaster");
-    const blueSm = blues.find((p) => p.role === "spymaster");
+    const redSm = reds.filter((p) => p.role === "spymaster");
+    const blueSm = blues.filter((p) => p.role === "spymaster");
     const redOps = reds.filter((p) => p.role === "operative").length;
     const blueOps = blues.filter((p) => p.role === "operative").length;
+    const spyDetail = (sms) => {
+      if (sms.length === 1) return sms[0].name;
+      if (sms.length > 1) return "only one allowed";
+      return "pick someone";
+    };
     const item = (label, ok, detail) => `
       <div class="lobby-status__item ${ok ? "lobby-status__item--ok" : "lobby-status__item--need"}">
         <span class="lobby-status__mark">${ok ? "✓" : "○"}</span>
@@ -1632,9 +1648,9 @@
       <div class="lobby-status panel" aria-live="polite">
         <div class="lobby-status__title">Who's playing what</div>
         <div class="lobby-status__grid">
-          ${item(`${esc(teamName("red"))} spymaster`, !!redSm, redSm ? redSm.name : "pick someone")}
+          ${item(`${esc(teamName("red"))} spymaster`, redSm.length === 1, spyDetail(redSm))}
           ${item(`${esc(teamName("red"))} operatives`, redOps > 0, redOps ? `${redOps} ready` : "need at least 1")}
-          ${item(`${esc(teamName("blue"))} spymaster`, !!blueSm, blueSm ? blueSm.name : "pick someone")}
+          ${item(`${esc(teamName("blue"))} spymaster`, blueSm.length === 1, spyDetail(blueSm))}
           ${item(`${esc(teamName("blue"))} operatives`, blueOps > 0, blueOps ? `${blueOps} ready` : "need at least 1")}
         </div>
       </div>`);
@@ -1651,7 +1667,7 @@
           <span class="role-slot__name">${holder ? esc(holder.name) : empty}</span>
         </div>
       </div>`;
-  return `
+    return `
       <div class="role-slots">
         ${slot("spy", "🎩", "Spymaster", spy, "Open — tap below")}
         ${slot("ops", "🔍", "Operatives", ops.length ? { name: ops.map((p) => p.name).join(", ") } : null, ops.length ? "" : "Open — tap below")}
@@ -1708,6 +1724,7 @@
     wrap.appendChild(meRow);
 
     // Settings summary + start
+    const canStart = lobbyTeamsReady(players, st.devMode);
     const startRow = h(`
       <div class="panel" style="display:grid; gap:14px">
         <div class="team-head">
@@ -1725,7 +1742,7 @@
           ${st.houseRules && !st.houseRules.noBoardWords ? `<span class="badge">Board words OK</span>` : ""}
         </div>
         ${you && you.isHost
-          ? `<button class="btn btn--primary btn--lg btn--block" id="start">▶ Start game</button>`
+          ? `<button class="btn btn--primary btn--lg btn--block" id="start" ${canStart ? "" : "disabled"} title="${canStart ? "" : "Each team needs one spymaster and at least one operative"}">▶ Start game</button>${canStart ? "" : `<p class="tiny muted" style="margin:0">Assign roles above — each team needs one spymaster and at least one operative.</p>`}`
           : `<div class="empty">Waiting for the host to start…</div>`}
       </div>`);
     const es = startRow.querySelector("#editset"); if (es) es.onclick = openSettings;
@@ -1809,12 +1826,16 @@
   function scoreboard() {
     const g = state.room.game;
     const active = g.status === "playing" ? g.currentTeam : null;
+    const starts = g.startingTeam;
+    const startBadge = (team) => (starts === team && g.status === "playing"
+      ? `<span class="team-start-badge" title="Starts this round (+1 agent)">Starts</span>`
+      : "");
     return h(`
       <div class="scoreboard-wrap mission-status">
         <div class="scoreboard mission-status__bar">
           <div class="team-score team-score--red ${active === "red" ? "active" : ""}">
             ${teamScoreNum("red", g)}
-            <div class="meta"><b>${esc(teamName("red"))}</b><span class="tiny muted">agents left</span></div>
+            <div class="meta"><b>${esc(teamName("red"))}</b><span class="tiny muted">agents left</span>${startBadge("red")}</div>
           </div>
           <div class="turn-pill">
             ${g.status === "ended"
@@ -1823,7 +1844,7 @@
             <span class="timer" id="timer"></span>
           </div>
           <div class="team-score team-score--blue ${active === "blue" ? "active" : ""}">
-            <div class="meta" style="text-align:right"><b>${esc(teamName("blue"))}</b><span class="tiny muted">agents left</span></div>
+            <div class="meta" style="text-align:right"><b>${esc(teamName("blue"))}</b><span class="tiny muted">agents left</span>${startBadge("blue")}</div>
             ${teamScoreNum("blue", g)}
           </div>
         </div>
@@ -1942,7 +1963,6 @@
     }
 
     const isActiveSpy = you && you.role === "spymaster" && you.team === g.currentTeam;
-    const isActiveOp = you && you.role === "operative" && you.team === g.currentTeam;
 
     if (g.phase === "clue" && isActiveSpy) {
       const compound = state.room.settings.houseRules && state.room.settings.houseRules.compoundClues;
@@ -1998,7 +2018,6 @@
         send({ type: "clue", word, count });
       };
     }
-    const p = el.querySelector("#pass"); if (p) p.onclick = () => send({ type: "endTurn" });
     return el;
   }
 

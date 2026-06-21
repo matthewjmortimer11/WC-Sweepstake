@@ -173,8 +173,8 @@ class Game:
             )
         chosen = rng.sample(pool, total)
 
-        # Alternate the starting team each round so neither side is always +1.
-        self.starting_team = RED if self.round_no % 2 == 0 else BLUE
+        # Random starting team each deal (seeded rng keeps tests deterministic).
+        self.starting_team = rng.choice([RED, BLUE])
         other = BLUE if self.starting_team == RED else RED
 
         start_n, second_n, neutral_n, assassin_n = _distribution(

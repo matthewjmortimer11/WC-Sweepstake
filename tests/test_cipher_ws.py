@@ -398,6 +398,66 @@ def test_dev_mode_allows_mid_game_role_switch(client):
     assert room.game.status == "playing"
 
 
+def test_only_one_spymaster_per_team(client):
+    code = client.post("/play/api/rooms").json()["code"]
+    with client.websocket_connect(f"/play/ws/{code}?pid=p1&name=One") as p1, \
+         client.websocket_connect(f"/play/ws/{code}?pid=p2&name=Two") as p2, \
+         client.websocket_connect(f"/play/ws/{code}?pid=p3&name=BlueSpy") as p3, \
+         client.websocket_connect(f"/play/ws/{code}?pid=p4&name=BlueOp") as p4:
+
+        for ws in (p1, p2, p3, p4):
+            ws.receive_json()
+            ws.receive_json()
+
+        p1.send_json({"type": "setTeam", "team": "red"})
+        p1.send_json({"type": "setRole", "role": "spymaster"})
+        p2.send_json({"type": "setTeam", "team": "red"})
+        p2.send_json({"type": "setRole", "role": "operative"})
+        p3.send_json({"type": "setTeam", "team": "blue"})
+        p3.send_json({"type": "setRole", "role": "spymaster"})
+        p4.send_json({"type": "setTeam", "team": "blue"})
+        p4.send_json({"type": "setRole", "role": "operative"})
+        _settle()
+
+        # Second red player taking spymaster demotes the first.
+        p2.send_json({"type": "setRole", "role": "spymaster"})
+        _settle()
+
+        room = manager.get(code)
+        assert room.players["p1"].role == "operative"
+        assert room.players["p2"].role == "spymaster"
+
+
+def test_start_requires_operative_per_team(client):
+    code = client.post("/play/api/rooms").json()["code"]
+    with client.websocket_connect(f"/play/ws/{code}?pid=rs&name=RedSpy") as rs, \
+         client.websocket_connect(f"/play/ws/{code}?pid=bs&name=BlueSpy") as bs:
+
+        rs.receive_json()
+        rs.receive_json()
+        bs.receive_json()
+        bs.receive_json()
+
+        rs.send_json({"type": "setTeam", "team": "red"})
+        rs.send_json({"type": "setRole", "role": "spymaster"})
+        bs.send_json({"type": "setTeam", "team": "blue"})
+        bs.send_json({"type": "setRole", "role": "spymaster"})
+        _settle()
+
+        rs.send_json({"type": "start"})
+        err = None
+        for _ in range(12):
+            msg = rs.receive_json()
+            if msg.get("type") == "error":
+                err = msg
+                break
+        assert err is not None
+        assert "operative" in err["message"].lower()
+
+        room = manager.get(code)
+        assert room.game.status == "lobby"
+
+
 def test_team_names_in_state_and_settable(client):
     code = client.post("/play/api/rooms").json()["code"]
     with client.websocket_connect(f"/play/ws/{code}?pid=host&name=Handler") as host:

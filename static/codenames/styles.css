@@ -399,6 +399,14 @@ textarea.input { resize: vertical; min-height: 92px; font-size: 0.92rem; }
 .team-score .meta { display: grid; gap: 1px; }
 .team-score .meta b { font-family: var(--mono); font-weight: 700; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.1em; }
 .team-score .meta .tiny { font-size: 0.58rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3); }
+.team-start-badge {
+  display: inline-block; margin-top: 2px;
+  font-family: var(--mono); font-size: 0.52rem; font-weight: 700;
+  letter-spacing: 0.1em; text-transform: uppercase;
+  padding: 2px 6px; border-radius: 4px;
+  color: var(--accent); border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
 .turn-pill { text-align: center; display: grid; gap: 3px; justify-items: center; align-content: center; padding: 0 8px; min-width: 120px; }
 .turn-pill .who { font-family: var(--mono); font-weight: 700; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; }
 .timer { font-weight: 700; font-variant-numeric: tabular-nums; font-size: 0.82rem; letter-spacing: 0.06em; color: var(--ink-3); }
@@ -504,7 +512,7 @@ textarea.input { resize: vertical; min-height: 92px; font-size: 0.92rem; }
 
 /* Operative view — unrevealed cards stay plain index stock (no team hints). */
 .board--blind .cardx:not(.revealed) {
-  background: linear-gradient(165deg, var(--card-paper-hi) 0%, var(--card-paper) 55%, #1e1c16 100%);
+  background: linear-gradient(165deg, var(--card-paper-hi) 0%, var(--card-paper) 55%, var(--card-paper-shadow) 100%);
   color: var(--card-ink);
   border-color: #4a4638;
 }
@@ -571,6 +579,10 @@ textarea.input { resize: vertical; min-height: 92px; font-size: 0.92rem; }
   text-transform: uppercase; letter-spacing: 0.1em; color: var(--accent);
 }
 
+.cardx:disabled {
+  cursor: default; opacity: 0.88; pointer-events: none;
+  filter: saturate(0.92);
+}
 .cardx.clickable { cursor: pointer; }
 .cardx.clickable:hover {
   border-color: var(--accent);
@@ -643,7 +655,7 @@ textarea.input { resize: vertical; min-height: 92px; font-size: 0.92rem; }
 }
 .clue-banner__main {
   display: flex; align-items: center; justify-content: center;
-  gap: clamp(14px, 4vw, 24px); flex-wrap: nowrap; width: 100%;
+  gap: clamp(14px, 4vw, 24px); flex-wrap: wrap; width: 100%;
   max-width: 100%;
 }
 .clue-banner__word {
@@ -652,8 +664,8 @@ textarea.input { resize: vertical; min-height: 92px; font-size: 0.92rem; }
   line-height: 0.95; letter-spacing: 0.03em;
   text-transform: uppercase;
   text-shadow: 0 2px 0 rgba(0, 0, 0, 0.18);
-  overflow: hidden; text-overflow: ellipsis;
-  max-width: min(100%, 16ch);
+  overflow-wrap: anywhere;
+  max-width: 100%;
 }
 .clue-banner__num {
   flex: none;
@@ -755,7 +767,7 @@ textarea.input { resize: vertical; min-height: 92px; font-size: 0.92rem; }
 .guess-confirm {
   position: fixed; left: 50%; transform: translateX(-50%);
   bottom: max(12px, env(safe-area-inset-bottom));
-  z-index: 35; width: min(520px, calc(100vw - 20px));
+  z-index: 70; width: min(520px, calc(100vw - 20px));
   display: grid; gap: 12px; padding: 14px 16px;
   border: 1.5px solid var(--accent); border-radius: var(--radius);
   background: color-mix(in srgb, var(--panel-solid) 92%, transparent);

@@ -639,6 +639,10 @@ async def _dispatch(room, player, mtype: str, msg: dict) -> bool:
             raise MoveError("Unknown role.")
         if role == "spymaster" and player.team not in (RED, BLUE):
             raise MoveError("Join a team before becoming spymaster.")
+        if role == "spymaster":
+            for p in room.players.values():
+                if p.team == player.team and p.role == "spymaster" and p.id != player.id:
+                    p.role = "operative"
         player.role = role
         return True
 
@@ -782,10 +786,16 @@ def _validate_teams(room) -> None:
     blues = [p for p in room.players.values() if p.team == BLUE]
     if not reds or not blues:
         raise MoveError("Both teams need at least one player.")
-    if not any(p.role == "spymaster" for p in reds):
-        raise MoveError("Red needs a spymaster.")
-    if not any(p.role == "spymaster" for p in blues):
-        raise MoveError("Blue needs a spymaster.")
+    red_sms = [p for p in reds if p.role == "spymaster"]
+    blue_sms = [p for p in blues if p.role == "spymaster"]
+    if len(red_sms) != 1:
+        raise MoveError("Red needs exactly one spymaster.")
+    if len(blue_sms) != 1:
+        raise MoveError("Blue needs exactly one spymaster.")
+    if not any(p.role == "operative" for p in reds):
+        raise MoveError("Red needs at least one operative.")
+    if not any(p.role == "operative" for p in blues):
+        raise MoveError("Blue needs at least one operative.")
 
 
 def _require_active_spymaster(room, player) -> None:
