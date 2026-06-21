@@ -57,7 +57,6 @@
       state.authUser = raw ? JSON.parse(raw) : null;
     } catch (_) { state.authUser = null; }
   }
-  loadAuthUser();
 
   async function authFetch(path, opts = {}) {
     const headers = Object.assign({}, opts.headers || {});
@@ -198,6 +197,7 @@
     authUser: null,
     social: null,
   };
+  loadAuthUser();
 
   function captureUiState() {
     const chatIn = $("#chatin");
@@ -366,25 +366,43 @@
 
   // ── boot / render dispatch ───────────────────────────────────────────────────
   async function boot() {
-    if (state.route === "home") {
-      closeSocket();
-      state.room = null; state.you = null;
-      resetRoomUiState();
-      await ensurePacks();
-      await ensureConfig();
-      state.social = await fetchSocialData();
-      await renderHome();
-    } else {
-      if (state.room && state.room.code !== state.code) {
-        state.room = null;
-        state.you = null;
+    try {
+      if (state.route === "home") {
+        closeSocket();
+        state.room = null; state.you = null;
         resetRoomUiState();
-      } else if (!state.room) {
-        resetRoomUiState();
+        await ensurePacks();
+        await ensureConfig();
+        state.social = await fetchSocialData();
+        await renderHome();
+      } else {
+        if (state.room && state.room.code !== state.code) {
+          state.room = null;
+          state.you = null;
+          resetRoomUiState();
+        } else if (!state.room) {
+          resetRoomUiState();
+        }
+        await ensurePacks();
+        if (!state.room) renderRoomShell();
+        connect();
       }
-      await ensurePacks();
-      if (!state.room) renderRoomShell();
-      connect();
+    } catch (err) {
+      console.error("Cipher boot failed:", err);
+      app.innerHTML = "";
+      app.appendChild(h(`
+        <div class="home">
+          <div class="panel" style="margin:24px auto; max-width:480px">
+            <h2>Something went wrong</h2>
+            <p class="muted">The page failed to load. Try refreshing — if you were signed in, signing out may help.</p>
+            <button class="btn btn--primary" id="recover">Reload</button>
+            <button class="btn" id="signout-recover">Sign out &amp; reload</button>
+          </div>
+        </div>`));
+      const reload = $("#recover");
+      if (reload) reload.onclick = () => location.reload();
+      const so = $("#signout-recover");
+      if (so) so.onclick = () => { setAuth(null, null); location.reload(); };
     }
   }
 
@@ -495,6 +513,17 @@
     }
 
     const u = state.authUser;
+    if (!u || !u.displayName) {
+      setAuth(null, null);
+      return `
+        <div class="panel social-panel" id="social-panel">
+          <div class="social-panel__head">
+            <h3>Stats &amp; friends <span class="tiny muted">optional</span></h3>
+          </div>
+          <p class="muted tiny">Sign in to track wins, fastest games, best pairings and friends. Guest play still works — this is separate from sweepstake leagues.</p>
+          <div id="google-signin" class="social-panel__google"></div>
+        </div>`;
+    }
     const data = state.social || {};
     const st = data.stats || {};
     const friends = (data.friends && data.friends.friends) || [];
@@ -507,15 +536,15 @@
       : `<li class="tiny muted">No friends yet — add someone from recent players.</li>`;
 
     const recentList = recent.length
-      ? recent.map((r) => `<li class="social-list__item"><span>${esc(r.user.displayName)}${r.wasTeammate ? " · teammate" : " · opponent"}</span><button class="btn btn--sm" data-addfriend="${esc(r.user.id)}">Add friend</button></li>`).join("")
+      ? recent.filter((r) => r && r.user).map((r) => `<li class="social-list__item"><span>${esc(r.user.displayName)}${r.wasTeammate ? " · teammate" : " · opponent"}</span><button class="btn btn--sm" data-addfriend="${esc(r.user.id)}">Add friend</button></li>`).join("")
       : `<li class="tiny muted">Play a logged-in match to see recent players.</li>`;
 
     const pairList = pairings.length
-      ? pairings.slice(0, 5).map((p) => `<li class="social-list__item"><span>${esc(p.user.displayName)}</span><span class="tiny muted">${p.winsTogether}/${p.gamesTogether} wins together</span></li>`).join("")
+      ? pairings.filter((p) => p && p.user).slice(0, 5).map((p) => `<li class="social-list__item"><span>${esc(p.user.displayName)}</span><span class="tiny muted">${p.winsTogether}/${p.gamesTogether} wins together</span></li>`).join("")
       : `<li class="tiny muted">No pairings yet.</li>`;
 
     const leaderList = leaders.length
-      ? leaders.slice(0, 8).map((l, i) => `<li class="social-list__item"><span>${i + 1}. ${esc(l.user.displayName)}</span><span class="tiny muted">${l.wins} wins</span></li>`).join("")
+      ? leaders.filter((l) => l && l.user).slice(0, 8).map((l, i) => `<li class="social-list__item"><span>${i + 1}. ${esc(l.user.displayName)}</span><span class="tiny muted">${l.wins} wins</span></li>`).join("")
       : `<li class="tiny muted">Leaderboard fills as logged-in games are played.</li>`;
 
     return `
