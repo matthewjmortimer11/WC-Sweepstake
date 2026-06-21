@@ -57,13 +57,22 @@ class Card:
 
 
 @dataclass
+class HouseRules:
+    compound_clues: bool = False       # allow multi-word clues
+    no_board_words: bool = True        # clue can't match a word on the board
+    rhymes_banned: bool = False        # honour system — surfaced in UI only
+
+
+@dataclass
 class Settings:
     board_size: int = 5            # N for an N×N grid (4–6)
-    pack_id: str = "classic"
+    pack_ids: list[str] = field(default_factory=lambda: ["classic"])
+    pack_id: str = "classic"       # legacy single-pack field
     custom_words: Optional[list[str]] = None
     turn_seconds: int = 0          # 0 = no timer
     assassins: int = 1
     pack_name: str = "Classic"
+    house_rules: HouseRules = field(default_factory=HouseRules)
 
 
 def _distribution(total: int, assassins: int) -> tuple[int, int, int, int]:
@@ -195,8 +204,14 @@ class Game:
             raise MoveError("Enter a clue word.")
         if len(word) > 40:
             raise MoveError("That clue is too long.")
-        if " " in word and self.settings.pack_id != "emoji":
-            raise MoveError("Clues must be a single word.")
+        rules = self.settings.house_rules
+        emoji_mode = "emoji" in (self.settings.pack_ids or [])
+        if " " in word and not (rules.compound_clues or emoji_mode):
+            raise MoveError("Clues must be a single word (enable compound clues in house rules).")
+        if rules.no_board_words:
+            norm = word.casefold()
+            if any(c.word.casefold() == norm for c in self.cards):
+                raise MoveError("That clue matches a word on the board.")
         if count < 0 or count > 9:
             raise MoveError("Pick a number from 0 to 9.")
 

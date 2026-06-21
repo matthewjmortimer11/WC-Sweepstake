@@ -28,6 +28,19 @@
   const getName = () => localStorage.getItem(LS.name) || "";
   const setName = (n) => localStorage.setItem(LS.name, n);
 
+  function nameFromUrl() {
+    try {
+      const q = new URLSearchParams(location.search).get("name");
+      return q ? q.trim().slice(0, 24) : "";
+    } catch (_) { return ""; }
+  }
+
+  function initNameFromUrl() {
+    const fromUrl = nameFromUrl();
+    if (fromUrl && !getName()) setName(fromUrl);
+  }
+  initNameFromUrl();
+
   // ── theme ──────────────────────────────────────────────────────────────────
   function initTheme() {
     const saved = localStorage.getItem(LS.theme) || "dark";
@@ -85,7 +98,35 @@
     turnTotal: 0,             // seconds for current turn (timer bar)
     lastTurnDeadline: null,   // ms deadline for active turn (timer bar sync)
     roomEpoch: 0,             // bumps when entering a room (reset per-room UI)
+    roomView: null,           // lobby | play — tracks shell mode for partial render
+    lastPhase: null,
+    lastCurrentTeam: null,
   };
+
+  function captureUiState() {
+    const chatIn = $("#chatin");
+    const clueIn = $("#clueword");
+    const chatFeed = $("#chatfeed");
+    return {
+      chatText: chatIn ? chatIn.value : "",
+      chatScroll: chatFeed ? chatFeed.scrollTop : 0,
+      clueText: clueIn ? clueIn.value : "",
+      clueFocus: clueIn && document.activeElement === clueIn,
+      activeId: document.activeElement && document.activeElement.id ? document.activeElement.id : null,
+    };
+  }
+
+  function restoreUiState(saved) {
+    if (!saved) return;
+    const chatIn = $("#chatin");
+    if (chatIn && saved.chatText) chatIn.value = saved.chatText;
+    const chatFeed = $("#chatfeed");
+    if (chatFeed) chatFeed.scrollTop = saved.chatScroll;
+    const clueIn = $("#clueword");
+    if (clueIn && saved.clueText) clueIn.value = saved.clueText;
+    const focusEl = saved.clueFocus ? clueIn : (saved.activeId ? document.getElementById(saved.activeId) : null);
+    if (focusEl && focusEl.focus) focusEl.focus();
+  }
 
   function resetRoomUiState() {
     state.lastRevealCount = 0;
@@ -94,6 +135,9 @@
     state.chatSeen = 0;
     state.turnTotal = 0;
     state.lastTurnDeadline = null;
+    state.roomView = null;
+    state.lastPhase = null;
+    state.lastCurrentTeam = null;
     state.roomEpoch += 1;
   }
 
@@ -307,20 +351,33 @@
     return { code, boxes, syncFilled };
   }
 
-  const adultConfirm = (packId) => {
-    if (packId === "bottomdrawer") {
+  const ADULT_PACKS = new Set(["drinking", "rude", "adult", "offensive", "unfiltered", "afterdark", "bottomdrawer"]);
+  const MATURE_PACKS = new Set(["drinking", "rude"]);
+
+  const adultConfirmPacks = (packIds) => {
+    const ids = Array.isArray(packIds) ? packIds : [packIds];
+    const tiers = ids.map((id) => {
+      const p = state.packs.find((x) => x.id === id);
+      return p ? p.tier : (ADULT_PACKS.has(id) ? "adult" : "family");
+    });
+    if (tiers.includes("adult") || ids.some((id) => ["offensive", "unfiltered", "adult", "afterdark", "bottomdrawer"].includes(id))) {
       return confirm(
-        "Bottom Drawer is 18+ with explicit sexual and gross-out content. "
-        + "Confirm everyone playing is 18 or over and actually wants this."
+        "You've selected 18+ packs (may include crude, sexual, political or offensive content). "
+        + "Confirm everyone playing is 18 or over and wants this."
       );
     }
-    if (packId === "afterdark") {
+    if (tiers.includes("mature") || ids.some((id) => MATURE_PACKS.has(id))) {
       return confirm(
-        "After Dark is an 18+ pack with crude, sexual and dark-humour content. "
+        "You've selected mature packs with drinking or crude humour. "
         + "Confirm everyone playing is 18 or over."
       );
     }
     return true;
+  };
+
+  const packIdsIncludeEmoji = (st) => {
+    const ids = st.packIds || (st.packId ? [st.packId] : ["classic"]);
+    return ids.includes("emoji") && !st.hasCustom;
   };
   function renderHome() {
     app.innerHTML = "";
@@ -376,7 +433,7 @@
           <span class="eyebrow">Why it's more fun</span>
           <div class="features" style="margin-top:14px">
             <div class="feature"><span class="ico">🎛️</span><h4>Fully customisable</h4><p>4×4, 5×5 or 6×6 boards, optional turn timers, 1–5 assassins.</p></div>
-            <div class="feature"><span class="ico">🃏</span><h4>Themed word packs</h4><p>Classic, Movies, Food, Sci-Fi, Emoji chaos, <b>After Dark</b> &amp; <b>Bottom Drawer</b> (18+) — or paste your own.</p></div>
+            <div class="feature"><span class="ico">🃏</span><h4>10 themed word packs</h4><p>Mix &amp; match Classic, Movies, Drinking, Rude, Offensive, Unfiltered and more — or paste your own.</p></div>
             <div class="feature"><span class="ico">⚡</span><h4>Instant & real-time</h4><p>Live sync over WebSockets. Reconnects automatically if you drop.</p></div>
             <div class="feature"><span class="ico">💬</span><h4>Chat & reactions</h4><p>Trash-talk, emoji bursts and a running play-by-play log.</p></div>
             <div class="feature"><span class="ico">♿</span><h4>Accessible by design</h4><p>Colour-blind glyphs, keyboard play, reduced-motion support.</p></div>
@@ -396,15 +453,15 @@
     $("#name1").oninput = (e) => { setName(e.target.value); $("#name2").value = e.target.value; };
     $("#name2").oninput = (e) => { setName(e.target.value); $("#name1").value = e.target.value; };
 
-    const createGame = async (packId, btn, label) => {
-      if (!adultConfirm(packId)) return;
+    const createGame = async (packIds, btn, label) => {
+      if (!adultConfirmPacks(packIds)) return;
       btn.disabled = true; btn.textContent = "Creating…";
       setName($("#name1").value.trim());
       try {
         const r = await fetch("/play/api/rooms", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ packId }),
+          body: JSON.stringify({ packIds: Array.isArray(packIds) ? packIds : [packIds] }),
         });
         const d = await r.json().catch(() => ({}));
         if (!r.ok || !d.code) {
@@ -416,8 +473,8 @@
         btn.disabled = false; btn.textContent = label;
       }
     };
-    $("#create").onclick = () => createGame("classic", $("#create"), "Create game →");
-    $("#create-dark").onclick = () => createGame("afterdark", $("#create-dark"), "🔞 After Dark game");
+    $("#create").onclick = () => createGame(["classic"], $("#create"), "Create game →");
+    $("#create-dark").onclick = () => createGame(["drinking", "rude", "adult"], $("#create-dark"), "🔞 After Dark game");
     const codeInput = wireCodeBoxes($("#codeboxes"), () => doJoin());
     const doJoin = () => {
       const code = codeInput.code();
@@ -444,23 +501,82 @@
   function renderRoom() {
     if (!state.room) { renderRoomShell(); return; }
     const g = state.room.game;
-    app.innerHTML = "";
-    app.appendChild(topbar());
-    if (g.status === "lobby") {
-      app.appendChild(lobby());
+    const view = g.status === "lobby" ? "lobby" : "play";
+    const saved = captureUiState();
+    const canPatch = state.roomView === view && view === "play" && app.querySelector("[data-room-root]");
+    const turnChanged = g.currentTeam !== state.lastCurrentTeam || g.phase !== state.lastPhase;
+
+    if (canPatch && !state.settingsOpen) {
+      patchPlayingView(turnChanged);
     } else {
-      app.appendChild(scoreboard());
-      const grid = h(`<div class="game-grid"></div>`);
-      const main = h(`<div class="board-wrap"></div>`);
-      if (g.status === "ended") main.appendChild(winBanner());
-      main.appendChild(board());
-      main.appendChild(cluebar());
-      grid.appendChild(main);
-      grid.appendChild(sidePanel());
-      app.appendChild(grid);
+      app.innerHTML = "";
+      const root = h(`<div data-room-root></div>`);
+      app.appendChild(root);
+      root.appendChild(topbar());
+      if (view === "lobby") {
+        root.appendChild(lobby());
+      } else {
+        const grid = h(`<div class="game-grid" data-game-grid></div>`);
+        const main = h(`<div class="board-wrap" data-board-wrap></div>`);
+        grid.appendChild(main);
+        grid.appendChild(sidePanel());
+        root.appendChild(scoreboard());
+        root.appendChild(grid);
+        fillPlayingView(main, grid);
+      }
+      state.roomView = view;
     }
-    if (state.settingsOpen) app.appendChild(settingsModal());
+
+    if (state.settingsOpen) {
+      const existing = $("#scrim");
+      if (existing) existing.remove();
+      app.appendChild(settingsModal());
+    }
+    state.lastPhase = g.phase;
+    state.lastCurrentTeam = g.currentTeam;
     renderConnState();
+    requestAnimationFrame(() => restoreUiState(saved));
+  }
+
+  function fillPlayingView(main, grid) {
+    const g = state.room.game;
+    const scoreWrap = $(".scoreboard-wrap");
+    if (scoreWrap) scoreWrap.replaceWith(scoreboard());
+    if (g.status === "ended" && !main.querySelector(".win-banner")) {
+      main.insertBefore(winBanner(), main.firstChild);
+    } else if (g.status !== "ended") {
+      const wb = main.querySelector(".win-banner");
+      if (wb) wb.remove();
+    }
+    const oldBoard = main.querySelector(".board-frame");
+    if (oldBoard) oldBoard.replaceWith(board());
+    else main.appendChild(board());
+    const oldClue = main.querySelector(".cluebar, .cluebar--active");
+    const clueParent = oldClue ? oldClue.parentElement : main;
+    const newClue = cluebar();
+    if (oldClue) oldClue.replaceWith(newClue);
+    else clueParent.appendChild(newClue);
+    const oldSide = grid.querySelector(".side");
+    if (oldSide) oldSide.replaceWith(sidePanel());
+  }
+
+  function patchPlayingView(turnChanged) {
+    const grid = $("[data-game-grid]");
+    const main = $("[data-board-wrap]");
+    if (!grid || !main) { state.roomView = null; renderRoom(); return; }
+    fillPlayingView(main, grid);
+    if (turnChanged) {
+      const pill = $(".turn-pill");
+      if (pill) {
+        pill.classList.add("turn-swap");
+        setTimeout(() => pill.classList.remove("turn-swap"), 500);
+      }
+      const activeScore = $(".team-score.active");
+      if (activeScore) {
+        activeScore.classList.add("team-pulse");
+        setTimeout(() => activeScore.classList.remove("team-pulse"), 600);
+      }
+    }
   }
 
   function renderConnState() {
@@ -504,7 +620,9 @@
   }
 
   function copyInvite() {
-    const url = `${location.origin}/play#/room/${state.room.code}`;
+    const name = (state.you && state.you.name) || getName();
+    const q = name ? `?name=${encodeURIComponent(name)}` : "";
+    const url = `${location.origin}/play${q}#/room/${state.room.code}`;
     const done = () => toast("Invite link copied!", "ok");
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(url).then(done).catch(() => fallbackCopy(url, done));
@@ -575,6 +693,8 @@
           <span class="badge">${st.hasCustom ? "Custom words" : esc(st.packName)}</span>
           <span class="badge">${st.turnSeconds ? st.turnSeconds + "s turns" : "No timer"}</span>
           <span class="badge">${st.assassins} assassin${st.assassins > 1 ? "s" : ""}</span>
+          ${st.houseRules && st.houseRules.compoundClues ? `<span class="badge">Compound clues</span>` : ""}
+          ${st.houseRules && !st.houseRules.noBoardWords ? `<span class="badge">Board words OK</span>` : ""}
         </div>
         ${you && you.isHost
           ? `<button class="btn btn--primary btn--lg btn--block" id="start">▶ Start game</button>`
@@ -651,7 +771,7 @@
   function board() {
     const g = state.room.game;
     const you = state.you;
-    const isEmoji = state.room.settings.packId === "emoji" && !state.room.settings.hasCustom;
+    const isEmoji = packIdsIncludeEmoji(state.room.settings);
     const canGuess = you && g.status === "playing" && g.phase === "guess"
       && you.team === g.currentTeam && you.role === "operative";
     const isSpy = you && you.role === "spymaster" && (you.team === "red" || you.team === "blue");
@@ -704,9 +824,10 @@
     if (g.status === "ended") {
       const el = h(`<div class="panel cluebar">
         ${you && you.isHost
-          ? `<button class="btn btn--primary" id="again">🔄 Play again</button><button class="btn" id="tolobby">⚙️ Back to lobby</button>`
-          : `<span class="muted">Waiting for the host to start a new round…</span>`}
+          ? `<button class="btn btn--primary" id="rematch">🔄 Rematch (same setup)</button><button class="btn" id="again">New round</button><button class="btn" id="tolobby">⚙️ Back to lobby</button>`
+          : `<span class="muted">Waiting for the host…</span>`}
       </div>`);
+      const r = el.querySelector("#rematch"); if (r) r.onclick = () => send({ type: "rematch" });
       const a = el.querySelector("#again"); if (a) a.onclick = () => send({ type: "start" });
       const l = el.querySelector("#tolobby"); if (l) l.onclick = () => send({ type: "reset" });
       return el;
@@ -717,12 +838,13 @@
 
     // Spymaster giving a clue
     if (g.phase === "clue" && isActiveSpy) {
+      const compound = state.room.settings.houseRules && state.room.settings.houseRules.compoundClues;
       const el = h(`
         <div class="panel cluebar">
           <form class="clue-form" id="clueform">
             <div class="field">
-              <label for="clueword">Your clue (one word)</label>
-              <input class="input" id="clueword" maxlength="40" autocomplete="off" placeholder="e.g. OCEAN" />
+              <label for="clueword">Your clue${compound ? "" : " (one word)"}</label>
+              <input class="input" id="clueword" maxlength="40" autocomplete="off" placeholder="${compound ? "e.g. ICE CREAM" : "e.g. OCEAN"}" />
             </div>
             <div class="field" style="flex:0 0 110px">
               <label for="cluenum">Number</label>
@@ -878,9 +1000,19 @@
   // ── settings modal ───────────────────────────────────────────────────────
   function openSettings() {
     const st = state.room.settings;
+    const packIds = st.packIds || (st.packId ? [st.packId] : ["classic"]);
+    const hr = st.houseRules || {};
     state.draftSettings = {
-      boardSize: st.boardSize, packId: st.packId, turnSeconds: st.turnSeconds,
-      assassins: st.assassins, customWords: st.customWords || "",
+      boardSize: st.boardSize,
+      packIds: [...packIds],
+      turnSeconds: st.turnSeconds,
+      assassins: st.assassins,
+      customWords: st.customWords || "",
+      houseRules: {
+        compoundClues: !!hr.compoundClues,
+        noBoardWords: hr.noBoardWords !== false,
+        rhymesBanned: !!hr.rhymesBanned,
+      },
     };
     state.settingsOpen = true;
     renderRoom();
@@ -897,8 +1029,16 @@
         </div>
         <div class="settings-grid">
           <div class="field">
-            <label>Word pack</label>
-            <div class="pack-grid" id="packs"></div>
+            <label>Word packs <span class="tiny muted">(toggle any combination)</span></label>
+            <div class="pack-grid pack-grid--multi" id="packs"></div>
+          </div>
+          <div class="field">
+            <label>House rules</label>
+            <div class="house-rules" id="houserules">
+              <label class="check-row"><input type="checkbox" id="hr-compound" ${d.houseRules.compoundClues ? "checked" : ""} /> Allow compound clues (multi-word)</label>
+              <label class="check-row"><input type="checkbox" id="hr-board" ${d.houseRules.noBoardWords ? "checked" : ""} /> Clue can't match a board word</label>
+              <label class="check-row"><input type="checkbox" id="hr-rhyme" ${d.houseRules.rhymesBanned ? "checked" : ""} /> No rhyming clues (honour system)</label>
+            </div>
           </div>
           <div class="field">
             <label for="custom">…or paste your own words (comma or line separated)</label>
@@ -938,14 +1078,37 @@
         </div>
       </div>`);
 
-    // Pack grid
+    // Pack grid — multi-select toggles
     const pg = modal.querySelector("#packs");
+    const syncPackBtns = () => {
+      pg.querySelectorAll(".pack-opt").forEach((x) => {
+        x.setAttribute("aria-pressed", d.packIds.includes(x.dataset.v) ? "true" : "false");
+      });
+    };
     state.packs.forEach((p) => {
-      const b = h(`<button class="pack-opt" data-v="${p.id}" aria-pressed="${p.id === d.packId}">
-        <span class="pemoji">${p.emoji}</span><b>${esc(p.name)}</b><small>${esc(p.blurb)}</small></button>`);
-      b.onclick = () => { d.packId = p.id; pg.querySelectorAll(".pack-opt").forEach((x) => x.setAttribute("aria-pressed", x.dataset.v === p.id)); };
+      const on = d.packIds.includes(p.id);
+      const tier = p.tier === "adult" ? " 🔞" : p.tier === "mature" ? " 18+" : "";
+      const b = h(`<button type="button" class="pack-opt pack-opt--toggle" data-v="${p.id}" aria-pressed="${on}">
+        <span class="pemoji">${p.emoji}</span><b>${esc(p.name)}${tier}</b><small>${esc(p.blurb)} · ${p.count} words</small></button>`);
+      b.onclick = () => {
+        const id = p.id;
+        if (d.packIds.includes(id)) {
+          if (d.packIds.length > 1) d.packIds = d.packIds.filter((x) => x !== id);
+        } else {
+          d.packIds.push(id);
+        }
+        if (!d.packIds.length) d.packIds = ["classic"];
+        syncPackBtns();
+      };
       pg.appendChild(b);
     });
+
+    const hrCompound = modal.querySelector("#hr-compound");
+    const hrBoard = modal.querySelector("#hr-board");
+    const hrRhyme = modal.querySelector("#hr-rhyme");
+    hrCompound.onchange = () => { d.houseRules.compoundClues = hrCompound.checked; };
+    hrBoard.onchange = () => { d.houseRules.noBoardWords = hrBoard.checked; };
+    hrRhyme.onchange = () => { d.houseRules.rhymesBanned = hrRhyme.checked; };
 
     const seg = (id, key, cast) => {
       modal.querySelectorAll(`#${id} button`).forEach((b) => {
@@ -977,10 +1140,11 @@
     scrim.onclick = (e) => { if (e.target === scrim) close(); };
     modal.querySelector("#custom").oninput = (e) => { d.customWords = e.target.value; };
     modal.querySelector("#applyset").onclick = () => {
-      if (!adultConfirm(d.packId)) return;
+      if (!adultConfirmPacks(d.packIds)) return;
       send({ type: "settings", settings: {
-        boardSize: d.boardSize, packId: d.packId, turnSeconds: d.turnSeconds,
+        boardSize: d.boardSize, packIds: d.packIds, turnSeconds: d.turnSeconds,
         assassins: d.assassins, customWords: d.customWords,
+        houseRules: d.houseRules,
       } });
       state.settingsOpen = false;
       toast("Setup saved", "ok");

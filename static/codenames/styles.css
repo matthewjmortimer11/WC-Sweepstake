@@ -551,6 +551,24 @@ textarea.input { resize: vertical; min-height: 92px; font-size: 0.92rem; }
 .pack-opt .pemoji { font-size: 1.35rem; filter: grayscale(0.25); }
 .pack-opt b { font-family: var(--head); font-size: 0.95rem; font-weight: 700; text-transform: uppercase; }
 .pack-opt small { color: var(--ink-3); font-size: 0.76rem; line-height: 1.35; }
+.pack-grid--multi .pack-opt--toggle[aria-pressed="true"] { box-shadow: inset 0 0 0 1px var(--accent), var(--hard-sm); }
+
+.house-rules { display: grid; gap: 10px; }
+.check-row { display: flex; align-items: center; gap: 10px; font-size: 0.88rem; cursor: pointer; }
+.check-row input { width: 16px; height: 16px; accent-color: var(--accent); }
+
+.turn-pill.turn-swap { animation: turn-swap 0.45s ease; }
+@keyframes turn-swap {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.04); color: var(--accent); }
+  100% { transform: scale(1); }
+}
+.team-score.team-pulse { animation: team-pulse 0.55s ease; }
+@keyframes team-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.03); }
+}
+.scoreboard-wrap .team-score.active { transition: box-shadow 0.25s, transform 0.25s; }
 
 /* Toggle switch */
 .timer-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }

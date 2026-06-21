@@ -23,7 +23,7 @@ from fastapi import APIRouter, HTTPException, Request, WebSocket, WebSocketDisco
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 
 from . import store
-from .game import BLUE, RED, STATUS_LOBBY, MAX_ASSASSINS, MoveError, Settings
+from .game import BLUE, RED, STATUS_LOBBY, MAX_ASSASSINS, MoveError, Settings, HouseRules
 from .manager import (
     _ALLOWED_SIZES,
     _MAX_CHAT,
@@ -34,7 +34,7 @@ from .manager import (
     clamp_timer,
     manager,
 )
-from .words import PACKS, pack_meta, words_for
+from .words import PACKS, pack_meta, words_for, words_for_packs, normalize_pack_ids, pack_label
 
 router = APIRouter()
 
@@ -96,18 +96,35 @@ async def create_room(request: Request) -> JSONResponse:
     # mode (e.g. "afterdark") so the choice is made upfront, not buried in
     # settings. Unknown/missing values fall back to the classic default.
     pack_id = "classic"
+    pack_ids: list[str] | None = None
     try:
         body = await request.json()
-        if isinstance(body, dict) and str(body.get("packId", "")) in PACKS:
-            pack_id = str(body["packId"])
+        if isinstance(body, dict):
+            raw_ids = body.get("packIds")
+            if isinstance(raw_ids, list) and raw_ids:
+                pack_ids = normalize_pack_ids([str(x) for x in raw_ids])
+            elif str(body.get("packId", "")) in PACKS:
+                pack_id = str(body["packId"])
+                pack_ids = normalize_pack_ids([pack_id])
     except Exception:
         pass
     room = manager.create_room()
-    if pack_id != "classic":
-        room.settings.pack_id = pack_id
-        room.settings.pack_name = PACKS[pack_id]["name"]
+    if pack_ids:
+        room.settings.pack_ids = pack_ids
+        room.settings.pack_id = pack_ids[0]
+        room.settings.pack_name = pack_label(pack_ids)
         room.game.settings = room.settings
-    return JSONResponse({"code": room.code, "packId": pack_id})
+    elif pack_id != "classic":
+        ids = normalize_pack_ids([pack_id])
+        room.settings.pack_ids = ids
+        room.settings.pack_id = ids[0]
+        room.settings.pack_name = pack_label(ids)
+        room.game.settings = room.settings
+    return JSONResponse({
+        "code": room.code,
+        "packId": room.settings.pack_id,
+        "packIds": room.settings.pack_ids,
+    })
 
 
 @router.get("/play/assets/{filename:path}")
@@ -121,6 +138,26 @@ async def assets(filename: str) -> FileResponse:
 
 
 # ── settings parsing ───────────────────────────────────────────────────────────
+def _parse_house_rules(raw, current: HouseRules) -> HouseRules:
+    if not isinstance(raw, dict):
+        return current
+    return HouseRules(
+        compound_clues=bool(raw.get("compoundClues", current.compound_clues)),
+        no_board_words=bool(raw.get("noBoardWords", current.no_board_words)),
+        rhymes_banned=bool(raw.get("rhymesBanned", current.rhymes_banned)),
+    )
+
+
+def _parse_pack_ids(payload: dict, current: Settings) -> list[str]:
+    raw = payload.get("packIds")
+    if isinstance(raw, list) and raw:
+        return normalize_pack_ids([str(x) for x in raw])
+    legacy = str(payload.get("packId", "")).strip()
+    if legacy and legacy in PACKS:
+        return normalize_pack_ids([legacy])
+    return list(current.pack_ids or ["classic"])
+
+
 def _build_settings(payload: dict, current: Settings) -> Settings:
     size = int(payload.get("boardSize", current.board_size))
     if size not in _ALLOWED_SIZES:
@@ -149,21 +186,22 @@ def _build_settings(payload: dict, current: Settings) -> Settings:
             raise MoveError(f"Custom list needs ≥ {size * size} unique words.")
         custom = custom or None
 
-    pack_id = str(payload.get("packId", current.pack_id))
-    if pack_id not in PACKS:
-        pack_id = "classic"
-    pack_name = "Custom" if custom else PACKS[pack_id]["name"]
+    pack_ids = _parse_pack_ids(payload, current)
+    pack_id = pack_ids[0]
+    pack_name = "Custom" if custom else pack_label(pack_ids)
+    house_rules = _parse_house_rules(payload.get("houseRules"), current.house_rules)
 
     return Settings(
-        board_size=size, pack_id=pack_id, custom_words=custom,
+        board_size=size, pack_ids=pack_ids, pack_id=pack_id, custom_words=custom,
         turn_seconds=timer, assassins=assassins, pack_name=pack_name,
+        house_rules=house_rules,
     )
 
 
 def _words_pool(settings: Settings) -> list[str]:
     if settings.custom_words:
         return list(settings.custom_words)
-    return words_for(settings.pack_id)
+    return words_for_packs(settings.pack_ids)
 
 
 # ── WebSocket ───────────────────────────────────────────────────────────────────
@@ -288,6 +326,16 @@ async def _dispatch(room, player, mtype: str, msg: dict) -> bool:
         game.settings = room.settings
         game.new_round(_words_pool(room.settings))
         room.persisted = False  # this new game can be persisted when it ends
+        return True
+
+    if mtype == "rematch":
+        if not player.is_host:
+            raise MoveError("Only the host can start a rematch.")
+        if game.status != "ended":
+            raise MoveError("The game hasn't ended yet.")
+        _validate_teams(room)
+        game.new_round(_words_pool(room.settings))
+        room.persisted = False
         return True
 
     if mtype == "reset":

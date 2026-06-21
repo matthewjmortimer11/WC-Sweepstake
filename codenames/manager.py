@@ -34,7 +34,7 @@ from .game import (
     MoveError,
     Settings,
 )
-from .words import PACKS, words_for
+from .words import PACKS, words_for, words_for_packs, normalize_pack_ids, pack_label
 
 # Avoid ambiguous characters in shareable room codes.
 _CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
@@ -127,13 +127,17 @@ class Room:
                 "settings": {
                     "boardSize": self.settings.board_size,
                     "packId": self.settings.pack_id,
+                    "packIds": list(self.settings.pack_ids or ["classic"]),
                     "packName": self.settings.pack_name,
                     "turnSeconds": self.settings.turn_seconds,
                     "assassins": self.settings.assassins,
                     "hasCustom": bool(self.settings.custom_words),
-                    # The pool is not secret (only the key card is), so echo it
-                    # back so the host's settings form can be repopulated.
                     "customWords": ", ".join(self.settings.custom_words or []),
+                    "houseRules": {
+                        "compoundClues": self.settings.house_rules.compound_clues,
+                        "noBoardWords": self.settings.house_rules.no_board_words,
+                        "rhymesBanned": self.settings.house_rules.rhymes_banned,
+                    },
                 },
                 "game": self.game.view(reveal_key=reveal),
                 "chat": self.chat[-60:],
@@ -210,7 +214,10 @@ class Manager:
                 break
         else:
             code = _gen_code(6)
-        settings = Settings(pack_id="classic", pack_name=PACKS["classic"]["name"])
+        settings = Settings(
+            pack_ids=["classic"], pack_id="classic",
+            pack_name=PACKS["classic"]["name"],
+        )
         room = Room(code=code, game=Game(settings=settings), settings=settings)
         self.rooms[code] = room
         return room
@@ -302,6 +309,7 @@ def _match_snapshot(room: Room) -> dict:
         "ended_at": datetime.now(timezone.utc),
         "board_size": s.board_size,
         "pack_id": s.pack_id,
+        "pack_ids": list(s.pack_ids or ["classic"]),
         "pack_name": s.pack_name,
         "custom_words": bool(s.custom_words),
         "turn_seconds": s.turn_seconds,

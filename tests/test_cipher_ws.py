@@ -13,6 +13,7 @@ from starlette.testclient import TestClient
 import main
 from codenames.game import RED
 from codenames.manager import manager
+from codenames.words import words_for_packs
 
 
 @pytest.fixture
@@ -75,11 +76,19 @@ def test_create_room_and_join_ws(client):
 def test_create_room_with_afterdark_pack_preset(client):
     r = client.post("/play/api/rooms", json={"packId": "afterdark"})
     body = r.json()
-    assert body["packId"] == "afterdark"
+    assert body["packIds"] == ["drinking", "rude", "adult"]
     code = body["code"]
     room = manager.get(code)
-    assert room.settings.pack_id == "afterdark"
-    assert room.settings.pack_name == "After Dark"
+    assert room.settings.pack_ids == ["drinking", "rude", "adult"]
+    assert "Drinking" in room.settings.pack_name
+
+
+def test_create_room_with_multi_pack_ids(client):
+    r = client.post("/play/api/rooms", json={"packIds": ["classic", "movies", "offensive"]})
+    body = r.json()
+    assert body["packIds"] == ["classic", "movies", "offensive"]
+    room = manager.get(body["code"])
+    assert len(words_for_packs(room.settings.pack_ids)) >= 36
 
 
 def test_create_room_unknown_pack_falls_back_to_classic(client):
@@ -171,3 +180,36 @@ def test_full_round_playable_over_state(client):
         _settle()
         assert game.remaining(starting) == before - 1
         assert game.cards[own].revealed is True
+
+
+def test_rematch_restarts_with_same_settings(client):
+    code = client.post("/play/api/rooms", json={"packIds": ["classic", "movies"]}).json()["code"]
+    with client.websocket_connect(f"/play/ws/{code}?pid=rs") as rs, \
+         client.websocket_connect(f"/play/ws/{code}?pid=ro") as ro, \
+         client.websocket_connect(f"/play/ws/{code}?pid=bs") as bs, \
+         client.websocket_connect(f"/play/ws/{code}?pid=bo") as bo:
+
+        for ws, team, role in [(rs, "red", "spymaster"), (ro, "red", "operative"),
+                               (bs, "blue", "spymaster"), (bo, "blue", "operative")]:
+            ws.send_json({"type": "setTeam", "team": team})
+            ws.send_json({"type": "setRole", "role": role})
+        _settle()
+        rs.send_json({"type": "start"})
+        _settle()
+
+        room = manager.get(code)
+        game = room.game
+        round1 = game.round_no
+        team = game.current_team
+        game.give_clue(team, "zzz", 3)
+        idx = next(i for i, c in enumerate(game.cards) if c.kind == "assassin")
+        op = ro if team == "red" else bo
+        op.send_json({"type": "guess", "index": idx})
+        _settle()
+        assert game.status == "ended"
+
+        rs.send_json({"type": "rematch"})
+        _settle()
+        assert game.status == "playing"
+        assert game.round_no == round1 + 1
+        assert room.settings.pack_ids == ["classic", "movies"]

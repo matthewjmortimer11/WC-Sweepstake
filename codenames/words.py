@@ -176,11 +176,163 @@ def _clean_emoji_pack(pack):
     return seen
 
 
-# ── After Dark (18+) ──────────────────────────────────────────────────────────
-# Crude, raunchy, dark-humour adult fare in the spirit of a certain card game:
-# booze, bad decisions, bodily betrayals and dad-bod despair. Deliberately edgy,
-# but kept to taboo/gross-out comedy — no slurs or content targeting protected
-# groups. (Want something sharper for your group? Use the custom word list.)
+# ── Drinking (18+) ────────────────────────────────────────────────────────────
+DRINKING = [
+    "Booze", "Vodka", "Tequila", "Whiskey", "Gin", "Rum", "Brandy", "Champagne",
+    "Prosecco", "Sangria", "Margarita", "Mojito", "Martini", "Negroni", "Old fashioned",
+    "Blackout", "Hangover", "Wasted", "Tipsy", "Buzzed", "Hammered", "Sloshed",
+    "Beer pong", "Keg stand", "Shotgun", "Jagerbomb", "Fireball", "Malort",
+    "Wine mom", "Day drinking", "Hair of the dog", "Pre-game", "Afters", "Last call",
+    "Power hour", "Beer funnel", "Body shot", "Tequila shot", "Disco nap",
+    "Bar tab", "Happy hour", "Open bar", "Cash bar", "Bartender", "Bouncer",
+    "Dive bar", "Speakeasy", "Pub crawl", "House party", "Frat party", "Tailgate",
+    "Flask", "Shot glass", "Pint", "Growler", "Keg", "Cork", "Cocktail shaker",
+    "Ice bucket", "Lime wedge", "Salt rim", "Garnish", "Mixer", "Soda gun",
+    "Hangxiety", "Drunk text", "Drunk dial", "Uber home", "Designated driver",
+    "Breathalyzer", "DUI", "Public intoxication", "Bail", "Mugshot",
+    "Wine drunk", "Tequila regret", "Whiskey courage", "Champagne problems",
+    "Bottomless brunch", "Mimosas", "Bloody Mary", "Irish coffee", "Hot toddy",
+    "Sake bomb", "Soju", "Absinthe", "Moonshine", "Hooch", "Brewery", "Distillery",
+    "Hangover cure", "Greasy spoon", "Diner booth", "3am pizza", "Late night kebab",
+    "Regrets", "What happened", "Blackout gap", "Walk of shame", "Mystery bruise",
+    "Room spin", "Floor is lava", "One more round", "Closing time", "Afterparty",
+    "Rooftop bar", "Nightclub", "VIP booth", "Cover charge", "ID check",
+    "Fake ID", "Bouncer glare", "Spilled drink", "Sticky floor", "Bathroom line",
+    "Karaoke drunk", "Dance floor", "Jukebox", "Pool table", "Dartboard",
+    "Beer garden", "Patio season", "Porch beers", "Campfire drinks", "Cooler",
+    "Red cup", "Solo cup", "Pong table", "Flip cup", "Kings", "Never have I ever",
+    "Truth or drink", "Drinking game", "Penalty shot", "Chug", "Skull", "Cheers",
+    "Toast", "Clink", "Round on me", "It's five o'clock", "Hair of the dog",
+]
+
+# ── Rude (18+) ────────────────────────────────────────────────────────────────
+# Crude, gross-out and edgy humour — no slurs or hate targeting protected groups.
+RUDE = [
+    "Vomit", "Fart", "Diarrhea", "Skid mark", "Dutch oven", "Morning breath",
+    "Food baby", "Beer belly", "Dad bod", "Man boobs", "Plumber crack",
+    "Camel toe", "Wedgie", "Muffin top", "Back fat", "Nose hair", "Nipple",
+    "Booty", "Twerk", "Thirst trap", "Nudes", "Sexting", "Tinder", "Ghosting",
+    "Catfish", "Sugar daddy", "Booty call", "One night stand", "Walk of shame",
+    "Side piece", "Wingman", "Friend zone", "Simp", "Situationship", "Ick",
+    "Condom", "Viagra", "Blue balls", "Morning wood", "Wet dream", "Cougar",
+    "MILF", "OnlyFans", "Stripper", "Lap dance", "Pole dance", "Strip club",
+    "Bachelor party", "Regrets", "Divorce", "Alimony", "Midlife crisis",
+    "Therapy", "Daddy issues", "Toxic ex", "Restraining order", "Group chat",
+    "Drunk text", "Snack", "Bong", "Edibles", "Munchies", "Couch lock",
+    "Mooning", "Streaking", "Speedo", "Mankini", "Crocs", "Cargo shorts",
+    "Fanny pack", "Tramp stamp", "Mullet", "Comb over", "Toupee", "Spray tan",
+    "Botox", "Manscaping", "Swamp ass", "Pit stains", "Hemorrhoids",
+    "Colonoscopy", "Vasectomy", "Prostate", "Menopause", "Prune juice",
+    "Adult diaper", "Karaoke", "Cringe", "Clout", "Karen", "Boomer",
+    "Hickey", "Walk-in", "Thin walls", "Roommate", "Landlord", "Overdraft",
+    "Screenshot", "Read receipt", "Block", "Unfollow", "Ex", "Rebound",
+    "Hall pass", "Open relationship", "Poly", "Throuple", "Safe word",
+    "Queef", "Gagging", "Brazilian", "Waxing", "Ingrown", "Bacne", "Jock itch",
+    "Toe fungus", "Crop dusting", "Shart", "Code brown", "Debt", "Credit score",
+    "BNPL", "Beige flag", "Red flag", "Gaslight", "Love bombing", "Dry spell",
+    "Body count", "Main character", "NPC", "Delulu", "Rizz", "Down bad",
+    "Office crush", "HR meeting", "PIP", "Quiet firing", "Bare minimum Monday",
+    "Crop dust", "Mystery stain", "Crusty sock", "Bad angle", "Double chin",
+]
+
+# ── Adult (18+) ───────────────────────────────────────────────────────────────
+# Sexual and bleak adult humour. No slurs or hate; use custom words for zero guardrails.
+ADULT = [
+    "Anal", "Oral", "Facial", "Creampie", "Bukkake", "Pegging", "Strap-on",
+    "Dildo", "Butt plug", "Lube", "Spit", "Choke", "Choking", "Spanking",
+    "Bondage", "Handcuffs", "Blindfold", "Fetish", "Kink", "Sub", "Dom",
+    "Switch", "Aftercare", "Post nut clarity", "Whiskey dick", "Limp dick",
+    "Premature", "Performance anxiety", "Dead bedroom", "Stealthing", "Raw",
+    "Finish inside", "Money shot", "Glory hole", "Deep throat", "Gag reflex",
+    "Morning after", "Plan B", "Pregnancy scare", "STD test", "Burning",
+    "Itching", "Discharge", "Smegma", "Yeast infection", "UTI",
+    "Period sex", "Tampon", "Pad", "Panty liner", "Skid marks", "Streak",
+    "Brown star", "Rusty trombone", "Blumpkin", "Cleveland steamer",
+    "Motorboat", "Tea bag", "Hummer", "Prolapse", "Hemorrhoid", "Fistula",
+    "Colon blow", "Explosive diarrhea", "Public bathroom", "Gas station toilet",
+    "Porta potty", "Wet fart", "Cum sock", "Incognito mode", "Browser history",
+    "OnlyFans leak", "Sextape", "Tape", "Blackmail", "Sugar baby", "Findom",
+    "Humiliation", "Degradation", "Objectify", "Thirst trap DM", "Bathroom selfie",
+    "Mirror pic", "Ex's new partner", "Instagram official", "Soft launch",
+    "Hard launch", "Cheating", "Affair", "Emotional affair", "Work spouse",
+    "Office affair", "HR complaint", "Hostile workplace", "Wrongful termination",
+    "Severance", "Child support", "Ankle monitor", "Community service",
+    "Intervention", "Rock bottom", "Relapse", "Dry drunk", "Functioning alcoholic",
+    "Jail", "Intervention", "STD", "Clinic", "Pullout", "Rawdog", "Edge", "Edging",
+    "Finsta", "Edging", "Plan B", "Stealthing",
+]
+
+# ── Offensive (18+) ───────────────────────────────────────────────────────────
+# Political figures, ideologies and historical villains for edgy groups.
+# Optional toggle — no slurs or content targeting protected groups.
+OFFENSIVE = [
+    "Hitler", "Nazi", "Nazis", "Fascist", "Fascists", "Fascism", "Socialist",
+    "Socialists", "Socialism", "Communist", "Communists", "Communism", "Liberal",
+    "Liberals", "Conservative", "Conservatives", "Libertarian", "Anarchist",
+    "Capitalist", "Marxist", "Leninist", "Maoist", "Stalinist", "Trotskyist",
+    "Stalin", "Mussolini", "Lenin", "Mao", "Pol Pot", "Pinochet", "Franco",
+    "Goebbels", "Himmler", "Eichmann", "Goring", "Hess", "Bormann",
+    "Dictator", "Tyrant", "Despot", "Autocrat", "Oligarch", "War criminal",
+    "Genocide", "Holocaust", "Concentration camp", "Gulag", "Propaganda",
+    "Censorship", "Book burning", "Purge", "Secret police", "Gestapo", "KGB",
+    "SS", "Brownshirt", "Swastika", "Sieg heil", "Third Reich", "Reichstag",
+    "Blitzkrieg", "Axis", "Allies", "D-Day", "Pearl Harbor", "Atomic bomb",
+    "Cold War", "Iron Curtain", "Berlin Wall", "Cuban Missile Crisis",
+    "Vietnam", "Draft dodger", "Protest", "Riot", "Coup", "Insurrection",
+    "Impeachment", "Scandal", "Watergate", "Monica", "Email server",
+    "Fake news", "Deep state", "Culture war", "Woke", "Anti-woke", "Cancel culture",
+    "Culture war", "Red pill", "Blue pill", "Echo chamber", "Filter bubble",
+    "Brexit", "Referendum", "Populist", "Nationalist", "Separatist", "Secession",
+    "Border wall", "Immigration", "Deportation", "Refugee crisis", "Asylum",
+    "Lobbyist", "Super PAC", "Gerrymandering", "Filibuster", "Shutdown",
+    "Debt ceiling", "Tax evasion", "Offshore account", "Panama Papers",
+    "Conspiracy", "Flat earth", "QAnon", "Illuminati", "New World Order",
+    "Cult leader", "Jim Jones", "Charles Manson", "David Koresh", "Jonestown",
+    "Serial killer", "Ted Bundy", "Jeffrey Dahmer", "Jack the Ripper",
+    "Terrorist", "Terrorism", "Jihad", "Crusade", "Holy war", "Fatwa",
+    "Assassination", "Regicide", "Treason", "Sedition", "Espionage", "Spygate",
+    "Waterboarding", "Torture", "Guantanamo", "Drone strike", "Collateral damage",
+    "Collateral", "War crime", "Hague", "Nuremberg", "War tribunal",
+    "Apartheid", "Segregation", "Jim Crow", "KKK", "White supremacy",
+    "Neo-Nazi", "Skinhead", "Proud Boys", "Antifa", "BLM", "MAGA",
+    "Trump", "Biden", "Obama", "Bush", "Clinton", "Reagan", "Thatcher",
+    "Putin", "Kim Jong-un", "Xi Jinping", "Netanyahu", "Zelenskyy", "Orban",
+    "Bolsonaro", "Modi", "Erdogan", "Khamenei", "Ayatollah", "Castro",
+    "Che Guevara", "Fidel", "Chavez", "Maduro", "Saddam", "Gaddafi", "Osama",
+    "ISIS", "Al-Qaeda", "Taliban", "Hezbollah", "Hamas", "IRA", "ETA",
+]
+
+# ── Unfiltered (18+) ──────────────────────────────────────────────────────────
+# Filthier than Adult — truly no apologies. Still no slurs or hate.
+UNFILTERED = [
+    "Anal", "Oral", "Facial", "Creampie", "Bukkake", "Pegging", "Strap-on",
+    "Dildo", "Butt plug", "Lube", "Spit", "Choke", "Choking", "Spanking",
+    "Bondage", "Handcuffs", "Blindfold", "Fetish", "Kink", "Sub", "Dom",
+    "Switch", "Aftercare", "Post nut clarity", "Whiskey dick", "Limp dick",
+    "Premature", "Performance anxiety", "Dead bedroom", "Stealthing", "Raw",
+    "Finish inside", "Money shot", "Glory hole", "Deep throat", "Gag reflex",
+    "Morning after", "Plan B", "Pregnancy scare", "STD test", "Burning",
+    "Itching", "Discharge", "Smegma", "Yeast infection", "UTI",
+    "Period sex", "Tampon", "Pad", "Panty liner", "Skid marks", "Streak",
+    "Brown star", "Rusty trombone", "Blumpkin", "Cleveland steamer", "Alabama hot pocket",
+    "Space dock", "Mung", "Santorum", "Felching", "Snowball", "Rusty hook",
+    "Donkey punch", "Dirty sanchez", "Cincinnati bowtie", "Alaskan pipeline",
+    "Hot carl", "Hot lunch", "Motorboat", "Tea bag", "Hummer", "Rusty anchor",
+    "Prolapse", "Hemorrhoid", "Fistula", "Colon blow", "Explosive diarrhea",
+    "Public bathroom", "Gas station toilet", "Porta potty", "Wet fart",
+    "Mystery stain", "Crusty sock", "Cum sock", "Incognito mode", "Browser history",
+    "OnlyFans leak", "Sextape", "Tape", "Blackmail",
+    "Sugar baby", "Findom", "Humiliation", "Degradation", "Objectify", "Thirst trap DM",
+    "Bathroom selfie", "Mirror pic", "Bad angle", "Double chin", "Muffin top pic",
+    "Ex's new partner", "Instagram official", "Soft launch", "Hard launch", "Cheating",
+    "Affair", "Emotional affair", "Work spouse", "Office affair", "HR complaint",
+    "Hostile workplace", "Wrongful termination", "Severance", "Alimony", "Child support",
+    "DUI", "Mugshot", "Breathalyzer", "Ankle monitor", "Community service",
+    "Intervention", "Rock bottom", "Relapse", "Dry drunk", "Functioning alcoholic",
+    "Wine drunk", "Tequila regret", "Jail", "Bail", "Public intoxication",
+]
+
+# Legacy alias content (kept for migration tests).
 AFTER_DARK = [
     "Booze", "Vodka", "Tequila", "Blackout", "Hangover", "Wasted", "Beer pong",
     "Keg stand", "Shotgun", "Wine mom", "Day drinking", "Hair of the dog",
@@ -262,29 +414,96 @@ def _dedupe_words(words: list[str]) -> list[str]:
 
 
 PACKS = {
-    "classic": {"name": "Classic", "emoji": "🕵️", "words": _dedupe_words(CLASSIC),
+    "classic": {"name": "Classic", "emoji": "🕵️", "tier": "family",
+                "words": _dedupe_words(CLASSIC),
                 "blurb": "The all-rounder. Concrete, evocative nouns."},
-    "movies": {"name": "Movies & TV", "emoji": "🎬", "words": _dedupe_words(MOVIES),
+    "movies": {"name": "Movies & TV", "emoji": "🎬", "tier": "family",
+               "words": _dedupe_words(MOVIES),
                "blurb": "Lights, camera, association."},
-    "food": {"name": "Food & Drink", "emoji": "🍜", "words": _dedupe_words(FOOD),
+    "food": {"name": "Food & Drink", "emoji": "🍜", "tier": "family",
+             "words": _dedupe_words(FOOD),
              "blurb": "A delicious tangle of clues."},
-    "scifi": {"name": "Sci-Fi & Fantasy", "emoji": "🚀", "words": _dedupe_words(SCIFI),
+    "scifi": {"name": "Sci-Fi & Fantasy", "emoji": "🚀", "tier": "family",
+              "words": _dedupe_words(SCIFI),
               "blurb": "Wizards, warp drives and wormholes."},
-    "emoji": {"name": "Emoji Chaos", "emoji": "😎", "words": _clean_emoji_pack(EMOJI),
+    "emoji": {"name": "Emoji Chaos", "emoji": "😎", "tier": "family",
+              "words": _clean_emoji_pack(EMOJI),
               "blurb": "No words at all — pure picture mayhem."},
-    "afterdark": {"name": "After Dark", "emoji": "🔞", "words": _dedupe_words(AFTER_DARK),
-                  "blurb": "Crude, rude, NSFW. Not for grandma. 18+."},
-    "bottomdrawer": {"name": "Bottom Drawer", "emoji": "☠️", "words": _dedupe_words(BOTTOM_DRAWER),
-                     "blurb": "Filthier than After Dark. Truly 18+. No apologies."},
+    "drinking": {"name": "Drinking", "emoji": "🍻", "tier": "mature",
+                 "words": _dedupe_words(DRINKING),
+                 "blurb": "Bars, booze and bad decisions. 18+."},
+    "rude": {"name": "Rude", "emoji": "🤬", "tier": "mature",
+             "words": _dedupe_words(RUDE),
+             "blurb": "Crude, gross-out and edgy humour. 18+."},
+    "adult": {"name": "Adult", "emoji": "🔞", "tier": "adult",
+              "words": _dedupe_words(ADULT),
+              "blurb": "Sexual and bleak adult humour. 18+."},
+    "offensive": {"name": "Offensive", "emoji": "💣", "tier": "adult",
+                  "words": _dedupe_words(OFFENSIVE),
+                  "blurb": "Politics, villains and culture-war chaos. 18+."},
+    "unfiltered": {"name": "Unfiltered", "emoji": "☠️", "tier": "adult",
+                   "words": _dedupe_words(UNFILTERED),
+                   "blurb": "Filthier than Adult. Truly 18+. No apologies."},
+    # Legacy ids — still resolve for old rooms / API calls.
+    "afterdark": {"name": "After Dark", "emoji": "🔞", "tier": "adult",
+                  "words": _dedupe_words(AFTER_DARK),
+                  "blurb": "Legacy pack — use Drinking + Rude + Adult instead."},
+    "bottomdrawer": {"name": "Bottom Drawer", "emoji": "☠️", "tier": "adult",
+                     "words": _dedupe_words(BOTTOM_DRAWER),
+                     "blurb": "Legacy pack — use Unfiltered instead."},
 }
+
+# Packs shown in the lobby toggle UI (excludes legacy aliases).
+SELECTABLE_PACK_IDS = [
+    "classic", "movies", "food", "scifi", "emoji",
+    "drinking", "rude", "adult", "offensive", "unfiltered",
+]
+
+_LEGACY_PACK_MAP = {
+    "afterdark": ["drinking", "rude", "adult"],
+    "bottomdrawer": ["unfiltered"],
+}
+
+
+def normalize_pack_ids(pack_ids: list[str] | None) -> list[str]:
+    """Validate and de-dupe pack ids; always returns at least classic."""
+    if not pack_ids:
+        return ["classic"]
+    out: list[str] = []
+    for raw in pack_ids:
+        pid = str(raw or "").strip().lower()
+        if not pid:
+            continue
+        if pid in _LEGACY_PACK_MAP:
+            for leg in _LEGACY_PACK_MAP[pid]:
+                if leg not in out:
+                    out.append(leg)
+            continue
+        if pid in SELECTABLE_PACK_IDS and pid not in out:
+            out.append(pid)
+    return out or ["classic"]
+
+
+def pack_label(pack_ids: list[str]) -> str:
+    """Human-readable label for a set of selected packs."""
+    ids = normalize_pack_ids(pack_ids)
+    if len(ids) == 1:
+        return PACKS[ids[0]]["name"]
+    names = [PACKS[i]["name"] for i in ids[:3]]
+    extra = len(ids) - 3
+    label = " + ".join(names)
+    if extra > 0:
+        label += f" +{extra}"
+    return label
 
 
 def pack_meta() -> list[dict]:
     """Lightweight pack descriptors for the lobby UI (no full word lists)."""
     return [
         {"id": pid, "name": p["name"], "emoji": p["emoji"],
-         "blurb": p["blurb"], "count": len(p["words"])}
+         "blurb": p["blurb"], "count": len(p["words"]), "tier": p.get("tier", "family")}
         for pid, p in PACKS.items()
+        if pid in SELECTABLE_PACK_IDS
     ]
 
 
@@ -293,3 +512,11 @@ def words_for(pack_id: str) -> list[str]:
     if not pack:
         return list(CLASSIC)
     return list(pack["words"])
+
+
+def words_for_packs(pack_ids: list[str] | None) -> list[str]:
+    """Merge words from multiple selected packs (de-duplicated, order preserved)."""
+    merged: list[str] = []
+    for pid in normalize_pack_ids(pack_ids):
+        merged.extend(words_for(pid))
+    return _dedupe_words(merged)
