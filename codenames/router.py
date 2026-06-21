@@ -321,23 +321,33 @@ async def game_socket(ws: WebSocket, code: str) -> None:
     name = ws.query_params.get("name") or ""
     cipher_uid = auth.user_id_from_token(ws.query_params.get("cipherToken"))
 
+    displaced_ws = None
     async with room.lock:
         try:
-            player = manager.join(room, pid, name, cipher_user_id=cipher_uid)
+            player, displaced_pid = manager.join(
+                room, pid, name, cipher_user_id=cipher_uid,
+            )
         except MoveError as exc:
             await ws.send_json({"type": "fatal", "message": str(exc)})
             await ws.close()
             return
+        resumed = displaced_pid is not None
+        if resumed:
+            displaced_ws = room.sockets.pop(displaced_pid, None)
         old = room.sockets.get(pid)
         room.sockets[pid] = ws
         room.touch()
-        await ws.send_json({"type": "hello", "pid": pid, "code": room.code})
+        hello = {"type": "hello", "pid": pid, "code": room.code}
+        if resumed:
+            hello["resumed"] = True
+        await ws.send_json(hello)
         await manager._broadcast(room)
-    if old is not None:
-        try:
-            await old.close()
-        except Exception:
-            pass
+    for stale in (old, displaced_ws):
+        if stale is not None and stale is not ws:
+            try:
+                await stale.close()
+            except Exception:
+                pass
 
     try:
         while True:
