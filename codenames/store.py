@@ -175,10 +175,10 @@ async def touch_user(user_id: str) -> None:
             await session.commit()
 
 
-async def save_match(snapshot: dict) -> None:
-    """Persist one completed match. Best-effort: never raises."""
+async def save_match(snapshot: dict) -> bool:
+    """Persist one completed match. Best-effort: never raises. Returns True on success."""
     if not ENABLED:
-        return
+        return False
     try:
         from .models import CipherMatch, CipherMatchPlayer
         await init_models()
@@ -211,8 +211,10 @@ async def save_match(snapshot: dict) -> None:
             await session.commit()
         log.info("Cipher: saved match %s (winner=%s)",
                  snapshot["room_code"], snapshot["winner"])
+        return True
     except Exception as exc:  # never let persistence break a game
         log.warning("Cipher: failed to persist match: %s", exc)
+        return False
 
 
 async def get_stats(limit: int = 10) -> dict:

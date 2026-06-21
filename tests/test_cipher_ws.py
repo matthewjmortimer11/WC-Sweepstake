@@ -238,6 +238,49 @@ def test_dev_mode_solo_start(client):
     assert all(c["kind"] != "hidden" for c in view["room"]["game"]["cards"])
 
 
+def test_dev_mode_spectator_host_gets_team(client):
+    """Dev mode must not start with the host stuck as spectator (no human clues)."""
+    code = client.post("/play/api/rooms").json()["code"]
+    with client.websocket_connect(f"/play/ws/{code}?pid=solo&name=SoloDev") as ws:
+        ws.receive_json()
+        ws.receive_json()
+        ws.send_json({"type": "settings", "settings": {"devMode": True}})
+        _settle()
+        ws.send_json({"type": "start"})
+        _settle()
+
+    room = manager.get(code)
+    host = room.players["solo"]
+    assert host.team in ("red", "blue")
+    assert host.role == "spymaster"
+    assert room.game.status == "playing"
+
+
+def test_start_rejected_mid_game(client):
+    code = client.post("/play/api/rooms").json()["code"]
+    with client.websocket_connect(f"/play/ws/{code}?pid=rs") as rs, \
+         client.websocket_connect(f"/play/ws/{code}?pid=ro") as ro, \
+         client.websocket_connect(f"/play/ws/{code}?pid=bs") as bs, \
+         client.websocket_connect(f"/play/ws/{code}?pid=bo") as bo:
+
+        for ws, team, role in [(rs, "red", "spymaster"), (ro, "red", "operative"),
+                               (bs, "blue", "spymaster"), (bo, "blue", "operative")]:
+            ws.send_json({"type": "setTeam", "team": team})
+            ws.send_json({"type": "setRole", "role": role})
+        _settle()
+        rs.send_json({"type": "start"})
+        _settle()
+        room = manager.get(code)
+        assert room.game.status == "playing"
+        round_no = room.game.round_no
+
+        rs.send_json({"type": "start"})
+        _settle()
+        after = manager.get(code)
+        assert after.game.status == "playing"
+        assert after.game.round_no == round_no
+
+
 def test_dev_mode_allows_mid_game_role_switch(client):
     code = client.post("/play/api/rooms").json()["code"]
     with client.websocket_connect(f"/play/ws/{code}?pid=solo&name=SoloDev") as ws:

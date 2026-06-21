@@ -76,6 +76,24 @@ def _slot_filled(players: list[Player], team: str, role: str) -> bool:
     return any(p.team == team and p.role == "operative" for p in players)
 
 
+def ensure_dev_host_playing(room: Room) -> None:
+    """Put the host on a team in dev mode so solo testing isn't stuck spectating."""
+    if not room.settings.dev_mode or not room.host_id:
+        return
+    host = room.players.get(room.host_id)
+    if not host:
+        return
+    humans = _human_players(room)
+    if host.team == "spectator":
+        host.team = RED
+        host.role = "spymaster"
+        return
+    if host.role != "spymaster":
+        has_sm = any(p.team == host.team and p.role == "spymaster" for p in humans)
+        if not has_sm:
+            host.role = "spymaster"
+
+
 def ensure_dev_bots(room: Room) -> None:
     """Fill empty team slots with bots when dev mode is on."""
     remove_dev_bots(room)
@@ -148,6 +166,7 @@ class Room:
     # True once a completed game has been written to the store (one record per
     # game). Reset when a new round starts.
     persisted: bool = False
+    match_persisting: bool = False
 
     def touch(self) -> None:
         self.last_active = time.time()
@@ -347,10 +366,20 @@ class Manager:
         # snapshot is built here under the room lock so the background write is
         # race-free even if the room is reset immediately afterwards.
         if room.game.status == STATUS_ENDED and not room.persisted:
-            room.persisted = True
-            if store.ENABLED and not room.settings.dev_mode:
+            if store.ENABLED and not room.settings.dev_mode and not room.match_persisting:
+                room.match_persisting = True
                 snapshot = _match_snapshot(room)
-                asyncio.create_task(store.save_match(snapshot))
+
+                async def _persist() -> None:
+                    try:
+                        if await store.save_match(snapshot):
+                            room.persisted = True
+                    finally:
+                        room.match_persisting = False
+
+                asyncio.create_task(_persist())
+            else:
+                room.persisted = True
 
 
 def _match_snapshot(room: Room) -> dict:

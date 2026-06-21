@@ -55,7 +55,15 @@
     try {
       const raw = localStorage.getItem(LS.user);
       state.authUser = raw ? JSON.parse(raw) : null;
-    } catch (_) { state.authUser = null; }
+    } catch (_) {
+      state.authUser = null;
+      localStorage.removeItem(LS.user);
+    }
+  }
+
+  function clearAuth() {
+    setAuth(null, null);
+    state.social = null;
   }
 
   async function authFetch(path, opts = {}) {
@@ -119,16 +127,27 @@
     return true;
   }
 
+  async function fetchJsonOrAuth(path, opts) {
+    const r = await authFetch(path, opts);
+    if (r.status === 401) return { __auth: true };
+    if (!r.ok) return null;
+    return r.json();
+  }
+
   async function fetchSocialData() {
     if (!getCipherToken()) return null;
     try {
       const [stats, recent, pairings, friends, leaderboard] = await Promise.all([
-        authFetch("/play/api/me/stats").then((r) => r.json()),
-        authFetch("/play/api/me/recent").then((r) => r.json()),
-        authFetch("/play/api/me/pairings").then((r) => r.json()),
-        authFetch("/play/api/me/friends").then((r) => r.json()),
-        fetch("/play/api/leaderboard").then((r) => r.json()),
+        fetchJsonOrAuth("/play/api/me/stats"),
+        fetchJsonOrAuth("/play/api/me/recent"),
+        fetchJsonOrAuth("/play/api/me/pairings"),
+        fetchJsonOrAuth("/play/api/me/friends"),
+        fetch("/play/api/leaderboard").then((r) => (r.ok ? r.json() : null)),
       ]);
+      if ([stats, recent, pairings, friends].some((x) => x && x.__auth)) {
+        clearAuth();
+        return null;
+      }
       return { stats, recent, pairings, friends, leaderboard };
     } catch (_) { return null; }
   }
@@ -178,6 +197,7 @@
     packs: [], sizes: [5], timer: { min: 15, max: 300, step: 5 },
     tab: localStorage.getItem(LS.tab) || "players",
     settingsOpen: false,
+    settingsSavePending: false,
     muted: false,
     reconnectTimer: null,
     reconnectDelay: 800,
@@ -203,11 +223,14 @@
     const chatIn = $("#chatin");
     const clueIn = $("#clueword");
     const chatFeed = $("#chatfeed");
+    const myName = $("#myname");
     return {
       chatText: chatIn ? chatIn.value : "",
       chatScroll: chatFeed ? chatFeed.scrollTop : 0,
       clueText: clueIn ? clueIn.value : "",
       clueFocus: clueIn && document.activeElement === clueIn,
+      myNameText: myName ? myName.value : "",
+      myNameFocus: myName && document.activeElement === myName,
       activeId: document.activeElement && document.activeElement.id ? document.activeElement.id : null,
     };
   }
@@ -220,7 +243,11 @@
     if (chatFeed) chatFeed.scrollTop = saved.chatScroll;
     const clueIn = $("#clueword");
     if (clueIn && saved.clueText) clueIn.value = saved.clueText;
-    const focusEl = saved.clueFocus ? clueIn : (saved.activeId ? document.getElementById(saved.activeId) : null);
+    const myName = $("#myname");
+    if (myName && saved.myNameText != null) myName.value = saved.myNameText;
+    const focusEl = saved.myNameFocus ? myName
+      : saved.clueFocus ? clueIn
+      : (saved.activeId ? document.getElementById(saved.activeId) : null);
     if (focusEl && focusEl.focus) focusEl.focus();
   }
 
@@ -290,6 +317,7 @@
 
   function closeSocket() {
     if (state.reconnectTimer) { clearTimeout(state.reconnectTimer); state.reconnectTimer = null; }
+    state.reconnectDelay = 800;
     if (state.ws) { try { state.ws.onclose = null; state.ws.close(); } catch (_) {} state.ws = null; }
   }
 
@@ -308,6 +336,7 @@
       case "state":
         applyState(msg); break;
       case "error":
+        if (state.settingsSavePending) state.settingsSavePending = false;
         toast(msg.message, "err"); beep(180, 0.12, "square"); break;
       case "fatal":
         toast(msg.message || "Connection closed.", "err");
@@ -361,6 +390,11 @@
       state.chatSeen = (state.room.chat || []).length;
     }
     state.lastStatus = g.status;
+    if (state.settingsSavePending) {
+      state.settingsSavePending = false;
+      state.settingsOpen = false;
+      toast("Setup saved", "ok");
+    }
     renderRoom();
   }
 
@@ -402,7 +436,7 @@
       const reload = $("#recover");
       if (reload) reload.onclick = () => location.reload();
       const so = $("#signout-recover");
-      if (so) so.onclick = () => { setAuth(null, null); location.reload(); };
+      if (so) so.onclick = () => { clearAuth(); location.reload(); };
     }
   }
 
@@ -514,7 +548,7 @@
 
     const u = state.authUser;
     if (!u || !u.displayName) {
-      setAuth(null, null);
+      clearAuth();
       return `
         <div class="panel social-panel" id="social-panel">
           <div class="social-panel__head">
@@ -575,7 +609,7 @@
   function wireSocialPanel() {
     const signout = $("#signout");
     if (signout) {
-      signout.onclick = () => { setAuth(null, null); state.social = null; boot(); };
+      signout.onclick = () => { clearAuth(); boot(); };
     }
     document.querySelectorAll("[data-addfriend]").forEach((btn) => {
       btn.onclick = async () => {
@@ -595,7 +629,9 @@
     document.querySelectorAll("[data-unfriend]").forEach((btn) => {
       btn.onclick = async () => {
         const id = btn.dataset.unfriend;
-        await authFetch(`/play/api/me/friends/${encodeURIComponent(id)}`, { method: "DELETE" });
+        const r = await authFetch(`/play/api/me/friends/${encodeURIComponent(id)}`, { method: "DELETE" });
+        const d = await r.json().catch(() => ({}));
+        if (!r.ok) { toast(d.detail || "Couldn't remove friend", "err"); return; }
         toast("Friend removed", "ok");
         state.social = await fetchSocialData();
         boot();
@@ -839,10 +875,16 @@
     return el;
   }
 
+  function updateTopbarControls() {
+    const mute = $("#mute");
+    if (mute) mute.textContent = state.muted ? "×" : "♪";
+  }
+
   function patchPlayingView(turnChanged) {
     const grid = $("[data-game-grid]");
     const main = $("[data-board-wrap]");
     if (!grid || !main) { state.roomView = null; renderRoom(); return; }
+    updateTopbarControls();
     fillPlayingView(main, grid);
     if (turnChanged) {
       const pill = $(".turn-pill");
@@ -1443,14 +1485,13 @@
     modal.querySelector("#custom").oninput = (e) => { d.customWords = e.target.value; };
     modal.querySelector("#applyset").onclick = () => {
       if (!adultConfirmPacks(d.packIds)) return;
+      state.settingsSavePending = true;
       send({ type: "settings", settings: {
         boardSize: d.boardSize, packIds: d.packIds, turnSeconds: d.turnSeconds,
         assassins: d.assassins, customWords: d.customWords,
         houseRules: d.houseRules, devMode: d.devMode,
       } });
-      state.settingsOpen = false;
-      toast("Setup saved", "ok");
-      renderRoom();
+      toast("Saving setup…", "");
     };
 
     scrim.appendChild(modal);

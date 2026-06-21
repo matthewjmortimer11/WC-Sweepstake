@@ -34,6 +34,7 @@ from .manager import (
     _clean_name,
     clamp_timer,
     ensure_dev_bots,
+    ensure_dev_host_playing,
     manager,
     remove_dev_bots,
 )
@@ -425,10 +426,13 @@ async def _dispatch(room, player, mtype: str, msg: dict) -> bool:
     if mtype == "start" or mtype == "newGame":
         if not player.is_host:
             raise MoveError("Only the host can start the game.")
+        if game.status == "playing":
+            raise MoveError("A game is already in progress.")
         if "settings" in msg:
             room.settings = _build_settings(msg["settings"], room.settings)
             game.settings = room.settings
         if room.settings.dev_mode:
+            ensure_dev_host_playing(room)
             ensure_dev_bots(room)
         _validate_teams(room)
         game.settings = room.settings
@@ -442,6 +446,7 @@ async def _dispatch(room, player, mtype: str, msg: dict) -> bool:
         if game.status != "ended":
             raise MoveError("The game hasn't ended yet.")
         if room.settings.dev_mode:
+            ensure_dev_host_playing(room)
             ensure_dev_bots(room)
         _validate_teams(room)
         game.new_round(_words_pool(room.settings))
