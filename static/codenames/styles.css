@@ -184,16 +184,16 @@ h1, h2, h3 { margin: 0; font-family: var(--head); font-weight: 600; line-height:
 .btn:active { transform: translateY(4px); box-shadow: 0 0 0 var(--edge), var(--hard-sm); }
 .btn:focus-visible { outline: none; box-shadow: var(--ring); }
 .btn[disabled] { opacity: 0.45; cursor: not-allowed; transform: none; box-shadow: 0 4px 0 var(--edge); filter: saturate(0.6); }
-.btn--primary { background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 88%, #fff) 0%, var(--accent) 100%); color: var(--accent-ink); box-shadow: 0 4px 0 var(--accent-2), 0 10px 24px -10px color-mix(in srgb, var(--accent) 70%, transparent); }
-.btn--primary:active { box-shadow: 0 0 0 var(--accent-2), 0 6px 16px -10px color-mix(in srgb, var(--accent) 70%, transparent); }
-.btn--ghost { background: transparent; box-shadow: none; border: 2px solid var(--line-strong); }
+.btn--primary { background: var(--accent); color: var(--accent-ink); box-shadow: 0 3px 0 var(--accent-2), var(--hard-sm); }
+.btn--primary:active { box-shadow: 0 0 0 var(--accent-2); }
+.btn--ghost { background: transparent; box-shadow: none; border: 1.5px solid var(--line-strong); }
 .btn--ghost:hover { box-shadow: none; border-color: var(--accent); }
 .btn--ghost:active { transform: translateY(2px); box-shadow: none; }
 .btn--lg { padding: 0.95em 1.7em; font-size: 1.08rem; border-radius: var(--radius); }
 .btn--block { width: 100%; justify-content: center; }
-.btn--red { background: linear-gradient(180deg, color-mix(in srgb, var(--red) 86%, #fff) 0%, var(--red) 100%); color: var(--red-ink); box-shadow: 0 4px 0 var(--red-deep), 0 10px 24px -12px color-mix(in srgb, var(--red) 70%, transparent); }
+.btn--red { background: var(--red); color: var(--red-ink); box-shadow: 0 3px 0 var(--red-deep), var(--hard-sm); }
 .btn--red:active { box-shadow: 0 0 0 var(--red-deep); }
-.btn--blue { background: linear-gradient(180deg, color-mix(in srgb, var(--blue) 86%, #fff) 0%, var(--blue) 100%); color: var(--blue-ink); box-shadow: 0 4px 0 var(--blue-deep), 0 10px 24px -12px color-mix(in srgb, var(--blue) 70%, transparent); }
+.btn--blue { background: var(--blue); color: var(--blue-ink); box-shadow: 0 3px 0 var(--blue-deep), var(--hard-sm); }
 .btn--blue:active { box-shadow: 0 0 0 var(--blue-deep); }
 .btn--danger { color: var(--danger); }
 .btn--sm { padding: 0.46em 0.85em; font-size: 0.82rem; box-shadow: 0 3px 0 var(--edge); border-radius: 10px; }
@@ -362,8 +362,8 @@ textarea.input { resize: vertical; min-height: 92px; font-size: 0.92rem; }
 .room-code.copied { color: var(--good); }
 
 .conn { display: inline-flex; align-items: center; gap: 7px; font-family: var(--head); font-size: 0.74rem; font-weight: 600; letter-spacing: 0.04em; color: var(--ink-3); text-transform: uppercase; }
-.conn .dot { background: var(--good); box-shadow: 0 0 10px var(--good); }
-.conn.bad .dot { background: var(--danger); box-shadow: 0 0 10px var(--danger); animation: pulse 1s steps(2) infinite; }
+.conn .dot { background: var(--good); }
+.conn.bad .dot { background: var(--danger); animation: pulse 1s steps(2) infinite; }
 
 /* ── Scoreboard ──────────────────────────────────────────────────────────── */
 .mission-status::before {
@@ -542,7 +542,7 @@ textarea.input { resize: vertical; min-height: 92px; font-size: 0.92rem; }
 .cardx.key-red {
   background: var(--red);
   color: var(--red-ink);
-  box-shadow: 0 5px 0 var(--red-deep), 0 10px 20px -10px color-mix(in srgb, var(--red) 60%, transparent), inset 0 1px 0 rgba(255, 255, 255, 0.22);
+  box-shadow: 0 5px 0 var(--red-deep), 0 8px 16px -10px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.22);
 }
 .cardx.key-red .word { color: var(--red-ink); text-shadow: 0 1px 1px rgba(0, 0, 0, 0.28); }
 .cardx.key-red .cardx__ref { color: rgba(255, 235, 240, 0.7); }
@@ -550,7 +550,7 @@ textarea.input { resize: vertical; min-height: 92px; font-size: 0.92rem; }
 .cardx.key-blue {
   background: var(--blue);
   color: var(--blue-ink);
-  box-shadow: 0 5px 0 var(--blue-deep), 0 10px 20px -10px color-mix(in srgb, var(--blue) 60%, transparent), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+  box-shadow: 0 5px 0 var(--blue-deep), 0 8px 16px -10px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.35);
 }
 .cardx.key-blue .word { color: var(--blue-ink); text-shadow: 0 1px 1px rgba(255, 255, 255, 0.25); }
 .cardx.key-blue .cardx__ref { color: rgba(4, 40, 43, 0.55); }
@@ -566,9 +566,9 @@ textarea.input { resize: vertical; min-height: 92px; font-size: 0.92rem; }
 .cardx.key-assassin {
   background: linear-gradient(160deg, #2a2436 0%, #100c16 55%, #050407 100%);
   color: #ffd9df;
-  box-shadow: 0 4px 0 #000, 0 0 0 2px color-mix(in srgb, var(--red) 45%, transparent), 0 12px 28px -10px color-mix(in srgb, var(--red) 55%, transparent), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  box-shadow: 0 4px 0 #000, 0 0 0 1.5px color-mix(in srgb, var(--red) 32%, transparent), 0 10px 22px -12px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
-.cardx.key-assassin .word { color: #ffe7eb; text-shadow: 0 0 12px rgba(251, 80, 113, 0.5); }
+.cardx.key-assassin .word { color: #ffe7eb; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6); }
 .cardx.key-assassin .cardx__ref { color: rgba(255, 200, 210, 0.45); }
 
 .cardx.key-red .cardx__mark,
@@ -607,7 +607,7 @@ textarea.input { resize: vertical; min-height: 92px; font-size: 0.92rem; }
   box-shadow: 0 4px 0 var(--card-paper-shadow), 0 0 0 2.5px color-mix(in srgb, var(--accent) 55%, transparent), 0 8px 16px -8px rgba(0, 0, 0, 0.4);
 }
 .cardx--near-mine {
-  box-shadow: 0 5px 0 var(--card-paper-shadow), 0 0 0 3px var(--accent), 0 8px 22px -8px color-mix(in srgb, var(--accent) 60%, transparent);
+  box-shadow: 0 5px 0 var(--card-paper-shadow), 0 0 0 3px var(--accent), 0 8px 18px -8px rgba(0, 0, 0, 0.4);
   background: color-mix(in srgb, var(--accent) 9%, var(--card-paper));
 }
 .cardx--taken {
@@ -617,7 +617,7 @@ textarea.input { resize: vertical; min-height: 92px; font-size: 0.92rem; }
 }
 .cardx--taken .word { opacity: 0.72; }
 .cardx--pending {
-  box-shadow: 0 0 0 3.5px var(--accent), 0 14px 30px -10px color-mix(in srgb, var(--accent) 70%, transparent), 0 4px 0 var(--accent-2);
+  box-shadow: 0 0 0 3px var(--accent), 0 14px 30px -12px rgba(0, 0, 0, 0.5), 0 4px 0 var(--accent-2);
   transform: translateY(-3px) scale(1.05);
   z-index: 3;
 }
@@ -667,11 +667,11 @@ textarea.input { resize: vertical; min-height: 92px; font-size: 0.92rem; }
 
 /* Revealed — color floods in with a satisfying pop */
 .cardx.revealed { cursor: default; box-shadow: 0 4px 0 rgba(0, 0, 0, 0.35), 0 10px 22px -10px rgba(0, 0, 0, 0.5); }
-.cardx.kind-red { background: var(--red); color: var(--red-ink); box-shadow: 0 4px 0 var(--red-deep), 0 8px 18px -10px color-mix(in srgb, var(--red) 60%, transparent); }
-.cardx.kind-blue { background: var(--blue); color: var(--blue-ink); box-shadow: 0 4px 0 var(--blue-deep), 0 8px 18px -10px color-mix(in srgb, var(--blue) 60%, transparent); }
+.cardx.kind-red { background: var(--red); color: var(--red-ink); box-shadow: 0 4px 0 var(--red-deep), 0 8px 18px -10px rgba(0, 0, 0, 0.4); }
+.cardx.kind-blue { background: var(--blue); color: var(--blue-ink); box-shadow: 0 4px 0 var(--blue-deep), 0 8px 18px -10px rgba(0, 0, 0, 0.4); }
 .cardx.kind-neutral { background: var(--neutral); color: var(--neutral-ink); box-shadow: 0 4px 0 var(--neutral-deep), 0 8px 18px -12px rgba(0, 0, 0, 0.3); }
-.cardx.kind-assassin { background: radial-gradient(120% 120% at 50% 0%, #2a2436 0%, #0a0810 55%, #050407 100%); color: #ffd9df; box-shadow: 0 4px 0 #000, 0 0 0 2px color-mix(in srgb, var(--red) 40%, transparent), 0 14px 30px -8px color-mix(in srgb, var(--red) 50%, transparent); }
-.cardx.kind-assassin .word { color: #ffe7eb; text-shadow: 0 0 14px rgba(251, 80, 113, 0.55); }
+.cardx.kind-assassin { background: radial-gradient(120% 120% at 50% 0%, #2a2436 0%, #0a0810 55%, #050407 100%); color: #ffd9df; box-shadow: 0 4px 0 #000, 0 0 0 1.5px color-mix(in srgb, var(--red) 30%, transparent), 0 12px 26px -12px rgba(0, 0, 0, 0.6); }
+.cardx.kind-assassin .word { color: #ffe7eb; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6); }
 .cardx.kind-assassin .cardx__mark { color: var(--red); }
 .cardx.kind-red .word, .cardx.kind-blue .word { text-shadow: 0 1px 1px rgba(0, 0, 0, 0.18); }
 
