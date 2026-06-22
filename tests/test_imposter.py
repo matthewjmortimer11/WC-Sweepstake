@@ -53,6 +53,9 @@ def test_charades_mode_present(client):
     # Score counter: who-guessed picker awards points to actor + guesser.
     for marker in ("Who guessed it", "Nobody got it", "awardCharade", "charadesScores"):
         assert marker in t, f"missing Charades score marker: {marker!r}"
+    # Optional acting timer.
+    for marker in ("Acting timer (optional)", "armCharadeTimer", "Time's up", "timerSecs"):
+        assert marker in t, f"missing Charades timer marker: {marker!r}"
 
 
 def test_imposter_is_local_only_no_api(client):
