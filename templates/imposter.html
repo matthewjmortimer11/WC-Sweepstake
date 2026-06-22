@@ -74,7 +74,23 @@
       padding:.3em .6em;border-radius:var(--radius);width:100%}
     .role.imposter{color:#fff;background:linear-gradient(180deg,var(--imposter),var(--imposter-deep))}
     .role.safe{color:var(--safe-deep);background:rgba(33,212,207,.14);border:2px solid var(--safe)}
+    .role.celeb{color:var(--accent-ink);background:linear-gradient(180deg,var(--accent),var(--accent-2));
+      font-size:clamp(1.7rem,8.5vw,2.8rem);line-height:1.1}
+    .role-cap{letter-spacing:.14em;text-transform:uppercase;font-weight:800}
     .role-sub{color:var(--ink-2);font-size:.95rem;line-height:1.5;margin:0;max-width:34ch}
+    /* Mode selector */
+    .modes{display:flex;gap:8px;background:#0a0a08;border:1.5px solid var(--line-strong);
+      border-radius:var(--radius-sm);padding:5px}
+    .mode-opt{flex:1;appearance:none;border:0;background:transparent;color:var(--ink-2);cursor:pointer;
+      font:inherit;font-weight:800;font-family:var(--head);padding:.7em .6em;border-radius:10px;
+      transition:.14s var(--ease);font-size:.92rem}
+    .mode-opt.on{background:var(--accent);color:var(--accent-ink);box-shadow:0 3px 0 var(--accent-2)}
+    .mode-opt:focus-visible{outline:none;box-shadow:0 0 0 3px var(--bg),0 0 0 6px var(--accent)}
+    /* Reveal-the-answer box (celebrity mode) */
+    .answer{background:var(--panel-2);border:1px solid var(--line);border-radius:var(--radius-sm);
+      padding:14px 16px;text-align:center;display:grid;gap:4px}
+    .answer__line{margin:0;line-height:1.5}
+    .answer__line b{color:var(--accent)}
     .foot{margin-top:auto;text-align:center;color:var(--ink-3);font-size:.78rem;font-family:var(--head);font-weight:600}
     @media (prefers-reduced-motion:reduce){*{transition-duration:.05ms!important}}
   </style>
@@ -97,11 +113,39 @@
     // ── client-side state (the useState equivalent) ──────────────────────────
     const state = {
       screen: "setup",                 // setup | select | reveal
+      mode: "classic",                 // classic | celebrity
       names: ["Player 1", "Player 2", "Player 3", "Player 4"],
-      imposter: -1,                    // index of the imposter
+      imposter: -1,                    // index of the imposter / odd-one-out
+      celebs: [],                      // celebrity mode: a name per player
+      commonCeleb: "",                 // the celeb three players share
+      oddCeleb: "",                    // the different celeb the odd one gets
+      revealAnswer: false,             // celebrity mode: show who was different
       viewed: [],                      // indices that have peeked this round
       current: -1,                     // index being revealed
     };
+
+    // Recognisable, fun-to-dance celebrities (kept family-friendly).
+    const CELEBS = [
+      "Beyoncé", "Michael Jackson", "Freddie Mercury", "Elvis Presley",
+      "Lady Gaga", "Mick Jagger", "Tina Turner", "Madonna", "Prince",
+      "Bruno Mars", "Rihanna", "Dua Lipa", "Harry Styles", "Taylor Swift",
+      "Britney Spears", "James Brown", "Shakira", "Elton John", "Dolly Parton",
+      "Stevie Wonder", "Lizzo", "Usher", "Justin Timberlake", "Adele",
+      "Cardi B", "Snoop Dogg", "Billie Eilish", "Ariana Grande", "Post Malone",
+      "Gordon Ramsay", "David Attenborough", "Mr Bean", "Austin Powers",
+      "Napoleon Dynamite", "Borat", "Forrest Gump", "Jack Sparrow",
+    ];
+    const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+
+    function dealCelebs(oddIndex) {
+      // Two distinct celebs: three players share one, the odd one gets the other.
+      const common = pick(CELEBS);
+      let odd = common;
+      while (odd === common) odd = pick(CELEBS);
+      state.commonCeleb = common;
+      state.oddCeleb = odd;
+      state.celebs = state.names.map((_, i) => (i === oddIndex ? odd : common));
+    }
 
     const el = (tag, attrs = {}, kids = []) => {
       const n = document.createElement(tag);
@@ -116,19 +160,23 @@
     };
 
     function startGame() {
-      // Randomly assign exactly one imposter; the other three are NOT IMPOSTER.
+      // Randomly pick the odd-one-out (imposter / different celeb).
       state.imposter = Math.floor(Math.random() * 4);
+      if (state.mode === "celebrity") dealCelebs(state.imposter);
       state.viewed = [];
+      state.revealAnswer = false;
       state.screen = "select";
       render();
     }
 
     function newRound() {
-      // Reshuffle the imposter, keep the same names.
+      // Reshuffle the odd-one-out (a different player each round) — keep names.
       const prev = state.imposter;
       do { state.imposter = Math.floor(Math.random() * 4); }
-      while (state.imposter === prev);     // a different player each round (4 players)
+      while (state.imposter === prev);
+      if (state.mode === "celebrity") dealCelebs(state.imposter);
       state.viewed = [];
+      state.revealAnswer = false;
       state.screen = "select";
       render();
     }
@@ -145,10 +193,24 @@
           }),
         ])
       );
+      const modeBtn = (id, label) => el("button", {
+        class: "mode-opt" + (state.mode === id ? " on" : ""),
+        "aria-pressed": state.mode === id ? "true" : "false",
+        onclick: () => { state.mode = id; render(); },
+      }, [el("span", { text: label })]);
+
+      const lede = state.mode === "celebrity"
+        ? "Four players, one phone. Everyone gets the same celebrity — except one. Check yours, then dance like them (accent or impression optional, but mainly dance). Spot the odd one out."
+        : "Four players, one phone. Enter names, then pass it around so everyone can secretly check their role.";
+
       return el("div", { class: "panel" }, [
         el("span", { class: "eyebrow", text: "Setup" }),
         el("h1", {}, [document.createTextNode("Who's "), el("span", { class: "em", text: "in?" })]),
-        el("p", { class: "lede", text: "Four players, one phone. Enter names, then pass it around so everyone can secretly check their role." }),
+        el("div", { class: "modes", role: "group", "aria-label": "Game mode" }, [
+          modeBtn("classic", "🕵️ Imposter"),
+          modeBtn("celebrity", "💃 Celebrity Dance"),
+        ]),
+        el("p", { class: "lede", text: lede }),
         el("div", { class: "names" }, inputs),
         el("button", {
           class: "btn btn--primary btn--lg btn--block", text: "Start game →",
@@ -175,11 +237,35 @@
           ]);
         })
       );
+      const celeb = state.mode === "celebrity";
+      const readyNote = celeb
+        ? "Everyone's seen their star. Dance! Then vote for the odd one out."
+        : "Everyone's seen their role. Time to find the imposter.";
+
+      // Celebrity mode lets the group reveal who had the different celeb.
+      let answer = null;
+      if (celeb && state.revealAnswer) {
+        answer = el("div", { class: "answer" }, [
+          el("p", { class: "answer__line" }, [
+            el("b", { text: state.names[state.imposter] }),
+            document.createTextNode(" was the odd one out — they had "),
+            el("b", { text: state.oddCeleb }),
+            document.createTextNode("."),
+          ]),
+          el("p", { class: "answer__line tiny muted", text: "Everyone else: " + state.commonCeleb + "." }),
+        ]);
+      }
+
       return el("div", { class: "panel" }, [
         el("span", { class: "eyebrow", text: "Pass the phone" }),
         el("p", { class: "note", text: "Only click your own name. No peeking." }),
         grid,
-        allViewed ? el("p", { class: "note", text: "Everyone's seen their role. Time to find the imposter." }) : null,
+        allViewed ? el("p", { class: "note", text: readyNote }) : null,
+        answer,
+        (celeb && allViewed && !state.revealAnswer)
+          ? el("button", { class: "btn btn--block", text: "Reveal the odd one out",
+              onclick: () => { state.revealAnswer = true; render(); } })
+          : null,
         el("div", { class: "row" }, [
           el("button", { class: "btn btn--ghost", text: "New round", onclick: newRound }),
           el("button", { class: "btn btn--ghost", text: "Edit names", onclick: () => { state.screen = "setup"; render(); } }),
@@ -189,6 +275,31 @@
 
     function revealScreen() {
       const i = state.current;
+      const hideBtn = el("button", {
+        class: "btn btn--primary btn--lg btn--block",
+        text: state.mode === "celebrity" ? "Hide" : "Hide role",
+        onclick: () => {
+          if (!state.viewed.includes(i)) state.viewed.push(i);
+          state.current = -1;
+          state.screen = "select";
+          render();
+        },
+      });
+
+      if (state.mode === "celebrity") {
+        // Same look for everyone — you only see your own celeb, never whether
+        // it's the shared one or the odd one. That's the whole game.
+        return el("div", { class: "panel" }, [
+          el("div", { class: "reveal" }, [
+            el("span", { class: "who", text: state.names[i] }),
+            el("span", { class: "role-cap tiny muted", text: "Your celebrity" }),
+            el("div", { class: "role celeb", text: state.celebs[i] }),
+            el("p", { class: "role-sub", text: "Dance like them. Accent or impression optional — but mainly dance." }),
+            hideBtn,
+          ]),
+        ]);
+      }
+
       const isImposter = i === state.imposter;
       return el("div", { class: "panel" }, [
         el("div", { class: "reveal" }, [
@@ -197,15 +308,7 @@
           el("p", { class: "role-sub", text: isImposter
             ? "Blend in. Don't get caught."
             : "Work out who the imposter is." }),
-          el("button", {
-            class: "btn btn--primary btn--lg btn--block", text: "Hide role",
-            onclick: () => {
-              if (!state.viewed.includes(i)) state.viewed.push(i);
-              state.current = -1;
-              state.screen = "select";
-              render();
-            },
-          }),
+          hideBtn,
         ]),
       ]);
     }
