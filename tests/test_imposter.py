@@ -50,6 +50,9 @@ def test_charades_mode_present(client):
         assert marker in t, f"missing Charades marker: {marker!r}"
     # Charades reuses the celebrity pool as prompts.
     assert "pickCharade" in t and "CELEBS" in t
+    # Score counter: who-guessed picker awards points to actor + guesser.
+    for marker in ("Who guessed it", "Nobody got it", "awardCharade", "charadesScores"):
+        assert marker in t, f"missing Charades score marker: {marker!r}"
 
 
 def test_imposter_is_local_only_no_api(client):
