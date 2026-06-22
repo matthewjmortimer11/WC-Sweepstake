@@ -30,6 +30,17 @@ def test_imposter_page_has_game_surface(client):
         assert marker in t, f"missing UI marker: {marker!r}"
 
 
+def test_celebrity_dance_mode_present(client):
+    t = client.get("/imposter").text
+    for marker in (
+        "Celebrity Dance", "Your celebrity",
+        "mainly dance", "Reveal the odd one out",
+    ):
+        assert marker in t, f"missing Celebrity Dance marker: {marker!r}"
+    # The celebrity pool ships with the page (local-only, no API).
+    assert "CELEBS" in t and "Beyoncé" in t
+
+
 def test_imposter_is_local_only_no_api(client):
     # The page must not call back to a server: no fetch/websocket/api endpoints.
     t = client.get("/imposter").text.lower()
