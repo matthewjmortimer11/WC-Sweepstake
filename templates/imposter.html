@@ -76,14 +76,20 @@
     .role.safe{color:var(--safe-deep);background:rgba(33,212,207,.14);border:2px solid var(--safe)}
     .role.celeb{color:var(--accent-ink);background:linear-gradient(180deg,var(--accent),var(--accent-2));
       font-size:clamp(1.7rem,8.5vw,2.8rem);line-height:1.1}
+    .role.charade{color:#fff;background:linear-gradient(180deg,#8b6df0,#5b3fc0);
+      font-size:clamp(1.7rem,8.5vw,2.8rem);line-height:1.1}
     .role-cap{letter-spacing:.14em;text-transform:uppercase;font-weight:800}
+    .turn-card{background:var(--panel-2);border:1px solid var(--line);border-radius:var(--radius-sm);
+      padding:18px;text-align:center;display:grid;gap:6px}
+    .turn-card__cap{letter-spacing:.14em;text-transform:uppercase;font-weight:800}
+    .turn-name{font-family:var(--head);font-weight:600;font-size:clamp(1.8rem,9vw,2.6rem);color:var(--ink);word-break:break-word}
     .role-sub{color:var(--ink-2);font-size:.95rem;line-height:1.5;margin:0;max-width:34ch}
     /* Mode selector */
-    .modes{display:flex;gap:8px;background:#0a0a08;border:1.5px solid var(--line-strong);
-      border-radius:var(--radius-sm);padding:5px}
-    .mode-opt{flex:1;appearance:none;border:0;background:transparent;color:var(--ink-2);cursor:pointer;
-      font:inherit;font-weight:800;font-family:var(--head);padding:.7em .6em;border-radius:10px;
-      transition:.14s var(--ease);font-size:.92rem}
+    .modes{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;background:#0a0a08;
+      border:1.5px solid var(--line-strong);border-radius:var(--radius-sm);padding:5px}
+    .mode-opt{appearance:none;border:0;background:transparent;color:var(--ink-2);cursor:pointer;
+      font:inherit;font-weight:800;font-family:var(--head);padding:.6em .35em;border-radius:10px;
+      transition:.14s var(--ease);font-size:.82rem;line-height:1.15;white-space:normal}
     .mode-opt.on{background:var(--accent);color:var(--accent-ink);box-shadow:0 3px 0 var(--accent-2)}
     .mode-opt:focus-visible{outline:none;box-shadow:0 0 0 3px var(--bg),0 0 0 6px var(--accent)}
     /* Reveal-the-answer box (celebrity mode) */
@@ -122,6 +128,8 @@
       revealAnswer: false,             // celebrity mode: show who was different
       viewed: [],                      // indices that have peeked this round
       current: -1,                     // index being revealed
+      charadesActor: 0,                // charades: whose turn it is to act
+      charadesWord: "",                // charades: the celebrity to act out (reused pool)
     };
 
     // Recognisable, fun-to-dance celebrities (kept family-friendly). A mix of
@@ -203,7 +211,23 @@
       return n;
     };
 
+    // Charades reuses the celebrity pool as the prompts to act out.
+    function pickCharade() {
+      const prev = state.charadesWord;
+      let next = pick(CELEBS);
+      while (next === prev && CELEBS.length > 1) next = pick(CELEBS);
+      state.charadesWord = next;
+    }
+
     function startGame() {
+      if (state.mode === "charades") {
+        state.charadesActor = Math.floor(Math.random() * state.names.length);
+        state.charadesWord = "";
+        pickCharade();
+        state.screen = "select";
+        render();
+        return;
+      }
       // Randomly pick the odd-one-out (imposter / different celeb).
       state.imposter = Math.floor(Math.random() * 4);
       if (state.mode === "celebrity") dealCelebs(state.imposter);
@@ -214,6 +238,7 @@
     }
 
     function newRound() {
+      if (state.mode === "charades") { startGame(); return; }
       // Reshuffle the odd-one-out (a different player each round) — keep names.
       const prev = state.imposter;
       do { state.imposter = Math.floor(Math.random() * 4); }
@@ -221,6 +246,13 @@
       if (state.mode === "celebrity") dealCelebs(state.imposter);
       state.viewed = [];
       state.revealAnswer = false;
+      state.screen = "select";
+      render();
+    }
+
+    function nextCharadesPlayer() {
+      state.charadesActor = (state.charadesActor + 1) % state.names.length;
+      pickCharade();
       state.screen = "select";
       render();
     }
@@ -245,6 +277,8 @@
 
       const lede = state.mode === "celebrity"
         ? "Four players, one phone. Everyone gets the same celebrity — except one. Check yours, then dance like them (accent or impression optional, but mainly dance). Spot the odd one out."
+        : state.mode === "charades"
+        ? "One phone, taking turns. Each round one person gets a celebrity to act out (no talking, no pointing at words) while everyone else guesses. Tap “Next player” to pass it on."
         : "Four players, one phone. Enter names, then pass it around so everyone can secretly check their role.";
 
       return el("div", { class: "panel" }, [
@@ -253,6 +287,7 @@
         el("div", { class: "modes", role: "group", "aria-label": "Game mode" }, [
           modeBtn("classic", "🕵️ Imposter"),
           modeBtn("celebrity", "💃 Celebrity Dance"),
+          modeBtn("charades", "🎭 Charades"),
         ]),
         el("p", { class: "lede", text: lede }),
         el("div", { class: "names" }, inputs),
@@ -268,6 +303,25 @@
     }
 
     function selectScreen() {
+      if (state.mode === "charades") {
+        return el("div", { class: "panel" }, [
+          el("span", { class: "eyebrow", text: "Charades" }),
+          el("p", { class: "note", text: "Everyone else: guess the celebrity being acted out." }),
+          el("div", { class: "turn-card" }, [
+            el("span", { class: "turn-card__cap tiny muted", text: "Up to act" }),
+            el("div", { class: "turn-name", text: state.names[state.charadesActor] }),
+          ]),
+          el("button", {
+            class: "btn btn--primary btn--lg btn--block", text: "Reveal charade →",
+            onclick: () => { state.screen = "reveal"; render(); },
+          }),
+          el("div", { class: "row" }, [
+            el("button", { class: "btn btn--ghost", text: "New game", onclick: newRound }),
+            el("button", { class: "btn btn--ghost", text: "Edit names", onclick: () => { state.screen = "setup"; render(); } }),
+          ]),
+        ]);
+      }
+
       const allViewed = state.viewed.length >= 4;
       const grid = el("div", { class: "pick-grid" },
         state.names.map((name, i) => {
@@ -318,6 +372,22 @@
     }
 
     function revealScreen() {
+      if (state.mode === "charades") {
+        // The actor sees the celebrity to mime; nobody else should look.
+        return el("div", { class: "panel" }, [
+          el("div", { class: "reveal" }, [
+            el("span", { class: "who", text: state.names[state.charadesActor] + " — your charade" }),
+            el("span", { class: "role-cap tiny muted", text: "Act this out" }),
+            el("div", { class: "role charade", text: state.charadesWord }),
+            el("p", { class: "role-sub", text: "No talking, no pointing at words — mime it. Others guess." }),
+            el("div", { class: "row" }, [
+              el("button", { class: "btn btn--ghost", text: "Different", onclick: () => { pickCharade(); render(); } }),
+              el("button", { class: "btn btn--primary", text: "Next player →", onclick: nextCharadesPlayer }),
+            ]),
+          ]),
+        ]);
+      }
+
       const i = state.current;
       const hideBtn = el("button", {
         class: "btn btn--primary btn--lg btn--block",

@@ -41,6 +41,17 @@ def test_celebrity_dance_mode_present(client):
     assert "CELEBS" in t and "Beyoncé" in t
 
 
+def test_charades_mode_present(client):
+    t = client.get("/imposter").text
+    for marker in (
+        "Charades", "Reveal charade", "Next player",
+        "No talking, no pointing", "Up to act",
+    ):
+        assert marker in t, f"missing Charades marker: {marker!r}"
+    # Charades reuses the celebrity pool as prompts.
+    assert "pickCharade" in t and "CELEBS" in t
+
+
 def test_imposter_is_local_only_no_api(client):
     # The page must not call back to a server: no fetch/websocket/api endpoints.
     t = client.get("/imposter").text.lower()
