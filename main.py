@@ -1057,6 +1057,15 @@ async def welcome_page():
     return HTMLResponse(content=path.read_text(encoding="utf-8"))
 
 
+@app.get("/imposter", response_class=HTMLResponse)
+async def imposter_page():
+    """Imposter — a self-contained, local-only 4-player party game (no backend)."""
+    path = Path("templates/imposter.html")
+    if not path.is_file():
+        raise HTTPException(status_code=404, detail="not found")
+    return HTMLResponse(content=path.read_text(encoding="utf-8"))
+
+
 def _public_base(request: Request) -> str:
     return str(request.base_url).rstrip("/")
 

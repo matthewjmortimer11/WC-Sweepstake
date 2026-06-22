@@ -1,0 +1,44 @@
+"""The local-only Imposter party game page (/imposter)."""
+
+import pytest
+from starlette.testclient import TestClient
+
+import main
+
+
+@pytest.fixture
+def client():
+    with TestClient(main.app) as c:
+        yield c
+
+
+def test_imposter_page_served(client):
+    r = client.get("/imposter")
+    assert r.status_code == 200
+    assert "text/html" in r.headers.get("content-type", "")
+
+
+def test_imposter_page_has_game_surface(client):
+    t = client.get("/imposter").text
+    # Setup, role-selection and reveal copy required by the spec.
+    for marker in (
+        "Player 1", "Player 4", "Start game",
+        "Only click your own name. No peeking.",
+        "IMPOSTER", "NOT IMPOSTER",
+        "Hide role", "New round", "Edit names",
+    ):
+        assert marker in t, f"missing UI marker: {marker!r}"
+
+
+def test_imposter_is_local_only_no_api(client):
+    # The page must not call back to a server: no fetch/websocket/api endpoints.
+    t = client.get("/imposter").text.lower()
+    assert "fetch(" not in t
+    assert "websocket" not in t
+    assert "/api/" not in t
+
+
+def test_existing_routes_unaffected(client):
+    assert client.get("/").status_code == 200
+    assert client.get("/welcome").status_code == 200
+    assert client.get("/play").status_code == 200
