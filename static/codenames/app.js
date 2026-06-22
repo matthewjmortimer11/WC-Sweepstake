@@ -1409,19 +1409,20 @@
 
   function cardWordSpan(word, isEmoji, cols) {
     const text = String(word == null ? "" : word).trim();
-    const n = Number(cols) || 5;
     if (isEmoji) {
-      const em = Math.min(1.7, Math.max(1, (n <= 4 ? 1.15 : 1) * 1.35));
-      return `<span class="word word--emoji" style="font-size:${em.toFixed(2)}rem">${esc(word)}</span>`;
+      return `<span class="word word--emoji">${esc(word)}</span>`;
     }
     if (!/[\s-]/.test(text)) {
+      // Single word: pass the character count so the CSS container-query rule
+      // (.word--single) can size it to fit the card. Do NOT set an inline
+      // font-size here — it would override that responsive sizing and clip
+      // long codewords like "Shakespeare" or "Helicopter".
       const chars = Math.max(text.length, 1);
-      const colScale = n >= 6 ? 0.86 : n <= 4 ? 1.06 : 1;
-      const size = Math.min(0.74 * colScale, Math.max(0.42 * colScale, (4.6 * colScale) / chars));
-      return `<span class="word word--single" style="--word-chars:${chars};font-size:${size.toFixed(3)}rem">${esc(word)}</span>`;
+      return `<span class="word word--single" style="--word-chars:${chars}">${esc(word)}</span>`;
     }
-    const multi = Math.min(0.7, 0.58 + (n <= 4 ? 0.06 : 0));
-    return `<span class="word word--multi" style="font-size:${multi.toFixed(3)}rem">${esc(word)}</span>`;
+    // Multi-word / hyphenated: CSS (.word--multi) wraps to two lines and sizes
+    // to the card width.
+    return `<span class="word word--multi">${esc(word)}</span>`;
   }
 
   function nearMarksForCard(nearPicks, index) {
@@ -2061,7 +2062,9 @@
   }
 
   function missionTrailMarkup(log) {
-    const items = (log || []).filter((l) => l.t === "clue" || l.t === "guess").slice(-12);
+    // Keep the most recent 12 and show newest first, so the latest move is at
+    // the start of the trail instead of scrolled off the end.
+    const items = (log || []).filter((l) => l.t === "clue" || l.t === "guess").slice(-12).reverse();
     if (!items.length) {
       return `<p class="mission-panel__trail-empty tiny muted">Recent clues and guesses show up here.</p>`;
     }
