@@ -1138,10 +1138,10 @@
         </div>
 
         <div class="home__hero">
-          <span class="eyebrow">Wheesht · Cipher · planning-room word-spy</span>
-          <h1>Two teams. One clue.<br/>Find your agents on a <span class="grad">classified map</span>.</h1>
-          <p class="hero-kicker">The free online word game — like Codenames, but you run the op.</p>
-          <p class="lede">Spread out around the planning table: <b>Field Crew</b> vs <b>The Desk</b>. One spymaster gives a single-word clue and a number; teammates guess which index cards are theirs. Hit every agent before the other side — or the assassin — ends the mission. Custom word packs, private rooms, no install.</p>
+          <span class="eyebrow">Cipher — a Wheesht word game</span>
+          <h1>Two teams. One clue.<br/>Find your agents on the <span class="grad">board</span>.</h1>
+          <p class="hero-kicker">A free online word game, in the spirit of Codenames.</p>
+          <p class="lede">Two teams — <b>Field Crew</b> and <b>The Desk</b> — share one grid of word cards. Each team's spymaster gives a single-word clue and a number, and their teammates work out which cards are theirs. Reveal all your agents before the other side does, and never touch the assassin. Custom word packs, private rooms, nothing to install.</p>
         </div>
 
         ${pwaInstallBanner()}
@@ -1150,20 +1150,20 @@
 
         <div class="home__actions">
           <div class="panel action-card">
-            <h3>🚀 Start a new game</h3>
-            <p class="muted tiny">Pick a vibe, create a private room, invite your crew with a 4-letter code.</p>
+            <h3>Start a new game</h3>
+            <p class="muted tiny">Create a private room and share the four-letter code with your group.</p>
             <div class="field">
               <label for="name1">Your nickname</label>
               <input class="input" id="name1" maxlength="24" placeholder="Agent…" value="${esc(getName())}" />
             </div>
             <button class="btn btn--primary btn--lg btn--block" id="create">Create game →</button>
-            <button class="btn btn--lg btn--block mode-dark" id="create-dark">🔞 After Dark game</button>
-            <button class="btn btn--lg btn--block mode-toofar" id="create-toofar">💀 Too Far game</button>
-            <p class="tiny muted" style="text-align:center; margin:0">Standard is family-friendly · After Dark is crude &amp; 18+ · Too Far is genuinely awful</p>
+            <button class="btn btn--lg btn--block mode-dark" id="create-dark">After Dark · 18+</button>
+            <button class="btn btn--lg btn--block mode-toofar" id="create-toofar">Too Far · 18+</button>
+            <p class="tiny muted" style="text-align:center; margin:0">Standard is family-friendly. After Dark is crude. Too Far is deliberately offensive.</p>
           </div>
           <div class="panel action-card">
-            <h3>🔑 Join with a code</h3>
-            <p class="muted tiny">Got a room code from a friend? Drop in here.</p>
+            <h3>Join with a code</h3>
+            <p class="muted tiny">Enter the room code a friend shared with you.</p>
             <div class="field">
               <label for="name2">Your name</label>
               <input class="input" id="name2" maxlength="24" placeholder="Agent…" value="${esc(getName())}" />
@@ -1184,20 +1184,20 @@
         <div id="social-mount"></div>
 
         <div class="panel">
-          <span class="eyebrow">Why it's more fun</span>
+          <span class="eyebrow">Built for game night</span>
           <div class="features" style="margin-top:14px">
-            <div class="feature"><span class="ico">🎛️</span><h4>Fully customisable</h4><p>4×4, 5×5 or 6×6 boards, optional turn timers, 1–5 assassins.</p></div>
-            <div class="feature"><span class="ico">🃏</span><h4>Themed word packs</h4><p>Mix &amp; match Classic, Countries, Marvel, UK Snacks, Offensive, Too Far and more — or paste your own.</p></div>
-            <div class="feature"><span class="ico">⚡</span><h4>Instant & real-time</h4><p>Live sync over WebSockets. Reconnects automatically if you drop.</p></div>
-            <div class="feature"><span class="ico">💬</span><h4>Chat & reactions</h4><p>Trash-talk, emoji bursts and a running play-by-play log.</p></div>
-            <div class="feature"><span class="ico">♿</span><h4>Accessible by design</h4><p>Colour-blind glyphs, keyboard play, reduced-motion support.</p></div>
-            <div class="feature"><span class="ico">📱</span><h4>Plays anywhere</h4><p>Phones to big screens. No install, no sign-up, no cost.</p></div>
+            <div class="feature"><h4>Customisable</h4><p>4×4, 5×5 or 6×6 boards, an optional turn timer, and one to five assassins.</p></div>
+            <div class="feature"><h4>Themed word packs</h4><p>Mix Classic, Countries, Marvel, UK Snacks and more, or paste your own list.</p></div>
+            <div class="feature"><h4>Real-time</h4><p>Live sync over WebSockets, with automatic reconnection if you drop.</p></div>
+            <div class="feature"><h4>Chat &amp; reactions</h4><p>In-room chat, quick reactions and a running play-by-play log.</p></div>
+            <div class="feature"><h4>Accessible</h4><p>Colour-blind glyphs, full keyboard play and reduced-motion support.</p></div>
+            <div class="feature"><h4>Plays anywhere</h4><p>Phones to big screens. No install, no sign-up, no cost.</p></div>
           </div>
         </div>
 
         <div class="home__foot">
-          <span>Part of the Wheesht family · Built for game nights</span>
-          <span class="tiny">Tip: one phone per player works great as a "spymaster screen".</span>
+          <span>A Wheesht word game.</span>
+          <span class="tiny">One phone per player works well as a spymaster screen.</span>
         </div>
       </div>`);
     app.appendChild(el);
@@ -1716,7 +1716,7 @@
     const name = (state.you && state.you.name) || getName();
     const q = name ? `?name=${encodeURIComponent(name)}` : "";
     const url = `${location.origin}/play${q}#/room/${state.room.code}`;
-    const done = () => toast("Invite link copied!", "ok");
+    const done = () => toast("Invite link copied", "ok");
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(url).then(done).catch(() => fallbackCopy(url, done));
     } else { fallbackCopy(url, done); }
