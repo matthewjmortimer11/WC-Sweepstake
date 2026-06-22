@@ -286,7 +286,7 @@
 
   // ── theme ──────────────────────────────────────────────────────────────────
   function initTheme() {
-    const saved = localStorage.getItem(LS.theme) || "light";
+    const saved = localStorage.getItem(LS.theme) || "dark";
     document.documentElement.dataset.theme = saved;
   }
   function toggleTheme() {
@@ -1411,7 +1411,7 @@
     const text = String(word == null ? "" : word).trim();
     const n = Number(cols) || 5;
     if (isEmoji) {
-      const em = Math.min(1.7, Math.max(1rem, (n <= 4 ? 1.15 : 1) * 1.35));
+      const em = Math.min(1.7, Math.max(1, (n <= 4 ? 1.15 : 1) * 1.35));
       return `<span class="word word--emoji" style="font-size:${em.toFixed(2)}rem">${esc(word)}</span>`;
     }
     if (!/[\s-]/.test(text)) {
@@ -1663,6 +1663,7 @@
 
   function topbar() {
     const isHost = state.you && state.you.isHost;
+    const unread = chatUnreadCount();
     const el = h(`
       <div class="topbar">
         <div class="topbar__left">
@@ -1671,9 +1672,10 @@
           <span class="conn" id="conn"><span class="dot"></span><span class="lbl">Live</span></span>
         </div>
         <div class="topbar__right">
-          <button class="btn btn--sm" id="copy">Copy link</button>
+          <button class="btn btn--sm" id="copy">Invite</button>
           ${isHost ? `<button class="btn btn--sm" id="settings">Setup</button>` : ""}
           <button class="icon-btn icon-btn--txt" id="theme" title="Toggle theme" aria-label="Toggle theme">◐</button>
+          <button class="btn btn--sm btn--primary" id="panel-toggle" title="Teams, log & chat" aria-label="Open game panel">Panel${unread ? `<span class="tab-badge">${unread}</span>` : ""}</button>
         </div>
       </div>`);
     el.querySelector("#leave").onclick = () => { location.hash = ""; };
@@ -1688,7 +1690,26 @@
       } else { fallbackCopy(code, done); }
     };
     const s = el.querySelector("#settings"); if (s) s.onclick = openSettings;
+    const pt = el.querySelector("#panel-toggle");
+    if (pt) pt.onclick = () => setPanel(!document.body.classList.contains("panel-open"));
     return el;
+  }
+
+  function setPanel(open) {
+    document.body.classList.toggle("panel-open", open);
+    let scrim = document.getElementById("panel-scrim");
+    if (open) {
+      if (state.tab === "chat" && state.room) state.chatSeen = (state.room.chat || []).length;
+      if (!scrim) {
+        scrim = document.createElement("div");
+        scrim.id = "panel-scrim";
+        scrim.className = "panel-scrim";
+        scrim.onclick = () => setPanel(false);
+        document.body.appendChild(scrim);
+      }
+    } else if (scrim) {
+      scrim.remove();
+    }
   }
 
   function copyInvite() {
@@ -2123,6 +2144,10 @@
     const unread = state.tab !== "chat" ? chatUnreadCount() : 0;
     const el = h(`
       <div class="side">
+        <div class="side__head">
+          <span class="side__title">Game panel</span>
+          <button class="icon-btn icon-btn--txt" id="panel-close" aria-label="Close panel">✕</button>
+        </div>
         <div class="tabs" role="tablist">
           <button role="tab" data-tab="players" aria-selected="${state.tab === "players"}">Teams</button>
           <button role="tab" data-tab="log" aria-selected="${state.tab === "log"}">Log</button>
@@ -2139,6 +2164,8 @@
       };
     });
     const body = el.querySelector("#tabbody");
+    const pc = el.querySelector("#panel-close");
+    if (pc) pc.onclick = () => setPanel(false);
     if (state.tab === "players") body.appendChild(playersTab());
     else if (state.tab === "log") body.appendChild(logTab());
     else {
@@ -2458,9 +2485,9 @@
     const ctx = cvs.getContext("2d");
     const dpr = window.devicePixelRatio || 1;
     cvs.width = innerWidth * dpr; cvs.height = innerHeight * dpr; ctx.scale(dpr, dpr);
-    const colors = team === "red" ? ["#c0473f", "#7e2b27", "#f3e3df"]
-      : team === "blue" ? ["#4d8893", "#2c545c", "#e4f0f1"]
-      : ["#c8a13a", "#b3a684", "#8aa24a"];
+    const colors = team === "red" ? ["#ff7d97", "#e11d48", "#ffc53d"]
+      : team === "blue" ? ["#5fe7df", "#14b8c4", "#ffc53d"]
+      : ["#ffc53d", "#fb5071", "#21d4cf"];
     const parts = Array.from({ length: 160 }, () => ({
       x: Math.random() * innerWidth, y: -20 - Math.random() * innerHeight * 0.5,
       r: 4 + Math.random() * 6, c: colors[(Math.random() * colors.length) | 0],
