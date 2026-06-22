@@ -83,6 +83,32 @@
       padding:18px;text-align:center;display:grid;gap:6px}
     .turn-card__cap{letter-spacing:.14em;text-transform:uppercase;font-weight:800}
     .turn-name{font-family:var(--head);font-weight:600;font-size:clamp(1.8rem,9vw,2.6rem);color:var(--ink);word-break:break-word}
+    /* Charades scoreboard */
+    .scorebar{display:flex;gap:7px;flex-wrap:wrap;justify-content:center}
+    .score-chip{display:inline-flex;align-items:center;gap:7px;background:var(--panel-2);
+      border:1.5px solid var(--line);border-radius:999px;padding:5px 12px;font-size:.85rem;font-weight:700}
+    .score-chip__n{color:var(--ink-2);max-width:9ch;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .score-chip b{font-family:var(--head);color:var(--ink);min-width:1ch;text-align:center}
+    .score-chip.act{border-color:var(--accent)}
+    .score-chip.act .score-chip__n{color:var(--ink)}
+    .score-chip.lead b{color:var(--accent)}
+    /* "Who guessed it?" picker */
+    .guesser-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;width:100%}
+    /* Charades acting timer */
+    .ch-timer{position:relative;width:100%;height:36px;background:#0a0a08;border:1.5px solid var(--line-strong);
+      border-radius:10px;overflow:hidden;display:grid;place-items:center}
+    .ch-timer__bar{position:absolute;left:0;top:0;bottom:0;width:100%;
+      background:linear-gradient(90deg,#8b6df0,#5b3fc0);opacity:.5;transition:width .2s linear}
+    .ch-timer__text{position:relative;font-family:var(--head);font-weight:700;font-variant-numeric:tabular-nums;
+      color:#fff;letter-spacing:.02em}
+    .ch-timer.up{border-color:var(--imposter)}
+    .ch-timer.up .ch-timer__bar{background:var(--imposter);opacity:.55;width:100%!important}
+    .timer-seg{display:grid;grid-template-columns:repeat(5,1fr);gap:5px;background:#0a0a08;
+      border:1.5px solid var(--line-strong);border-radius:var(--radius-sm);padding:5px}
+    .timer-opt{appearance:none;border:0;background:transparent;color:var(--ink-2);cursor:pointer;font:inherit;
+      font-weight:800;font-family:var(--head);padding:.55em .2em;border-radius:9px;font-size:.85rem;transition:.14s var(--ease)}
+    .timer-opt.on{background:var(--accent);color:var(--accent-ink);box-shadow:0 3px 0 var(--accent-2)}
+    .timer-opt:focus-visible{outline:none;box-shadow:0 0 0 3px var(--bg),0 0 0 6px var(--accent)}
     .role-sub{color:var(--ink-2);font-size:.95rem;line-height:1.5;margin:0;max-width:34ch}
     /* Mode selector */
     .modes{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;background:#0a0a08;
@@ -115,6 +141,7 @@
   (() => {
     "use strict";
     const app = document.getElementById("app");
+    let timerInterval = null;          // charades acting-timer ticker
 
     // ── client-side state (the useState equivalent) ──────────────────────────
     const state = {
@@ -130,6 +157,8 @@
       current: -1,                     // index being revealed
       charadesActor: 0,                // charades: whose turn it is to act
       charadesWord: "",                // charades: the celebrity to act out (reused pool)
+      charadesScores: [0, 0, 0, 0],    // charades: running points per player
+      timerSecs: 60,                   // charades: optional acting timer (0 = off)
     };
 
     // Recognisable, fun-to-dance celebrities (kept family-friendly). A mix of
@@ -222,6 +251,7 @@
     function startGame() {
       if (state.mode === "charades") {
         state.charadesActor = Math.floor(Math.random() * state.names.length);
+        state.charadesScores = state.names.map(() => 0);
         state.charadesWord = "";
         pickCharade();
         state.screen = "select";
@@ -257,6 +287,14 @@
       render();
     }
 
+    function awardCharade(guesserIndex) {
+      // Both the actor (who put it across) and the guesser score a point.
+      if (!state.charadesScores) state.charadesScores = state.names.map(() => 0);
+      state.charadesScores[guesserIndex] = (state.charadesScores[guesserIndex] || 0) + 1;
+      state.charadesScores[state.charadesActor] = (state.charadesScores[state.charadesActor] || 0) + 1;
+      nextCharadesPlayer();
+    }
+
     // ── screens ──────────────────────────────────────────────────────────────
     function setupScreen() {
       const inputs = state.names.map((name, i) =>
@@ -290,6 +328,17 @@
           modeBtn("charades", "🎭 Charades"),
         ]),
         el("p", { class: "lede", text: lede }),
+        state.mode === "charades" ? el("div", { class: "field" }, [
+          el("label", { class: "fl", text: "Acting timer (optional)" }),
+          el("div", { class: "timer-seg", role: "group", "aria-label": "Acting timer" },
+            [0, 30, 60, 90, 120].map((s) => el("button", {
+              class: "timer-opt" + (state.timerSecs === s ? " on" : ""),
+              "aria-pressed": state.timerSecs === s ? "true" : "false",
+              text: s === 0 ? "Off" : s + "s",
+              onclick: () => { state.timerSecs = s; render(); },
+            }))
+          ),
+        ]) : null,
         el("div", { class: "names" }, inputs),
         el("button", {
           class: "btn btn--primary btn--lg btn--block", text: "Start game →",
@@ -304,8 +353,19 @@
 
     function selectScreen() {
       if (state.mode === "charades") {
+        const scores = state.charadesScores || state.names.map(() => 0);
+        const best = Math.max(0, ...scores);
+        const scorebar = el("div", { class: "scorebar", "aria-label": "Scores" },
+          state.names.map((n, i) => el("span", {
+            class: "score-chip" + (i === state.charadesActor ? " act" : "") + (scores[i] === best && best > 0 ? " lead" : ""),
+          }, [
+            el("span", { class: "score-chip__n", text: n }),
+            el("b", { text: String(scores[i] || 0) }),
+          ]))
+        );
         return el("div", { class: "panel" }, [
           el("span", { class: "eyebrow", text: "Charades" }),
+          scorebar,
           el("p", { class: "note", text: "Everyone else: guess the celebrity being acted out." }),
           el("div", { class: "turn-card" }, [
             el("span", { class: "turn-card__cap tiny muted", text: "Up to act" }),
@@ -374,16 +434,28 @@
     function revealScreen() {
       if (state.mode === "charades") {
         // The actor sees the celebrity to mime; nobody else should look.
+        const others = state.names
+          .map((n, idx) => ({ n, idx }))
+          .filter((o) => o.idx !== state.charadesActor);
+        const guessers = el("div", { class: "guesser-grid" },
+          others.map((o) => el("button", {
+            class: "btn pick", onclick: () => awardCharade(o.idx),
+          }, [el("span", { text: o.n })]))
+        );
         return el("div", { class: "panel" }, [
           el("div", { class: "reveal" }, [
             el("span", { class: "who", text: state.names[state.charadesActor] + " — your charade" }),
             el("span", { class: "role-cap tiny muted", text: "Act this out" }),
             el("div", { class: "role charade", text: state.charadesWord }),
             el("p", { class: "role-sub", text: "No talking, no pointing at words — mime it. Others guess." }),
-            el("div", { class: "row" }, [
-              el("button", { class: "btn btn--ghost", text: "Different", onclick: () => { pickCharade(); render(); } }),
-              el("button", { class: "btn btn--primary", text: "Next player →", onclick: nextCharadesPlayer }),
-            ]),
+            state.timerSecs > 0 ? el("div", { class: "ch-timer", id: "ch-timer" }, [
+              el("div", { class: "ch-timer__bar", id: "ch-timer-bar" }),
+              el("span", { class: "ch-timer__text", id: "ch-timer-text", text: state.timerSecs + "s" }),
+            ]) : null,
+            el("button", { class: "btn btn--ghost btn--block", text: "Different charade", onclick: () => { pickCharade(); render(); } }),
+            el("p", { class: "note tiny muted", text: "Who guessed it? Tap their name — you both score a point." }),
+            guessers,
+            el("button", { class: "btn btn--block", text: "Nobody got it →", onclick: nextCharadesPlayer }),
           ]),
         ]);
       }
@@ -427,13 +499,38 @@
       ]);
     }
 
+    function armCharadeTimer() {
+      const total = state.timerSecs;
+      if (!total) return;
+      const deadline = Date.now() + total * 1000;
+      const wrap = document.getElementById("ch-timer");
+      const bar = document.getElementById("ch-timer-bar");
+      const txt = document.getElementById("ch-timer-text");
+      const tick = () => {
+        const left = Math.max(0, deadline - Date.now());
+        if (txt) txt.textContent = left > 0 ? Math.ceil(left / 1000) + "s" : "Time's up!";
+        if (bar) bar.style.width = (100 * left / (total * 1000)) + "%";
+        if (left <= 0) {
+          if (wrap) wrap.classList.add("up");
+          if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+        }
+      };
+      tick();
+      timerInterval = setInterval(tick, 200);
+    }
+
     function render() {
+      // A new render means leaving whatever screen the timer was on.
+      if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
       app.replaceChildren(
         state.screen === "setup" ? setupScreen()
         : state.screen === "reveal" ? revealScreen()
         : selectScreen()
       );
       window.scrollTo(0, 0);
+      if (state.mode === "charades" && state.screen === "reveal" && state.timerSecs > 0) {
+        armCharadeTimer();
+      }
     }
 
     render();
