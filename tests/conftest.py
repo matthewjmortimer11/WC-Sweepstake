@@ -37,6 +37,29 @@ import main  # noqa: E402
 from db import Base, engine  # noqa: E402
 from httpx import ASGITransport, AsyncClient  # noqa: E402
 
+# Cipher keeps its own module-global async engine (codenames/store.py). By default
+# it falls back to DATABASE_URL — the *same* SQLite file as the sweepstake engine.
+# That, combined with Cipher's fire-and-forget match-persist tasks (scheduled on
+# game end), means two writers can hit one SQLite file at once and raise an
+# intermittent "database is locked". For the test session, point Cipher at its own
+# SQLite file (no cross-engine contention) and give it a generous busy timeout so a
+# brief write overlap waits rather than erroring. NullPool keeps each connection
+# loop-local under pytest-asyncio. Test-only; production keeps its pooled engine.
+from codenames import store as _cipher_store  # noqa: E402
+
+if _cipher_store.ENABLED and not _TEST_DB:
+    from sqlalchemy.ext.asyncio import async_sessionmaker as _async_sessionmaker  # noqa: E402
+    from sqlalchemy.ext.asyncio import create_async_engine as _create_async_engine  # noqa: E402
+    from sqlalchemy.pool import NullPool  # noqa: E402
+
+    _cipher_file = Path(tempfile.gettempdir()) / f"cipher_test_{uuid.uuid4().hex}.db"
+    _cipher_store.DATABASE_URL = f"sqlite+aiosqlite:///{_cipher_file}"
+    _cipher_store.engine = _create_async_engine(
+        _cipher_store.DATABASE_URL, poolclass=NullPool, connect_args={"timeout": 30},
+    )
+    _cipher_store.SessionLocal = _async_sessionmaker(_cipher_store.engine, expire_on_commit=False)
+    _cipher_store._initialised = False
+
 
 @pytest_asyncio.fixture
 async def client():
