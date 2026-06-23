@@ -1,4 +1,4 @@
-"""The local-only "Dial" guess-the-scale party game (/wheel)."""
+"""The Dial guess-the-scale party game (/wheel) — online multiplayer."""
 
 import pytest
 from starlette.testclient import TestClient
@@ -20,18 +20,19 @@ def test_wheel_page_served(client):
 
 def test_wheel_has_game_surface(client):
     t = client.get("/wheel").text
-    for marker in (
-        "Read the", "Play to", "Psychic", "Lock in guess", "Next round",
-        "gaugeHTML", "pointsFor", "SPECTRA",
-    ):
+    for marker in ("Read the", "Dial", "/wheel/assets/app.js"):
         assert marker in t, f"missing Dial marker: {marker!r}"
+    js = client.get("/wheel/assets/app.js").text
+    for marker in ("Create room", "gaugeHTML", "pointsFor", "lockGuess", "psychicReady", "Free-for-all"):
+        assert marker in js, f"missing Dial JS marker: {marker!r}"
 
 
-def test_wheel_is_local_only_no_api(client):
-    t = client.get("/wheel").text.lower()
-    assert "fetch(" not in t
-    assert "websocket" not in t
-    assert "/api/" not in t
+def test_wheel_has_multiplayer_api(client):
+    t = client.get("/wheel").text
+    assert "/wheel/assets/app.js" in t
+    r = client.post("/wheel/api/rooms", json={"mode": "teams"})
+    assert r.status_code == 200
+    assert "code" in r.json()
 
 
 def test_party_games_routes_all_serve(client):
