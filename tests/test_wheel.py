@@ -23,7 +23,7 @@ def test_wheel_has_game_surface(client):
     for marker in ("Read the", "Dial", "/wheel/assets/app.js"):
         assert marker in t, f"missing Dial marker: {marker!r}"
     js = client.get("/wheel/assets/app.js").text
-    for marker in ("Create room", "gaugeHTML", "pointsFor", "lockGuess", "psychicReady", "Free-for-all"):
+    for marker in ("Create room", "gaugeHTML", "pointsFor", "lockGuess", "psychicReady", "Free-for-all", "Share game link", "roomInviteUrl"):
         assert marker in js, f"missing Dial JS marker: {marker!r}"
 
 

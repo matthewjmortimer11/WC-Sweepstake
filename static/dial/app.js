@@ -95,8 +95,62 @@
     try { return (localStorage.getItem(LS.name) || "").trim(); } catch (_) { return ""; }
   }
 
+  function nameFromUrl() {
+    try {
+      const q = new URLSearchParams(location.search).get("name");
+      return q ? q.trim().slice(0, 24) : "";
+    } catch (_) { return ""; }
+  }
+
+  function initNameFromUrl() {
+    const fromUrl = nameFromUrl();
+    if (fromUrl && !playerName()) saveName(fromUrl);
+  }
+
   function saveName(n) {
     try { localStorage.setItem(LS.name, n); } catch (_) {}
+  }
+
+  function roomInviteUrl(code) {
+    const name = playerName();
+    const q = name ? `?name=${encodeURIComponent(name)}` : "";
+    return `${location.origin}/wheel${q}#/room/${code}`;
+  }
+
+  function fallbackCopy(text, done) {
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.style.position = "fixed";
+    ta.style.opacity = "0";
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand("copy"); if (done) done(); } catch (_) { toast(text); }
+    ta.remove();
+  }
+
+  function copyText(text, okMsg) {
+    const done = () => toast(okMsg);
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done).catch(() => fallbackCopy(text, done));
+    } else {
+      fallbackCopy(text, done);
+    }
+  }
+
+  function shareRoomLink(code) {
+    const url = roomInviteUrl(code);
+    const text = `Join my Dial game — room ${code}`;
+    if (navigator.share) {
+      navigator.share({ title: "Dial — Wheesht", text, url })
+        .then(() => toast("Invite sent"))
+        .catch(() => copyText(url, "Invite link copied"));
+      return;
+    }
+    copyText(url, "Invite link copied");
+  }
+
+  function copyRoomCode(code) {
+    copyText(code, "Room code copied");
   }
 
   function send(msg) {
@@ -298,7 +352,26 @@
 
     return el("div", { class: "panel" }, [
       el("span", { class: "eyebrow", text: "Lobby" }),
-      el("div", { class: "room-code", text: room.code }),
+      el("div", {
+        class: "room-code",
+        text: room.code,
+        title: "Tap to copy code",
+        style: "cursor:pointer",
+        onclick: () => copyRoomCode(room.code),
+      }),
+      el("div", { class: "row" }, [
+        el("button", {
+          class: "btn btn--primary",
+          text: "Share game link",
+          onclick: () => shareRoomLink(room.code),
+        }),
+        el("button", {
+          class: "btn btn--ghost",
+          text: "Copy code",
+          onclick: () => copyRoomCode(room.code),
+        }),
+      ]),
+      el("p", { class: "note", text: "Send the link — friends land in this room with the code filled in." }),
       el("label", { class: "fl" }, [el("span", { text: "Your name" }), nameIn]),
       teamSeg,
       el("div", { class: "players" }, playerRows),
@@ -488,6 +561,7 @@
   }
 
   function boot() {
+    initNameFromUrl();
     parseRoute();
     render();
     if (routeCode) connect(routeCode);
