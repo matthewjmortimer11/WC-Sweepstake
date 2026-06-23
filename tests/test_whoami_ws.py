@@ -114,7 +114,28 @@ def test_disconnect_does_not_block_round(client):
     assert room.game.all_claimed(connected)
 
 
-def test_mid_game_join_blocked(client):
+def test_two_player_start_via_websocket(client):
+    import time
+
+    code = client.post("/whoami/api/rooms").json()["code"]
+    with client.websocket_connect(f"/whoami/ws/{code}?pid=h1&name=Host") as host, \
+         client.websocket_connect(f"/whoami/ws/{code}?pid=h2&name=Guest") as guest:
+        host.receive_json()
+        host.receive_json()
+        guest.receive_json()
+        guest.receive_json()
+        host.receive_json()
+        host.send_json({"type": "start"})
+        time.sleep(0.05)
+        playing = None
+        for _ in range(8):
+            msg = host.receive_json()
+            if msg.get("type") == "state" and msg["room"]["game"]["status"] == "playing":
+                playing = msg
+                break
+        assert playing is not None
+        assert len(playing["room"]["game"]["playerIds"]) == 2
+
     from whoami.game import MoveError
 
     code = client.post("/whoami/api/rooms").json()["code"]

@@ -21,9 +21,11 @@
   const el = (tag, attrs = {}, kids = []) => {
     const n = document.createElement(tag);
     for (const [k, v] of Object.entries(attrs)) {
+      if (v == null || v === false) continue;
       if (k === "class") n.className = v;
       else if (k === "text") n.textContent = v;
       else if (k.startsWith("on") && typeof v === "function") n.addEventListener(k.slice(2), v);
+      else if (k === "disabled" && v === "disabled") n.disabled = true;
       else n.setAttribute(k, v);
     }
     (Array.isArray(kids) ? kids : [kids]).forEach((c) => c != null && n.append(c));
@@ -54,7 +56,12 @@
   }
 
   function send(msg) {
-    if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg));
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify(msg));
+      return true;
+    }
+    toast("Not connected — wait a moment and try again.");
+    return false;
   }
 
   function parseRoute() {
@@ -180,7 +187,13 @@
   async function createRoom() {
     const r = await fetch("/whoami/api/rooms", { method: "POST" });
     if (!r.ok) { toast("Couldn't create room."); return; }
-    location.hash = `#/room/${(await r.json()).code}`;
+    const code = (await r.json()).code;
+    location.hash = `#/room/${code}`;
+    parseRoute();
+    if (routeCode) {
+      lastRouteCode = null;
+      boot();
+    }
   }
 
   function avatarPicker(you) {
@@ -225,13 +238,14 @@
           },
         }),
       ]),
-      el("p", { class: "note", text: `Need at least ${MIN_PLAYERS} players. Share the game link so friends join on their phones.` }),
+      el("p", { class: "note", text: `Works with ${MIN_PLAYERS}+ players. Share the game link — friends join on their phones, then the host starts when everyone's in.` }),
     ]);
   }
 
   function lobbyScreen() {
     const room = state.room;
     const you = state.you;
+    const me = playerById(you.id) || you;
     const connected = room.players.filter((p) => p.connected).length;
     const minP = lobbyMin(room);
     const canStart = connected >= minP;
@@ -241,11 +255,11 @@
       onchange: (e) => send({ type: "rename", name: e.target.value.trim() }),
     });
 
-    const hostBits = you.isHost ? [
+    const hostBits = me.isHost ? [
       el("button", {
         class: "btn btn--primary btn--lg btn--block",
-        text: canStart ? "Start game →" : `Need at least ${minP} players (${connected})…`,
-        disabled: canStart ? null : "disabled",
+        text: canStart ? `Start game (${connected} players) →` : `Waiting for players (${connected}/${minP})…`,
+        disabled: canStart ? false : "disabled",
         onclick: () => send({ type: "start" }),
       }),
     ] : [
