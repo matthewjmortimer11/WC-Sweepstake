@@ -111,4 +111,13 @@ input[type=range]::-moz-range-thumb{width:30px;height:30px;border-radius:50%;bac
 .wait-panel{text-align:center;padding:1.5em;color:var(--ink-2)}
 .foot-link{color:var(--ink-3);text-decoration:none;border-bottom:1px dotted var(--line-strong)}
 .foot-link:hover{color:var(--ink-2);border-bottom-color:var(--accent)}
+.clue-toggle{align-self:flex-start;padding:.35em .7em;font-size:.75rem;font-weight:800;color:var(--ink-3);
+  background:transparent;border:1px solid var(--line);border-radius:999px;cursor:pointer;font-family:var(--head)}
+.clue-toggle.on{color:var(--accent-ink);background:var(--accent);border-color:var(--accent-2)}
+.clue-box{display:grid;gap:6px}
+.clue-box textarea.in{min-height:3.2em;resize:vertical;line-height:1.4;font-weight:600}
+.clue-readout{padding:.75em .95em;border-radius:var(--radius-sm);background:var(--panel-2);border:1px solid var(--line);
+  color:var(--ink);font-size:.95rem;line-height:1.45;text-align:center}
+.clue-readout__label{font-size:.68rem;font-weight:800;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--ink-3);margin-bottom:.35em}
 @media (prefers-reduced-motion:reduce){*{transition-duration:.05ms!important}}

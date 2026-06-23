@@ -172,9 +172,16 @@ class Room:
         if g.phase == PHASE_REVEAL:
             show_target = True
         guesser_ids = self.guessers_for_round()
+        show_clue = bool(
+            g.clue and (
+                g.phase in (PHASE_GUESS, PHASE_REVEAL)
+                or (g.phase == PHASE_PSYCHIC and is_psychic)
+            )
+        )
         game_view = g.view(
             pid=pid,
             show_target=show_target,
+            show_clue=show_clue,
             guesser_ids=guesser_ids if g.phase == PHASE_REVEAL else None,
         )
         if g.phase == PHASE_REVEAL:

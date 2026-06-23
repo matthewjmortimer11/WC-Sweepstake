@@ -142,6 +142,41 @@ def test_target_not_leaked_before_reveal(client):
         assert "target" not in guesser_view["room"]["game"]
 
 
+def test_clue_hidden_until_guess_phase(client):
+    code = client.post("/wheel/api/rooms").json()["code"]
+    with client.websocket_connect(f"/wheel/ws/{code}?pid=p1&name=One") as p1, \
+         client.websocket_connect(f"/wheel/ws/{code}?pid=p2&name=Two") as p2:
+
+        for ws in (p1, p2):
+            ws.receive_json()
+            ws.receive_json()
+        p1.send_json({"type": "setTeam", "team": "team0"})
+        p2.send_json({"type": "setTeam", "team": "team1"})
+        p1.send_json({"type": "start"})
+        _settle()
+
+        room = manager.get(code)
+        psychic_id = room.game.psychic_id
+        psychic_ws = p1 if psychic_id == "p1" else p2
+        guesser_ws = p2 if psychic_ws is p1 else p1
+
+        psychic_ws.send_json({"type": "setClue", "text": "Think tropical"})
+        _settle()
+
+        psychic_view = room.state_for(psychic_id)
+        assert psychic_view["room"]["game"].get("clue") == "Think tropical"
+
+        guesser_id = "p2" if psychic_id == "p1" else "p1"
+        guesser_view = room.state_for(guesser_id)
+        assert "clue" not in guesser_view["room"]["game"]
+
+        psychic_ws.send_json({"type": "psychicReady"})
+        _settle()
+
+        guesser_view = room.state_for(guesser_id)
+        assert guesser_view["room"]["game"].get("clue") == "Think tropical"
+
+
 def test_party_games_routes_all_serve(client):
     for path in ("/", "/welcome", "/play", "/imposter", "/wheel"):
         assert client.get(path).status_code == 200

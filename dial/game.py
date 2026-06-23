@@ -81,6 +81,7 @@ class DialGame:
     winner: Optional[str] = None  # team index as "0"/"1" or player id in ffa
     psychic_order: list[str] = field(default_factory=list)
     psychic_index: int = 0
+    clue: str = ""
 
     def _rng_target(self, rng: random.Random) -> int:
         return 12 + rng.randint(0, 76)
@@ -112,6 +113,7 @@ class DialGame:
         self.guesses.clear()
         self.locked.clear()
         self.round_points.clear()
+        self.clue = ""
         self.phase = PHASE_PSYCHIC
 
         if self.settings.mode == MODE_TEAMS:
@@ -133,6 +135,13 @@ class DialGame:
         if pid != self.psychic_id:
             raise MoveError("Only the Psychic can continue.")
         self.phase = PHASE_GUESS
+
+    def set_clue(self, pid: str, text: str) -> None:
+        if self.status != STATUS_PLAYING or self.phase != PHASE_PSYCHIC:
+            raise MoveError("Clues can only be set during the psychic phase.")
+        if pid != self.psychic_id:
+            raise MoveError("Only the Psychic can set the clue.")
+        self.clue = text
 
     def set_guess(self, pid: str, value: int) -> None:
         if self.status != STATUS_PLAYING or self.phase != PHASE_GUESS:
@@ -215,6 +224,7 @@ class DialGame:
         *,
         pid: str,
         show_target: bool = False,
+        show_clue: bool = False,
         guesser_ids: Optional[list[str]] = None,
     ) -> dict:
         guesser_ids = guesser_ids or []
@@ -236,6 +246,8 @@ class DialGame:
         }
         if show_target:
             out["target"] = self.target
+        if show_clue and self.clue:
+            out["clue"] = self.clue
         if self.phase == PHASE_REVEAL:
             out["target"] = self.target
             out["guesses"] = {k: self.guesses[k] for k in guesser_ids if k in self.guesses}

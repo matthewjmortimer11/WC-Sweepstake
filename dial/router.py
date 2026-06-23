@@ -52,6 +52,14 @@ _WHEEL_CSP = (
 _CREATE_BUCKETS: dict[str, list[float]] = {}
 _CREATE_LIMIT = 30
 _CREATE_WINDOW = 10 * 60
+_MAX_CLUE = 200
+
+
+def _clean_clue(text: str) -> str:
+    text = (text or "").strip()
+    text = " ".join(text.split())
+    text = "".join(ch for ch in text if ch.isprintable())
+    return text[:_MAX_CLUE]
 
 
 def _rate_limit_create(request: Request) -> None:
@@ -269,6 +277,10 @@ def _dispatch(room, player, mtype: str, msg: dict) -> bool:
 
     if mtype == "psychicReady":
         game.psychic_ready(player.id)
+        return True
+
+    if mtype == "setClue":
+        game.set_clue(player.id, _clean_clue(str(msg.get("text", ""))))
         return True
 
     if mtype == "setGuess":

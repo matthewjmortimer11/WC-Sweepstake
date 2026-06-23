@@ -4,7 +4,7 @@
 
   const app = document.getElementById("app");
   const toastEl = document.getElementById("toast");
-  const LS = { pid: "dial.pid", name: "dial.name" };
+  const LS = { pid: "dial.pid", name: "dial.name", clueBox: "dial.clueBox" };
 
   const CX = 160, CY = 152, R = 122;
   const degForVal = (v) => 180 - (v / 100) * 180;
@@ -79,6 +79,7 @@
   let guessDragActive = false;
   let guessSendTimer = null;
   let pendingGuessValue = null;
+  let clueSendTimer = null;
 
   const state = {
     connected: false,
@@ -101,6 +102,56 @@
 
   function saveName(n) {
     try { localStorage.setItem(LS.name, n); } catch (_) {}
+  }
+
+  function clueBoxVisible() {
+    try { return localStorage.getItem(LS.clueBox) === "1"; } catch (_) { return false; }
+  }
+
+  function setClueBoxVisible(on) {
+    try { localStorage.setItem(LS.clueBox, on ? "1" : "0"); } catch (_) {}
+  }
+
+  function clueToggleButton() {
+    const on = clueBoxVisible();
+    return el("button", {
+      type: "button",
+      class: "clue-toggle" + (on ? " on" : ""),
+      text: on ? "Text clue on" : "Text clue off",
+      title: "Type a clue for players who aren't in the same room",
+      onclick: () => {
+        setClueBoxVisible(!on);
+        render();
+      },
+    });
+  }
+
+  function clueReadout(text) {
+    if (!text) return null;
+    return el("div", { class: "clue-readout" }, [
+      el("div", { class: "clue-readout__label", text: "Psychic's clue" }),
+      document.createTextNode(text),
+    ]);
+  }
+
+  function clueInput(value, onDraft) {
+    const ta = el("textarea", {
+      class: "in",
+      maxlength: "200",
+      rows: "2",
+      placeholder: "One-line clue — don't use the dial words",
+      oninput: (e) => onDraft(e.target.value),
+    });
+    ta.value = value || "";
+    return el("label", { class: "fl clue-box" }, [
+      el("span", { text: "Type your clue (for remote players)" }),
+      ta,
+    ]);
+  }
+
+  function queueClueSend(text) {
+    clearTimeout(clueSendTimer);
+    clueSendTimer = setTimeout(() => send({ type: "setClue", text: (text || "").trim() }), 180);
   }
 
   function roomInviteUrl(code) {
@@ -434,14 +485,26 @@
   function psychicScreen() {
     const game = state.room.game;
     const target = game.target;
+    const clueOn = clueBoxVisible();
     return el("div", { class: "panel" }, [
       el("span", { class: "eyebrow", text: "Psychic — keep this hidden" }),
+      clueToggleButton(),
       scorebar(game, game.teamNames),
       spectrumEl(game.spectrum),
       el("div", { class: "gauge", html: gaugeHTML({ showBands: true, showTarget: true, target }) }),
-      el("p", { class: "note", text: "Give your team a one-line clue for where the gold zone sits. Don't say the dial words." }),
+      el("p", { class: "note", text: clueOn
+        ? "Type a clue below or say it out loud. Don't use the dial words."
+        : "Give your team a one-line clue for where the gold zone sits. Don't say the dial words." }),
+      clueOn ? clueInput(game.clue || "", (text) => queueClueSend(text)) : null,
       el("button", { class: "btn btn--primary btn--lg btn--block", text: "Ready — let guessers play →",
-        onclick: () => send({ type: "psychicReady" }) }),
+        onclick: (e) => {
+          clearTimeout(clueSendTimer);
+          if (clueOn) {
+            const ta = e.target.closest(".panel")?.querySelector(".clue-box textarea");
+            if (ta) send({ type: "setClue", text: ta.value.trim() });
+          }
+          send({ type: "psychicReady" });
+        } }),
     ]);
   }
 
@@ -492,6 +555,7 @@
       el("span", { class: "eyebrow", text: "Turn the dial" }),
       scorebar(game, game.teamNames),
       spectrumEl(game.spectrum),
+      clueReadout(game.clue),
       gauge,
       slider,
       el("p", { class: "note", "data-dial-hint": "", text: locked
@@ -517,6 +581,7 @@
       el("span", { class: "eyebrow", text: title }),
       scorebar(game, game.teamNames),
       spectrumEl(game.spectrum),
+      clueReadout(game.clue),
       el("div", { class: "wait-panel" }, [
         el("p", { text: note }),
         psychic ? el("p", { class: "note", text: `Psychic: ${psychic.name}` }) : null,
@@ -551,6 +616,7 @@
     return el("div", { class: "panel" }, [
       el("span", { class: "eyebrow", text: "Reveal" }),
       spectrumEl(game.spectrum),
+      clueReadout(game.clue),
       el("div", { class: "gauge", html: gaugeHTML({
         showBands: true, showTarget: true, showGuess: false, target,
         extraNeedles,
@@ -635,6 +701,7 @@
     target: 50,
     guess: 50,
     points: 0,
+    clue: "",
   };
 
   function localSpectrumEl() {
@@ -661,6 +728,7 @@
     local.target = 12 + Math.floor(Math.random() * 77);
     local.guess = 50;
     local.points = 0;
+    local.clue = "";
     local.screen = "pass";
     renderLocal();
   }
@@ -743,15 +811,28 @@
   }
 
   function localPsychicScreen() {
+    const clueOn = clueBoxVisible();
     return el("div", { class: "panel" }, [
       el("span", { class: "eyebrow", text: "Psychic — keep this hidden" }),
+      clueToggleButton(),
       localSpectrumEl(),
       el("div", { class: "gauge", html: gaugeHTML({ showBands: true, showTarget: true, target: local.target }) }),
-      el("p", { class: "note", text: "Give your team a one-line clue for where the gold zone sits on this scale. Don't say the dial words." }),
+      el("p", { class: "note", text: clueOn
+        ? "Type a clue below or say it out loud. Don't use the dial words."
+        : "Give your team a one-line clue for where the gold zone sits on this scale. Don't say the dial words." }),
+      clueOn ? clueInput(local.clue, (text) => { local.clue = text.trim(); }) : null,
       el("button", {
         class: "btn btn--primary btn--lg btn--block",
         text: "Hide & pass to team →",
-        onclick: () => { local.guess = 50; local.screen = "guess"; renderLocal(); },
+        onclick: (e) => {
+          if (clueOn) {
+            const ta = e.target.closest(".panel")?.querySelector(".clue-box textarea");
+            if (ta) local.clue = ta.value.trim();
+          }
+          local.guess = 50;
+          local.screen = "guess";
+          renderLocal();
+        },
       }),
     ]);
   }
@@ -769,6 +850,7 @@
     return el("div", { class: "panel" }, [
       el("span", { class: "eyebrow", text: local.teams[local.turn] + " — turn the dial" }),
       localSpectrumEl(),
+      clueReadout(local.clue),
       gauge,
       slider,
       el("p", { class: "note", text: "Discuss as a team, then lock in where you think the hidden zone is." }),
@@ -785,6 +867,7 @@
     return el("div", { class: "panel" }, [
       el("span", { class: "eyebrow", text: "Reveal" }),
       localSpectrumEl(),
+      clueReadout(local.clue),
       el("div", { class: "gauge", html: gaugeHTML({
         showBands: true, showTarget: true, showGuess: true,
         target: local.target, guess: local.guess,
