@@ -83,12 +83,14 @@
   let guessSendTimer = null;
   let pendingGuessValue = null;
   let clueSendTimer = null;
+  let pingTimer = null;
 
   const state = {
     connected: false,
     room: null,
     you: null,
     pendingSettings: null,
+    creating: false,
   };
 
   function pid() {
@@ -292,12 +294,34 @@
     return (state.room && state.room.players || []).find((p) => p.id === id);
   }
 
+  function renderConnState() {
+    const c = document.getElementById("conn");
+    if (!c) return;
+    const inRoom = !localMode && routeCode;
+    c.hidden = !inRoom;
+    if (!inRoom) return;
+    c.classList.toggle("bad", !state.connected);
+    const lbl = c.querySelector(".lbl");
+    if (lbl) lbl.textContent = state.connected ? "Live" : "Reconnecting…";
+  }
+
+  function startPing() {
+    clearPing();
+    pingTimer = setInterval(() => {
+      if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: "ping" }));
+    }, 25000);
+  }
+
+  function clearPing() {
+    if (pingTimer) { clearInterval(pingTimer); pingTimer = null; }
+  }
+
   function connect(code) {
     if (ws) { try { ws.close(); } catch (_) {} ws = null; }
     const proto = location.protocol === "https:" ? "wss:" : "ws:";
     const url = `${proto}//${location.host}/wheel/ws/${code}?pid=${encodeURIComponent(pid())}&name=${encodeURIComponent(playerName())}`;
     ws = new WebSocket(url);
-    ws.onopen = () => { reconnectDelay = 800; state.connected = true; };
+    ws.onopen = () => { reconnectDelay = 800; state.connected = true; renderConnState(); startPing(); };
     ws.onmessage = (ev) => {
       let msg;
       try { msg = JSON.parse(ev.data); } catch (_) { return; }
@@ -316,6 +340,8 @@
     };
     ws.onclose = () => {
       state.connected = false;
+      clearPing();
+      renderConnState();
       if (routeCode) {
         clearTimeout(reconnectTimer);
         reconnectTimer = setTimeout(() => { reconnectDelay = Math.min(reconnectDelay * 1.5, 8000); connect(routeCode); }, reconnectDelay);
@@ -324,6 +350,9 @@
   }
 
   async function createRoom(mode) {
+    if (state.creating) return;
+    state.creating = true;
+    render();
     const body = state.pendingSettings || { mode, targetScore: 10, teamNames: ["Team 1", "Team 2"] };
     body.mode = mode || body.mode || "teams";
     const r = await fetch("/wheel/api/rooms", {
@@ -331,7 +360,8 @@
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
-    if (!r.ok) { toast("Couldn't create room."); return; }
+    state.creating = false;
+    if (!r.ok) { toast("Couldn't create room."); render(); return; }
     const d = await r.json();
     location.hash = `#/room/${d.code}`;
   }
@@ -373,7 +403,9 @@
       el("h1", {}, [document.createTextNode("Read the "), el("span", { class: "em", text: "room." })]),
       el("p", { class: "lede", text: "Everyone joins on their own phone. Each round one Psychic secretly sees the target zone and gives a clue; everyone else turns their own dial. Closer = more points." }),
       el("label", { class: "fl" }, [el("span", { text: "Your name" }), nameIn]),
-      el("button", { class: "btn btn--primary btn--lg btn--block", text: "Create room →",
+      el("button", { class: "btn btn--primary btn--lg btn--block",
+        text: state.creating ? "Creating room…" : "Create room →",
+        disabled: state.creating ? "disabled" : false,
         onclick: () => { saveName(nameIn.value.trim()); createRoom("teams"); } }),
       el("div", { class: "row" }, [
         joinIn,
@@ -943,15 +975,15 @@
   }
 
   function render() {
-    if (localMode) {
-      renderLocal();
-      return;
-    }
+    if (localMode) { clearPing(); renderConnState(); renderLocal(); return; }
     if (!routeCode) {
+      clearPing();
+      renderConnState();
       app.replaceChildren(homeScreen());
       return;
     }
     if (!state.room) {
+      renderConnState();
       app.replaceChildren(el("div", { class: "panel" }, [
         el("p", { class: "note", text: "Connecting to room…" }),
       ]));
@@ -960,6 +992,7 @@
     const game = state.room.game;
     if (game.status === "lobby") app.replaceChildren(lobbyScreen());
     else app.replaceChildren(gameScreen());
+    renderConnState();
     window.scrollTo(0, 0);
   }
 

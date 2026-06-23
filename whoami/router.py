@@ -9,6 +9,11 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 
+from party.assets import serve_asset
+from party.pages import render_game_page
+from party.ratelimit import WsRateLimitError, rate_limit_create, rate_limit_ws_message
+from party.stats import ensure_can_create_room
+
 from .game import STATUS_PLAYING, MoveError, Settings
 from .manager import _clean_name, manager
 from .packs import DEFAULT_PACK_IDS, characters_for_packs, normalize_pack_ids, pack_label, pack_meta
@@ -17,7 +22,6 @@ router = APIRouter()
 
 _TEMPLATE = Path("templates/whoami.html")
 _ASSETS = Path("static/whoami")
-_MEDIA = {".js": "application/javascript", ".css": "text/css"}
 
 _WHOAMI_CSP = (
     "default-src 'self'; "
@@ -30,29 +34,13 @@ _WHOAMI_CSP = (
     "frame-ancestors 'none'"
 )
 
-_CREATE_BUCKETS: dict[str, list[float]] = {}
-_CREATE_LIMIT = 30
-_CREATE_WINDOW = 10 * 60
-
-
-def _rate_limit_create(request: Request) -> None:
-    key = request.client.host if request.client else "unknown"
-    now = time.time()
-    hits = [t for t in _CREATE_BUCKETS.get(key, []) if now - t < _CREATE_WINDOW]
-    if len(hits) >= _CREATE_LIMIT:
-        raise HTTPException(status_code=429, detail="Too many rooms created — try again shortly.")
-    hits.append(now)
-    _CREATE_BUCKETS[key] = hits
-
 
 @router.get("/whoami", response_class=HTMLResponse)
 async def whoami_page() -> HTMLResponse:
-    if not _TEMPLATE.is_file():
-        raise HTTPException(status_code=404)
-    return HTMLResponse(
-        _TEMPLATE.read_text(encoding="utf-8"),
-        headers={"Content-Security-Policy": _WHOAMI_CSP},
-    )
+    try:
+        return render_game_page(_TEMPLATE, _WHOAMI_CSP)
+    except FileNotFoundError:
+        raise HTTPException(status_code=404) from None
 
 
 @router.get("/whoami/api/packs")
@@ -71,7 +59,8 @@ async def character_pool(packIds: str = "") -> JSONResponse:
 
 @router.post("/whoami/api/rooms")
 async def create_room(request: Request) -> JSONResponse:
-    _rate_limit_create(request)
+    rate_limit_create(request)
+    ensure_can_create_room()
     manager.start()
     pack_ids = list(DEFAULT_PACK_IDS)
     try:
@@ -111,12 +100,7 @@ async def get_avatar(code: str, player_id: str) -> Response:
 
 @router.get("/whoami/assets/{filename:path}")
 async def assets(filename: str) -> FileResponse:
-    root = _ASSETS.resolve()
-    path = (_ASSETS / filename).resolve()
-    if not path.is_file() or root not in path.parents:
-        raise HTTPException(status_code=404)
-    media = _MEDIA.get(path.suffix, "application/octet-stream")
-    return FileResponse(path, media_type=media)
+    return serve_asset(_ASSETS, filename)
 
 
 @router.websocket("/whoami/ws/{code}")
@@ -182,8 +166,14 @@ async def _handle(room, pid: str, msg: dict) -> None:
         if player is None:
             return
         try:
+            rate_limit_ws_message("whoami", room.code, pid, mtype=mtype)
             changed = _dispatch(room, player, mtype, msg)
         except MoveError as exc:
+            ws = room.sockets.get(pid)
+            if ws:
+                await ws.send_json({"type": "error", "message": str(exc)})
+            return
+        except WsRateLimitError as exc:
             ws = room.sockets.get(pid)
             if ws:
                 await ws.send_json({"type": "error", "message": str(exc)})

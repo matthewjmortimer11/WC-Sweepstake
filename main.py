@@ -1002,6 +1002,8 @@ async def lifespan(app: FastAPI):
         await task
     except asyncio.CancelledError:
         pass
+    from party.stats import stop_all_managers
+    await stop_all_managers()
     await engine.dispose()
 
 
@@ -1029,6 +1031,30 @@ async def games_page():
     if not _GAMES_TEMPLATE.is_file():
         raise HTTPException(status_code=404, detail="not found")
     return HTMLResponse(content=_GAMES_TEMPLATE.read_text(encoding="utf-8"))
+
+
+@app.get("/health")
+async def health():
+    return {"ok": True}
+
+
+@app.get("/ready")
+async def ready():
+    from party.stats import party_stats
+    from sqlalchemy import text
+
+    stats = party_stats()
+    db_ok = False
+    try:
+        async with engine.connect() as conn:
+            await conn.execute(text("SELECT 1"))
+        db_ok = True
+    except Exception:
+        db_ok = False
+    body = {"ok": db_ok, "party": stats}
+    if not db_ok:
+        return JSONResponse(body, status_code=503)
+    return body
 
 
 # Content Security Policy. Tuned to exactly what the app loads: React/Babel from

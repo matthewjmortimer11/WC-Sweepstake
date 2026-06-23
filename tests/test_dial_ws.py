@@ -199,18 +199,19 @@ def test_disconnected_guesser_does_not_block_reveal(client):
         room = manager.get(code)
         psychic = room.game.psychic_id
         guessers = [p for p in ("a", "b", "c") if p != psychic]
-        ws_psy = a if psychic == "a" else (b if psychic == "b" else c)
-        ws_g1 = b if psychic != "b" else c
-        ws_g2 = c if psychic != "c" else b
+        active_guesser, dropped_guesser = guessers[0], guessers[1]
+        ws_by_pid = {"a": a, "b": b, "c": c}
+        ws_psy = ws_by_pid[psychic]
+        ws_active = ws_by_pid[active_guesser]
 
         ws_psy.send_json({"type": "psychicReady"})
         _settle()
 
         # One guesser locks in; the other disconnects.
-        ws_g1.send_json({"type": "setGuess", "value": 50})
-        ws_g1.send_json({"type": "lockGuess"})
-        room.players[guessers[1]].connected = False
-        manager.handle_disconnect(room, guessers[1])
+        ws_active.send_json({"type": "setGuess", "value": 50})
+        ws_active.send_json({"type": "lockGuess"})
+        room.players[dropped_guesser].connected = False
+        manager.handle_disconnect(room, dropped_guesser)
         _settle()
 
         room = manager.get(code)

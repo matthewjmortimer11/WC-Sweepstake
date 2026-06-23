@@ -15,7 +15,11 @@ body{margin:0;font-family:var(--font);font-weight:600;color:var(--ink);
   -webkit-font-smoothing:antialiased;min-height:100dvh}
 .wrap{max-width:560px;margin:0 auto;padding:clamp(16px,4vw,32px);
   padding-bottom:max(20px,env(safe-area-inset-bottom));min-height:100dvh;display:flex;flex-direction:column;gap:20px}
-.topbar{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.topbar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.conn{display:inline-flex;align-items:center;gap:7px;font-family:var(--head);font-size:.74rem;font-weight:600;letter-spacing:.04em;color:var(--ink-3);text-transform:uppercase}
+.conn .dot{width:7px;height:7px;border-radius:50%;background:var(--got);flex-shrink:0}
+.conn.bad .dot{background:#fb5071;animation:pulse 1s steps(2) infinite}
+@keyframes pulse{50%{opacity:.35}}
 .brand{font-family:var(--head);font-weight:600;font-size:1.05rem;display:flex;align-items:center;gap:.5rem}
 .brand .tag{color:var(--ink-3);font-size:.7rem;text-transform:uppercase;letter-spacing:.14em;font-weight:700}
 a.back{color:var(--ink-2);text-decoration:none;font-size:.82rem;font-weight:700;border:1.5px solid var(--line-strong);

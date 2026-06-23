@@ -15,18 +15,19 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/whoami/assets/styles.css" />
+  <link rel="stylesheet" href="/whoami/assets/styles.css?v={{ASSET_VERSION}}" />
 </head>
 <body>
   <main class="wrap">
     <div class="topbar">
       <span class="brand">🪪 Who Am I? <span class="tag">Wheesht</span></span>
+      <span class="conn" id="conn" hidden aria-live="polite"><span class="dot"></span><span class="lbl">Live</span></span>
       <a class="back" href="/games">← Games</a>
     </div>
     <div id="app" aria-live="polite"></div>
     <p class="foot">A Wheesht party game · online rooms · <a class="foot-link" href="#/local">one phone</a></p>
   </main>
   <div id="toast" class="toast" hidden></div>
-  <script src="/whoami/assets/app.js" defer></script>
+  <script src="/whoami/assets/app.js?v={{ASSET_VERSION}}" defer></script>
 </body>
 </html>

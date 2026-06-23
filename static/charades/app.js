@@ -17,8 +17,9 @@
   let localMode = false;
   let charadeTimerKey = null;
   let lastRouteCode = null;
+  let pingTimer = null;
 
-  const state = { room: null, you: null, pendingSettings: null };
+  const state = { room: null, you: null, pendingSettings: null, connected: false, creating: false };
 
   const lobbyMin = (room) => (room && room.settings && room.settings.minPlayers) || MIN_PLAYERS;
   const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
@@ -124,12 +125,34 @@
     copyText(url, "Invite link copied");
   }
 
+  function renderConnState() {
+    const c = document.getElementById("conn");
+    if (!c) return;
+    const inRoom = !localMode && routeCode;
+    c.hidden = !inRoom;
+    if (!inRoom) return;
+    c.classList.toggle("bad", !state.connected);
+    const lbl = c.querySelector(".lbl");
+    if (lbl) lbl.textContent = state.connected ? "Live" : "Reconnecting…";
+  }
+
+  function startPing() {
+    clearPing();
+    pingTimer = setInterval(() => {
+      if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: "ping" }));
+    }, 25000);
+  }
+
+  function clearPing() {
+    if (pingTimer) { clearInterval(pingTimer); pingTimer = null; }
+  }
+
   function connect(code) {
     if (ws) { try { ws.close(); } catch (_) {} ws = null; }
     const proto = location.protocol === "https:" ? "wss:" : "ws:";
     const url = `${proto}//${location.host}/charades/ws/${code}?pid=${encodeURIComponent(pid())}&name=${encodeURIComponent(playerName())}`;
     ws = new WebSocket(url);
-    ws.onopen = () => { reconnectDelay = 800; };
+    ws.onopen = () => { reconnectDelay = 800; state.connected = true; renderConnState(); startPing(); };
     ws.onmessage = (ev) => {
       let msg;
       try { msg = JSON.parse(ev.data); } catch (_) { return; }
@@ -150,6 +173,9 @@
       }
     };
     ws.onclose = () => {
+      state.connected = false;
+      clearPing();
+      renderConnState();
       if (routeCode) {
         clearTimeout(reconnectTimer);
         reconnectTimer = setTimeout(() => {
@@ -161,13 +187,17 @@
   }
 
   async function createRoom() {
+    if (state.creating) return;
+    state.creating = true;
+    render();
     const body = state.pendingSettings || { timerSecs: 60 };
     const r = await fetch("/charades/api/rooms", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
-    if (!r.ok) { toast("Couldn't create room."); return; }
+    state.creating = false;
+    if (!r.ok) { toast("Couldn't create room."); render(); return; }
     location.hash = `#/room/${(await r.json()).code}`;
   }
 
@@ -247,7 +277,9 @@
       el("p", { class: "lede", text: "One celebrity to mime each round — no talking, no pointing. Everyone guesses on their own device." }),
       el("label", { class: "fl" }, [el("span", { text: "Your name" }), nameIn]),
       el("button", {
-        class: "btn btn--primary btn--lg btn--block", text: "Create room →",
+        class: "btn btn--primary btn--lg btn--block",
+        text: state.creating ? "Creating room…" : "Create room →",
+        disabled: state.creating ? "disabled" : false,
         onclick: () => { saveName(nameIn.value.trim()); createRoom(); },
       }),
       el("div", { class: "row" }, [
@@ -520,14 +552,17 @@
   }
 
   function render() {
-    if (localMode) { renderLocal(); return; }
+    if (localMode) { clearPing(); renderConnState(); renderLocal(); return; }
     if (!routeCode) {
       clearCharadeTimer();
       charadeTimerKey = null;
+      clearPing();
+      renderConnState();
       app.replaceChildren(homeScreen());
       return;
     }
     if (!state.room) {
+      renderConnState();
       app.replaceChildren(el("div", { class: "panel" }, [el("p", { class: "note", text: "Connecting to room…" })]));
       return;
     }
@@ -541,6 +576,7 @@
       app.replaceChildren(you.isActor ? actorScreen() : waitScreen());
       syncCharadeTimer(game, you);
     }
+    renderConnState();
     window.scrollTo(0, 0);
   }
 

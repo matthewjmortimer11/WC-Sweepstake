@@ -25,6 +25,11 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Request, WebSocke
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 from pydantic import BaseModel
 
+from party.assets import serve_asset
+from party.pages import render_game_page
+from party.ratelimit import WsRateLimitError, rate_limit_create, rate_limit_ws_message
+from party.stats import ensure_can_create_room
+
 from . import auth, store
 from .avatars import decode_data_url
 from .game import BLUE, RED, STATUS_LOBBY, MAX_ASSASSINS, MIN_PLAYERS, MoveError, Settings, HouseRules
@@ -125,12 +130,10 @@ def get_cipher_user(
 
 @router.get("/play", response_class=HTMLResponse)
 async def play_page() -> HTMLResponse:
-    if not _TEMPLATE.is_file():
-        raise HTTPException(status_code=404)
-    return HTMLResponse(
-        _TEMPLATE.read_text(encoding="utf-8"),
-        headers={"Content-Security-Policy": _PLAY_CSP},
-    )
+    try:
+        return render_game_page(_TEMPLATE, _PLAY_CSP)
+    except FileNotFoundError:
+        raise HTTPException(status_code=404) from None
 
 
 @router.get("/play/manifest.webmanifest")
@@ -355,6 +358,8 @@ async def leaderboard() -> JSONResponse:
 
 @router.post("/play/api/rooms")
 async def create_room(request: Request) -> JSONResponse:
+    rate_limit_create(request)
+    ensure_can_create_room()
     manager.start()
     # An optional packId lets the home screen spin up a room pre-tuned to a
     # mode (e.g. "afterdark") so the choice is made upfront, not buried in
@@ -404,12 +409,7 @@ async def create_room(request: Request) -> JSONResponse:
 
 @router.get("/play/assets/{filename:path}")
 async def assets(filename: str) -> FileResponse:
-    root = _ASSETS.resolve()
-    path = (_ASSETS / filename).resolve()
-    if not path.is_file() or root not in path.parents:
-        raise HTTPException(status_code=404)
-    media = _MEDIA.get(path.suffix, "application/octet-stream")
-    return FileResponse(path, media_type=media)
+    return serve_asset(_ASSETS, filename)
 
 
 # ── settings parsing ───────────────────────────────────────────────────────────
@@ -583,8 +583,14 @@ async def _handle(room, pid: str, msg: dict) -> None:
         if player is None:
             return
         try:
+            rate_limit_ws_message("cipher", room.code, pid, mtype=mtype)
             changed = await _dispatch(room, player, mtype, msg)
         except MoveError as exc:
+            ws = room.sockets.get(pid)
+            if ws:
+                await ws.send_json({"type": "error", "message": str(exc)})
+            return
+        except WsRateLimitError as exc:
             ws = room.sockets.get(pid)
             if ws:
                 await ws.send_json({"type": "error", "message": str(exc)})
