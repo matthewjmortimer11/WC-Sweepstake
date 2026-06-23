@@ -38,6 +38,17 @@ def test_imposter_has_game_surface(client):
     assert "charades" not in js.lower()
 
 
+def test_imposter_play_screen_defines_host(client):
+    """onlinePlayScreen must resolve host from the player list (not undefined `me`)."""
+    js = client.get("/imposter/assets/app.js").text
+    play_start = js.index("function onlinePlayScreen()")
+    play_end = js.index("function onlineGameScreen()", play_start)
+    play_block = js[play_start:play_end]
+    assert "const me = playerById(you.id)" in play_block
+    assert "armDiscussionTimer" in js
+    assert "syncDiscussionTimer" in js
+
+
 def test_imposter_has_local_link(client):
     t = client.get("/imposter").text
     assert 'href="#/local"' in t

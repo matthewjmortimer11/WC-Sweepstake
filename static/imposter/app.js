@@ -15,6 +15,8 @@
   let routeCode = null;
   let localMode = false;
   let lastRouteCode = null;
+  let timerInterval = null;
+  let discussionTimerKey = null;
 
   const state = {
     connected: false,
@@ -198,6 +200,38 @@
     );
   }
 
+  function armDiscussionTimer(total) {
+    if (!total) return;
+    const deadline = Date.now() + total * 1000;
+    const wrap = document.getElementById("imp-timer");
+    const bar = document.getElementById("imp-timer-bar");
+    const txt = document.getElementById("imp-timer-text");
+    const tick = () => {
+      const left = Math.max(0, deadline - Date.now());
+      if (txt) txt.textContent = left > 0 ? Math.ceil(left / 1000) + "s" : "Time's up!";
+      if (bar) bar.style.width = (100 * left / (total * 1000)) + "%";
+      if (left <= 0) {
+        if (wrap) wrap.classList.add("up");
+        if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+      }
+    };
+    tick();
+    timerInterval = setInterval(tick, 200);
+  }
+
+  function clearDiscussionTimer() {
+    if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+  }
+
+  function syncDiscussionTimer(game) {
+    const nextKey = game.status === "playing" && game.phase === "play"
+      ? `${(game.playerIds || []).join()}:${game.timerSecs}` : null;
+    if (nextKey === discussionTimerKey) return;
+    clearDiscussionTimer();
+    discussionTimerKey = nextKey;
+    if (nextKey && game.timerSecs > 0) armDiscussionTimer(game.timerSecs);
+  }
+
   // ── Online screens ───────────────────────────────────────────────────────
 
   function homeScreen() {
@@ -346,14 +380,21 @@
     const room = state.room;
     const game = room.game;
     const you = state.you;
+    const me = playerById(you.id) || you;
     const celeb = game.mode === "celebrity";
     const readyNote = celeb
       ? "Everyone's seen their star. Dance! Then vote for the odd one out."
       : "Everyone's seen their role. Time to find the imposter.";
 
+    const timer = game.timerSecs > 0 ? el("div", { class: "ch-timer", id: "imp-timer" }, [
+      el("div", { class: "ch-timer__bar", id: "imp-timer-bar" }),
+      el("span", { class: "ch-timer__text", id: "imp-timer-text", text: game.timerSecs + "s" }),
+    ]) : null;
+
     const bits = [
       el("span", { class: "eyebrow", text: celeb ? "Celebrity Dance" : "Classic" }),
       el("p", { class: "note", text: readyNote }),
+      timer,
     ];
 
     if (celeb && game.revealAnswer) {
@@ -601,22 +642,34 @@
 
   function render() {
     if (localMode) {
+      clearDiscussionTimer();
+      discussionTimerKey = null;
       renderLocal();
       return;
     }
     if (!routeCode) {
+      clearDiscussionTimer();
+      discussionTimerKey = null;
       app.replaceChildren(homeScreen());
       return;
     }
     if (!state.room) {
+      clearDiscussionTimer();
+      discussionTimerKey = null;
       app.replaceChildren(el("div", { class: "panel" }, [
         el("p", { class: "note", text: "Connecting to room…" }),
       ]));
       return;
     }
     const game = state.room.game;
-    if (game.status === "lobby") app.replaceChildren(lobbyScreen());
-    else app.replaceChildren(onlineGameScreen());
+    if (game.status === "lobby") {
+      clearDiscussionTimer();
+      discussionTimerKey = null;
+      app.replaceChildren(lobbyScreen());
+    } else {
+      app.replaceChildren(onlineGameScreen());
+      syncDiscussionTimer(game);
+    }
     window.scrollTo(0, 0);
   }
 
@@ -633,6 +686,7 @@
     if (routeChanged) {
       clearTimeout(reconnectTimer);
       lastRouteCode = routeCode;
+      discussionTimerKey = null;
       if (!routeCode) {
         if (ws) { try { ws.close(); } catch (_) {} ws = null; }
         state.room = null;
