@@ -88,17 +88,29 @@
     }
   }
 
-  function confirmMaturePacks(packIds) {
-    const mature = packIds.filter((id) => {
+  function confirmMaturePacks(packIds, prevIds) {
+    const prev = new Set(prevIds || []);
+    const newlyMature = packIds.filter((id) => {
+      if (prev.has(id)) return false;
       const p = state.packs.find((x) => x.id === id);
       return p && p.tier === "mature";
     });
-    if (!mature.length) return true;
-    const names = mature.map((id) => (state.packs.find((x) => x.id === id) || {}).name).filter(Boolean).join(", ");
+    if (!newlyMature.length) return true;
+    const names = newlyMature.map((id) => (state.packs.find((x) => x.id === id) || {}).name).filter(Boolean).join(", ");
     return window.confirm(
       `You've selected mature packs (${names}) — dictators, tyrants and controversial figures. `
       + "Only continue if everyone in the room is comfortable. Start anyway?"
     );
+  }
+
+  function refreshPackGrid(grid, selectedIds) {
+    const ids = selectedIds || ["uk_celebs"];
+    grid.querySelectorAll(".pack-opt").forEach((btn) => {
+      const id = btn.dataset.pack;
+      const on = ids.includes(id);
+      btn.classList.toggle("on", on);
+      btn.setAttribute("aria-pressed", on ? "true" : "false");
+    });
   }
 
   function packToggleGrid(selectedIds, onToggle, editable) {
@@ -110,14 +122,16 @@
         const btn = el("button", {
           type: "button",
           class: "pack-opt" + (on ? " on" : "") + (p.tier === "mature" ? " pack-opt--mature" : ""),
+          "data-pack": p.id,
           "aria-pressed": on ? "true" : "false",
           disabled: editable ? false : "disabled",
           onclick: () => {
             if (!editable) return;
             let next = on ? ids.filter((x) => x !== p.id) : [...ids, p.id];
             if (!next.length) next = ["uk_celebs"];
-            if (!confirmMaturePacks(next)) return;
+            if (!confirmMaturePacks(next, ids)) return;
             onToggle(next);
+            refreshPackGrid(grid, next);
           },
         }, [
           el("span", { class: "pack-opt__emoji", text: p.emoji || "📦" }),
@@ -249,7 +263,7 @@
 
   async function createRoom(packIds) {
     const ids = packIds && packIds.length ? packIds : state.homePackIds;
-    if (!confirmMaturePacks(ids)) return;
+    if (!confirmMaturePacks(ids, [])) return;
     const r = await fetch("/whoami/api/rooms", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -279,7 +293,10 @@
   }
 
   function homeScreen() {
-    const nameIn = el("input", { class: "in", maxlength: "24", value: playerName(), placeholder: "Your name" });
+    const nameIn = el("input", {
+      class: "in", maxlength: "24", value: playerName(), placeholder: "Your name",
+      oninput: (e) => saveName(e.target.value.trim()),
+    });
     const joinIn = el("input", { class: "in", maxlength: "6", placeholder: "Room code", style: "text-transform:uppercase;letter-spacing:.15em" });
     return el("div", { class: "panel" }, [
       el("span", { class: "eyebrow", text: "Online" }),
@@ -287,7 +304,7 @@
       el("p", { class: "lede", text: "Everyone gets a secret identity stuck to their forehead — UK celebs, Marvel heroes, cartoon characters, random objects, or notorious figures. You see everyone else's card, not your own. Ask yes/no questions until you guess it." }),
       el("label", { class: "fl" }, [
         el("span", { text: "Identity packs" }),
-        packToggleGrid(state.homePackIds, (ids) => { state.homePackIds = ids; render(); }, true),
+        packToggleGrid(state.homePackIds, (ids) => { state.homePackIds = ids; }, true),
       ]),
       el("label", { class: "fl" }, [el("span", { text: "Your name" }), nameIn]),
       el("button", {
@@ -325,16 +342,25 @@
 
     const packIds = (room.settings && room.settings.packIds) || ["uk_celebs"];
     const packName = (room.settings && room.settings.packName) || "UK Celebs";
+    const identityCount = (room.settings && room.settings.identityCount) || 0;
+    const enoughIdentities = identityCount >= connected;
 
     const hostBits = me.isHost ? [
       el("label", { class: "fl" }, [
         el("span", { text: "Identity packs" }),
         packToggleGrid(packIds, (ids) => sendPackSettings(ids), true),
       ]),
+      enoughIdentities
+        ? el("p", { class: "note tiny muted", text: `${identityCount} identities from ${packName}` })
+        : el("p", { class: "note", text: `Only ${identityCount} identities in ${packName} — need ${connected}. Add more packs.` }),
       el("button", {
         class: "btn btn--primary btn--lg btn--block",
-        text: canStart ? `Start game (${connected} players) →` : `Waiting for players (${connected}/${minP})…`,
-        disabled: canStart ? false : "disabled",
+        text: !canStart
+          ? `Waiting for players (${connected}/${minP})…`
+          : !enoughIdentities
+            ? `Need more packs (${identityCount}/${connected} identities)`
+            : `Start game (${connected} players) →`,
+        disabled: canStart && enoughIdentities ? false : "disabled",
         onclick: () => send({ type: "start" }),
       }),
     ] : [
@@ -454,7 +480,13 @@
   function render() {
     app.replaceChildren();
     if (!state.room) {
-      app.append(homeScreen());
+      if (routeCode) {
+        app.append(el("div", { class: "panel" }, [
+          el("p", { class: "note", text: "Connecting to room…" }),
+        ]));
+      } else {
+        app.append(homeScreen());
+      }
       return;
     }
     const status = state.room.game && state.room.game.status;
@@ -466,11 +498,14 @@
     await loadPacks();
     parseRoute();
     if (routeCode !== lastRouteCode) {
+      clearTimeout(reconnectTimer);
       lastRouteCode = routeCode;
-      if (routeCode) connect(routeCode);
-      else {
+      if (routeCode) {
+        state.room = null;
+        state.you = null;
+        connect(routeCode);
+      } else {
         if (ws) { try { ws.close(); } catch (_) {} ws = null; }
-        clearTimeout(reconnectTimer);
         state.room = null;
         state.you = null;
       }

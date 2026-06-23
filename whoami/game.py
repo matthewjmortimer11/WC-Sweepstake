@@ -5,7 +5,7 @@ from __future__ import annotations
 import random
 from dataclasses import dataclass, field
 
-from .packs import DEFAULT_PACK_IDS, characters_for_packs, normalize_pack_ids, pack_label
+from .packs import DEFAULT_PACK_IDS, characters_for_packs
 
 STATUS_LOBBY = "lobby"
 STATUS_PLAYING = "playing"

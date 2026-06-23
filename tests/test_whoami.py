@@ -25,7 +25,7 @@ def test_whoami_has_game_surface(client):
     for marker in (
         "Create room", "Share game link", "confirmGuess", "claimGotIt",
         "They got it!", "I got it!", "Change photo", "newRound",
-        "packToggleGrid", "Identity packs", "/whoami/api/packs",
+        "packToggleGrid", "Identity packs", "/whoami/api/packs", "identityCount",
     ):
         assert marker in js, f"missing Who Am I? JS marker: {marker!r}"
 

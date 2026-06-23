@@ -194,3 +194,13 @@ def test_settings_pack_change_in_lobby(client):
     assert room.settings.pack_ids == ["cartoons", "marvel"]
     state = room.state_for(host_id)
     assert state["room"]["settings"]["packIds"] == ["cartoons", "marvel"]
+    assert state["room"]["settings"]["identityCount"] > 0
+
+
+def test_start_blocked_when_pool_too_small(client):
+    from whoami.game import MoveError
+
+    code = client.post("/whoami/api/rooms", json={"packIds": ["objects"]}).json()["code"]
+    room, pids = _room_with_players(code, 45)
+    with pytest.raises(MoveError, match="Not enough identities"):
+        manager.start_game(room)

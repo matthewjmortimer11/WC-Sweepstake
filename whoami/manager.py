@@ -19,6 +19,7 @@ from .game import (
     Settings,
     WhoAmIGame,
 )
+from .packs import characters_for_packs
 
 _CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
 _ROOM_TTL_EMPTY = 120
@@ -111,6 +112,7 @@ class Room:
                     "maxPlayers": MAX_PLAYERS,
                     "packIds": list(self.settings.pack_ids),
                     "packName": self.settings.pack_name,
+                    "identityCount": len(characters_for_packs(self.settings.pack_ids)),
                 },
                 "game": g.view(pid, connected_ids=connected_ids),
             },
@@ -252,6 +254,11 @@ class Manager:
             raise MoveError(f"Need at least {MIN_PLAYERS} connected players.")
         if n > MAX_PLAYERS:
             raise MoveError(f"Too many players (max {MAX_PLAYERS}).")
+        pool_size = len(characters_for_packs(room.settings.pack_ids))
+        if pool_size < n:
+            raise MoveError(
+                f"Not enough identities ({pool_size}) for {n} players — add more packs."
+            )
         room.game.start_game(connected, room.rng)
 
 
