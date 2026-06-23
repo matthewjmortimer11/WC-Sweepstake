@@ -284,7 +284,7 @@
     const cls = "wai-card" + (isYou ? " you" : "") + (card.claimed ? " done" : "");
 
     const charEl = el("div", {
-      class: "wai-card__char" + (card.hidden ? " hidden" : ""),
+      class: "wai-card__char" + (card.hidden ? " hidden" : " reveal"),
       text: card.hidden ? "???  (ask the others)" : (card.character || "…"),
     });
 
@@ -374,6 +374,7 @@
       if (routeCode) connect(routeCode);
       else {
         if (ws) { try { ws.close(); } catch (_) {} ws = null; }
+        clearTimeout(reconnectTimer);
         state.room = null;
         state.you = null;
       }

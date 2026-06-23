@@ -58,10 +58,10 @@ class WhoAmIGame:
         self.status = STATUS_PLAYING
         self.phase = PHASE_GUESSING
 
-    def new_round(self, rng: random.Random) -> None:
+    def new_round(self, rng: random.Random, connected_ids: set[str] | None = None) -> None:
         if self.status != STATUS_PLAYING:
             raise MoveError("No round in progress.")
-        if not self.all_claimed():
+        if not self.all_claimed(connected_ids):
             raise MoveError("Everyone must guess before the next round.")
         self._deal(rng)
         self.phase = PHASE_GUESSING
@@ -92,8 +92,14 @@ class WhoAmIGame:
             raise MoveError("Wait for someone else to confirm you got it.")
         self.claimed.add(pid)
 
-    def all_claimed(self) -> bool:
-        return bool(self.player_ids) and all(p in self.claimed for p in self.player_ids)
+    def _active_ids(self, connected_ids: set[str] | None) -> list[str]:
+        if connected_ids is None:
+            return list(self.player_ids)
+        return [p for p in self.player_ids if p in connected_ids]
+
+    def all_claimed(self, connected_ids: set[str] | None = None) -> bool:
+        targets = self._active_ids(connected_ids)
+        return bool(targets) and all(p in self.claimed for p in targets)
 
     def can_claim(self, pid: str) -> bool:
         if pid in self.claimed or pid not in self.player_ids:
@@ -102,7 +108,7 @@ class WhoAmIGame:
         confirmed = self.confirmed_by.get(pid, set())
         return any(o in confirmed for o in others)
 
-    def view(self, pid: str) -> dict:
+    def view(self, pid: str, *, connected_ids: set[str] | None = None) -> dict:
         cards = []
         for other_id in self.player_ids:
             confirmed = sorted(self.confirmed_by.get(other_id, set()))
@@ -112,7 +118,7 @@ class WhoAmIGame:
                 "confirmCount": len(confirmed),
                 "confirmedByYou": pid in confirmed,
             }
-            if other_id == pid:
+            if other_id == pid and other_id not in self.claimed:
                 entry["character"] = None
                 entry["hidden"] = True
             else:
@@ -125,7 +131,7 @@ class WhoAmIGame:
             "phase": self.phase,
             "playerIds": list(self.player_ids),
             "cards": cards,
-            "allClaimed": self.all_claimed(),
+            "allClaimed": self.all_claimed(connected_ids),
             "canClaim": self.can_claim(pid),
             "youClaimed": pid in self.claimed,
         }

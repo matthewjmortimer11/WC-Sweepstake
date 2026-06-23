@@ -191,7 +191,8 @@ def _dispatch(room, player, mtype: str, msg: dict) -> bool:
     if mtype == "newRound":
         if not player.is_host:
             raise MoveError("Only the host can start a new round.")
-        game.new_round(room.rng)
+        connected_ids = {p.id for p in room.players.values() if p.connected}
+        game.new_round(room.rng, connected_ids)
         return True
 
     if mtype == "confirmGuess":

@@ -86,3 +86,39 @@ def test_variable_player_count(client):
     manager.start_game(room)
     assert len(room.game.player_ids) == 5
     assert len(set(room.game.char_by_pid.values())) == 5
+
+
+def test_own_identity_revealed_after_claim(client):
+    code = client.post("/whoami/api/rooms").json()["code"]
+    room, pids = _room_with_players(code, 2)
+    manager.start_game(room)
+    a, b = pids
+    room.game.confirm_guess(b, a)
+    room.game.claim_got_it(a)
+    own = next(c for c in room.state_for(a)["room"]["game"]["cards"] if c["id"] == a)
+    assert own["hidden"] is False
+    assert own["character"]
+
+
+def test_disconnect_does_not_block_round(client):
+    code = client.post("/whoami/api/rooms").json()["code"]
+    room, pids = _room_with_players(code, 3)
+    manager.start_game(room)
+    a, b, c = pids
+    room.game.confirm_guess(b, a)
+    room.game.claim_got_it(a)
+    room.game.confirm_guess(a, b)
+    room.game.claim_got_it(b)
+    room.players[c].connected = False
+    connected = {p.id for p in room.players.values() if p.connected}
+    assert room.game.all_claimed(connected)
+
+
+def test_mid_game_join_blocked(client):
+    from whoami.game import MoveError
+
+    code = client.post("/whoami/api/rooms").json()["code"]
+    room, _ = _room_with_players(code, 2)
+    manager.start_game(room)
+    with pytest.raises(MoveError, match="in progress"):
+        manager.join(room, "newbie", "Latecomer")

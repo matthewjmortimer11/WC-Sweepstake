@@ -100,6 +100,7 @@ class Room:
     def state_for(self, pid: str) -> dict:
         g = self.game
         me = self.players.get(pid)
+        connected_ids = {p.id for p in self.players.values() if p.connected}
         return {
             "type": "state",
             "room": {
@@ -109,7 +110,7 @@ class Room:
                     "minPlayers": MIN_PLAYERS,
                     "maxPlayers": MAX_PLAYERS,
                 },
-                "game": g.view(pid),
+                "game": g.view(pid, connected_ids=connected_ids),
             },
             "you": {
                 "id": pid,
@@ -174,6 +175,8 @@ class Manager:
     def join(self, room: Room, pid: str, name: str) -> Player:
         name = _clean_name(name)
         existing = room.players.get(pid)
+        if existing is None and room.game.status == STATUS_PLAYING:
+            raise MoveError("Game in progress — wait for the next round.")
         if existing:
             existing.name = name or existing.name
             existing.connected = True
