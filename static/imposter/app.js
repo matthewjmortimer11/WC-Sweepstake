@@ -13,6 +13,7 @@
   let reconnectDelay = 800;
   let routeCode = null;
   let localMode = false;
+  let charadeTimerKey = null;
 
   const state = {
     connected: false,
@@ -310,8 +311,6 @@
     const you = state.you;
     const mode = game.mode;
 
-    if (mode === "charades") return onlineCharadeActorScreen();
-
     if (you.hasViewed) {
       const waiting = (game.viewed || []).length;
       return el("div", { class: "panel" }, [
@@ -449,8 +448,9 @@
   function onlineCharadeWaitScreen() {
     const room = state.room;
     const game = room.game;
+    const you = state.you;
     const actor = playerById(game.charadesActorId);
-    return el("div", { class: "panel" }, [
+    const bits = [
       el("span", { class: "eyebrow", text: "Charades" }),
       charadesScorebar(room.players, game.charadesScores, game.charadesActorId),
       el("p", { class: "note", text: "Guess the celebrity being acted out." }),
@@ -459,7 +459,14 @@
         el("div", { class: "turn-name", text: (actor && actor.name) || "…" }),
       ]),
       el("p", { class: "note", text: "Watch and guess — the actor taps who got it right." }),
-    ]);
+    ];
+    if (you.isHost) {
+      bits.push(el("button", {
+        class: "btn btn--ghost btn--block", text: "Skip turn →",
+        onclick: () => send({ type: "skipCharade" }),
+      }));
+    }
+    return el("div", { class: "panel" }, bits);
   }
 
   function onlineGameScreen() {
@@ -751,13 +758,24 @@
 
   // ── Render router ────────────────────────────────────────────────────────
 
+  function syncCharadeTimer(game, you) {
+    const nextKey = game.mode === "charades" && game.phase === "charade" && you.isActor
+      ? `${game.charadesActorId}:${game.charadesWord}:${game.timerSecs}`
+      : null;
+    if (nextKey === charadeTimerKey) return;
+    clearCharadeTimer();
+    charadeTimerKey = nextKey;
+    if (nextKey && game.timerSecs > 0) armCharadeTimer(game.timerSecs);
+  }
+
   function render() {
     if (localMode) {
       renderLocal();
       return;
     }
-    clearCharadeTimer();
     if (!routeCode) {
+      clearCharadeTimer();
+      charadeTimerKey = null;
       app.replaceChildren(homeScreen());
       return;
     }
@@ -768,12 +786,14 @@
       return;
     }
     const game = state.room.game;
-    if (game.status === "lobby") app.replaceChildren(lobbyScreen());
-    else {
+    const you = state.you;
+    if (game.status === "lobby") {
+      clearCharadeTimer();
+      charadeTimerKey = null;
+      app.replaceChildren(lobbyScreen());
+    } else {
       app.replaceChildren(onlineGameScreen());
-      if (game.mode === "charades" && game.phase === "charade" && state.you.isActor && game.timerSecs > 0) {
-        armCharadeTimer(game.timerSecs);
-      }
+      syncCharadeTimer(game, you);
     }
     window.scrollTo(0, 0);
   }

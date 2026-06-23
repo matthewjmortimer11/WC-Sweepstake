@@ -99,6 +99,54 @@ def test_charades_actor_sees_word(client):
         assert "charadesWord" not in view
 
 
+def test_peek_advances_when_player_abandons(client):
+    code = client.post("/imposter/api/rooms", json={"mode": "classic"}).json()["code"]
+    room, pids = _room_with_four(code)
+    manager.start_game(room)
+
+    for pid in pids[:3]:
+        room.game.mark_viewed(pid)
+    assert room.game.phase == "peek"
+
+    room.game.abandon_peek(pids[3])
+    assert room.game.phase == "play"
+    assert len(room.game.viewed) == 4
+
+
+def test_award_charade_requires_actor(client):
+    from imposter.game import MoveError
+    from imposter.manager import Player
+    from imposter.router import _dispatch
+
+    code = client.post("/imposter/api/rooms", json={"mode": "charades"}).json()["code"]
+    room, pids = _room_with_four(code)
+    manager.start_game(room)
+    actor_id = room.game.actor_id()
+    non_actor = next(p for p in pids if p != actor_id)
+    guesser = next(p for p in pids if p not in (actor_id, non_actor))
+
+    room.players[actor_id] = Player(id=actor_id, name="Actor", connected=True)
+    room.players[non_actor] = Player(id=non_actor, name="Other", connected=True)
+
+    with pytest.raises(MoveError, match="actor"):
+        _dispatch(room, room.players[non_actor], "awardCharade", {"guesserId": guesser})
+
+
+def test_host_can_skip_charade(client):
+    from imposter.router import _dispatch
+
+    code = client.post("/imposter/api/rooms", json={"mode": "charades"}).json()["code"]
+    room, pids = _room_with_four(code)
+    manager.start_game(room)
+    first_actor = room.game.actor_id()
+    host_id = pids[0]
+    for p in room.players.values():
+        p.is_host = (p.id == host_id)
+
+    _dispatch(room, room.players[host_id], "skipCharade", {})
+    assert room.game.actor_id() != first_actor
+
+
 def test_ws_join_broadcasts_state(client):
     code = client.post("/imposter/api/rooms", json={"mode": "classic"}).json()["code"]
     with client.websocket_connect(f"/imposter/ws/{code}?pid=p1&name=One") as ws:

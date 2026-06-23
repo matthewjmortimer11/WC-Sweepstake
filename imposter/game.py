@@ -108,6 +108,17 @@ class ImposterGame:
         if len(self.viewed) >= len(self.player_ids):
             self.phase = PHASE_PLAY
 
+    def abandon_peek(self, pid: str) -> bool:
+        """Treat a disconnected player as done peeking so the round can continue."""
+        if self.status != STATUS_PLAYING or self.phase != PHASE_PEEK:
+            return False
+        if pid not in self.player_ids:
+            return False
+        self.viewed.add(pid)
+        if len(self.viewed) >= len(self.player_ids):
+            self.phase = PHASE_PLAY
+        return True
+
     def reveal_answer(self) -> None:
         if self.status != STATUS_PLAYING or self.settings.mode != MODE_CELEBRITY:
             raise MoveError("Reveal is only for Celebrity Dance.")

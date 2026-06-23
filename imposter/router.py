@@ -10,7 +10,7 @@ from fastapi import APIRouter, HTTPException, Request, WebSocket, WebSocketDisco
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 
 from .celebs import CELEBS
-from .game import MODES, TIMER_OPTIONS, MODE_CLASSIC, STATUS_LOBBY, STATUS_PLAYING, MoveError, Settings
+from .game import MODES, TIMER_OPTIONS, MODE_CHARADES, MODE_CLASSIC, STATUS_LOBBY, STATUS_PLAYING, MoveError, Settings
 from .manager import _clean_name, manager
 
 router = APIRouter()
@@ -153,6 +153,9 @@ async def game_socket(ws: WebSocket, code: str) -> None:
             if pid in room.players:
                 room.players[pid].connected = False
                 room.players[pid].last_seen = time.time()
+            game = room.game
+            if game.status == STATUS_PLAYING:
+                game.abandon_peek(pid)
             manager._ensure_host(room)
             room.touch()
             await manager._broadcast(room)
@@ -224,8 +227,18 @@ def _dispatch(room, player, mtype: str, msg: dict) -> bool:
         return True
 
     if mtype == "awardCharade":
+        if player.id != game.actor_id():
+            raise MoveError("Only the actor can award a guess.")
         guesser = str(msg.get("guesserId", "")).strip()
         game.award_charade(guesser)
+        game._next_charades_turn(room.rng)
+        return True
+
+    if mtype == "skipCharade":
+        if not player.is_host:
+            raise MoveError("Only the host can skip a turn.")
+        if game.status != STATUS_PLAYING or game.settings.mode != MODE_CHARADES:
+            raise MoveError("Not in charades.")
         game._next_charades_turn(room.rng)
         return True
 
