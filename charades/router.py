@@ -1,4 +1,4 @@
-"""Imposter — FastAPI router."""
+"""Charades — FastAPI router."""
 
 from __future__ import annotations
 
@@ -9,17 +9,17 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 
-from .celebs import CELEBS
-from .game import MODES, TIMER_OPTIONS, MODE_CLASSIC, PHASE_PEEK, STATUS_LOBBY, STATUS_PLAYING, MoveError, Settings
+from imposter.celebs import CELEBS
+from .game import TIMER_OPTIONS, STATUS_LOBBY, STATUS_PLAYING, MoveError, Settings
 from .manager import _clean_name, manager
 
 router = APIRouter()
 
-_TEMPLATE = Path("templates/imposter.html")
-_ASSETS = Path("static/imposter")
+_TEMPLATE = Path("templates/charades.html")
+_ASSETS = Path("static/charades")
 _MEDIA = {".js": "application/javascript", ".css": "text/css"}
 
-_IMPOSTER_CSP = (
+_CSP = (
     "default-src 'self'; "
     "script-src 'self'; "
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
@@ -46,34 +46,23 @@ def _rate_limit_create(request: Request) -> None:
 
 
 def _parse_settings(payload: dict, current: Settings) -> Settings:
-    mode = str(payload.get("mode", current.mode))
-    if mode not in MODES:
-        raise MoveError("Unknown game mode.")
     try:
         timer = int(payload.get("timerSecs", current.timer_secs))
     except (TypeError, ValueError):
         raise MoveError("Invalid timer.")
     if timer not in TIMER_OPTIONS:
         raise MoveError("Timer must be off, 30, 60, 90, or 120 seconds.")
-    return Settings(mode=mode, timer_secs=timer)
+    return Settings(timer_secs=timer)
 
 
-@router.get("/imposter", response_class=HTMLResponse)
-async def imposter_page() -> HTMLResponse:
+@router.get("/charades", response_class=HTMLResponse)
+async def charades_page() -> HTMLResponse:
     if not _TEMPLATE.is_file():
         raise HTTPException(status_code=404)
-    return HTMLResponse(
-        _TEMPLATE.read_text(encoding="utf-8"),
-        headers={"Content-Security-Policy": _IMPOSTER_CSP},
-    )
+    return HTMLResponse(_TEMPLATE.read_text(encoding="utf-8"), headers={"Content-Security-Policy": _CSP})
 
 
-@router.get("/imposter/api/celebs")
-async def celebs_meta() -> JSONResponse:
-    return JSONResponse({"count": len(CELEBS)})
-
-
-@router.post("/imposter/api/rooms")
+@router.post("/charades/api/rooms")
 async def create_room(request: Request) -> JSONResponse:
     _rate_limit_create(request)
     manager.start()
@@ -87,14 +76,10 @@ async def create_room(request: Request) -> JSONResponse:
     except Exception:
         pass
     room = manager.create_room(settings)
-    return JSONResponse({
-        "code": room.code,
-        "mode": room.settings.mode,
-        "timerSecs": room.settings.timer_secs,
-    })
+    return JSONResponse({"code": room.code, "timerSecs": room.settings.timer_secs})
 
 
-@router.get("/imposter/assets/{filename:path}")
+@router.get("/charades/assets/{filename:path}")
 async def assets(filename: str) -> FileResponse:
     root = _ASSETS.resolve()
     path = (_ASSETS / filename).resolve()
@@ -104,7 +89,7 @@ async def assets(filename: str) -> FileResponse:
     return FileResponse(path, media_type=media)
 
 
-@router.websocket("/imposter/ws/{code}")
+@router.websocket("/charades/ws/{code}")
 async def game_socket(ws: WebSocket, code: str) -> None:
     manager.start()
     room = manager.get(code)
@@ -120,7 +105,7 @@ async def game_socket(ws: WebSocket, code: str) -> None:
 
     async with room.lock:
         try:
-            player = manager.join(room, pid, name)
+            manager.join(room, pid, name)
         except MoveError as exc:
             await ws.send_json({"type": "fatal", "message": str(exc)})
             await ws.close()
@@ -128,18 +113,14 @@ async def game_socket(ws: WebSocket, code: str) -> None:
         old = room.sockets.get(pid)
         room.sockets[pid] = ws
         room.touch()
-        game = room.game
-        if game.status == STATUS_PLAYING and game.phase == PHASE_PEEK:
-            game.viewed.discard(pid)
         await ws.send_json({"type": "hello", "pid": pid, "code": room.code})
         await manager._broadcast(room)
 
-    for stale in (old,):
-        if stale is not None and stale is not ws:
-            try:
-                await stale.close()
-            except Exception:
-                pass
+    if old is not None and old is not ws:
+        try:
+            await old.close()
+        except Exception:
+            pass
 
     try:
         while True:
@@ -156,9 +137,6 @@ async def game_socket(ws: WebSocket, code: str) -> None:
             if pid in room.players:
                 room.players[pid].connected = False
                 room.players[pid].last_seen = time.time()
-            game = room.game
-            if game.status == STATUS_PLAYING:
-                game.abandon_peek(pid)
             manager._ensure_host(room)
             room.touch()
             await manager._broadcast(room)
@@ -211,29 +189,40 @@ def _dispatch(room, player, mtype: str, msg: dict) -> bool:
         manager.start_game(room)
         return True
 
-    if mtype == "newRound":
+    if mtype == "awardCharade":
+        if player.id != game.actor_id():
+            raise MoveError("Only the actor can award a guess.")
+        guesser = str(msg.get("guesserId", "")).strip()
+        game.award(guesser)
+        game.next_turn(room.rng)
+        return True
+
+    if mtype == "skipCharade":
         if not player.is_host:
-            raise MoveError("Only the host can start a new round.")
+            raise MoveError("Only the host can skip a turn.")
         if game.status != STATUS_PLAYING:
-            raise MoveError("No round in progress.")
-        game.new_round(room.rng)
+            raise MoveError("No game in progress.")
+        game.next_turn(room.rng)
         return True
 
-    if mtype == "markViewed":
-        game.mark_viewed(player.id)
+    if mtype == "charadeNobody":
+        if player.id != game.actor_id():
+            raise MoveError("Only the actor can pass.")
+        game.nobody_guessed()
+        game.next_turn(room.rng)
         return True
 
-    if mtype == "revealAnswer":
-        if not player.is_host:
-            raise MoveError("Only the host can reveal the answer.")
-        game.reveal_answer()
+    if mtype == "newCharade":
+        if player.id != game.actor_id():
+            raise MoveError("Only the actor can pick a new charade.")
+        game.new_word(room.rng)
         return True
 
     if mtype == "reset":
         if not player.is_host:
             raise MoveError("Only the host can reset.")
-        from .game import ImposterGame
-        room.game = ImposterGame(settings=room.settings)
+        from .game import CharadesGame
+        room.game = CharadesGame(settings=room.settings)
         return True
 
     if mtype == "ping":

@@ -1010,12 +1010,23 @@ app = FastAPI(title="Wheesht — World Cup Sweepstake 2026", lifespan=lifespan)
 # Cipher — a customisable, real-time word-association party game served from
 # /play. Fully self-contained (in-memory rooms + WebSockets); see codenames/.
 from codenames import router as cipher_router  # noqa: E402
+from charades import router as charades_router  # noqa: E402
 from dial import router as dial_router  # noqa: E402
 from imposter import router as imposter_router  # noqa: E402
 
 app.include_router(cipher_router)
 app.include_router(dial_router)
 app.include_router(imposter_router)
+app.include_router(charades_router)
+
+_GAMES_TEMPLATE = Path("templates/games.html")
+
+
+@app.get("/games", response_class=HTMLResponse)
+async def games_page():
+    if not _GAMES_TEMPLATE.is_file():
+        raise HTTPException(status_code=404, detail="not found")
+    return HTMLResponse(content=_GAMES_TEMPLATE.read_text(encoding="utf-8"))
 
 
 # Content Security Policy. Tuned to exactly what the app loads: React/Babel from

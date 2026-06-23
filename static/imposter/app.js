@@ -7,13 +7,11 @@
   const LS = { pid: "imposter.pid", name: "imposter.name" };
   const CELEBS = window.IMPOSTER_CELEBS || [];
 
-  let timerInterval = null;
   let ws = null;
   let reconnectTimer = null;
   let reconnectDelay = 800;
   let routeCode = null;
   let localMode = false;
-  let charadeTimerKey = null;
   let lastRouteCode = null;
 
   const state = {
@@ -168,57 +166,6 @@
     }, [el("span", { text: label })]);
   }
 
-  function timerSeg(current, onPick) {
-    return el("div", { class: "timer-seg", role: "group", "aria-label": "Acting timer" },
-      [0, 30, 60, 90, 120].map((s) => el("button", {
-        class: "timer-opt" + (current === s ? " on" : ""),
-        "aria-pressed": current === s ? "true" : "false",
-        text: s === 0 ? "Off" : s + "s",
-        onclick: () => onPick(s),
-      }))
-    );
-  }
-
-  function charadesScorebar(players, scores, actorId) {
-    const entries = (players || []).map((p) => ({
-      id: p.id,
-      name: p.name,
-      score: (scores && scores[p.id]) || 0,
-    }));
-    const best = Math.max(0, ...entries.map((e) => e.score));
-    return el("div", { class: "scorebar", "aria-label": "Scores" },
-      entries.map((e) => el("span", {
-        class: "score-chip" + (e.id === actorId ? " act" : "") + (e.score === best && best > 0 ? " lead" : ""),
-      }, [
-        el("span", { class: "score-chip__n", text: e.name }),
-        el("b", { text: String(e.score) }),
-      ]))
-    );
-  }
-
-  function armCharadeTimer(total) {
-    if (!total) return;
-    const deadline = Date.now() + total * 1000;
-    const wrap = document.getElementById("ch-timer");
-    const bar = document.getElementById("ch-timer-bar");
-    const txt = document.getElementById("ch-timer-text");
-    const tick = () => {
-      const left = Math.max(0, deadline - Date.now());
-      if (txt) txt.textContent = left > 0 ? Math.ceil(left / 1000) + "s" : "Time's up!";
-      if (bar) bar.style.width = (100 * left / (total * 1000)) + "%";
-      if (left <= 0) {
-        if (wrap) wrap.classList.add("up");
-        if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
-      }
-    };
-    tick();
-    timerInterval = setInterval(tick, 200);
-  }
-
-  function clearCharadeTimer() {
-    if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
-  }
-
   // ── Online screens ───────────────────────────────────────────────────────
 
   function homeScreen() {
@@ -227,7 +174,7 @@
     return el("div", { class: "panel" }, [
       el("span", { class: "eyebrow", text: "Online" }),
       el("h1", {}, [document.createTextNode("Who's the "), el("span", { class: "em", text: "imposter?" })]),
-      el("p", { class: "lede", text: "Four players, four phones. Classic imposter, celebrity dance, or charades — everyone sees their own secret on their device." }),
+      el("p", { class: "lede", text: "Four players, four phones. Classic imposter or Celebrity Dance — everyone sees their own secret on their device." }),
       el("label", { class: "fl" }, [el("span", { text: "Your name" }), nameIn]),
       el("button", {
         class: "btn btn--primary btn--lg btn--block", text: "Create room →",
@@ -262,23 +209,14 @@
     });
 
     const hostBits = you.isHost ? [
-      el("div", { class: "modes", role: "group", "aria-label": "Game mode" }, [
+      el("div", { class: "modes modes--2", role: "group", "aria-label": "Game mode" }, [
         modeBtn("classic", "🕵️ Imposter", settings.mode, (id) => {
           send({ type: "settings", settings: { ...state.pendingSettings, mode: id } });
         }),
         modeBtn("celebrity", "💃 Celebrity Dance", settings.mode, (id) => {
           send({ type: "settings", settings: { ...state.pendingSettings, mode: id } });
         }),
-        modeBtn("charades", "🎭 Charades", settings.mode, (id) => {
-          send({ type: "settings", settings: { ...state.pendingSettings, mode: id } });
-        }),
       ]),
-      settings.mode === "charades" ? el("label", { class: "fl" }, [
-        el("span", { text: "Acting timer (optional)" }),
-        timerSeg(settings.timerSecs, (s) => {
-          send({ type: "settings", settings: { ...state.pendingSettings, timerSecs: s } });
-        }),
-      ]) : null,
       el("button", {
         class: "btn btn--primary btn--lg btn--block",
         text: connected === 4 ? "Start game →" : `Waiting for players (${connected}/4)…`,
@@ -361,13 +299,7 @@
     const room = state.room;
     const game = room.game;
     const you = state.you;
-    const mode = game.mode;
-
-    if (mode === "charades") {
-      return you.isActor ? onlineCharadeActorScreen() : onlineCharadeWaitScreen();
-    }
-
-    const celeb = mode === "celebrity";
+    const celeb = game.mode === "celebrity";
     const readyNote = celeb
       ? "Everyone's seen their star. Dance! Then vote for the odd one out."
       : "Everyone's seen their role. Time to find the imposter.";
@@ -413,89 +345,10 @@
     return el("div", { class: "panel" }, bits);
   }
 
-  function charadesHostExtras() {
-    if (!state.you.isHost) return [];
-    return [
-      el("button", {
-        class: "btn btn--ghost btn--block", text: "Back to lobby",
-        onclick: () => send({ type: "reset" }),
-      }),
-    ];
-  }
-
-  function onlineCharadeActorScreen() {
-    const room = state.room;
-    const game = room.game;
-    const you = state.you;
-    const others = room.players.filter((p) => p.id !== you.id && p.connected);
-
-    const guessers = el("div", { class: "guesser-grid" },
-      others.map((p) => el("button", {
-        class: "btn pick",
-        onclick: () => send({ type: "awardCharade", guesserId: p.id }),
-      }, [el("span", { text: p.name })]))
-    );
-
-    const timer = game.timerSecs > 0 ? el("div", { class: "ch-timer", id: "ch-timer" }, [
-      el("div", { class: "ch-timer__bar", id: "ch-timer-bar" }),
-      el("span", { class: "ch-timer__text", id: "ch-timer-text", text: game.timerSecs + "s" }),
-    ]) : null;
-
-    return el("div", { class: "panel" }, [
-      el("span", { class: "eyebrow", text: "Charades" }),
-      charadesScorebar(room.players, game.charadesScores, you.id),
-      el("div", { class: "reveal" }, [
-        el("span", { class: "who", text: you.name + " — your charade" }),
-        el("span", { class: "role-cap tiny muted", text: "Act this out" }),
-        el("div", { class: "role charade", text: game.charadesWord || "…" }),
-        el("p", { class: "role-sub", text: "No talking, no pointing at words — mime it. Others guess." }),
-        timer,
-        el("button", {
-          class: "btn btn--ghost btn--block", text: "Different charade",
-          onclick: () => send({ type: "newCharade" }),
-        }),
-        el("p", { class: "note tiny muted", text: "Who guessed it? Tap their name — you both score a point." }),
-        guessers,
-        el("button", {
-          class: "btn btn--block", text: "Nobody got it →",
-          onclick: () => send({ type: "charadeNobody" }),
-        }),
-      ]),
-      ...charadesHostExtras(),
-    ]);
-  }
-
-  function onlineCharadeWaitScreen() {
-    const room = state.room;
-    const game = room.game;
-    const you = state.you;
-    const actor = playerById(game.charadesActorId);
-    const bits = [
-      el("span", { class: "eyebrow", text: "Charades" }),
-      charadesScorebar(room.players, game.charadesScores, game.charadesActorId),
-      el("p", { class: "note", text: "Guess the celebrity being acted out." }),
-      el("div", { class: "turn-card" }, [
-        el("span", { class: "turn-card__cap tiny muted", text: "Up to act" }),
-        el("div", { class: "turn-name", text: (actor && actor.name) || "…" }),
-      ]),
-      el("p", { class: "note", text: "Watch and guess — the actor taps who got it right." }),
-    ];
-    if (you.isHost) {
-      bits.push(el("button", {
-        class: "btn btn--ghost btn--block", text: "Skip turn →",
-        onclick: () => send({ type: "skipCharade" }),
-      }));
-    }
-    bits.push(...charadesHostExtras());
-    return el("div", { class: "panel" }, bits);
-  }
-
   function onlineGameScreen() {
     const game = state.room.game;
     if (game.phase === "peek") return onlinePeekScreen();
-    if (game.phase === "play") return onlinePlayScreen();
-    if (game.phase === "charade") return state.you.isActor ? onlineCharadeActorScreen() : onlineCharadeWaitScreen();
-    return el("div", { class: "panel" }, [el("p", { class: "note", text: "…" })]);
+    return onlinePlayScreen();
   }
 
   // ── Local pass-the-phone ─────────────────────────────────────────────────
@@ -511,10 +364,6 @@
     revealAnswer: false,
     viewed: [],
     current: -1,
-    charadesActor: 0,
-    charadesWord: "",
-    charadesScores: [0, 0, 0, 0],
-    timerSecs: 60,
   };
 
   function dealCelebs(oddIndex) {
@@ -526,22 +375,9 @@
     local.celebs = local.names.map((_, i) => (i === oddIndex ? odd : common));
   }
 
-  function pickCharade() {
-    const prev = local.charadesWord;
-    let next = pick(CELEBS);
-    while (next === prev && CELEBS.length > 1) next = pick(CELEBS);
-    local.charadesWord = next;
-  }
-
   function localStartGame() {
-    if (!CELEBS.length) { toast("Celebrity list failed to load — refresh the page."); return; }
-    if (local.mode === "charades") {
-      local.charadesActor = Math.floor(Math.random() * local.names.length);
-      local.charadesScores = local.names.map(() => 0);
-      local.charadesWord = "";
-      pickCharade();
-      local.screen = "select";
-      renderLocal();
+    if (!CELEBS.length && local.mode === "celebrity") {
+      toast("Celebrity list failed to load — refresh the page.");
       return;
     }
     local.imposter = Math.floor(Math.random() * 4);
@@ -553,7 +389,6 @@
   }
 
   function localNewRound() {
-    if (local.mode === "charades") { localStartGame(); return; }
     const prev = local.imposter;
     do { local.imposter = Math.floor(Math.random() * 4); }
     while (local.imposter === prev);
@@ -562,20 +397,6 @@
     local.revealAnswer = false;
     local.screen = "select";
     renderLocal();
-  }
-
-  function nextCharadesPlayer() {
-    local.charadesActor = (local.charadesActor + 1) % local.names.length;
-    pickCharade();
-    local.screen = "select";
-    renderLocal();
-  }
-
-  function awardCharade(guesserIndex) {
-    if (!local.charadesScores) local.charadesScores = local.names.map(() => 0);
-    local.charadesScores[guesserIndex] = (local.charadesScores[guesserIndex] || 0) + 1;
-    local.charadesScores[local.charadesActor] = (local.charadesScores[local.charadesActor] || 0) + 1;
-    nextCharadesPlayer();
   }
 
   function localSetupScreen() {
@@ -591,24 +412,17 @@
     );
 
     const lede = local.mode === "celebrity"
-      ? "Four players, one phone. Everyone gets the same celebrity — except one. Check yours, then dance like them (accent or impression optional, but mainly dance). Spot the odd one out."
-      : local.mode === "charades"
-      ? "One phone, taking turns. Each round one person gets a celebrity to act out (no talking, no pointing at words) while everyone else guesses. Tap “Next player” to pass it on."
+      ? "Four players, one phone. Everyone gets the same celebrity — except one. Check yours, then dance like them. Spot the odd one out."
       : "Four players, one phone. Enter names, then pass it around so everyone can secretly check their role.";
 
     return el("div", { class: "panel" }, [
       el("span", { class: "eyebrow", text: "One phone" }),
       el("h1", {}, [document.createTextNode("Who's "), el("span", { class: "em", text: "in?" })]),
-      el("div", { class: "modes", role: "group", "aria-label": "Game mode" }, [
+      el("div", { class: "modes modes--2", role: "group", "aria-label": "Game mode" }, [
         modeBtn("classic", "🕵️ Imposter", local.mode, (id) => { local.mode = id; renderLocal(); }),
         modeBtn("celebrity", "💃 Celebrity Dance", local.mode, (id) => { local.mode = id; renderLocal(); }),
-        modeBtn("charades", "🎭 Charades", local.mode, (id) => { local.mode = id; renderLocal(); }),
       ]),
       el("p", { class: "lede", text: lede }),
-      local.mode === "charades" ? el("div", { class: "field" }, [
-        el("label", { class: "fl", text: "Acting timer (optional)" }),
-        timerSeg(local.timerSecs, (s) => { local.timerSecs = s; renderLocal(); }),
-      ]) : null,
       el("div", { class: "names" }, inputs),
       el("button", {
         class: "btn btn--primary btn--lg btn--block", text: "Start game →",
@@ -625,36 +439,6 @@
   }
 
   function localSelectScreen() {
-    if (local.mode === "charades") {
-      const scores = local.charadesScores || local.names.map(() => 0);
-      const best = Math.max(0, ...scores);
-      const scorebar = el("div", { class: "scorebar", "aria-label": "Scores" },
-        local.names.map((n, i) => el("span", {
-          class: "score-chip" + (i === local.charadesActor ? " act" : "") + (scores[i] === best && best > 0 ? " lead" : ""),
-        }, [
-          el("span", { class: "score-chip__n", text: n }),
-          el("b", { text: String(scores[i] || 0) }),
-        ]))
-      );
-      return el("div", { class: "panel" }, [
-        el("span", { class: "eyebrow", text: "Charades" }),
-        scorebar,
-        el("p", { class: "note", text: "Everyone else: guess the celebrity being acted out." }),
-        el("div", { class: "turn-card" }, [
-          el("span", { class: "turn-card__cap tiny muted", text: "Up to act" }),
-          el("div", { class: "turn-name", text: local.names[local.charadesActor] }),
-        ]),
-        el("button", {
-          class: "btn btn--primary btn--lg btn--block", text: "Reveal charade →",
-          onclick: () => { local.screen = "reveal"; renderLocal(); },
-        }),
-        el("div", { class: "row" }, [
-          el("button", { class: "btn btn--ghost", text: "New game", onclick: localNewRound }),
-          el("button", { class: "btn btn--ghost", text: "Edit names", onclick: () => { local.screen = "setup"; renderLocal(); } }),
-        ]),
-      ]);
-    }
-
     const allViewed = local.viewed.length >= 4;
     const grid = el("div", { class: "pick-grid" },
       local.names.map((name, i) => {
@@ -704,33 +488,6 @@
   }
 
   function localRevealScreen() {
-    if (local.mode === "charades") {
-      const others = local.names
-        .map((n, idx) => ({ n, idx }))
-        .filter((o) => o.idx !== local.charadesActor);
-      const guessers = el("div", { class: "guesser-grid" },
-        others.map((o) => el("button", {
-          class: "btn pick", onclick: () => awardCharade(o.idx),
-        }, [el("span", { text: o.n })]))
-      );
-      return el("div", { class: "panel" }, [
-        el("div", { class: "reveal" }, [
-          el("span", { class: "who", text: local.names[local.charadesActor] + " — your charade" }),
-          el("span", { class: "role-cap tiny muted", text: "Act this out" }),
-          el("div", { class: "role charade", text: local.charadesWord }),
-          el("p", { class: "role-sub", text: "No talking, no pointing at words — mime it. Others guess." }),
-          local.timerSecs > 0 ? el("div", { class: "ch-timer", id: "ch-timer" }, [
-            el("div", { class: "ch-timer__bar", id: "ch-timer-bar" }),
-            el("span", { class: "ch-timer__text", id: "ch-timer-text", text: local.timerSecs + "s" }),
-          ]) : null,
-          el("button", { class: "btn btn--ghost btn--block", text: "Different charade", onclick: () => { pickCharade(); renderLocal(); } }),
-          el("p", { class: "note tiny muted", text: "Who guessed it? Tap their name — you both score a point." }),
-          guessers,
-          el("button", { class: "btn btn--block", text: "Nobody got it →", onclick: nextCharadesPlayer }),
-        ]),
-      ]);
-    }
-
     const i = local.current;
     const hideBtn = el("button", {
       class: "btn btn--primary btn--lg btn--block",
@@ -767,27 +524,11 @@
   }
 
   function renderLocal() {
-    clearCharadeTimer();
     const screen = local.screen === "setup" ? localSetupScreen()
       : local.screen === "reveal" ? localRevealScreen()
       : localSelectScreen();
     app.replaceChildren(screen);
     window.scrollTo(0, 0);
-    if (local.mode === "charades" && local.screen === "reveal" && local.timerSecs > 0) {
-      armCharadeTimer(local.timerSecs);
-    }
-  }
-
-  // ── Render router ────────────────────────────────────────────────────────
-
-  function syncCharadeTimer(game, you) {
-    const nextKey = game.mode === "charades" && game.phase === "charade" && you.isActor
-      ? `${game.charadesActorId}:${game.charadesWord}:${game.timerSecs}`
-      : null;
-    if (nextKey === charadeTimerKey) return;
-    clearCharadeTimer();
-    charadeTimerKey = nextKey;
-    if (nextKey && game.timerSecs > 0) armCharadeTimer(game.timerSecs);
   }
 
   function render() {
@@ -796,8 +537,6 @@
       return;
     }
     if (!routeCode) {
-      clearCharadeTimer();
-      charadeTimerKey = null;
       app.replaceChildren(homeScreen());
       return;
     }
@@ -808,15 +547,8 @@
       return;
     }
     const game = state.room.game;
-    const you = state.you;
-    if (game.status === "lobby") {
-      clearCharadeTimer();
-      charadeTimerKey = null;
-      app.replaceChildren(lobbyScreen());
-    } else {
-      app.replaceChildren(onlineGameScreen());
-      syncCharadeTimer(game, you);
-    }
+    if (game.status === "lobby") app.replaceChildren(lobbyScreen());
+    else app.replaceChildren(onlineGameScreen());
     window.scrollTo(0, 0);
   }
 
@@ -831,7 +563,6 @@
     if (routeCode !== lastRouteCode) {
       state.room = null;
       state.you = null;
-      charadeTimerKey = null;
       lastRouteCode = routeCode;
     }
     if (!routeCode) {
@@ -839,7 +570,6 @@
       clearTimeout(reconnectTimer);
       state.room = null;
       state.you = null;
-      charadeTimerKey = null;
       lastRouteCode = null;
     }
     render();

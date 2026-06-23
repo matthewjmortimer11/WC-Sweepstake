@@ -1,4 +1,4 @@
-"""The Imposter party game (/imposter) — online multiplayer + local mode."""
+"""The Imposter party game (/imposter) — classic + celebrity dance."""
 
 import pytest
 from starlette.testclient import TestClient
@@ -31,14 +31,11 @@ def test_imposter_has_game_surface(client):
         "Hide role", "New round", "Edit names",
         "Celebrity Dance", "Your celebrity",
         "mainly dance", "Reveal the odd one out",
-        "Charades", "Reveal charade", "Next player",
-        "No talking, no pointing", "Up to act",
-        "pickCharade", "IMPOSTER_CELEBS",
-        "Who guessed it", "Nobody got it", "awardCharade", "charadesScores",
-        "Acting timer (optional)", "armCharadeTimer", "Time's up", "timerSecs",
-        "markViewed", "revealAnswer", "newRound", "skipCharade", "syncCharadeTimer", "charadesHostExtras",
+        "markViewed", "revealAnswer", "newRound",
+        "modes--2",
     ):
         assert marker in js, f"missing Imposter JS marker: {marker!r}"
+    assert "charades" not in js.lower()
 
 
 def test_imposter_has_local_link(client):
@@ -48,8 +45,6 @@ def test_imposter_has_local_link(client):
 
 
 def test_imposter_has_multiplayer_api(client):
-    t = client.get("/imposter").text
-    assert "/imposter/assets/app.js" in t
     r = client.post("/imposter/api/rooms", json={"mode": "classic"})
     assert r.status_code == 200
     assert "code" in r.json()
@@ -58,9 +53,8 @@ def test_imposter_has_multiplayer_api(client):
 def test_imposter_assets_served(client):
     assert client.get("/imposter/assets/app.js").status_code == 200
     assert client.get("/imposter/assets/styles.css").status_code == 200
-    assert client.get("/imposter/assets/celebs.js").status_code == 200
 
 
 def test_party_games_routes_all_serve(client):
-    for path in ("/", "/welcome", "/play", "/imposter", "/wheel"):
+    for path in ("/games", "/play", "/imposter", "/charades", "/wheel"):
         assert client.get(path).status_code == 200

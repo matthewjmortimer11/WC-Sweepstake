@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Wheesht party games</title>
+  <meta name="description" content="Free online party games from Wheesht — Cipher, Imposter, Dial, and Charades. Everyone on their own phone." />
+  <meta name="theme-color" content="#0e1016" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet" />
+  <style>
+    :root{
+      --bg:#0e1016; --panel:#1a1e2b; --panel-2:#212636; --line:#2c3346; --line-strong:#3b4459;
+      --ink:#f4f7ff; --ink-2:#aab4c9; --ink-3:#717c92;
+      --accent:#ffc53d; --accent-2:#f0a417; --accent-ink:#2a1c02;
+      --radius:18px; --radius-sm:13px;
+      --font:"Nunito",system-ui,sans-serif; --head:"Fredoka",var(--font);
+      --shadow:0 24px 60px -28px rgba(0,0,0,.85);
+    }
+    *{box-sizing:border-box}
+    body{margin:0;font-family:var(--font);font-weight:600;color:var(--ink);
+      background:radial-gradient(125% 65% at 50% -25%,rgba(255,197,61,.08) 0%,transparent 62%),var(--bg);
+      min-height:100dvh;-webkit-font-smoothing:antialiased}
+    .wrap{max-width:560px;margin:0 auto;padding:clamp(16px,4vw,32px);padding-bottom:max(20px,env(safe-area-inset-bottom))}
+    h1{font-family:var(--head);font-weight:600;font-size:clamp(1.9rem,7vw,2.7rem);line-height:1.05;margin:0}
+    h1 .em{color:var(--accent)}
+    .lede{color:var(--ink-2);margin:.5rem 0 1.4rem;line-height:1.5;font-size:.98rem}
+    .eyebrow{font-family:var(--head);font-size:.72rem;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:var(--accent);display:block;margin-bottom:.35rem}
+    .grid{display:grid;gap:12px}
+    a.card{display:grid;gap:6px;text-decoration:none;color:inherit;background:var(--panel);border:1px solid var(--line);
+      border-radius:var(--radius);padding:18px 18px 16px;box-shadow:var(--shadow);transition:border-color .15s,transform .08s}
+    a.card:hover{border-color:var(--accent);transform:translateY(-1px)}
+    a.card:active{transform:translateY(1px)}
+    .card__row{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+    .card__title{font-family:var(--head);font-size:1.15rem;font-weight:600;margin:0}
+    .card__icon{font-size:1.6rem;line-height:1}
+    .card__desc{margin:0;color:var(--ink-2);font-size:.9rem;line-height:1.45}
+    .card__cta{font-family:var(--head);font-size:.82rem;color:var(--accent);font-weight:700;margin-top:2px}
+    .foot{margin-top:1.6rem;text-align:center;color:var(--ink-3);font-size:.78rem;font-family:var(--head)}
+    .foot a{color:var(--ink-2);text-decoration:none;border-bottom:1px dotted var(--line-strong)}
+    .foot a:hover{color:var(--accent);border-bottom-color:var(--accent)}
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <span class="eyebrow">Wheesht</span>
+    <h1>Party <span class="em">games</span></h1>
+    <p class="lede">Quick games for groups — everyone on their own phone, or pass one device around. Pick a game and share the room link.</p>
+    <div class="grid">
+      <a class="card" href="/play">
+        <div class="card__row">
+          <h2 class="card__title">Cipher</h2>
+          <span class="card__icon" aria-hidden="true">🕵️</span>
+        </div>
+        <p class="card__desc">Two spymasters, one grid of secret agents. Custom word packs, timers, and themes.</p>
+        <span class="card__cta">Play Cipher →</span>
+      </a>
+      <a class="card" href="/imposter">
+        <div class="card__row">
+          <h2 class="card__title">Imposter</h2>
+          <span class="card__icon" aria-hidden="true">🎭</span>
+        </div>
+        <p class="card__desc">Classic imposter or Celebrity Dance — check your secret role, then work out who doesn't belong.</p>
+        <span class="card__cta">Play Imposter →</span>
+      </a>
+      <a class="card" href="/wheel">
+        <div class="card__row">
+          <h2 class="card__title">Dial</h2>
+          <span class="card__icon" aria-hidden="true">🎯</span>
+        </div>
+        <p class="card__desc">The Psychic sees a hidden zone on the dial and gives a clue. Everyone else guesses where it sits.</p>
+        <span class="card__cta">Play Dial →</span>
+      </a>
+      <a class="card" href="/charades">
+        <div class="card__row">
+          <h2 class="card__title">Charades</h2>
+          <span class="card__icon" aria-hidden="true">💃</span>
+        </div>
+        <p class="card__desc">Mime a celebrity while everyone else guesses. Acting timer optional. Score as you go.</p>
+        <span class="card__cta">Play Charades →</span>
+      </a>
+    </div>
+    <p class="foot">Made by <a href="/welcome">Wheesht</a></p>
+  </main>
+</body>
+</html>

@@ -1,4 +1,4 @@
-"""Imposter — online party game (classic, celebrity dance, charades)."""
+"""Imposter — online party game (classic imposter, celebrity dance)."""
 
 from .router import router  # noqa: F401
 

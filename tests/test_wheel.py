@@ -42,5 +42,5 @@ def test_wheel_has_multiplayer_api(client):
 
 
 def test_party_games_routes_all_serve(client):
-    for path in ("/", "/welcome", "/play", "/imposter", "/wheel"):
+    for path in ("/games", "/play", "/imposter", "/charades", "/wheel"):
         assert client.get(path).status_code == 200

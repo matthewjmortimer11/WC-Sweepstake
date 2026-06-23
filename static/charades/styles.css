@@ -105,7 +105,6 @@
       transition:.14s var(--ease);font-size:.82rem;line-height:1.15;white-space:normal}
     .mode-opt.on{background:var(--accent);color:var(--accent-ink);box-shadow:0 3px 0 var(--accent-2)}
     .mode-opt:focus-visible{outline:none;box-shadow:0 0 0 3px var(--bg),0 0 0 6px var(--accent)}
-    .modes--2{grid-template-columns:1fr 1fr}
     /* Reveal-the-answer box (celebrity mode) */
     .answer{background:var(--panel-2);border:1px solid var(--line);border-radius:var(--radius-sm);
       padding:14px 16px;text-align:center;display:grid;gap:4px}

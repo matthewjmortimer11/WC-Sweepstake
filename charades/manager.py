@@ -1,4 +1,4 @@
-"""Imposter — room & connection manager."""
+"""Charades — room & connection manager."""
 
 from __future__ import annotations
 
@@ -10,16 +10,13 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 from .game import (
-    MODE_CLASSIC,
-    MODE_CELEBRITY,
-    PHASE_PEEK,
+    PHASE_CHARADE,
     REQUIRED_PLAYERS,
     STATUS_LOBBY,
     STATUS_PLAYING,
-    ImposterGame,
+    CharadesGame,
     MoveError,
     Settings,
-    TIMER_OPTIONS,
 )
 
 _CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
@@ -59,7 +56,7 @@ class Player:
 @dataclass
 class Room:
     code: str
-    game: ImposterGame
+    game: CharadesGame
     settings: Settings
     host_id: Optional[str] = None
     players: dict = field(default_factory=dict)
@@ -87,29 +84,25 @@ class Room:
 
     def state_for(self, pid: str) -> dict:
         g = self.game
-        show_secrets = False
-        if g.status == STATUS_PLAYING:
-            if g.settings.mode in (MODE_CLASSIC, MODE_CELEBRITY) and g.phase == PHASE_PEEK:
-                if pid not in g.viewed:
-                    show_secrets = True
-        game_view = g.view(pid, show_secrets=show_secrets)
+        show_word = (
+            g.status == STATUS_PLAYING
+            and g.phase == PHASE_CHARADE
+            and pid == g.actor_id()
+        )
         me = self.players.get(pid)
         return {
             "type": "state",
             "room": {
                 "code": self.code,
                 "players": self.public_players(),
-                "settings": {
-                    "mode": self.settings.mode,
-                    "timerSecs": self.settings.timer_secs,
-                },
-                "game": game_view,
+                "settings": {"timerSecs": self.settings.timer_secs},
+                "game": g.view(pid, show_word=show_word),
             },
             "you": {
                 "id": pid,
                 "name": me.name if me else "",
                 "isHost": bool(me and me.is_host),
-                "hasViewed": pid in g.viewed,
+                "isActor": pid == g.actor_id(),
             },
         }
 
@@ -156,7 +149,7 @@ class Manager:
         else:
             code = _gen_code(6)
         settings = settings or Settings()
-        game = ImposterGame(settings=settings)
+        game = CharadesGame(settings=settings)
         room = Room(code=code, game=game, settings=settings)
         self.rooms[code] = room
         return room
