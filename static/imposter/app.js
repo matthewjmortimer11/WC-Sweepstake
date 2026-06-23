@@ -14,6 +14,7 @@
   let routeCode = null;
   let localMode = false;
   let charadeTimerKey = null;
+  let lastRouteCode = null;
 
   const state = {
     connected: false,
@@ -119,7 +120,15 @@
     ws.onmessage = (ev) => {
       let msg;
       try { msg = JSON.parse(ev.data); } catch (_) { return; }
-      if (msg.type === "fatal") { toast(msg.message || "Connection failed."); location.hash = ""; return; }
+      if (msg.type === "fatal") {
+        toast(msg.message || "Connection failed.");
+        if (ws) { try { ws.close(); } catch (_) {} ws = null; }
+        state.room = null;
+        state.you = null;
+        clearTimeout(reconnectTimer);
+        location.hash = "";
+        return;
+      }
       if (msg.type === "error") { toast(msg.message || "Error"); return; }
       if (msg.type === "state") {
         state.room = msg.room;
@@ -404,11 +413,21 @@
     return el("div", { class: "panel" }, bits);
   }
 
+  function charadesHostExtras() {
+    if (!state.you.isHost) return [];
+    return [
+      el("button", {
+        class: "btn btn--ghost btn--block", text: "Back to lobby",
+        onclick: () => send({ type: "reset" }),
+      }),
+    ];
+  }
+
   function onlineCharadeActorScreen() {
     const room = state.room;
     const game = room.game;
     const you = state.you;
-    const others = room.players.filter((p) => p.id !== you.id);
+    const others = room.players.filter((p) => p.id !== you.id && p.connected);
 
     const guessers = el("div", { class: "guesser-grid" },
       others.map((p) => el("button", {
@@ -442,6 +461,7 @@
           onclick: () => send({ type: "charadeNobody" }),
         }),
       ]),
+      ...charadesHostExtras(),
     ]);
   }
 
@@ -466,6 +486,7 @@
         onclick: () => send({ type: "skipCharade" }),
       }));
     }
+    bits.push(...charadesHostExtras());
     return el("div", { class: "panel" }, bits);
   }
 
@@ -513,6 +534,7 @@
   }
 
   function localStartGame() {
+    if (!CELEBS.length) { toast("Celebrity list failed to load — refresh the page."); return; }
     if (local.mode === "charades") {
       local.charadesActor = Math.floor(Math.random() * local.names.length);
       local.charadesScores = local.names.map(() => 0);
@@ -806,9 +828,22 @@
       state.room = null;
       state.you = null;
     }
+    if (routeCode !== lastRouteCode) {
+      state.room = null;
+      state.you = null;
+      charadeTimerKey = null;
+      lastRouteCode = routeCode;
+    }
+    if (!routeCode) {
+      if (ws) { try { ws.close(); } catch (_) {} ws = null; }
+      clearTimeout(reconnectTimer);
+      state.room = null;
+      state.you = null;
+      charadeTimerKey = null;
+      lastRouteCode = null;
+    }
     render();
     if (routeCode) connect(routeCode);
-    else if (ws) { try { ws.close(); } catch (_) {} ws = null; }
   }
 
   window.addEventListener("hashchange", boot);

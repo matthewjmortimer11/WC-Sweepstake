@@ -147,6 +147,29 @@ def test_host_can_skip_charade(client):
     assert room.game.actor_id() != first_actor
 
 
+def test_new_round_blocked_during_peek(client):
+    from imposter.game import MoveError
+
+    code = client.post("/imposter/api/rooms", json={"mode": "classic"}).json()["code"]
+    room, pids = _room_with_four(code)
+    manager.start_game(room)
+
+    with pytest.raises(MoveError, match="peek"):
+        room.game.new_round(room.rng)
+
+
+def test_reconnect_can_peek_again(client):
+    code = client.post("/imposter/api/rooms", json={"mode": "classic"}).json()["code"]
+    room, pids = _room_with_four(code)
+    manager.start_game(room)
+
+    room.game.mark_viewed(pids[0])
+    assert "isImposter" not in room.state_for(pids[0])["room"]["game"]
+
+    room.game.viewed.discard(pids[0])
+    assert "isImposter" in room.state_for(pids[0])["room"]["game"]
+
+
 def test_ws_join_broadcasts_state(client):
     code = client.post("/imposter/api/rooms", json={"mode": "classic"}).json()["code"]
     with client.websocket_connect(f"/imposter/ws/{code}?pid=p1&name=One") as ws:

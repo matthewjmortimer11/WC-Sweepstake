@@ -36,7 +36,7 @@ def test_imposter_has_game_surface(client):
         "pickCharade", "IMPOSTER_CELEBS",
         "Who guessed it", "Nobody got it", "awardCharade", "charadesScores",
         "Acting timer (optional)", "armCharadeTimer", "Time's up", "timerSecs",
-        "markViewed", "revealAnswer", "newRound", "skipCharade", "syncCharadeTimer",
+        "markViewed", "revealAnswer", "newRound", "skipCharade", "syncCharadeTimer", "charadesHostExtras",
     ):
         assert marker in js, f"missing Imposter JS marker: {marker!r}"
 

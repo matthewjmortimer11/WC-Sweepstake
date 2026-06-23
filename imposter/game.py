@@ -130,8 +130,12 @@ class ImposterGame:
         if self.status != STATUS_PLAYING:
             raise MoveError("No game in progress.")
         if self.settings.mode == MODE_CHARADES:
+            if self.phase != PHASE_CHARADE:
+                raise MoveError("Wait for the actor.")
             self._next_charades_turn(rng)
             return
+        if self.phase != PHASE_PLAY:
+            raise MoveError("Everyone must peek first.")
         prev = self.imposter_index
         choices = [i for i in range(REQUIRED_PLAYERS) if i != prev]
         self.imposter_index = rng.choice(choices)
@@ -162,10 +166,14 @@ class ImposterGame:
     def charade_nobody(self) -> None:
         if self.status != STATUS_PLAYING or self.settings.mode != MODE_CHARADES:
             raise MoveError("Not in charades.")
+        if self.phase != PHASE_CHARADE:
+            raise MoveError("Wait for the actor.")
 
     def new_charade_word(self, rng: random.Random) -> None:
         if self.status != STATUS_PLAYING or self.settings.mode != MODE_CHARADES:
             raise MoveError("Not in charades.")
+        if self.phase != PHASE_CHARADE:
+            raise MoveError("Wait for the actor.")
         self.charades_word = self._pick_charade(rng)
 
     def actor_id(self) -> Optional[str]:
