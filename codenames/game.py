@@ -33,6 +33,7 @@ NEUTRAL = "neutral"
 ASSASSIN = "assassin"
 
 MAX_ASSASSINS = 5
+MIN_PLAYERS = 4
 MAX_TEAM_NAME = 20
 DEFAULT_TEAM_RED = "Field Crew"
 DEFAULT_TEAM_BLUE = "The Desk"

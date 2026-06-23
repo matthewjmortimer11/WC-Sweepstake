@@ -13,13 +13,35 @@ def client():
         yield c
 
 
-def _room_with_four(code: str):
+def _room_with_players(code: str, n: int = 4):
     room = manager.get(code)
-    pids = ["p1", "p2", "p3", "p4"]
+    pids = [f"p{i}" for i in range(1, n + 1)]
     for i, pid in enumerate(pids):
         manager.join(room, pid, f"Player {i + 1}")
         room.players[pid].connected = True
     return room, pids
+
+
+def _room_with_four(code: str):
+    return _room_with_players(code, 4)
+
+
+def test_start_requires_minimum_players(client):
+    from imposter.game import MoveError
+
+    code = client.post("/imposter/api/rooms", json={"mode": "classic"}).json()["code"]
+    room, _ = _room_with_players(code, 1)
+    with pytest.raises(MoveError, match="at least"):
+        manager.start_game(room)
+
+
+def test_variable_player_count(client):
+    code = client.post("/imposter/api/rooms", json={"mode": "classic"}).json()["code"]
+    room, pids = _room_with_players(code, 3)
+    manager.start_game(room)
+    assert len(room.game.player_ids) == 3
+    for pid in pids:
+        assert "isImposter" in room.state_for(pid)["room"]["game"]
 
 
 def test_create_room(client):

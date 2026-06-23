@@ -6,6 +6,8 @@
   const toastEl = document.getElementById("toast");
   const LS = { pid: "imposter.pid", name: "imposter.name" };
   const CELEBS = window.IMPOSTER_CELEBS || [];
+  const MIN_PLAYERS = 2;
+  const MAX_PLAYERS = 50;
 
   let ws = null;
   let reconnectTimer = null;
@@ -22,6 +24,9 @@
   };
 
   const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+
+  const lobbyMin = (room) => (room && room.settings && room.settings.minPlayers) || MIN_PLAYERS;
+  const lobbyMax = (room) => (room && room.settings && room.settings.maxPlayers) || MAX_PLAYERS;
 
   const el = (tag, attrs = {}, kids = []) => {
     const n = document.createElement(tag);
@@ -174,7 +179,7 @@
     return el("div", { class: "panel" }, [
       el("span", { class: "eyebrow", text: "Online" }),
       el("h1", {}, [document.createTextNode("Who's the "), el("span", { class: "em", text: "imposter?" })]),
-      el("p", { class: "lede", text: "Four players, four phones. Classic imposter or Celebrity Dance — everyone sees their own secret on their device." }),
+      el("p", { class: "lede", text: "Classic imposter or Celebrity Dance — everyone sees their own secret on their device." }),
       el("label", { class: "fl" }, [el("span", { text: "Your name" }), nameIn]),
       el("button", {
         class: "btn btn--primary btn--lg btn--block", text: "Create room →",
@@ -192,7 +197,7 @@
           },
         }),
       ]),
-      el("p", { class: "note", text: "Need exactly 4 players. Share the game link so friends join on their phones." }),
+      el("p", { class: "note", text: `Need at least ${MIN_PLAYERS} players. Share the game link so friends join on their phones.` }),
     ]);
   }
 
@@ -208,6 +213,10 @@
       onchange: (e) => send({ type: "rename", name: e.target.value.trim() }),
     });
 
+    const minP = lobbyMin(room);
+    const maxP = lobbyMax(room);
+    const canStart = connected >= minP;
+
     const hostBits = you.isHost ? [
       el("div", { class: "modes modes--2", role: "group", "aria-label": "Game mode" }, [
         modeBtn("classic", "🕵️ Imposter", settings.mode, (id) => {
@@ -219,12 +228,12 @@
       ]),
       el("button", {
         class: "btn btn--primary btn--lg btn--block",
-        text: connected === 4 ? "Start game →" : `Waiting for players (${connected}/4)…`,
-        disabled: connected !== 4 ? "disabled" : null,
+        text: canStart ? "Start game →" : `Need at least ${minP} players (${connected}${maxP < 99 ? `/${maxP}` : ""})…`,
+        disabled: canStart ? null : "disabled",
         onclick: () => send({ type: "start" }),
       }),
     ] : [
-      el("p", { class: "note", text: `Waiting for the host to start… (${connected}/4 connected)` }),
+      el("p", { class: "note", text: `Waiting for the host to start… (${connected} connected, need ${minP}+)` }),
     ];
 
     const playerRows = room.players.map((p) => el("div", { class: "player-row" + (p.connected ? "" : " off") }, [
@@ -260,9 +269,10 @@
 
     if (you.hasViewed) {
       const waiting = (game.viewed || []).length;
+      const total = (game.playerIds || []).length;
       return el("div", { class: "panel" }, [
         el("span", { class: "eyebrow", text: "Waiting" }),
-        el("p", { class: "note", text: `You've seen your role. Waiting for others (${waiting}/4)…` }),
+        el("p", { class: "note", text: `You've seen your role. Waiting for others (${waiting}/${total})…` }),
       ]);
     }
 
@@ -366,6 +376,22 @@
     current: -1,
   };
 
+  function localPlayerCount() {
+    return local.names.length;
+  }
+
+  function addLocalPlayer() {
+    if (local.names.length >= MAX_PLAYERS) return;
+    local.names.push("Player " + (local.names.length + 1));
+    renderLocal();
+  }
+
+  function removeLocalPlayer() {
+    if (local.names.length <= MIN_PLAYERS) return;
+    local.names.pop();
+    renderLocal();
+  }
+
   function dealCelebs(oddIndex) {
     const common = pick(CELEBS);
     let odd = common;
@@ -380,7 +406,7 @@
       toast("Celebrity list failed to load — refresh the page.");
       return;
     }
-    local.imposter = Math.floor(Math.random() * 4);
+    local.imposter = Math.floor(Math.random() * localPlayerCount());
     if (local.mode === "celebrity") dealCelebs(local.imposter);
     local.viewed = [];
     local.revealAnswer = false;
@@ -390,7 +416,7 @@
 
   function localNewRound() {
     const prev = local.imposter;
-    do { local.imposter = Math.floor(Math.random() * 4); }
+    do { local.imposter = Math.floor(Math.random() * localPlayerCount()); }
     while (local.imposter === prev);
     if (local.mode === "celebrity") dealCelebs(local.imposter);
     local.viewed = [];
@@ -412,8 +438,23 @@
     );
 
     const lede = local.mode === "celebrity"
-      ? "Four players, one phone. Everyone gets the same celebrity — except one. Check yours, then dance like them. Spot the odd one out."
-      : "Four players, one phone. Enter names, then pass it around so everyone can secretly check their role.";
+      ? "One phone, pass it around. Everyone gets the same celebrity — except one. Check yours, then dance like them. Spot the odd one out."
+      : "One phone, pass it around. Enter names, then pass it so everyone can secretly check their role.";
+
+    const playerControls = el("div", { class: "row" }, [
+      el("button", {
+        class: "btn btn--ghost",
+        text: "+ Add player",
+        disabled: local.names.length >= MAX_PLAYERS ? "disabled" : null,
+        onclick: addLocalPlayer,
+      }),
+      el("button", {
+        class: "btn btn--ghost",
+        text: "− Remove player",
+        disabled: local.names.length <= MIN_PLAYERS ? "disabled" : null,
+        onclick: removeLocalPlayer,
+      }),
+    ]);
 
     return el("div", { class: "panel" }, [
       el("span", { class: "eyebrow", text: "One phone" }),
@@ -423,9 +464,11 @@
         modeBtn("celebrity", "💃 Celebrity Dance", local.mode, (id) => { local.mode = id; renderLocal(); }),
       ]),
       el("p", { class: "lede", text: lede }),
+      playerControls,
       el("div", { class: "names" }, inputs),
       el("button", {
         class: "btn btn--primary btn--lg btn--block", text: "Start game →",
+        disabled: local.names.length < MIN_PLAYERS ? "disabled" : null,
         onclick: () => {
           local.names = local.names.map((n, i) => (n || "").trim() || ("Player " + (i + 1)));
           localStartGame();
@@ -439,7 +482,7 @@
   }
 
   function localSelectScreen() {
-    const allViewed = local.viewed.length >= 4;
+    const allViewed = local.viewed.length >= localPlayerCount();
     const grid = el("div", { class: "pick-grid" },
       local.names.map((name, i) => {
         const done = local.viewed.includes(i);

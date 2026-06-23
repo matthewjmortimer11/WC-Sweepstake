@@ -6,6 +6,8 @@
   const toastEl = document.getElementById("toast");
   const LS = { pid: "charades.pid", name: "charades.name" };
   const CELEBS = window.IMPOSTER_CELEBS || [];
+  const MIN_PLAYERS = 2;
+  const MAX_PLAYERS = 50;
 
   let timerInterval = null;
   let ws = null;
@@ -18,6 +20,9 @@
 
   const state = { room: null, you: null, pendingSettings: null };
   const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+
+  const lobbyMin = (room) => (room && room.settings && room.settings.minPlayers) || MIN_PLAYERS;
+  const lobbyMax = (room) => (room && room.settings && room.settings.maxPlayers) || MAX_PLAYERS;
 
   const el = (tag, attrs = {}, kids = []) => {
     const n = document.createElement(tag);
@@ -212,7 +217,7 @@
     return el("div", { class: "panel" }, [
       el("span", { class: "eyebrow", text: "Online" }),
       el("h1", {}, [document.createTextNode("Act it "), el("span", { class: "em", text: "out" })]),
-      el("p", { class: "lede", text: "Four players, four phones. One celebrity to mime each round — no talking, no pointing. Everyone guesses on their own device." }),
+      el("p", { class: "lede", text: "One celebrity to mime each round — no talking, no pointing. Everyone guesses on their own device." }),
       el("label", { class: "fl" }, [el("span", { text: "Your name" }), nameIn]),
       el("button", {
         class: "btn btn--primary btn--lg btn--block", text: "Create room →",
@@ -230,7 +235,7 @@
           },
         }),
       ]),
-      el("p", { class: "note", text: "Need exactly 4 players. Share the game link so friends join on their phones." }),
+      el("p", { class: "note", text: `Need at least ${MIN_PLAYERS} players. Share the game link so friends join on their phones.` }),
     ]);
   }
 
@@ -246,16 +251,20 @@
       onchange: (e) => send({ type: "rename", name: e.target.value.trim() }),
     });
 
+    const minP = lobbyMin(room);
+    const maxP = lobbyMax(room);
+    const canStart = connected >= minP;
+
     const hostBits = you.isHost ? [
       ...hostLobbyExtras(settings),
       el("button", {
         class: "btn btn--primary btn--lg btn--block",
-        text: connected === 4 ? "Start game →" : `Waiting for players (${connected}/4)…`,
-        disabled: connected !== 4 ? "disabled" : null,
+        text: canStart ? "Start game →" : `Need at least ${minP} players (${connected}${maxP < 99 ? `/${maxP}` : ""})…`,
+        disabled: canStart ? null : "disabled",
         onclick: () => send({ type: "start" }),
       }),
     ] : [
-      el("p", { class: "note", text: `Waiting for the host to start… (${connected}/4 connected)` }),
+      el("p", { class: "note", text: `Waiting for the host to start… (${connected} connected, need ${minP}+)` }),
     ];
 
     return el("div", { class: "panel" }, [
@@ -345,6 +354,29 @@
     timerSecs: 60,
   };
 
+  function localPlayerCount() {
+    return local.names.length;
+  }
+
+  function resetLocalScores() {
+    local.scores = local.names.map(() => 0);
+  }
+
+  function addLocalPlayer() {
+    if (local.names.length >= MAX_PLAYERS) return;
+    local.names.push("Player " + (local.names.length + 1));
+    local.scores.push(0);
+    renderLocal();
+  }
+
+  function removeLocalPlayer() {
+    if (local.names.length <= MIN_PLAYERS) return;
+    local.names.pop();
+    local.scores.pop();
+    if (local.actor >= local.names.length) local.actor = 0;
+    renderLocal();
+  }
+
   function pickCharade() {
     const prev = local.word;
     let next = pick(CELEBS);
@@ -354,15 +386,15 @@
 
   function localStart() {
     if (!CELEBS.length) { toast("Celebrity list failed to load — refresh the page."); return; }
-    local.actor = Math.floor(Math.random() * 4);
-    local.scores = [0, 0, 0, 0];
+    local.actor = Math.floor(Math.random() * localPlayerCount());
+    resetLocalScores();
     pickCharade();
     local.screen = "select";
     renderLocal();
   }
 
   function nextLocalTurn() {
-    local.actor = (local.actor + 1) % 4;
+    local.actor = (local.actor + 1) % localPlayerCount();
     pickCharade();
     local.screen = "select";
     renderLocal();
@@ -375,18 +407,35 @@
   }
 
   function localSetup() {
+    const playerControls = el("div", { class: "row" }, [
+      el("button", {
+        class: "btn btn--ghost",
+        text: "+ Add player",
+        disabled: local.names.length >= MAX_PLAYERS ? "disabled" : null,
+        onclick: addLocalPlayer,
+      }),
+      el("button", {
+        class: "btn btn--ghost",
+        text: "− Remove player",
+        disabled: local.names.length <= MIN_PLAYERS ? "disabled" : null,
+        onclick: removeLocalPlayer,
+      }),
+    ]);
+
     return el("div", { class: "panel" }, [
       el("span", { class: "eyebrow", text: "One phone" }),
       el("h1", {}, [document.createTextNode("Act it "), el("span", { class: "em", text: "out" })]),
       el("p", { class: "lede", text: "One phone, taking turns. Each round one person gets a celebrity to act out while everyone else guesses." }),
       el("label", { class: "fl", text: "Acting timer (optional)" }),
       timerSeg(local.timerSecs, (s) => { local.timerSecs = s; renderLocal(); }),
+      playerControls,
       el("div", { class: "names" }, local.names.map((name, i) => el("label", { class: "fl" }, [
         el("span", { text: "Player " + (i + 1) }),
         el("input", { class: "in", maxlength: "20", value: name, oninput: (e) => { local.names[i] = e.target.value; } }),
       ]))),
       el("button", {
         class: "btn btn--primary btn--lg btn--block", text: "Start game →",
+        disabled: local.names.length < MIN_PLAYERS ? "disabled" : null,
         onclick: () => {
           local.names = local.names.map((n, i) => (n || "").trim() || ("Player " + (i + 1)));
           localStart();
