@@ -25,7 +25,7 @@ def test_imposter_has_game_surface(client):
     js = client.get("/imposter/assets/app.js").text
     for marker in (
         "Create room", "Share game link", "roomInviteUrl", "renderLocal", "localMode",
-        "Player 1", "Player 4", "Start game",
+        "Player 1", "Add player", "Start game",
         "Only click your own name. No peeking.",
         "IMPOSTER", "NOT IMPOSTER",
         "Hide role", "New round", "Edit names",

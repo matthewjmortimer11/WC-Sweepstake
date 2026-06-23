@@ -1730,8 +1730,12 @@
   }
 
   // ── lobby ────────────────────────────────────────────────────────────────
+  const CIPHER_MIN_PLAYERS = 4;
+
   function lobbyTeamsReady(players, devMode) {
     if (devMode) return true;
+    const connected = players.filter((p) => p.connected);
+    if (connected.length < CIPHER_MIN_PLAYERS) return false;
     const ready = (team) => {
       const members = players.filter((p) => p.team === team);
       if (!members.length) return false;
@@ -1844,6 +1848,8 @@
 
     // Settings summary + start
     const canStart = lobbyTeamsReady(players, st.devMode);
+    const connectedCount = players.filter((p) => p.connected).length;
+    const needPlayers = !st.devMode && connectedCount < CIPHER_MIN_PLAYERS;
     const startRow = h(`
       <div class="panel" style="display:grid; gap:14px">
         <div class="team-head">
@@ -1861,7 +1867,7 @@
           ${st.houseRules && !st.houseRules.noBoardWords ? `<span class="badge">Board words OK</span>` : ""}
         </div>
         ${you && you.isHost
-          ? `<button class="btn btn--primary btn--lg btn--block" id="start" ${canStart ? "" : "disabled"} title="${canStart ? "" : "Each team needs one spymaster and at least one operative"}">▶ Start game</button>${canStart ? "" : `<p class="tiny muted" style="margin:0">Assign roles above — each team needs one spymaster and at least one operative.</p>`}`
+          ? `<button class="btn btn--primary btn--lg btn--block" id="start" ${canStart ? "" : "disabled"} title="${canStart ? "" : needPlayers ? `Need at least ${CIPHER_MIN_PLAYERS} players` : "Each team needs one spymaster and at least one operative"}">▶ Start game</button>${canStart ? "" : `<p class="tiny muted" style="margin:0">${needPlayers ? `Need at least ${CIPHER_MIN_PLAYERS} players (${connectedCount} connected).` : "Assign roles above — each team needs one spymaster and at least one operative."}</p>`}`
           : `<div class="empty">Waiting for the host to start…</div>`}
       </div>`);
     const es = startRow.querySelector("#editset"); if (es) es.onclick = openSettings;

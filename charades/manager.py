@@ -10,8 +10,9 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 from .game import (
+    MAX_PLAYERS,
+    MIN_PLAYERS,
     PHASE_CHARADE,
-    REQUIRED_PLAYERS,
     STATUS_LOBBY,
     STATUS_PLAYING,
     CharadesGame,
@@ -23,7 +24,6 @@ _CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
 _ROOM_TTL_EMPTY = 120
 _ROOM_TTL_IDLE = 60 * 60 * 6
 _MAX_ROOMS = 2000
-_MAX_PLAYERS = REQUIRED_PLAYERS
 _MAX_NAME = 24
 
 _PALETTE = [
@@ -95,7 +95,11 @@ class Room:
             "room": {
                 "code": self.code,
                 "players": self.public_players(),
-                "settings": {"timerSecs": self.settings.timer_secs},
+                "settings": {
+                    "timerSecs": self.settings.timer_secs,
+                    "minPlayers": MIN_PLAYERS,
+                    "maxPlayers": MAX_PLAYERS,
+                },
                 "game": g.view(pid, show_word=show_word),
             },
             "you": {
@@ -165,8 +169,8 @@ class Manager:
             existing.connected = True
             existing.last_seen = time.time()
             return existing
-        if len(room.players) >= _MAX_PLAYERS:
-            raise MoveError("This room is full (4 players).")
+        if len(room.players) >= MAX_PLAYERS:
+            raise MoveError(f"This room is full ({MAX_PLAYERS} players).")
         used = {p.color for p in room.players.values()}
         color = next((c for c in _PALETTE if c not in used), secrets.choice(_PALETTE))
         player = Player(
@@ -206,8 +210,11 @@ class Manager:
 
     def start_game(self, room: Room) -> None:
         connected = [p.id for p in room.players.values() if p.connected]
-        if len(connected) != REQUIRED_PLAYERS:
-            raise MoveError(f"Need exactly {REQUIRED_PLAYERS} connected players.")
+        n = len(connected)
+        if n < MIN_PLAYERS:
+            raise MoveError(f"Need at least {MIN_PLAYERS} connected players.")
+        if n > MAX_PLAYERS:
+            raise MoveError(f"Too many players (max {MAX_PLAYERS}).")
         room.game.start_game(connected, room.rng)
 
 

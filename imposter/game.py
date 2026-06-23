@@ -18,7 +18,8 @@ STATUS_PLAYING = "playing"
 PHASE_PEEK = "peek"
 PHASE_PLAY = "play"
 
-REQUIRED_PLAYERS = 4
+MIN_PLAYERS = 2
+MAX_PLAYERS = 50
 TIMER_OPTIONS = {0, 30, 60, 90, 120}
 
 
@@ -62,15 +63,18 @@ class ImposterGame:
     def start_game(self, player_ids: list[str], rng: random.Random) -> None:
         if self.status == STATUS_PLAYING:
             raise MoveError("A game is already in progress.")
-        if len(player_ids) != REQUIRED_PLAYERS:
-            raise MoveError(f"Need exactly {REQUIRED_PLAYERS} players.")
+        n = len(player_ids)
+        if n < MIN_PLAYERS:
+            raise MoveError(f"Need at least {MIN_PLAYERS} players.")
+        if n > MAX_PLAYERS:
+            raise MoveError(f"Too many players (max {MAX_PLAYERS}).")
         if self.settings.mode not in MODES:
             raise MoveError("Unknown game mode.")
         self.player_ids = list(player_ids)
         self.viewed.clear()
         self.answer_revealed = False
         self.status = STATUS_PLAYING
-        self.imposter_index = rng.randrange(REQUIRED_PLAYERS)
+        self.imposter_index = rng.randrange(n)
         if self.settings.mode == MODE_CELEBRITY:
             self._deal_celebs(rng)
         else:
@@ -111,7 +115,7 @@ class ImposterGame:
         if self.phase != PHASE_PLAY:
             raise MoveError("Everyone must peek first.")
         prev = self.imposter_index
-        choices = [i for i in range(REQUIRED_PLAYERS) if i != prev]
+        choices = [i for i in range(len(self.player_ids)) if i != prev]
         self.imposter_index = rng.choice(choices)
         if self.settings.mode == MODE_CELEBRITY:
             self._deal_celebs(rng)

@@ -472,34 +472,41 @@ def test_only_one_spymaster_per_team(client):
         assert room.players["p2"].role == "spymaster"
 
 
-def test_start_requires_operative_per_team(client):
+def test_start_requires_minimum_four_players(client):
+    from codenames.game import MIN_PLAYERS, MoveError
+    from codenames.manager import Player
+    from codenames.router import _validate_teams
+
     code = client.post("/play/api/rooms").json()["code"]
-    with client.websocket_connect(f"/play/ws/{code}?pid=rs&name=RedSpy") as rs, \
-         client.websocket_connect(f"/play/ws/{code}?pid=bs&name=BlueSpy") as bs:
+    room = manager.get(code)
+    for pid, team, role in (
+        ("p1", "red", "spymaster"),
+        ("p2", "red", "operative"),
+        ("p3", "blue", "spymaster"),
+    ):
+        room.players[pid] = Player(id=pid, name=pid, team=team, role=role, connected=True)
 
-        rs.receive_json()
-        rs.receive_json()
-        bs.receive_json()
-        bs.receive_json()
+    with pytest.raises(MoveError, match=f"at least {MIN_PLAYERS}"):
+        _validate_teams(room)
 
-        rs.send_json({"type": "setTeam", "team": "red"})
-        rs.send_json({"type": "setRole", "role": "spymaster"})
-        bs.send_json({"type": "setTeam", "team": "blue"})
-        bs.send_json({"type": "setRole", "role": "spymaster"})
-        _settle()
 
-        rs.send_json({"type": "start"})
-        err = None
-        for _ in range(12):
-            msg = rs.receive_json()
-            if msg.get("type") == "error":
-                err = msg
-                break
-        assert err is not None
-        assert "operative" in err["message"].lower()
+def test_start_requires_operative_per_team(client):
+    from codenames.game import MoveError
+    from codenames.manager import Player
+    from codenames.router import _validate_teams
 
-        room = manager.get(code)
-        assert room.game.status == "lobby"
+    code = client.post("/play/api/rooms").json()["code"]
+    room = manager.get(code)
+    for pid, team, role in (
+        ("p1", "red", "spymaster"),
+        ("p2", "red", "operative"),
+        ("p3", "blue", "spymaster"),
+        ("p4", "spectator", "operative"),
+    ):
+        room.players[pid] = Player(id=pid, name=pid, team=team, role=role, connected=True)
+
+    with pytest.raises(MoveError, match="operative"):
+        _validate_teams(room)
 
 
 def test_team_names_in_state_and_settable(client):

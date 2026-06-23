@@ -25,6 +25,7 @@ def test_charades_has_game_surface(client):
     for marker in (
         "Create room", "Share game link", "renderLocal", "localMode",
         "Reveal charade", "Up to act", "Nobody got it", "awardCharade",
+        "Add player",
         "Acting timer (optional)", "armCharadeTimer", "pickCharade",
         "No talking, no pointing", "IMPOSTER_CELEBS",
     ):
