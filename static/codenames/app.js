@@ -1196,7 +1196,7 @@
         </div>
 
         <div class="home__foot">
-          <span>A Wheesht word game. Also try <a href="/imposter" style="color:var(--accent);font-weight:700">Imposter</a> — a quick 4-player party game.</span>
+          <span>A Wheesht word game. Also try <a href="/imposter" style="color:var(--accent);font-weight:700">Imposter</a> &amp; <a href="/wheel" style="color:var(--accent);font-weight:700">Dial</a> — quick party games.</span>
           <span class="tiny">One phone per player works well as a spymaster screen.</span>
         </div>
       </div>`);
