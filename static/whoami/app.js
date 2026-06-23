@@ -35,9 +35,14 @@
   function pid() {
     try {
       let id = localStorage.getItem(LS.pid);
-      if (!id) { id = crypto.randomUUID().replace(/-/g, ""); localStorage.setItem(LS.pid, id); }
+      if (!id) {
+        id = crypto.randomUUID().replace(/-/g, "");
+        localStorage.setItem(LS.pid, id);
+      }
       return id;
-    } catch (_) { return "anon"; }
+    } catch (_) {
+      return crypto.randomUUID().replace(/-/g, "");
+    }
   }
 
   function playerName() {
@@ -167,6 +172,9 @@
         return;
       }
       if (msg.type === "error") { toast(msg.message || "Error"); return; }
+      if (msg.type === "hello" && msg.pid) {
+        try { localStorage.setItem(LS.pid, msg.pid); } catch (_) {}
+      }
       if (msg.type === "state") {
         state.room = msg.room;
         state.you = msg.you;
@@ -189,11 +197,6 @@
     if (!r.ok) { toast("Couldn't create room."); return; }
     const code = (await r.json()).code;
     location.hash = `#/room/${code}`;
-    parseRoute();
-    if (routeCode) {
-      lastRouteCode = null;
-      boot();
-    }
   }
 
   function avatarPicker(you) {
@@ -306,8 +309,12 @@
     if (!isYou && !card.claimed) {
       actions.push(el("button", {
         class: "btn btn--sm" + (card.confirmedByYou ? " btn--got" : " btn--ghost"),
-        text: card.confirmedByYou ? "✓ Confirmed" : "They got it!",
-        onclick: () => send({ type: "confirmGuess", playerId: card.id }),
+        text: card.confirmedByYou ? "✓ Confirmed (tap to undo)" : "They got it!",
+        onclick: () => send({
+          type: "confirmGuess",
+          playerId: card.id,
+          undo: card.confirmedByYou ? true : false,
+        }),
       }));
     }
 
@@ -332,6 +339,7 @@
   function gameScreen() {
     const room = state.room;
     const you = state.you;
+    const me = playerById(you.id) || you;
     const game = room.game;
 
     const bits = [
@@ -354,13 +362,13 @@
 
     if (game.allClaimed) {
       bits.push(el("p", { class: "note", text: "Everyone guessed! Host can deal a new round." }));
-      if (you.isHost) {
+      if (me.isHost) {
         bits.push(el("button", {
           class: "btn btn--primary btn--block", text: "Next round →",
           onclick: () => send({ type: "newRound" }),
         }));
       }
-    } else if (you.isHost) {
+    } else if (me.isHost) {
       bits.push(el("button", {
         class: "btn btn--ghost btn--block", text: "Back to lobby",
         onclick: () => send({ type: "reset" }),

@@ -79,6 +79,20 @@ class WhoAmIGame:
             raise MoveError("They already claimed it.")
         self.confirmed_by.setdefault(target_id, set()).add(confirmer_id)
 
+    def unconfirm_guess(self, confirmer_id: str, target_id: str) -> None:
+        if self.status != STATUS_PLAYING:
+            raise MoveError("No round in progress.")
+        if confirmer_id not in self.player_ids:
+            raise MoveError("Unknown player.")
+        if target_id not in self.player_ids:
+            raise MoveError("Unknown player.")
+        if confirmer_id == target_id:
+            raise MoveError("You can't confirm yourself.")
+        if target_id in self.claimed:
+            raise MoveError("They already claimed it.")
+        confirmed = self.confirmed_by.get(target_id, set())
+        confirmed.discard(confirmer_id)
+
     def claim_got_it(self, pid: str) -> None:
         if self.status != STATUS_PLAYING:
             raise MoveError("No round in progress.")

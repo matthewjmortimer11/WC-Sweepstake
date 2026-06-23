@@ -136,6 +136,8 @@ def test_two_player_start_via_websocket(client):
         assert playing is not None
         assert len(playing["room"]["game"]["playerIds"]) == 2
 
+
+def test_mid_game_join_blocked(client):
     from whoami.game import MoveError
 
     code = client.post("/whoami/api/rooms").json()["code"]
@@ -143,3 +145,26 @@ def test_two_player_start_via_websocket(client):
     manager.start_game(room)
     with pytest.raises(MoveError, match="in progress"):
         manager.join(room, "newbie", "Latecomer")
+
+
+def test_reconnect_blocked_if_missed_round(client):
+    from whoami.game import MoveError
+
+    code = client.post("/whoami/api/rooms").json()["code"]
+    room, pids = _room_with_players(code, 3)
+    room.players[pids[2]].connected = False
+    manager.start_game(room)
+    assert pids[2] not in room.game.player_ids
+    with pytest.raises(MoveError, match="already started"):
+        manager.join(room, pids[2], "Player 3")
+
+
+def test_unconfirm_guess(client):
+    code = client.post("/whoami/api/rooms").json()["code"]
+    room, pids = _room_with_players(code, 2)
+    manager.start_game(room)
+    a, b = pids
+    room.game.confirm_guess(b, a)
+    assert room.game.can_claim(a)
+    room.game.unconfirm_guess(b, a)
+    assert not room.game.can_claim(a)

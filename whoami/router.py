@@ -197,7 +197,10 @@ def _dispatch(room, player, mtype: str, msg: dict) -> bool:
 
     if mtype == "confirmGuess":
         target = str(msg.get("playerId", ""))
-        game.confirm_guess(player.id, target)
+        if msg.get("undo"):
+            game.unconfirm_guess(player.id, target)
+        else:
+            game.confirm_guess(player.id, target)
         return True
 
     if mtype == "claimGotIt":

@@ -179,6 +179,8 @@ class Manager:
             raise MoveError("Game in progress — wait for the next round.")
         if existing:
             existing.name = name or existing.name
+            if room.game.status == STATUS_PLAYING and existing.id not in room.game.player_ids:
+                raise MoveError("This round already started — wait for the next round.")
             existing.connected = True
             existing.last_seen = time.time()
             return existing
