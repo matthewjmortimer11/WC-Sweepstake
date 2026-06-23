@@ -1011,9 +1011,11 @@ app = FastAPI(title="Wheesht — World Cup Sweepstake 2026", lifespan=lifespan)
 # /play. Fully self-contained (in-memory rooms + WebSockets); see codenames/.
 from codenames import router as cipher_router  # noqa: E402
 from dial import router as dial_router  # noqa: E402
+from imposter import router as imposter_router  # noqa: E402
 
 app.include_router(cipher_router)
 app.include_router(dial_router)
+app.include_router(imposter_router)
 
 
 # Content Security Policy. Tuned to exactly what the app loads: React/Babel from
@@ -1054,15 +1056,6 @@ async def index():
 @app.get("/welcome", response_class=HTMLResponse)
 async def welcome_page():
     path = Path("templates/welcome.html")
-    if not path.is_file():
-        raise HTTPException(status_code=404, detail="not found")
-    return HTMLResponse(content=path.read_text(encoding="utf-8"))
-
-
-@app.get("/imposter", response_class=HTMLResponse)
-async def imposter_page():
-    """Imposter — a self-contained, local-only 4-player party game (no backend)."""
-    path = Path("templates/imposter.html")
     if not path.is_file():
         raise HTTPException(status_code=404, detail="not found")
     return HTMLResponse(content=path.read_text(encoding="utf-8"))

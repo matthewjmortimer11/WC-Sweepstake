@@ -1,4 +1,4 @@
-"""The local-only Imposter party game page (/imposter)."""
+"""The Imposter party game (/imposter) — online multiplayer + local mode."""
 
 import pytest
 from starlette.testclient import TestClient
@@ -18,55 +18,49 @@ def test_imposter_page_served(client):
     assert "text/html" in r.headers.get("content-type", "")
 
 
-def test_imposter_page_has_game_surface(client):
+def test_imposter_has_game_surface(client):
     t = client.get("/imposter").text
-    # Setup, role-selection and reveal copy required by the spec.
+    for marker in ("Imposter", "/imposter/assets/app.js", "/imposter/assets/celebs.js"):
+        assert marker in t, f"missing Imposter marker: {marker!r}"
+    js = client.get("/imposter/assets/app.js").text
     for marker in (
+        "Create room", "Share game link", "roomInviteUrl", "renderLocal", "localMode",
         "Player 1", "Player 4", "Start game",
         "Only click your own name. No peeking.",
         "IMPOSTER", "NOT IMPOSTER",
         "Hide role", "New round", "Edit names",
-    ):
-        assert marker in t, f"missing UI marker: {marker!r}"
-
-
-def test_celebrity_dance_mode_present(client):
-    t = client.get("/imposter").text
-    for marker in (
         "Celebrity Dance", "Your celebrity",
         "mainly dance", "Reveal the odd one out",
-    ):
-        assert marker in t, f"missing Celebrity Dance marker: {marker!r}"
-    # The celebrity pool ships with the page (local-only, no API).
-    assert "CELEBS" in t and "Beyoncé" in t
-
-
-def test_charades_mode_present(client):
-    t = client.get("/imposter").text
-    for marker in (
         "Charades", "Reveal charade", "Next player",
         "No talking, no pointing", "Up to act",
+        "pickCharade", "IMPOSTER_CELEBS",
+        "Who guessed it", "Nobody got it", "awardCharade", "charadesScores",
+        "Acting timer (optional)", "armCharadeTimer", "Time's up", "timerSecs",
+        "markViewed", "revealAnswer", "newRound",
     ):
-        assert marker in t, f"missing Charades marker: {marker!r}"
-    # Charades reuses the celebrity pool as prompts.
-    assert "pickCharade" in t and "CELEBS" in t
-    # Score counter: who-guessed picker awards points to actor + guesser.
-    for marker in ("Who guessed it", "Nobody got it", "awardCharade", "charadesScores"):
-        assert marker in t, f"missing Charades score marker: {marker!r}"
-    # Optional acting timer.
-    for marker in ("Acting timer (optional)", "armCharadeTimer", "Time's up", "timerSecs"):
-        assert marker in t, f"missing Charades timer marker: {marker!r}"
+        assert marker in js, f"missing Imposter JS marker: {marker!r}"
 
 
-def test_imposter_is_local_only_no_api(client):
-    # The page must not call back to a server: no fetch/websocket/api endpoints.
-    t = client.get("/imposter").text.lower()
-    assert "fetch(" not in t
-    assert "websocket" not in t
-    assert "/api/" not in t
+def test_imposter_has_local_link(client):
+    t = client.get("/imposter").text
+    assert 'href="#/local"' in t
+    assert "one phone" in t
 
 
-def test_existing_routes_unaffected(client):
-    assert client.get("/").status_code == 200
-    assert client.get("/welcome").status_code == 200
-    assert client.get("/play").status_code == 200
+def test_imposter_has_multiplayer_api(client):
+    t = client.get("/imposter").text
+    assert "/imposter/assets/app.js" in t
+    r = client.post("/imposter/api/rooms", json={"mode": "classic"})
+    assert r.status_code == 200
+    assert "code" in r.json()
+
+
+def test_imposter_assets_served(client):
+    assert client.get("/imposter/assets/app.js").status_code == 200
+    assert client.get("/imposter/assets/styles.css").status_code == 200
+    assert client.get("/imposter/assets/celebs.js").status_code == 200
+
+
+def test_party_games_routes_all_serve(client):
+    for path in ("/", "/welcome", "/play", "/imposter", "/wheel"):
+        assert client.get(path).status_code == 200
