@@ -184,6 +184,7 @@ async def game_socket(ws: WebSocket, code: str) -> None:
                 room.players[pid].connected = False
                 room.players[pid].last_seen = time.time()
             manager._ensure_host(room)
+            manager.handle_disconnect(room, pid)
             room.touch()
             await manager._broadcast(room)
 

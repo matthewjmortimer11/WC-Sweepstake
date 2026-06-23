@@ -60,10 +60,12 @@
   const el = (tag, attrs = {}, kids = []) => {
     const n = document.createElement(tag);
     for (const [k, v] of Object.entries(attrs)) {
+      if (v == null || v === false) continue;
       if (k === "class") n.className = v;
       else if (k === "html") n.innerHTML = v;
       else if (k === "text") n.textContent = v;
       else if (k.startsWith("on") && typeof v === "function") n.addEventListener(k.slice(2), v);
+      else if (k === "disabled" && v === "disabled") n.disabled = true;
       else n.setAttribute(k, v);
     }
     (Array.isArray(kids) ? kids : [kids]).forEach((c) => c != null && n.append(c));
@@ -75,6 +77,7 @@
   let reconnectDelay = 800;
   let localGuess = 50;
   let routeCode = null;
+  let lastRouteCode = null;
   let localMode = false;
   let guessDragActive = false;
   let guessSendTimer = null;
@@ -93,7 +96,7 @@
       let id = localStorage.getItem(LS.pid);
       if (!id) { id = crypto.randomUUID().replace(/-/g, ""); localStorage.setItem(LS.pid, id); }
       return id;
-    } catch (_) { return "anon"; }
+    } catch (_) { return crypto.randomUUID().replace(/-/g, ""); }
   }
 
   function playerName() {
@@ -249,7 +252,12 @@
   }
 
   function send(msg) {
-    if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg));
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify(msg));
+      return true;
+    }
+    toast("Not connected — wait a moment and try again.");
+    return false;
   }
 
   function toast(msg) {
@@ -378,6 +386,7 @@
   function lobbyScreen() {
     const room = state.room;
     const you = state.you;
+    const me = playerById(you.id) || you;
     const settings = room.settings;
     const game = room.game;
     const names = settings.teamNames || ["Team 1", "Team 2"];
@@ -397,7 +406,7 @@
         onclick: () => send({ type: "setTeam", team: "team1" }) }),
     ]) : null;
 
-    const hostBits = you.isHost ? [
+    const hostBits = me.isHost ? [
       el("label", { class: "fl" }, [
         el("span", { text: "Play to" }),
         el("div", { class: "seg" }, [10, 15, 20].map((n) =>
@@ -511,6 +520,7 @@
   function guessScreen() {
     const game = state.room.game;
     const you = state.you;
+    const me = playerById(you.id) || you;
     const val = game.myGuess != null ? game.myGuess : localGuess;
     localGuess = val;
 
@@ -591,6 +601,7 @@
 
   function revealScreen() {
     const game = state.room.game;
+    const me = playerById(state.you.id) || state.you;
     const target = game.target;
     const guesses = game.guesses || {};
     const pts = game.roundPoints || {};
@@ -626,7 +637,7 @@
         : null,
       el("div", { class: "guess-list" }, rows),
       scorebar(game, game.teamNames),
-      state.you.isHost
+      me.isHost
         ? el("button", { class: "btn btn--primary btn--lg btn--block", text: "Next round →",
             onclick: () => send({ type: "nextRound" }) })
         : el("p", { class: "note", text: "Waiting for host to continue…" }),
@@ -635,6 +646,7 @@
 
   function winScreen() {
     const game = state.room.game;
+    const me = playerById(state.you.id) || state.you;
     const names = game.teamNames || ["Team 1", "Team 2"];
     let title = "Game over!";
     if (game.mode === "teams" && game.winner != null) {
@@ -648,7 +660,7 @@
       el("div", { class: "trophy", text: "🏆" }),
       el("h1", {}, [el("span", { class: "em", text: title })]),
       scorebar(game, names),
-      state.you.isHost ? el("button", {
+      me.isHost ? el("button", {
         class: "btn btn--primary btn--lg btn--block", text: "Play again",
         onclick: () => send({ type: "rematch" }),
       }) : el("p", { class: "note", text: "Waiting for host…" }),
@@ -658,6 +670,7 @@
   function gameScreen() {
     const game = state.room.game;
     const you = state.you;
+    const me = playerById(you.id) || you;
     if (game.status === "ended") return winScreen();
     if (game.phase === "psychic") {
       if (you.isPsychic) return psychicScreen();
@@ -941,10 +954,24 @@
     if (localMode && ws) {
       try { ws.close(); } catch (_) {}
       ws = null;
+      state.room = null;
+      state.you = null;
+    }
+    const routeChanged = routeCode !== lastRouteCode;
+    if (routeChanged) {
+      clearTimeout(reconnectTimer);
+      lastRouteCode = routeCode;
+      if (!routeCode) {
+        if (ws) { try { ws.close(); } catch (_) {} ws = null; }
+        state.room = null;
+        state.you = null;
+      } else {
+        state.room = null;
+        state.you = null;
+        connect(routeCode);
+      }
     }
     render();
-    if (routeCode) connect(routeCode);
-    else if (ws) { try { ws.close(); } catch (_) {} ws = null; }
   }
 
   window.addEventListener("hashchange", boot);

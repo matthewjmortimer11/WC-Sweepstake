@@ -78,3 +78,41 @@ def test_reconnect_can_peek_again(client):
     room.game.mark_viewed(pids[0])
     room.game.viewed.discard(pids[0])
     assert "isImposter" in room.state_for(pids[0])["room"]["game"]
+
+
+def _room_with_n(code: str, n: int):
+    room = manager.get(code)
+    pids = [f"p{i}" for i in range(1, n + 1)]
+    for i, pid in enumerate(pids):
+        manager.join(room, pid, f"Player {i + 1}")
+        room.players[pid].connected = True
+    return room, pids
+
+
+def test_two_player_start(client):
+    code = client.post("/imposter/api/rooms", json={"mode": "classic"}).json()["code"]
+    room, pids = _room_with_n(code, 2)
+    manager.start_game(room)
+    assert len(room.game.player_ids) == 2
+
+
+def test_mid_game_join_blocked(client):
+    from imposter.game import MoveError
+
+    code = client.post("/imposter/api/rooms", json={"mode": "classic"}).json()["code"]
+    room, _ = _room_with_n(code, 2)
+    manager.start_game(room)
+    with pytest.raises(MoveError, match="in progress"):
+        manager.join(room, "newbie", "Latecomer")
+
+
+def test_reconnect_blocked_if_missed_round(client):
+    from imposter.game import MoveError
+
+    code = client.post("/imposter/api/rooms", json={"mode": "classic"}).json()["code"]
+    room, pids = _room_with_n(code, 3)
+    room.players[pids[2]].connected = False
+    manager.start_game(room)
+    assert pids[2] not in room.game.player_ids
+    with pytest.raises(MoveError, match="already started"):
+        manager.join(room, pids[2], "Player 3")

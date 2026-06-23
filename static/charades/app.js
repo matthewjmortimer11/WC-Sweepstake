@@ -6,6 +6,8 @@
   const toastEl = document.getElementById("toast");
   const LS = { pid: "charades.pid", name: "charades.name" };
   const CELEBS = window.IMPOSTER_CELEBS || [];
+  const MIN_PLAYERS = 2;
+  const MAX_PLAYERS = 50;
 
   let timerInterval = null;
   let ws = null;
@@ -17,14 +19,18 @@
   let lastRouteCode = null;
 
   const state = { room: null, you: null, pendingSettings: null };
+
+  const lobbyMin = (room) => (room && room.settings && room.settings.minPlayers) || MIN_PLAYERS;
   const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
 
   const el = (tag, attrs = {}, kids = []) => {
     const n = document.createElement(tag);
     for (const [k, v] of Object.entries(attrs)) {
+      if (v == null || v === false) continue;
       if (k === "class") n.className = v;
       else if (k === "text") n.textContent = v;
       else if (k.startsWith("on") && typeof v === "function") n.addEventListener(k.slice(2), v);
+      else if (k === "disabled" && v === "disabled") n.disabled = true;
       else n.setAttribute(k, v);
     }
     (Array.isArray(kids) ? kids : [kids]).forEach((c) => c != null && n.append(c));
@@ -36,7 +42,7 @@
       let id = localStorage.getItem(LS.pid);
       if (!id) { id = crypto.randomUUID().replace(/-/g, ""); localStorage.setItem(LS.pid, id); }
       return id;
-    } catch (_) { return "anon"; }
+    } catch (_) { return crypto.randomUUID().replace(/-/g, ""); }
   }
 
   function playerName() {
@@ -55,7 +61,12 @@
   }
 
   function send(msg) {
-    if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg));
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify(msg));
+      return true;
+    }
+    toast("Not connected — wait a moment and try again.");
+    return false;
   }
 
   function parseRoute() {
@@ -212,7 +223,7 @@
     return el("div", { class: "panel" }, [
       el("span", { class: "eyebrow", text: "Online" }),
       el("h1", {}, [document.createTextNode("Act it "), el("span", { class: "em", text: "out" })]),
-      el("p", { class: "lede", text: "Four players, four phones. One celebrity to mime each round — no talking, no pointing. Everyone guesses on their own device." }),
+      el("p", { class: "lede", text: "One celebrity to mime each round — no talking, no pointing. Everyone guesses on their own device." }),
       el("label", { class: "fl" }, [el("span", { text: "Your name" }), nameIn]),
       el("button", {
         class: "btn btn--primary btn--lg btn--block", text: "Create room →",
@@ -230,7 +241,7 @@
           },
         }),
       ]),
-      el("p", { class: "note", text: "Need exactly 4 players. Share the game link so friends join on their phones." }),
+      el("p", { class: "note", text: `Works with ${MIN_PLAYERS}+ players. Share the game link so friends join on their phones.` }),
     ]);
   }
 
@@ -238,7 +249,10 @@
     const room = state.room;
     const you = state.you;
     const settings = room.settings;
+    const me = playerById(you.id) || you;
     const connected = room.players.filter((p) => p.connected).length;
+    const minP = lobbyMin(room);
+    const canStart = connected >= minP;
     state.pendingSettings = { timerSecs: settings.timerSecs };
 
     const nameIn = el("input", {
@@ -246,16 +260,16 @@
       onchange: (e) => send({ type: "rename", name: e.target.value.trim() }),
     });
 
-    const hostBits = you.isHost ? [
+    const hostBits = me.isHost ? [
       ...hostLobbyExtras(settings),
       el("button", {
         class: "btn btn--primary btn--lg btn--block",
-        text: connected === 4 ? "Start game →" : `Waiting for players (${connected}/4)…`,
-        disabled: connected !== 4 ? "disabled" : null,
+        text: canStart ? `Start game (${connected} players) →` : `Waiting for players (${connected}/${minP})…`,
+        disabled: canStart ? false : "disabled",
         onclick: () => send({ type: "start" }),
       }),
     ] : [
-      el("p", { class: "note", text: `Waiting for the host to start… (${connected}/4 connected)` }),
+      el("p", { class: "note", text: `Waiting for the host to start… (${connected} connected, need ${minP}+)` }),
     ];
 
     return el("div", { class: "panel" }, [
@@ -285,6 +299,7 @@
     const room = state.room;
     const game = room.game;
     const you = state.you;
+    const me = playerById(you.id) || you;
     const others = room.players.filter((p) => p.id !== you.id && p.connected);
     const timer = game.timerSecs > 0 ? el("div", { class: "ch-timer", id: "ch-timer" }, [
       el("div", { class: "ch-timer__bar", id: "ch-timer-bar" }),
@@ -308,7 +323,7 @@
         }, [el("span", { text: p.name })]))),
         el("button", { class: "btn btn--block", text: "Nobody got it →", onclick: () => send({ type: "charadeNobody" }) }),
       ]),
-      you.isHost ? hostResetBtn() : null,
+      me.isHost ? hostResetBtn() : null,
     ]);
   }
 
@@ -316,6 +331,7 @@
     const room = state.room;
     const game = room.game;
     const you = state.you;
+    const me = playerById(you.id) || you;
     const actor = playerById(game.actorId);
     const bits = [
       el("span", { class: "eyebrow", text: "Charades" }),
@@ -327,7 +343,7 @@
       ]),
       el("p", { class: "note", text: "Watch and guess — the actor taps who got it right." }),
     ];
-    if (you.isHost) {
+    if (me.isHost) {
       bits.push(el("button", { class: "btn btn--ghost btn--block", text: "Skip turn →", onclick: () => send({ type: "skipCharade" }) }));
       bits.push(hostResetBtn());
     }
@@ -345,6 +361,25 @@
     timerSecs: 60,
   };
 
+  function localPlayerCount() {
+    return local.names.length;
+  }
+
+  function addLocalPlayer() {
+    if (local.names.length >= MAX_PLAYERS) return;
+    local.names.push("Player " + (local.names.length + 1));
+    local.scores.push(0);
+    renderLocal();
+  }
+
+  function removeLocalPlayer() {
+    if (local.names.length <= MIN_PLAYERS) return;
+    local.names.pop();
+    local.scores.pop();
+    if (local.actor >= local.names.length) local.actor = 0;
+    renderLocal();
+  }
+
   function pickCharade() {
     const prev = local.word;
     let next = pick(CELEBS);
@@ -354,15 +389,15 @@
 
   function localStart() {
     if (!CELEBS.length) { toast("Celebrity list failed to load — refresh the page."); return; }
-    local.actor = Math.floor(Math.random() * 4);
-    local.scores = [0, 0, 0, 0];
+    local.actor = Math.floor(Math.random() * localPlayerCount());
+    local.scores = local.names.map(() => 0);
     pickCharade();
     local.screen = "select";
     renderLocal();
   }
 
   function nextLocalTurn() {
-    local.actor = (local.actor + 1) % 4;
+    local.actor = (local.actor + 1) % localPlayerCount();
     pickCharade();
     local.screen = "select";
     renderLocal();
@@ -385,8 +420,13 @@
         el("span", { text: "Player " + (i + 1) }),
         el("input", { class: "in", maxlength: "20", value: name, oninput: (e) => { local.names[i] = e.target.value; } }),
       ]))),
+      el("div", { class: "row" }, [
+        el("button", { class: "btn btn--ghost", text: "+ Add player", disabled: local.names.length >= MAX_PLAYERS ? "disabled" : false, onclick: addLocalPlayer }),
+        el("button", { class: "btn btn--ghost", text: "− Remove player", disabled: local.names.length <= MIN_PLAYERS ? "disabled" : false, onclick: removeLocalPlayer }),
+      ]),
       el("button", {
         class: "btn btn--primary btn--lg btn--block", text: "Start game →",
+        disabled: local.names.length < MIN_PLAYERS ? "disabled" : false,
         onclick: () => {
           local.names = local.names.map((n, i) => (n || "").trim() || ("Player " + (i + 1)));
           localStart();
@@ -481,18 +521,28 @@
 
   function boot() {
     parseRoute();
-    if (localMode && ws) { try { ws.close(); } catch (_) {} ws = null; state.room = null; state.you = null; }
-    if (routeCode !== lastRouteCode) { state.room = null; state.you = null; charadeTimerKey = null; lastRouteCode = routeCode; }
-    if (!routeCode) {
-      if (ws) { try { ws.close(); } catch (_) {} ws = null; }
-      clearTimeout(reconnectTimer);
+    if (localMode && ws) {
+      try { ws.close(); } catch (_) {}
+      ws = null;
       state.room = null;
       state.you = null;
+    }
+    const routeChanged = routeCode !== lastRouteCode;
+    if (routeChanged) {
+      clearTimeout(reconnectTimer);
+      lastRouteCode = routeCode;
       charadeTimerKey = null;
-      lastRouteCode = null;
+      if (!routeCode) {
+        if (ws) { try { ws.close(); } catch (_) {} ws = null; }
+        state.room = null;
+        state.you = null;
+      } else {
+        state.room = null;
+        state.you = null;
+        connect(routeCode);
+      }
     }
     render();
-    if (routeCode) connect(routeCode);
   }
 
   window.addEventListener("hashchange", boot);
