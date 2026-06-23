@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Dial — a Wheesht party game</title>
+  <meta name="description" content="A local 'read the room' party game. The Psychic sees a hidden zone on the dial and gives a clue; their team turns the dial to guess where it is. Closer = more points." />
+  <meta name="theme-color" content="#0e1016" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%8E%AF%3C/text%3E%3C/svg%3E" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet" />
+  <style>
+    :root{
+      --bg:#0e1016; --panel:#1a1e2b; --panel-2:#212636; --line:#2c3346; --line-strong:#3b4459;
+      --ink:#f4f7ff; --ink-2:#aab4c9; --ink-3:#717c92;
+      --accent:#ffc53d; --accent-2:#f0a417; --accent-ink:#2a1c02;
+      --t1:#fb5071; --t1-deep:#b91c47; --t2:#21d4cf; --t2-deep:#0c8f93;
+      --w2:#21d4cf; --w3:#ffb454; --w4:#fb5071; --needle:#ffc53d;
+      --radius:18px; --radius-sm:13px;
+      --font:"Nunito",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+      --head:"Fredoka",var(--font);
+      --shadow:0 24px 60px -28px rgba(0,0,0,.85);
+      --ease:cubic-bezier(.34,1.56,.64,1);
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{margin:0;font-family:var(--font);font-weight:600;color:var(--ink);
+      background:radial-gradient(125% 65% at 50% -25%,rgba(255,197,61,.08) 0%,transparent 62%),var(--bg);
+      -webkit-font-smoothing:antialiased;min-height:100dvh}
+    .wrap{max-width:560px;margin:0 auto;padding:clamp(16px,4vw,32px);
+      padding-bottom:max(20px,env(safe-area-inset-bottom));min-height:100dvh;display:flex;flex-direction:column;gap:18px}
+    .topbar{display:flex;align-items:center;justify-content:space-between;gap:12px}
+    .brand{font-family:var(--head);font-weight:600;font-size:1.05rem;display:flex;align-items:center;gap:.5rem}
+    .brand .tag{color:var(--ink-3);font-size:.7rem;text-transform:uppercase;letter-spacing:.14em;font-weight:700}
+    a.back{color:var(--ink-2);text-decoration:none;font-size:.82rem;font-weight:700;
+      border:1.5px solid var(--line-strong);padding:.4em .8em;border-radius:10px;transition:.15s}
+    a.back:hover{border-color:var(--accent);color:var(--ink)}
+    h1{font-family:var(--head);font-weight:600;font-size:clamp(1.8rem,7vw,2.6rem);line-height:1.04;margin:0}
+    h1 .em{color:var(--accent)}
+    .lede{color:var(--ink-2);margin:.4rem 0 0;line-height:1.5;font-size:.98rem}
+    .panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+      padding:clamp(16px,4vw,24px);box-shadow:var(--shadow);display:grid;gap:16px}
+    .eyebrow{font-family:var(--head);font-size:.72rem;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:var(--accent)}
+    label.fl{display:grid;gap:6px;font-size:.78rem;font-weight:800;color:var(--ink-2)}
+    input.in{font:inherit;font-weight:700;color:var(--ink);background:#0a0a08;border:2px solid var(--line-strong);
+      border-radius:var(--radius-sm);padding:.74em .95em;width:100%}
+    input.in:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 4px rgba(255,197,61,.14)}
+    .btn{appearance:none;cursor:pointer;font:inherit;font-weight:800;font-family:var(--head);
+      color:var(--ink);background:var(--panel-2);border:0;border-radius:var(--radius-sm);
+      padding:.85em 1.2em;display:inline-flex;align-items:center;justify-content:center;gap:.5em;
+      box-shadow:0 3px 0 var(--line-strong);transition:transform .08s var(--ease),box-shadow .08s var(--ease),filter .15s}
+    .btn:hover{filter:brightness(1.08)}
+    .btn:active{transform:translateY(3px);box-shadow:0 0 0 var(--line-strong)}
+    .btn:focus-visible{outline:none;box-shadow:0 0 0 3px var(--bg),0 0 0 6px var(--accent)}
+    .btn--primary{background:var(--accent);color:var(--accent-ink);box-shadow:0 3px 0 var(--accent-2)}
+    .btn--primary:active{box-shadow:0 0 0 var(--accent-2)}
+    .btn--block{width:100%}.btn--lg{padding:1em 1.4em;font-size:1.1rem}
+    .btn--ghost{background:transparent;box-shadow:none;border:1.5px solid var(--line-strong);color:var(--ink-2)}
+    .btn--ghost:hover{border-color:var(--accent);color:var(--ink)}
+    .row{display:flex;gap:10px;flex-wrap:wrap}.row .btn{flex:1}
+    .note{color:var(--ink-2);text-align:center;font-size:.92rem;margin:0}
+    .foot{margin-top:auto;text-align:center;color:var(--ink-3);font-size:.78rem;font-family:var(--head);font-weight:600}
+    /* Scoreboard */
+    .scorebar{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    .team-score{display:grid;gap:2px;justify-items:center;padding:10px;border-radius:var(--radius-sm);
+      background:var(--panel-2);border:1.5px solid var(--line)}
+    .team-score.t1{border-color:var(--t1-deep)}.team-score.t2{border-color:var(--t2-deep)}
+    .team-score.on.t1{border-color:var(--t1)}.team-score.on.t2{border-color:var(--t2)}
+    .team-score__n{font-family:var(--head);font-weight:600;font-size:.9rem;color:var(--ink-2);text-align:center}
+    .team-score.t1 .team-score__n{color:var(--t1)}.team-score.t2 .team-score__n{color:var(--t2)}
+    .team-score__v{font-family:var(--head);font-weight:600;font-size:1.7rem;line-height:1}
+    /* Spectrum + dial */
+    .spectrum{display:flex;align-items:center;justify-content:space-between;gap:10px;font-family:var(--head);font-weight:600}
+    .spectrum span{flex:1;padding:8px 10px;border-radius:10px;background:var(--panel-2);text-align:center;font-size:.95rem}
+    .spectrum .lft{color:var(--t1)}.spectrum .rgt{color:var(--t2);text-align:center}
+    .spectrum .vs{flex:0;color:var(--ink-3);font-size:.8rem}
+    .gauge{width:100%}
+    .gauge svg{width:100%;height:auto;display:block}
+    .gauge .track{fill:none;stroke:var(--line-strong);stroke-width:22;stroke-linecap:round}
+    .gauge .band{fill:none;stroke-width:22;stroke-linecap:butt}
+    .gauge .band--2{stroke:var(--w2)}.gauge .band--3{stroke:var(--w3)}.gauge .band--4{stroke:var(--w4)}
+    .gauge .needle{stroke:var(--needle);stroke-width:6;stroke-linecap:round}
+    .gauge .tneedle{stroke:#fff;stroke-width:4;stroke-linecap:round;opacity:.9}
+    .gauge .hub{fill:var(--needle)}
+    .slider{width:100%}
+    input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:10px;border-radius:999px;
+      background:linear-gradient(90deg,var(--t1),var(--t2));outline:none}
+    input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:30px;height:30px;border-radius:50%;
+      background:var(--needle);border:3px solid #0a0a08;box-shadow:0 3px 8px rgba(0,0,0,.5);cursor:pointer}
+    input[type=range]::-moz-range-thumb{width:30px;height:30px;border-radius:50%;background:var(--needle);
+      border:3px solid #0a0a08;cursor:pointer}
+    .points{font-family:var(--head);font-weight:600;font-size:clamp(2.4rem,12vw,3.6rem);text-align:center;
+      color:var(--accent-ink);background:linear-gradient(180deg,var(--accent),var(--accent-2));
+      border-radius:var(--radius);padding:.2em .4em}
+    .points.zero{color:#fff;background:linear-gradient(180deg,#3a4154,#2a3040)}
+    .seg{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;background:#0a0a08;border:1.5px solid var(--line-strong);
+      border-radius:var(--radius-sm);padding:5px}
+    .seg button{appearance:none;border:0;background:transparent;color:var(--ink-2);cursor:pointer;font:inherit;
+      font-weight:800;font-family:var(--head);padding:.55em;border-radius:9px;font-size:.9rem}
+    .seg button.on{background:var(--accent);color:var(--accent-ink);box-shadow:0 3px 0 var(--accent-2)}
+    .win h1{text-align:center}.win .trophy{font-size:3.4rem;text-align:center}
+    @media (prefers-reduced-motion:reduce){*{transition-duration:.05ms!important}}
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <div class="topbar">
+      <span class="brand">🎯 Dial <span class="tag">Wheesht</span></span>
+      <a class="back" href="/play">← Games</a>
+    </div>
+    <div id="app"></div>
+    <p class="foot">A Wheesht party game · one phone · two teams · read the room</p>
+  </main>
+
+  <script>
+  (() => {
+    "use strict";
+    const app = document.getElementById("app");
+
+    // ── dial geometry (semicircle: value 0 = left, 100 = right) ───────────────
+    const CX = 160, CY = 152, R = 122;
+    const degForVal = (v) => 180 - (v / 100) * 180;
+    const polar = (r, deg) => {
+      const a = deg * Math.PI / 180;
+      return { x: CX + r * Math.cos(a), y: CY - r * Math.sin(a) };
+    };
+    const arc = (v1, v2) => {
+      const p1 = polar(R, degForVal(v1)), p2 = polar(R, degForVal(v2));
+      return `M${p1.x.toFixed(1)} ${p1.y.toFixed(1)} A${R} ${R} 0 0 1 ${p2.x.toFixed(1)} ${p2.y.toFixed(1)}`;
+    };
+    const clamp = (v) => Math.max(0, Math.min(100, v));
+    const bandArc = (v1, v2, cls) => {
+      v1 = clamp(v1); v2 = clamp(v2);
+      if (v2 - v1 < 0.5) return "";
+      return `<path class="band ${cls}" d="${arc(v1, v2)}"/>`;
+    };
+    const needle = (v, cls, id) => {
+      const p = polar(R - 6, degForVal(v));
+      return `<line id="${id}" class="${cls}" x1="${CX}" y1="${CY}" x2="${p.x.toFixed(1)}" y2="${p.y.toFixed(1)}"/>`;
+    };
+    function gaugeHTML(opts) {
+      const o = opts || {};
+      const bands = o.showBands ? (
+        bandArc(o.target - 20, o.target - 12, "band--2") +
+        bandArc(o.target + 12, o.target + 20, "band--2") +
+        bandArc(o.target - 12, o.target - 4, "band--3") +
+        bandArc(o.target + 4, o.target + 12, "band--3") +
+        bandArc(o.target - 4, o.target + 4, "band--4")
+      ) : "";
+      const tn = o.showTarget ? needle(o.target, "tneedle", "tneedle") : "";
+      const gn = o.showGuess ? needle(o.guess, "needle", "needle") : "";
+      return `<svg viewBox="0 0 320 172" role="img" aria-label="Guessing dial">
+        <path class="track" d="${arc(0, 100)}"/>${bands}${tn}${gn}
+        <circle class="hub" cx="${CX}" cy="${CY}" r="9"/></svg>`;
+    }
+    function pointsFor(target, guess) {
+      const d = Math.abs(target - guess);
+      return d <= 4 ? 4 : d <= 12 ? 3 : d <= 20 ? 2 : 0;
+    }
+
+    // ── spectrum prompts (family-friendly opposites) ──────────────────────────
+    const SPECTRA = [
+      ["Cold", "Hot"], ["Underrated", "Overrated"], ["Useless", "Useful"],
+      ["Scary", "Not scary"], ["Cheap", "Expensive"], ["Round", "Pointy"],
+      ["Fantasy", "Sci-fi"], ["Bad superpower", "Good superpower"],
+      ["Forbidden", "Encouraged"], ["Common", "Rare"], ["Unhealthy", "Healthy"],
+      ["Casual", "Formal"], ["Quiet", "Loud"], ["Old", "New"], ["Weird", "Normal"],
+      ["Boring", "Exciting"], ["Temporary", "Permanent"], ["Introvert", "Extrovert"],
+      ["Guilty pleasure", "Universally loved"], ["Hard to do", "Easy to do"],
+      ["Smells bad", "Smells good"], ["A want", "A need"], ["Overrated food", "Underrated food"],
+      ["Villain", "Hero"], ["Ugly", "Beautiful"], ["Cringe", "Cool"],
+      ["Waste of money", "Worth it"], ["Childish", "Grown-up"], ["Calm", "Chaotic"],
+      ["A chore", "A treat"], ["Forgettable", "Iconic"], ["Slow", "Fast"],
+      ["Messy", "Tidy"], ["Cursed", "Blessed"], ["Basic", "Fancy"],
+      ["Overshare", "Keep to yourself"], ["Soft", "Hard"], ["Dry", "Wet"],
+      ["Light", "Heavy"], ["Tame", "Wild"], ["Quiet night in", "Big night out"],
+      ["Low effort", "High effort"], ["A myth", "Real"], ["Awkward", "Smooth"],
+    ];
+    const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+
+    // ── state ─────────────────────────────────────────────────────────────────
+    const state = {
+      screen: "setup",                 // setup | pass | psychic | guess | reveal | win
+      teams: ["Team 1", "Team 2"],
+      scores: [0, 0],
+      turn: 0,
+      targetScore: 10,
+      spectrum: ["Cold", "Hot"],
+      target: 50,                      // hidden 0-100
+      guess: 50,
+      points: 0,
+    };
+
+    const el = (tag, attrs = {}, kids = []) => {
+      const n = document.createElement(tag);
+      for (const [k, v] of Object.entries(attrs)) {
+        if (k === "class") n.className = v;
+        else if (k === "html") n.innerHTML = v;        // trusted markup only (gauge)
+        else if (k === "text") n.textContent = v;      // safe for user input
+        else if (k.startsWith("on") && typeof v === "function") n.addEventListener(k.slice(2), v);
+        else n.setAttribute(k, v);
+      }
+      (Array.isArray(kids) ? kids : [kids]).forEach((c) => c != null && n.append(c));
+      return n;
+    };
+
+    function startGame() {
+      state.scores = [0, 0];
+      state.turn = Math.floor(Math.random() * 2);
+      newRound();
+    }
+    function newRound() {
+      state.spectrum = pick(SPECTRA);
+      state.target = 12 + Math.floor(Math.random() * 77);   // 12..88
+      state.guess = 50;
+      state.points = 0;
+      state.screen = "pass";
+      render();
+    }
+    function lockIn() {
+      state.points = pointsFor(state.target, state.guess);
+      state.scores[state.turn] += state.points;
+      state.screen = "reveal";
+      render();
+    }
+    function nextRound() {
+      const [a, b] = state.scores;
+      if ((a >= state.targetScore || b >= state.targetScore) && a !== b) {
+        state.screen = "win";
+        render();
+        return;
+      }
+      state.turn = 1 - state.turn;
+      newRound();
+    }
+
+    const spectrumEl = () => el("div", { class: "spectrum" }, [
+      el("span", { class: "lft", text: state.spectrum[0] }),
+      el("span", { class: "vs", text: "↔" }),
+      el("span", { class: "rgt", text: state.spectrum[1] }),
+    ]);
+    function scorebar() {
+      return el("div", { class: "scorebar" }, [0, 1].map((i) =>
+        el("div", { class: "team-score t" + (i + 1) + (state.turn === i ? " on" : "") }, [
+          el("span", { class: "team-score__n", text: state.teams[i] }),
+          el("span", { class: "team-score__v", text: String(state.scores[i]) }),
+        ])
+      ));
+    }
+
+    // ── screens ─────────────────────────────────────────────────────────────
+    function setupScreen() {
+      const inputs = state.teams.map((name, i) =>
+        el("label", { class: "fl" }, [
+          el("span", { text: "Team " + (i + 1) + " name" }),
+          el("input", { class: "in", maxlength: "18", value: name,
+            oninput: (e) => { state.teams[i] = e.target.value; } }),
+        ])
+      );
+      return el("div", { class: "panel" }, [
+        el("span", { class: "eyebrow", text: "Setup" }),
+        el("h1", {}, [document.createTextNode("Read the "), el("span", { class: "em", text: "room." })]),
+        el("p", { class: "lede", text: "One phone, two teams. The Psychic sees a hidden zone on the dial and gives a one-line clue; their team turns the dial to find it. Closer to the middle of the zone = more points." }),
+        ...inputs,
+        el("label", { class: "fl" }, [
+          el("span", { text: "Play to" }),
+          el("div", { class: "seg" }, [10, 15, 20].map((n) =>
+            el("button", { class: state.targetScore === n ? "on" : "", text: n + " pts",
+              onclick: () => { state.targetScore = n; render(); } })
+          )),
+        ]),
+        el("button", { class: "btn btn--primary btn--lg btn--block", text: "Start game →",
+          onclick: () => {
+            state.teams = state.teams.map((n, i) => (n || "").trim() || ("Team " + (i + 1)));
+            startGame();
+          } }),
+      ]);
+    }
+    function passScreen() {
+      return el("div", { class: "panel" }, [
+        el("span", { class: "eyebrow", text: "Round" }),
+        scorebar(),
+        el("p", { class: "note", text: state.teams[state.turn] + " — pass the phone to your Psychic only." }),
+        el("button", { class: "btn btn--primary btn--lg btn--block", text: "I'm the Psychic — reveal the zone",
+          onclick: () => { state.screen = "psychic"; render(); } }),
+        el("button", { class: "btn btn--ghost", text: "Edit teams", onclick: () => { state.screen = "setup"; render(); } }),
+      ]);
+    }
+    function psychicScreen() {
+      return el("div", { class: "panel" }, [
+        el("span", { class: "eyebrow", text: "Psychic — keep this hidden" }),
+        spectrumEl(),
+        el("div", { class: "gauge", html: gaugeHTML({ showBands: true, showTarget: true, target: state.target }) }),
+        el("p", { class: "note", text: "Give your team a one-line clue for where the gold zone sits on this scale. Don't say the dial words." }),
+        el("button", { class: "btn btn--primary btn--lg btn--block", text: "Hide & pass to team →",
+          onclick: () => { state.guess = 50; state.screen = "guess"; render(); } }),
+      ]);
+    }
+    function guessScreen() {
+      const gauge = el("div", { class: "gauge", html: gaugeHTML({ showGuess: true, guess: state.guess }) });
+      const slider = el("input", { type: "range", min: "0", max: "100", step: "1", value: String(state.guess),
+        class: "slider", "aria-label": "Turn the dial",
+        oninput: (e) => {
+          state.guess = Number(e.target.value);
+          const ln = document.getElementById("needle");
+          if (ln) { const p = polar(R - 6, degForVal(state.guess)); ln.setAttribute("x2", p.x.toFixed(1)); ln.setAttribute("y2", p.y.toFixed(1)); }
+        } });
+      return el("div", { class: "panel" }, [
+        el("span", { class: "eyebrow", text: state.teams[state.turn] + " — turn the dial" }),
+        spectrumEl(),
+        gauge,
+        slider,
+        el("p", { class: "note", text: "Discuss as a team, then lock in where you think the hidden zone is." }),
+        el("button", { class: "btn btn--primary btn--lg btn--block", text: "Lock in guess",
+          onclick: lockIn }),
+      ]);
+    }
+    function revealScreen() {
+      const pts = state.points;
+      return el("div", { class: "panel" }, [
+        el("span", { class: "eyebrow", text: "Reveal" }),
+        spectrumEl(),
+        el("div", { class: "gauge", html: gaugeHTML({ showBands: true, showTarget: true, showGuess: true, target: state.target, guess: state.guess }) }),
+        el("div", { class: "points" + (pts === 0 ? " zero" : ""), text: pts === 0 ? "Missed it!" : "+" + pts + (pts === 1 ? " point" : " points") }),
+        scorebar(),
+        el("button", { class: "btn btn--primary btn--lg btn--block", text: "Next round →", onclick: nextRound }),
+      ]);
+    }
+    function winScreen() {
+      const w = state.scores[0] >= state.scores[1] ? 0 : 1;
+      return el("div", { class: "panel win" }, [
+        el("div", { class: "trophy", text: "🏆" }),
+        el("h1", {}, [el("span", { class: "em", text: state.teams[w] }), document.createTextNode(" win!")]),
+        scorebar(),
+        el("button", { class: "btn btn--primary btn--lg btn--block", text: "Play again", onclick: startGame }),
+        el("button", { class: "btn btn--ghost", text: "Edit teams", onclick: () => { state.screen = "setup"; render(); } }),
+      ]);
+    }
+
+    function render() {
+      app.replaceChildren(
+        state.screen === "setup" ? setupScreen()
+        : state.screen === "pass" ? passScreen()
+        : state.screen === "psychic" ? psychicScreen()
+        : state.screen === "guess" ? guessScreen()
+        : state.screen === "reveal" ? revealScreen()
+        : winScreen()
+      );
+      window.scrollTo(0, 0);
+    }
+
+    render();
+  })();
+  </script>
+</body>
+</html>
