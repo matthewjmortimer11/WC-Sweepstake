@@ -61,6 +61,17 @@ if _cipher_store.ENABLED and not _TEST_DB:
     _cipher_store._initialised = False
 
 
+@pytest.fixture(autouse=True)
+def _clear_party_rate_buckets():
+    """Party-game routers share global create/WS buckets — reset each test."""
+    from party import ratelimit as _party_rl
+    _party_rl._CREATE_BUCKETS.clear()
+    _party_rl._WS_BUCKETS.clear()
+    yield
+    _party_rl._CREATE_BUCKETS.clear()
+    _party_rl._WS_BUCKETS.clear()
+
+
 @pytest_asyncio.fixture
 async def client():
     """A fresh schema per test, driving the ASGI app in-process.
@@ -74,6 +85,9 @@ async def client():
         await conn.run_sync(Base.metadata.create_all)
     # Reset the in-memory rate limiter for test isolation.
     main._RATE_BUCKETS.clear()
+    from party import ratelimit as _party_rl
+    _party_rl._CREATE_BUCKETS.clear()
+    _party_rl._WS_BUCKETS.clear()
     # Seed the config league (no network; legacy JSON files are absent in CI).
     await main._seed_and_migrate()
     transport = ASGITransport(app=main.app)

@@ -332,6 +332,7 @@
     settingsSavePending: false,
     reconnectTimer: null,
     reconnectDelay: 800,
+    pingTimer: null,
     lastRevealCount: 0,
     lastRevealedAt: {},       // card index → timestamp (for stamp animation)
     lastStatus: null,
@@ -431,13 +432,23 @@
     try { ws = new WebSocket(url); } catch (e) { scheduleReconnect(); return; }
     state.ws = ws;
 
-    ws.onopen = () => { state.connected = true; state.reconnectDelay = 800; renderConnState(); };
+    ws.onopen = () => {
+      state.connected = true;
+      state.reconnectDelay = 800;
+      renderConnState();
+      if (state.pingTimer) clearInterval(state.pingTimer);
+      state.pingTimer = setInterval(() => {
+        if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: "ping" }));
+      }, 25000);
+    };
     ws.onmessage = (ev) => {
       let msg; try { msg = JSON.parse(ev.data); } catch (_) { return; }
       handleMessage(msg);
     };
     ws.onclose = () => {
-      state.connected = false; renderConnState();
+      state.connected = false;
+      if (state.pingTimer) { clearInterval(state.pingTimer); state.pingTimer = null; }
+      renderConnState();
       if (state.route === "room") scheduleReconnect();
     };
     ws.onerror = () => { try { ws.close(); } catch (_) {} };

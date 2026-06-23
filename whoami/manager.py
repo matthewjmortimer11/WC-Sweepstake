@@ -135,6 +135,14 @@ class Manager:
         if self._ticker is None or self._ticker.done():
             self._ticker = asyncio.create_task(self._run_ticker())
 
+    async def stop(self) -> None:
+        if self._ticker:
+            self._ticker.cancel()
+            try:
+                await self._ticker
+            except asyncio.CancelledError:
+                pass
+
     async def _run_ticker(self) -> None:
         while True:
             await asyncio.sleep(1)

@@ -14,10 +14,11 @@
   let routeCode = null;
   let lastRouteCode = null;
   let localMode = false;
+  let pingTimer = null;
 
   const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
 
-  const state = { room: null, you: null, packs: [], homePackIds: ["uk_celebs"] };
+  const state = { room: null, you: null, packs: [], homePackIds: ["uk_celebs"], connected: false, creating: false };
 
   const lobbyMin = (room) => (room && room.settings && room.settings.minPlayers) || MIN_PLAYERS;
 
@@ -247,12 +248,34 @@
     input.click();
   }
 
+  function renderConnState() {
+    const c = document.getElementById("conn");
+    if (!c) return;
+    const inRoom = !localMode && routeCode;
+    c.hidden = !inRoom;
+    if (!inRoom) return;
+    c.classList.toggle("bad", !state.connected);
+    const lbl = c.querySelector(".lbl");
+    if (lbl) lbl.textContent = state.connected ? "Live" : "Reconnecting…";
+  }
+
+  function startPing() {
+    clearPing();
+    pingTimer = setInterval(() => {
+      if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: "ping" }));
+    }, 25000);
+  }
+
+  function clearPing() {
+    if (pingTimer) { clearInterval(pingTimer); pingTimer = null; }
+  }
+
   function connect(code) {
     if (ws) { try { ws.close(); } catch (_) {} ws = null; }
     const proto = location.protocol === "https:" ? "wss:" : "ws:";
     const url = `${proto}//${location.host}/whoami/ws/${code}?pid=${encodeURIComponent(pid())}&name=${encodeURIComponent(playerName())}`;
     ws = new WebSocket(url);
-    ws.onopen = () => { reconnectDelay = 800; };
+    ws.onopen = () => { reconnectDelay = 800; state.connected = true; renderConnState(); startPing(); };
     ws.onmessage = (ev) => {
       let msg;
       try { msg = JSON.parse(ev.data); } catch (_) { return; }
@@ -276,6 +299,9 @@
       }
     };
     ws.onclose = () => {
+      state.connected = false;
+      clearPing();
+      renderConnState();
       if (routeCode) {
         clearTimeout(reconnectTimer);
         reconnectTimer = setTimeout(() => {
@@ -289,12 +315,16 @@
   async function createRoom(packIds) {
     const ids = packIds && packIds.length ? packIds : state.homePackIds;
     if (!confirmMaturePacks(ids, [])) return;
+    if (state.creating) return;
+    state.creating = true;
+    render();
     const r = await fetch("/whoami/api/rooms", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ packIds: ids }),
     });
-    if (!r.ok) { toast("Couldn't create room."); return; }
+    state.creating = false;
+    if (!r.ok) { toast("Couldn't create room."); render(); return; }
     const code = (await r.json()).code;
     location.hash = `#/room/${code}`;
   }
@@ -334,7 +364,9 @@
       ]),
       el("label", { class: "fl" }, [el("span", { text: "Your name" }), nameIn]),
       el("button", {
-        class: "btn btn--primary btn--lg btn--block", text: "Create room →",
+        class: "btn btn--primary btn--lg btn--block",
+        text: state.creating ? "Creating room…" : "Create room →",
+        disabled: state.creating ? "disabled" : false,
         onclick: () => { saveName(nameIn.value.trim()); createRoom(state.homePackIds); },
       }),
       el("div", { class: "row" }, [
@@ -757,15 +789,20 @@
   function render() {
     app.replaceChildren();
     if (localMode) {
+      clearPing();
+      renderConnState();
       renderLocal();
       return;
     }
     if (!state.room) {
       if (routeCode) {
+        renderConnState();
         app.append(el("div", { class: "panel" }, [
           el("p", { class: "note", text: "Connecting to room…" }),
         ]));
       } else {
+        clearPing();
+        renderConnState();
         app.append(homeScreen());
       }
       return;
@@ -773,6 +810,7 @@
     const status = state.room.game && state.room.game.status;
     if (status === "playing") app.append(gameScreen());
     else app.append(lobbyScreen());
+    renderConnState();
   }
 
   async function boot() {
