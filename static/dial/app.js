@@ -75,6 +75,7 @@
   let reconnectDelay = 800;
   let localGuess = 50;
   let routeCode = null;
+  let localMode = false;
   let guessDragActive = false;
   let guessSendTimer = null;
   let pendingGuessValue = null;
@@ -208,8 +209,9 @@
   }
 
   function parseRoute() {
+    localMode = /^#\/local\b/i.test(location.hash || "");
     const m = location.hash.match(/^#\/room\/([A-Za-z0-9]+)/i);
-    routeCode = m ? m[1].toUpperCase() : null;
+    routeCode = localMode ? null : (m ? m[1].toUpperCase() : null);
   }
 
   function teamLabel(team, names) {
@@ -603,7 +605,238 @@
     return lobbyScreen();
   }
 
+  // ── local pass-the-phone (one shared device) ─────────────────────────────
+  const SPECTRA = [
+    ["Cold", "Hot"], ["Underrated", "Overrated"], ["Useless", "Useful"],
+    ["Scary", "Not scary"], ["Cheap", "Expensive"], ["Round", "Pointy"],
+    ["Fantasy", "Sci-fi"], ["Bad superpower", "Good superpower"],
+    ["Forbidden", "Encouraged"], ["Common", "Rare"], ["Unhealthy", "Healthy"],
+    ["Casual", "Formal"], ["Quiet", "Loud"], ["Old", "New"], ["Weird", "Normal"],
+    ["Boring", "Exciting"], ["Temporary", "Permanent"], ["Introvert", "Extrovert"],
+    ["Guilty pleasure", "Universally loved"], ["Hard to do", "Easy to do"],
+    ["Smells bad", "Smells good"], ["A want", "A need"], ["Overrated food", "Underrated food"],
+    ["Villain", "Hero"], ["Ugly", "Beautiful"], ["Cringe", "Cool"],
+    ["Waste of money", "Worth it"], ["Childish", "Grown-up"], ["Calm", "Chaotic"],
+    ["A chore", "A treat"], ["Forgettable", "Iconic"], ["Slow", "Fast"],
+    ["Messy", "Tidy"], ["Cursed", "Blessed"], ["Basic", "Fancy"],
+    ["Overshare", "Keep to yourself"], ["Soft", "Hard"], ["Dry", "Wet"],
+    ["Light", "Heavy"], ["Tame", "Wild"], ["Quiet night in", "Big night out"],
+    ["Low effort", "High effort"], ["A myth", "Real"], ["Awkward", "Smooth"],
+  ];
+  const pickSpectrum = () => SPECTRA[Math.floor(Math.random() * SPECTRA.length)];
+
+  const local = {
+    screen: "setup",
+    teams: ["Team 1", "Team 2"],
+    scores: [0, 0],
+    turn: 0,
+    targetScore: 10,
+    spectrum: ["Cold", "Hot"],
+    target: 50,
+    guess: 50,
+    points: 0,
+  };
+
+  function localSpectrumEl() {
+    return spectrumEl(local.spectrum);
+  }
+
+  function localScorebar() {
+    return el("div", { class: "scorebar" }, [0, 1].map((i) =>
+      el("div", { class: "team-score t" + (i + 1) + (local.turn === i ? " on" : "") }, [
+        el("span", { class: "team-score__n", text: local.teams[i] }),
+        el("span", { class: "team-score__v", text: String(local.scores[i]) }),
+      ])
+    ));
+  }
+
+  function localStartGame() {
+    local.scores = [0, 0];
+    local.turn = Math.floor(Math.random() * 2);
+    localNewRound();
+  }
+
+  function localNewRound() {
+    local.spectrum = pickSpectrum();
+    local.target = 12 + Math.floor(Math.random() * 77);
+    local.guess = 50;
+    local.points = 0;
+    local.screen = "pass";
+    renderLocal();
+  }
+
+  function localLockIn() {
+    local.points = pointsFor(local.target, local.guess);
+    local.scores[local.turn] += local.points;
+    local.screen = "reveal";
+    renderLocal();
+  }
+
+  function localNextRound() {
+    const [a, b] = local.scores;
+    if ((a >= local.targetScore || b >= local.targetScore) && a !== b) {
+      local.screen = "win";
+      renderLocal();
+      return;
+    }
+    local.turn = 1 - local.turn;
+    localNewRound();
+  }
+
+  function localSetupScreen() {
+    const inputs = local.teams.map((name, i) =>
+      el("label", { class: "fl" }, [
+        el("span", { text: "Team " + (i + 1) + " name" }),
+        el("input", {
+          class: "in", maxlength: "18", value: name,
+          oninput: (e) => { local.teams[i] = e.target.value; },
+        }),
+      ])
+    );
+    return el("div", { class: "panel" }, [
+      el("span", { class: "eyebrow", text: "One phone" }),
+      el("h1", {}, [document.createTextNode("Read the "), el("span", { class: "em", text: "room." })]),
+      el("p", { class: "lede", text: "Pass one device between teams. The Psychic sees a hidden zone on the dial and gives a one-line clue; their team turns the dial to find it. Closer to the middle of the zone = more points." }),
+      ...inputs,
+      el("label", { class: "fl" }, [
+        el("span", { text: "Play to" }),
+        el("div", { class: "seg" }, [10, 15, 20].map((n) =>
+          el("button", {
+            class: local.targetScore === n ? "on" : "",
+            text: n + " pts",
+            onclick: () => { local.targetScore = n; renderLocal(); },
+          })
+        )),
+      ]),
+      el("button", {
+        class: "btn btn--primary btn--lg btn--block",
+        text: "Start game →",
+        onclick: () => {
+          local.teams = local.teams.map((n, i) => (n || "").trim() || ("Team " + (i + 1)));
+          localStartGame();
+        },
+      }),
+      el("button", {
+        class: "btn btn--ghost btn--block",
+        text: "← Online rooms",
+        onclick: () => { location.hash = ""; },
+      }),
+    ]);
+  }
+
+  function localPassScreen() {
+    return el("div", { class: "panel" }, [
+      el("span", { class: "eyebrow", text: "Round" }),
+      localScorebar(),
+      el("p", { class: "note", text: local.teams[local.turn] + " — pass the phone to your Psychic only." }),
+      el("button", {
+        class: "btn btn--primary btn--lg btn--block",
+        text: "I'm the Psychic — reveal the zone",
+        onclick: () => { local.screen = "psychic"; renderLocal(); },
+      }),
+      el("button", {
+        class: "btn btn--ghost",
+        text: "Edit teams",
+        onclick: () => { local.screen = "setup"; renderLocal(); },
+      }),
+    ]);
+  }
+
+  function localPsychicScreen() {
+    return el("div", { class: "panel" }, [
+      el("span", { class: "eyebrow", text: "Psychic — keep this hidden" }),
+      localSpectrumEl(),
+      el("div", { class: "gauge", html: gaugeHTML({ showBands: true, showTarget: true, target: local.target }) }),
+      el("p", { class: "note", text: "Give your team a one-line clue for where the gold zone sits on this scale. Don't say the dial words." }),
+      el("button", {
+        class: "btn btn--primary btn--lg btn--block",
+        text: "Hide & pass to team →",
+        onclick: () => { local.guess = 50; local.screen = "guess"; renderLocal(); },
+      }),
+    ]);
+  }
+
+  function localGuessScreen() {
+    const gauge = el("div", { class: "gauge", html: gaugeHTML({ showGuess: true, guess: local.guess }) });
+    const slider = el("input", {
+      type: "range", min: "0", max: "100", step: "1", value: String(local.guess),
+      class: "slider", "aria-label": "Turn the dial",
+      oninput: (e) => {
+        local.guess = Number(e.target.value);
+        updateNeedle(local.guess);
+      },
+    });
+    return el("div", { class: "panel" }, [
+      el("span", { class: "eyebrow", text: local.teams[local.turn] + " — turn the dial" }),
+      localSpectrumEl(),
+      gauge,
+      slider,
+      el("p", { class: "note", text: "Discuss as a team, then lock in where you think the hidden zone is." }),
+      el("button", {
+        class: "btn btn--primary btn--lg btn--block",
+        text: "Lock in guess",
+        onclick: localLockIn,
+      }),
+    ]);
+  }
+
+  function localRevealScreen() {
+    const pts = local.points;
+    return el("div", { class: "panel" }, [
+      el("span", { class: "eyebrow", text: "Reveal" }),
+      localSpectrumEl(),
+      el("div", { class: "gauge", html: gaugeHTML({
+        showBands: true, showTarget: true, showGuess: true,
+        target: local.target, guess: local.guess,
+      }) }),
+      el("div", {
+        class: "points" + (pts === 0 ? " zero" : ""),
+        text: pts === 0 ? "Missed it!" : "+" + pts + (pts === 1 ? " point" : " points"),
+      }),
+      localScorebar(),
+      el("button", {
+        class: "btn btn--primary btn--lg btn--block",
+        text: "Next round →",
+        onclick: localNextRound,
+      }),
+    ]);
+  }
+
+  function localWinScreen() {
+    const w = local.scores[0] >= local.scores[1] ? 0 : 1;
+    return el("div", { class: "panel win" }, [
+      el("div", { class: "trophy", text: "🏆" }),
+      el("h1", {}, [el("span", { class: "em", text: local.teams[w] }), document.createTextNode(" win!")]),
+      localScorebar(),
+      el("button", {
+        class: "btn btn--primary btn--lg btn--block",
+        text: "Play again",
+        onclick: localStartGame,
+      }),
+      el("button", {
+        class: "btn btn--ghost",
+        text: "Edit teams",
+        onclick: () => { local.screen = "setup"; renderLocal(); },
+      }),
+    ]);
+  }
+
+  function renderLocal() {
+    const screen = local.screen === "setup" ? localSetupScreen()
+      : local.screen === "pass" ? localPassScreen()
+      : local.screen === "psychic" ? localPsychicScreen()
+      : local.screen === "guess" ? localGuessScreen()
+      : local.screen === "reveal" ? localRevealScreen()
+      : localWinScreen();
+    app.replaceChildren(screen);
+    window.scrollTo(0, 0);
+  }
+
   function render() {
+    if (localMode) {
+      renderLocal();
+      return;
+    }
     if (!routeCode) {
       app.replaceChildren(homeScreen());
       return;
@@ -622,6 +855,10 @@
 
   function boot() {
     parseRoute();
+    if (localMode && ws) {
+      try { ws.close(); } catch (_) {}
+      ws = null;
+    }
     render();
     if (routeCode) connect(routeCode);
     else if (ws) { try { ws.close(); } catch (_) {} ws = null; }
