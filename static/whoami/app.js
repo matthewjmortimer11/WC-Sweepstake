@@ -14,7 +14,7 @@
   let routeCode = null;
   let lastRouteCode = null;
 
-  const state = { room: null, you: null };
+  const state = { room: null, you: null, packs: [], homePackIds: ["uk_celebs"] };
 
   const lobbyMin = (room) => (room && room.settings && room.settings.minPlayers) || MIN_PLAYERS;
 
@@ -76,6 +76,61 @@
 
   function playerById(id) {
     return (state.room && state.room.players || []).find((p) => p.id === id);
+  }
+
+  async function loadPacks() {
+    if (state.packs.length) return;
+    try {
+      const r = await fetch("/whoami/api/packs");
+      if (r.ok) state.packs = (await r.json()).packs || [];
+    } catch (_) {
+      state.packs = [];
+    }
+  }
+
+  function confirmMaturePacks(packIds) {
+    const mature = packIds.filter((id) => {
+      const p = state.packs.find((x) => x.id === id);
+      return p && p.tier === "mature";
+    });
+    if (!mature.length) return true;
+    const names = mature.map((id) => (state.packs.find((x) => x.id === id) || {}).name).filter(Boolean).join(", ");
+    return window.confirm(
+      `You've selected mature packs (${names}) — dictators, tyrants and controversial figures. `
+      + "Only continue if everyone in the room is comfortable. Start anyway?"
+    );
+  }
+
+  function packToggleGrid(selectedIds, onToggle, editable) {
+    const ids = selectedIds || ["uk_celebs"];
+    const grid = el("div", { class: "pack-grid" });
+    (state.packs.length ? state.packs : [{ id: "uk_celebs", name: "UK Celebs", emoji: "🇬🇧", blurb: "", count: 0, tier: "family" }])
+      .forEach((p) => {
+        const on = ids.includes(p.id);
+        const btn = el("button", {
+          type: "button",
+          class: "pack-opt" + (on ? " on" : "") + (p.tier === "mature" ? " pack-opt--mature" : ""),
+          "aria-pressed": on ? "true" : "false",
+          disabled: editable ? false : "disabled",
+          onclick: () => {
+            if (!editable) return;
+            let next = on ? ids.filter((x) => x !== p.id) : [...ids, p.id];
+            if (!next.length) next = ["uk_celebs"];
+            if (!confirmMaturePacks(next)) return;
+            onToggle(next);
+          },
+        }, [
+          el("span", { class: "pack-opt__emoji", text: p.emoji || "📦" }),
+          el("span", { class: "pack-opt__name", text: p.name }),
+          el("span", { class: "pack-opt__meta tiny muted", text: (p.count || 0) + " identities" }),
+        ]);
+        grid.append(btn);
+      });
+    return grid;
+  }
+
+  function sendPackSettings(packIds) {
+    send({ type: "settings", settings: { packIds } });
   }
 
   function roomInviteUrl(code) {
@@ -192,8 +247,14 @@
     };
   }
 
-  async function createRoom() {
-    const r = await fetch("/whoami/api/rooms", { method: "POST" });
+  async function createRoom(packIds) {
+    const ids = packIds && packIds.length ? packIds : state.homePackIds;
+    if (!confirmMaturePacks(ids)) return;
+    const r = await fetch("/whoami/api/rooms", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ packIds: ids }),
+    });
     if (!r.ok) { toast("Couldn't create room."); return; }
     const code = (await r.json()).code;
     location.hash = `#/room/${code}`;
@@ -223,11 +284,15 @@
     return el("div", { class: "panel" }, [
       el("span", { class: "eyebrow", text: "Online" }),
       el("h1", {}, [document.createTextNode("Who "), el("span", { class: "em", text: "am I?" })]),
-      el("p", { class: "lede", text: "Everyone gets a daft secret identity — Hitler, a light bulb, a hung parliament. You can see everyone else's card, but not your own. Ask yes/no questions until you guess it." }),
+      el("p", { class: "lede", text: "Everyone gets a secret identity stuck to their forehead — UK celebs, Marvel heroes, cartoon characters, random objects, or notorious figures. You see everyone else's card, not your own. Ask yes/no questions until you guess it." }),
+      el("label", { class: "fl" }, [
+        el("span", { text: "Identity packs" }),
+        packToggleGrid(state.homePackIds, (ids) => { state.homePackIds = ids; render(); }, true),
+      ]),
       el("label", { class: "fl" }, [el("span", { text: "Your name" }), nameIn]),
       el("button", {
         class: "btn btn--primary btn--lg btn--block", text: "Create room →",
-        onclick: () => { saveName(nameIn.value.trim()); createRoom(); },
+        onclick: () => { saveName(nameIn.value.trim()); createRoom(state.homePackIds); },
       }),
       el("div", { class: "row" }, [
         joinIn,
@@ -258,7 +323,14 @@
       onchange: (e) => send({ type: "rename", name: e.target.value.trim() }),
     });
 
+    const packIds = (room.settings && room.settings.packIds) || ["uk_celebs"];
+    const packName = (room.settings && room.settings.packName) || "UK Celebs";
+
     const hostBits = me.isHost ? [
+      el("label", { class: "fl" }, [
+        el("span", { text: "Identity packs" }),
+        packToggleGrid(packIds, (ids) => sendPackSettings(ids), true),
+      ]),
       el("button", {
         class: "btn btn--primary btn--lg btn--block",
         text: canStart ? `Start game (${connected} players) →` : `Waiting for players (${connected}/${minP})…`,
@@ -266,6 +338,7 @@
         onclick: () => send({ type: "start" }),
       }),
     ] : [
+      el("p", { class: "note", text: `Packs: ${packName}` }),
       el("p", { class: "note", text: `Waiting for the host to start… (${connected} connected, need ${minP}+)` }),
     ];
 
@@ -389,7 +462,8 @@
     else app.append(lobbyScreen());
   }
 
-  function boot() {
+  async function boot() {
+    await loadPacks();
     parseRoute();
     if (routeCode !== lastRouteCode) {
       lastRouteCode = routeCode;

@@ -11,6 +11,7 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 
 from .game import STATUS_PLAYING, MoveError, Settings
 from .manager import _clean_name, manager
+from .packs import DEFAULT_PACK_IDS, normalize_pack_ids, pack_label, pack_meta
 
 router = APIRouter()
 
@@ -54,12 +55,34 @@ async def whoami_page() -> HTMLResponse:
     )
 
 
+@router.get("/whoami/api/packs")
+async def packs() -> JSONResponse:
+    return JSONResponse({"packs": pack_meta()})
+
+
 @router.post("/whoami/api/rooms")
 async def create_room(request: Request) -> JSONResponse:
     _rate_limit_create(request)
     manager.start()
-    room = manager.create_room(Settings())
-    return JSONResponse({"code": room.code})
+    pack_ids = list(DEFAULT_PACK_IDS)
+    try:
+        body = await request.json()
+        if isinstance(body, dict):
+            raw = body.get("packIds")
+            if isinstance(raw, list):
+                pack_ids = normalize_pack_ids([str(x) for x in raw])
+    except Exception:
+        pass
+    settings = Settings(
+        pack_ids=pack_ids,
+        pack_name=pack_label(pack_ids),
+    )
+    room = manager.create_room(settings)
+    return JSONResponse({
+        "code": room.code,
+        "packIds": room.settings.pack_ids,
+        "packName": room.settings.pack_name,
+    })
 
 
 @router.get("/whoami/api/rooms/{code}/avatar/{player_id}")
@@ -178,6 +201,18 @@ def _dispatch(room, player, mtype: str, msg: dict) -> bool:
 
     if mtype == "clearAvatar":
         manager.clear_avatar(room, player.id)
+        return True
+
+    if mtype == "settings":
+        if not player.is_host:
+            raise MoveError("Only the host can change settings.")
+        if game.status == STATUS_PLAYING:
+            raise MoveError("Finish the round to change packs.")
+        payload = msg.get("settings") or {}
+        pack_ids = normalize_pack_ids(payload.get("packIds"))
+        room.settings.pack_ids = pack_ids
+        room.settings.pack_name = pack_label(pack_ids)
+        room.game.settings = room.settings
         return True
 
     if mtype in ("start", "newGame"):

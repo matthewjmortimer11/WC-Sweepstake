@@ -168,3 +168,29 @@ def test_unconfirm_guess(client):
     assert room.game.can_claim(a)
     room.game.unconfirm_guess(b, a)
     assert not room.game.can_claim(a)
+
+
+def test_deal_uses_selected_packs():
+    import random
+
+    from whoami.game import Settings, WhoAmIGame
+    from whoami.packs import words_for_pack
+
+    marvel = set(words_for_pack("marvel"))
+    game = WhoAmIGame(settings=Settings(pack_ids=["marvel"]))
+    game.start_game(["a", "b"], random.Random(0))
+    for pid in ("a", "b"):
+        assert game.char_by_pid[pid] in marvel
+
+
+def test_settings_pack_change_in_lobby(client):
+    code = client.post("/whoami/api/rooms", json={"packIds": ["uk_celebs"]}).json()["code"]
+    room, pids = _room_with_players(code, 1)
+    host_id = pids[0]
+    for p in room.players.values():
+        p.is_host = p.id == host_id
+    from whoami.router import _dispatch
+    _dispatch(room, room.players[host_id], "settings", {"settings": {"packIds": ["cartoons", "marvel"]}})
+    assert room.settings.pack_ids == ["cartoons", "marvel"]
+    state = room.state_for(host_id)
+    assert state["room"]["settings"]["packIds"] == ["cartoons", "marvel"]

@@ -109,6 +109,8 @@ class Room:
                 "settings": {
                     "minPlayers": MIN_PLAYERS,
                     "maxPlayers": MAX_PLAYERS,
+                    "packIds": list(self.settings.pack_ids),
+                    "packName": self.settings.pack_name,
                 },
                 "game": g.view(pid, connected_ids=connected_ids),
             },

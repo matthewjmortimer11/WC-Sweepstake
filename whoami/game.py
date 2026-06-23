@@ -5,7 +5,7 @@ from __future__ import annotations
 import random
 from dataclasses import dataclass, field
 
-from .characters import CHARACTERS
+from .packs import DEFAULT_PACK_IDS, characters_for_packs, normalize_pack_ids, pack_label
 
 STATUS_LOBBY = "lobby"
 STATUS_PLAYING = "playing"
@@ -21,7 +21,8 @@ class MoveError(Exception):
 
 @dataclass
 class Settings:
-    pass
+    pack_ids: list[str] = field(default_factory=lambda: list(DEFAULT_PACK_IDS))
+    pack_name: str = "UK Celebs"
 
 
 @dataclass
@@ -35,9 +36,9 @@ class WhoAmIGame:
     claimed: set[str] = field(default_factory=set)
 
     def _deal(self, rng: random.Random) -> None:
-        pool = list(CHARACTERS)
+        pool = characters_for_packs(self.settings.pack_ids)
         if len(pool) < len(self.player_ids):
-            raise MoveError("Not enough unique characters for this many players.")
+            raise MoveError("Not enough unique identities for this many players — add more packs.")
         rng.shuffle(pool)
         self.char_by_pid = {
             pid: pool[i] for i, pid in enumerate(self.player_ids)
