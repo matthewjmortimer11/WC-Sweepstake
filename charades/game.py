@@ -11,7 +11,8 @@ from imposter.celebs import CELEBS
 STATUS_LOBBY = "lobby"
 STATUS_PLAYING = "playing"
 PHASE_CHARADE = "charade"
-REQUIRED_PLAYERS = 4
+MIN_PLAYERS = 2
+MAX_PLAYERS = 50
 TIMER_OPTIONS = {0, 30, 60, 90, 120}
 
 
@@ -47,17 +48,20 @@ class CharadesGame:
     def start_game(self, player_ids: list[str], rng: random.Random) -> None:
         if self.status == STATUS_PLAYING:
             raise MoveError("A game is already in progress.")
-        if len(player_ids) != REQUIRED_PLAYERS:
-            raise MoveError(f"Need exactly {REQUIRED_PLAYERS} players.")
+        n = len(player_ids)
+        if n < MIN_PLAYERS:
+            raise MoveError(f"Need at least {MIN_PLAYERS} players.")
+        if n > MAX_PLAYERS:
+            raise MoveError(f"Too many players (max {MAX_PLAYERS}).")
         self.player_ids = list(player_ids)
-        self.actor_index = rng.randrange(REQUIRED_PLAYERS)
+        self.actor_index = rng.randrange(n)
         self.scores = {pid: 0 for pid in self.player_ids}
         self.word = self._pick_word(rng)
         self.status = STATUS_PLAYING
         self.phase = PHASE_CHARADE
 
     def next_turn(self, rng: random.Random) -> None:
-        self.actor_index = (self.actor_index + 1) % REQUIRED_PLAYERS
+        self.actor_index = (self.actor_index + 1) % len(self.player_ids)
         self.word = self._pick_word(rng)
         self.phase = PHASE_CHARADE
 

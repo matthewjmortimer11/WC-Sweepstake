@@ -97,11 +97,12 @@ class Room:
             team = TEAM_0 if g.active_team == 0 else TEAM_1
             return [
                 p.id for p in self.players.values()
-                if p.team == team and p.id != psychic and p.role != ROLE_SPECTATOR
+                if p.connected and p.team == team and p.id != psychic
+                and p.role != ROLE_SPECTATOR
             ]
         return [
             p.id for p in self.players.values()
-            if p.id != psychic and p.role != ROLE_SPECTATOR
+            if p.connected and p.id != psychic and p.role != ROLE_SPECTATOR
         ]
 
     def pick_team_psychic(self) -> str:
@@ -284,6 +285,8 @@ class Manager:
     def join(self, room: Room, pid: str, name: str) -> Player:
         name = _clean_name(name)
         existing = room.players.get(pid)
+        if existing is None and room.game.status == STATUS_PLAYING:
+            raise MoveError("Game in progress — wait for the next round.")
         if existing:
             existing.name = name or existing.name
             existing.connected = True
@@ -350,7 +353,7 @@ class Manager:
             room.game.psychic_id = room.pick_team_psychic()
 
     def maybe_advance_guess(self, room: Room) -> bool:
-        """Auto-reveal when all guessers have locked in."""
+        """Auto-reveal when all connected guessers have locked in."""
         g = room.game
         if g.status != STATUS_PLAYING or g.phase != PHASE_GUESS:
             return False
@@ -359,6 +362,31 @@ class Manager:
             return False
         g.score_round(guessers)
         return True
+
+    def handle_disconnect(self, room: Room, pid: str) -> None:
+        """Keep rounds moving when players drop mid-game."""
+        g = room.game
+        if g.status != STATUS_PLAYING:
+            return
+        if g.phase == PHASE_GUESS:
+            self.maybe_advance_guess(room)
+            return
+        if g.phase == PHASE_PSYCHIC and pid == g.psychic_id:
+            psychic = room.players.get(g.psychic_id or "")
+            if psychic and psychic.connected:
+                return
+            if g.settings.mode == MODE_TEAMS:
+                try:
+                    g.psychic_id = room.pick_team_psychic()
+                except MoveError:
+                    pass
+            else:
+                connected = [
+                    p.id for p in room.players.values()
+                    if p.connected and p.role != ROLE_SPECTATOR
+                ]
+                if connected:
+                    g.psychic_id = connected[g.round_no % len(connected)]
 
 
 manager = Manager()

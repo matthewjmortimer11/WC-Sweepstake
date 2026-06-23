@@ -475,17 +475,20 @@ def test_only_one_spymaster_per_team(client):
 def test_start_requires_operative_per_team(client):
     code = client.post("/play/api/rooms").json()["code"]
     with client.websocket_connect(f"/play/ws/{code}?pid=rs&name=RedSpy") as rs, \
-         client.websocket_connect(f"/play/ws/{code}?pid=bs&name=BlueSpy") as bs:
+         client.websocket_connect(f"/play/ws/{code}?pid=ro&name=RedFan") as ro, \
+         client.websocket_connect(f"/play/ws/{code}?pid=bs&name=BlueSpy") as bs, \
+         client.websocket_connect(f"/play/ws/{code}?pid=bo&name=BlueFan") as bo:
 
-        rs.receive_json()
-        rs.receive_json()
-        bs.receive_json()
-        bs.receive_json()
+        for ws in (rs, ro, bs, bo):
+            ws.receive_json()
+            ws.receive_json()
 
         rs.send_json({"type": "setTeam", "team": "red"})
         rs.send_json({"type": "setRole", "role": "spymaster"})
+        ro.send_json({"type": "setTeam", "team": "spectator"})
         bs.send_json({"type": "setTeam", "team": "blue"})
         bs.send_json({"type": "setRole", "role": "spymaster"})
+        bo.send_json({"type": "setTeam", "team": "spectator"})
         _settle()
 
         rs.send_json({"type": "start"})
@@ -529,3 +532,38 @@ def test_team_names_in_state_and_settable(client):
 
     room = manager.get(code)
     assert room.settings.team_blue_name == "Whitehall Desk"
+
+
+def test_start_requires_connected_players(client):
+    """Disconnected lobby ghosts must not count toward the 4-player minimum."""
+    code = client.post("/play/api/rooms").json()["code"]
+    with client.websocket_connect(f"/play/ws/{code}?pid=p1&name=One") as p1, \
+         client.websocket_connect(f"/play/ws/{code}?pid=p2&name=Two") as p2, \
+         client.websocket_connect(f"/play/ws/{code}?pid=p3&name=Three") as p3, \
+         client.websocket_connect(f"/play/ws/{code}?pid=p4&name=Four") as p4:
+
+        for ws in (p1, p2, p3, p4):
+            ws.receive_json()
+            ws.receive_json()
+
+        for ws, team in ((p1, "red"), (p2, "red"), (p3, "blue"), (p4, "blue")):
+            ws.send_json({"type": "setTeam", "team": team})
+        p1.send_json({"type": "setRole", "role": "spymaster"})
+        p2.send_json({"type": "setRole", "role": "operative"})
+        p3.send_json({"type": "setRole", "role": "spymaster"})
+        p4.send_json({"type": "setRole", "role": "operative"})
+        _settle()
+
+        room = manager.get(code)
+        room.players["p4"].connected = False
+
+        p1.send_json({"type": "start"})
+        err = None
+        for _ in range(12):
+            msg = p1.receive_json()
+            if msg.get("type") == "error":
+                err = msg
+                break
+        assert err is not None
+        assert "4" in err["message"]
+        assert room.game.status == "lobby"

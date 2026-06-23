@@ -68,3 +68,29 @@ def test_host_can_skip(client):
         p.is_host = p.id == host_id
     _dispatch(room, room.players[host_id], "skipCharade", {})
     assert room.game.actor_id() != first
+
+
+def _room_with_n(code: str, n: int):
+    room = manager.get(code)
+    pids = [f"p{i}" for i in range(1, n + 1)]
+    for i, pid in enumerate(pids):
+        manager.join(room, pid, f"Player {i + 1}")
+        room.players[pid].connected = True
+    return room, pids
+
+
+def test_two_player_start(client):
+    code = client.post("/charades/api/rooms").json()["code"]
+    room, pids = _room_with_n(code, 2)
+    manager.start_game(room)
+    assert len(room.game.player_ids) == 2
+
+
+def test_mid_game_join_blocked(client):
+    from charades.game import MoveError
+
+    code = client.post("/charades/api/rooms").json()["code"]
+    room, _ = _room_with_n(code, 2)
+    manager.start_game(room)
+    with pytest.raises(MoveError, match="in progress"):
+        manager.join(room, "newbie", "Latecomer")

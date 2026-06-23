@@ -1590,7 +1590,9 @@
         </div>
       </div>`);
     el.querySelector("#guess-cancel").onclick = () => {
+      const idx = state.pendingGuess;
       state.pendingGuess = null;
+      if (idx != null) send({ type: "toggleNearPick", index: idx });
       patchGuessUi();
     };
     el.querySelector("#guess-commit").onclick = () => {
@@ -1732,8 +1734,10 @@
   // ── lobby ────────────────────────────────────────────────────────────────
   function lobbyTeamsReady(players, devMode) {
     if (devMode) return true;
+    const connected = players.filter((p) => p.connected);
+    if (connected.length < 4) return false;
     const ready = (team) => {
-      const members = players.filter((p) => p.team === team);
+      const members = connected.filter((p) => p.team === team);
       if (!members.length) return false;
       if (members.filter((p) => p.role === "spymaster").length !== 1) return false;
       return members.some((p) => p.role === "operative");

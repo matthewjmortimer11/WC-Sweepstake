@@ -180,3 +180,38 @@ def test_clue_hidden_until_guess_phase(client):
 def test_party_games_routes_all_serve(client):
     for path in ("/games", "/play", "/imposter", "/charades", "/wheel"):
         assert client.get(path).status_code == 200
+
+
+def test_disconnected_guesser_does_not_block_reveal(client):
+    """A dropped guesser must not stall the round for connected players."""
+    code = client.post("/wheel/api/rooms", json={"mode": "ffa"}).json()["code"]
+    with client.websocket_connect(f"/wheel/ws/{code}?pid=a&name=Ann") as a, \
+         client.websocket_connect(f"/wheel/ws/{code}?pid=b&name=Ben") as b, \
+         client.websocket_connect(f"/wheel/ws/{code}?pid=c&name=Cara") as c:
+
+        for ws in (a, b, c):
+            ws.receive_json()
+            ws.receive_json()
+
+        a.send_json({"type": "start"})
+        _settle()
+
+        room = manager.get(code)
+        psychic = room.game.psychic_id
+        guessers = [p for p in ("a", "b", "c") if p != psychic]
+        ws_psy = a if psychic == "a" else (b if psychic == "b" else c)
+        ws_g1 = b if psychic != "b" else c
+        ws_g2 = c if psychic != "c" else b
+
+        ws_psy.send_json({"type": "psychicReady"})
+        _settle()
+
+        # One guesser locks in; the other disconnects.
+        ws_g1.send_json({"type": "setGuess", "value": 50})
+        ws_g1.send_json({"type": "lockGuess"})
+        room.players[guessers[1]].connected = False
+        manager.handle_disconnect(room, guessers[1])
+        _settle()
+
+        room = manager.get(code)
+        assert room.game.phase == "reveal"

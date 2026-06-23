@@ -27,7 +27,7 @@ from pydantic import BaseModel
 
 from . import auth, store
 from .avatars import decode_data_url
-from .game import BLUE, RED, STATUS_LOBBY, MAX_ASSASSINS, MoveError, Settings, HouseRules
+from .game import BLUE, RED, STATUS_LOBBY, MAX_ASSASSINS, MIN_PLAYERS, MoveError, Settings, HouseRules
 from .game import (
     DEFAULT_TEAM_BLUE,
     DEFAULT_TEAM_RED,
@@ -46,6 +46,7 @@ from .manager import (
     clamp_timer,
     ensure_dev_bots,
     ensure_dev_host_playing,
+    is_dev_bot,
     manager,
     remove_dev_bots,
 )
@@ -793,8 +794,12 @@ async def _dispatch(room, player, mtype: str, msg: dict) -> bool:
 def _validate_teams(room) -> None:
     if room.settings.dev_mode:
         ensure_dev_bots(room)
-    reds = [p for p in room.players.values() if p.team == RED]
-    blues = [p for p in room.players.values() if p.team == BLUE]
+        return
+    humans = [p for p in room.players.values() if p.connected and not is_dev_bot(p.id)]
+    if len(humans) < MIN_PLAYERS:
+        raise MoveError(f"Need at least {MIN_PLAYERS} players.")
+    reds = [p for p in humans if p.team == RED]
+    blues = [p for p in humans if p.team == BLUE]
     if not reds or not blues:
         raise MoveError("Both teams need at least one player.")
     red_sms = [p for p in reds if p.role == "spymaster"]
