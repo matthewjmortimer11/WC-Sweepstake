@@ -26,6 +26,7 @@ def test_whoami_has_game_surface(client):
         "Create room", "Share game link", "confirmGuess", "claimGotIt",
         "They got it!", "I got it!", "Change photo", "newRound",
         "packToggleGrid", "Identity packs", "/whoami/api/packs", "identityCount",
+        "renderLocal", "#/local", "One phone",
     ):
         assert marker in js, f"missing Who Am I? JS marker: {marker!r}"
 
@@ -47,7 +48,16 @@ def test_whoami_packs_api(client):
     assert "notorious" in ids
 
 
-def test_games_hub_lists_whoami(client):
+def test_character_pool_api(client):
+    r = client.get("/whoami/api/character-pool?packIds=marvel")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["packIds"] == ["marvel"]
+    assert "Spider-Man" in body["characters"]
+    assert body["count"] == len(body["characters"])
+
+
+def test_games_hub_lists_all_party_games(client):
     t = client.get("/games").text
-    assert 'href="/whoami"' in t
-    assert "Who Am I?" in t
+    for marker in ("Who Am I?", "Cipher", "Imposter", "Dial", "Charades", "UK celebs"):
+        assert marker in t, f"missing games hub marker: {marker!r}"

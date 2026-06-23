@@ -86,8 +86,17 @@
     return (state.room && state.room.players || []).find((p) => p.id === id);
   }
 
+  function readNameFromUrl() {
+    try {
+      const n = (new URLSearchParams(location.search).get("name") || "").trim();
+      if (n) saveName(n);
+    } catch (_) {}
+  }
+
   function roomInviteUrl(code) {
-    return `${location.origin}/imposter#/room/${code}`;
+    const n = playerName();
+    const q = n ? `?name=${encodeURIComponent(n)}` : "";
+    return `${location.origin}/imposter${q}#/room/${code}`;
   }
 
   function fallbackCopy(text, done) {
@@ -179,15 +188,26 @@
     }, [el("span", { text: label })]);
   }
 
+  function timerSeg(current, onPick) {
+    return el("div", { class: "timer-seg", role: "group", "aria-label": "Discussion timer" },
+      [0, 30, 60, 90, 120].map((s) => el("button", {
+        class: "timer-opt" + (current === s ? " on" : ""),
+        text: s === 0 ? "Off" : s + "s",
+        onclick: () => onPick(s),
+      }))
+    );
+  }
+
   // ── Online screens ───────────────────────────────────────────────────────
 
   function homeScreen() {
+    readNameFromUrl();
     const nameIn = el("input", { class: "in", maxlength: "24", value: playerName(), placeholder: "Your name" });
     const joinIn = el("input", { class: "in", maxlength: "6", placeholder: "Room code", style: "text-transform:uppercase;letter-spacing:.15em" });
     return el("div", { class: "panel" }, [
       el("span", { class: "eyebrow", text: "Online" }),
       el("h1", {}, [document.createTextNode("Who's the "), el("span", { class: "em", text: "imposter?" })]),
-      el("p", { class: "lede", text: "Four players, four phones. Classic imposter or Celebrity Dance — everyone sees their own secret on their device." }),
+      el("p", { class: "lede", text: "Classic imposter or Celebrity Dance — everyone sees their own secret on their device." }),
       el("label", { class: "fl" }, [el("span", { text: "Your name" }), nameIn]),
       el("button", {
         class: "btn btn--primary btn--lg btn--block", text: "Create room →",
@@ -206,6 +226,10 @@
         }),
       ]),
       el("p", { class: "note", text: `Works with ${MIN_PLAYERS}+ players. Share the game link so friends join on their phones.` }),
+      el("button", {
+        class: "btn btn--ghost btn--block", text: "One phone — pass it around",
+        onclick: () => { location.hash = "#/local"; },
+      }),
     ]);
   }
 
@@ -231,6 +255,12 @@
         }),
         modeBtn("celebrity", "💃 Celebrity Dance", settings.mode, (id) => {
           send({ type: "settings", settings: { ...state.pendingSettings, mode: id } });
+        }),
+      ]),
+      el("label", { class: "fl" }, [
+        el("span", { text: "Discussion timer (optional)" }),
+        timerSeg(settings.timerSecs, (s) => {
+          send({ type: "settings", settings: { ...state.pendingSettings, timerSecs: s } });
         }),
       ]),
       el("button", {
@@ -591,6 +621,7 @@
   }
 
   function boot() {
+    readNameFromUrl();
     parseRoute();
     if (localMode && ws) {
       try { ws.close(); } catch (_) {}

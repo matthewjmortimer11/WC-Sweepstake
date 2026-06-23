@@ -11,7 +11,7 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 
 from .game import STATUS_PLAYING, MoveError, Settings
 from .manager import _clean_name, manager
-from .packs import DEFAULT_PACK_IDS, normalize_pack_ids, pack_label, pack_meta
+from .packs import DEFAULT_PACK_IDS, characters_for_packs, normalize_pack_ids, pack_label, pack_meta
 
 router = APIRouter()
 
@@ -58,6 +58,15 @@ async def whoami_page() -> HTMLResponse:
 @router.get("/whoami/api/packs")
 async def packs() -> JSONResponse:
     return JSONResponse({"packs": pack_meta()})
+
+
+@router.get("/whoami/api/character-pool")
+async def character_pool(packIds: str = "") -> JSONResponse:
+    """Identity list for local / pass-the-phone mode (selected packs only)."""
+    raw = [x.strip() for x in packIds.split(",") if x.strip()] if packIds else None
+    ids = normalize_pack_ids(raw)
+    words = characters_for_packs(ids)
+    return JSONResponse({"packIds": ids, "count": len(words), "characters": words})
 
 
 @router.post("/whoami/api/rooms")

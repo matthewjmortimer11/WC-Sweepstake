@@ -13,6 +13,9 @@
   let reconnectDelay = 800;
   let routeCode = null;
   let lastRouteCode = null;
+  let localMode = false;
+
+  const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
 
   const state = { room: null, you: null, packs: [], homePackIds: ["uk_celebs"] };
 
@@ -69,9 +72,17 @@
     return false;
   }
 
+  function readNameFromUrl() {
+    try {
+      const n = (new URLSearchParams(location.search).get("name") || "").trim();
+      if (n) saveName(n);
+    } catch (_) {}
+  }
+
   function parseRoute() {
+    localMode = /^#\/local\b/i.test(location.hash || "");
     const m = location.hash.match(/^#\/room\/([A-Za-z0-9]+)/i);
-    routeCode = m ? m[1].toUpperCase() : null;
+    routeCode = localMode ? null : (m ? m[1].toUpperCase() : null);
   }
 
   function playerById(id) {
@@ -136,6 +147,7 @@
         }, [
           el("span", { class: "pack-opt__emoji", text: p.emoji || "📦" }),
           el("span", { class: "pack-opt__name", text: p.name }),
+          p.blurb ? el("span", { class: "pack-opt__blurb tiny muted", text: p.blurb }) : null,
           el("span", { class: "pack-opt__meta tiny muted", text: (p.count || 0) + " identities" }),
         ]);
         grid.append(btn);
@@ -148,14 +160,27 @@
   }
 
   function roomInviteUrl(code) {
-    return `${location.origin}/whoami#/room/${code}`;
+    const n = playerName();
+    const q = n ? `?name=${encodeURIComponent(n)}` : "";
+    return `${location.origin}/whoami${q}#/room/${code}`;
+  }
+
+  function fallbackCopy(text, done) {
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.style.position = "fixed";
+    ta.style.opacity = "0";
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand("copy"); if (done) done(); } catch (_) { toast(text); }
+    ta.remove();
   }
 
   function copyText(text, okMsg) {
     const done = () => toast(okMsg);
     if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(text).then(done).catch(() => toast(text));
-    } else toast(text);
+      navigator.clipboard.writeText(text).then(done).catch(() => fallbackCopy(text, done));
+    } else fallbackCopy(text, done);
   }
 
   function shareRoomLink(code) {
@@ -293,6 +318,7 @@
   }
 
   function homeScreen() {
+    readNameFromUrl();
     const nameIn = el("input", {
       class: "in", maxlength: "24", value: playerName(), placeholder: "Your name",
       oninput: (e) => saveName(e.target.value.trim()),
@@ -324,7 +350,258 @@
         }),
       ]),
       el("p", { class: "note", text: `Works with ${MIN_PLAYERS}+ players. Share the game link — friends join on their phones, then the host starts when everyone's in.` }),
+      el("button", {
+        class: "btn btn--ghost btn--block", text: "One phone — pass it around",
+        onclick: () => { location.hash = "#/local"; },
+      }),
     ]);
+  }
+
+  // ── Local pass-the-phone ─────────────────────────────────────────────────
+
+  const local = {
+    screen: "setup",
+    names: ["Player 1", "Player 2", "Player 3", "Player 4"],
+    packIds: ["uk_celebs"],
+    chars: [],
+    viewed: [],
+    claimed: [],
+    confirmed: {},
+    perspective: 0,
+    current: -1,
+  };
+
+  function localPlayerCount() {
+    return local.names.length;
+  }
+
+  function addLocalPlayer() {
+    if (local.names.length >= MAX_PLAYERS) return;
+    local.names.push("Player " + (local.names.length + 1));
+    renderLocal();
+  }
+
+  function removeLocalPlayer() {
+    if (local.names.length <= MIN_PLAYERS) return;
+    local.names.pop();
+    renderLocal();
+  }
+
+  async function fetchCharacterPool(packIds) {
+    const q = encodeURIComponent((packIds || ["uk_celebs"]).join(","));
+    const r = await fetch(`/whoami/api/character-pool?packIds=${q}`);
+    if (!r.ok) throw new Error("pool");
+    return (await r.json()).characters;
+  }
+
+  function shuffleDeal(pool) {
+    const copy = pool.slice();
+    for (let i = copy.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [copy[i], copy[j]] = [copy[j], copy[i]];
+    }
+    return copy.slice(0, localPlayerCount());
+  }
+
+  async function localStartGame() {
+    let pool;
+    try {
+      pool = await fetchCharacterPool(local.packIds);
+    } catch (_) {
+      toast("Couldn't load identities — check your connection.");
+      return;
+    }
+    if (pool.length < localPlayerCount()) {
+      toast(`Need more packs — only ${pool.length} identities for ${localPlayerCount()} players.`);
+      return;
+    }
+    if (!confirmMaturePacks(local.packIds, [])) return;
+    local.chars = shuffleDeal(pool);
+    local.viewed = [];
+    local.claimed = [];
+    local.confirmed = {};
+    local.perspective = 0;
+    local.screen = "select";
+    renderLocal();
+  }
+
+  async function localNewRound() {
+    let pool;
+    try {
+      pool = await fetchCharacterPool(local.packIds);
+    } catch (_) {
+      toast("Couldn't load identities.");
+      return;
+    }
+    if (pool.length < localPlayerCount()) {
+      toast("Add more packs for this many players.");
+      return;
+    }
+    local.chars = shuffleDeal(pool);
+    local.viewed = [];
+    local.claimed = [];
+    local.confirmed = {};
+    local.screen = "select";
+    renderLocal();
+  }
+
+  function localConfirmedSet(targetIdx) {
+    if (!local.confirmed[targetIdx]) local.confirmed[targetIdx] = new Set();
+    return local.confirmed[targetIdx];
+  }
+
+  function localCanClaim(idx) {
+    if (local.claimed.includes(idx)) return false;
+    const others = local.names.map((_, i) => i).filter((i) => i !== idx);
+    const confirmed = local.confirmed[idx] || new Set();
+    return others.some((o) => confirmed.has(o));
+  }
+
+  function localAllClaimed() {
+    return local.names.every((_, i) => local.claimed.includes(i));
+  }
+
+  function localSetupScreen() {
+    return el("div", { class: "panel" }, [
+      el("span", { class: "eyebrow", text: "One phone" }),
+      el("h1", {}, [document.createTextNode("Who "), el("span", { class: "em", text: "am I?" })]),
+      el("p", { class: "lede", text: "Pass the phone so everyone secretly sees their identity, then ask yes/no questions until each person guesses who they are." }),
+      el("label", { class: "fl" }, [
+        el("span", { text: "Identity packs" }),
+        packToggleGrid(local.packIds, (ids) => { local.packIds = ids; }, true),
+      ]),
+      el("div", { class: "row" }, [
+        el("button", { class: "btn btn--ghost", text: "+ Add player", disabled: local.names.length >= MAX_PLAYERS ? "disabled" : false, onclick: addLocalPlayer }),
+        el("button", { class: "btn btn--ghost", text: "− Remove player", disabled: local.names.length <= MIN_PLAYERS ? "disabled" : false, onclick: removeLocalPlayer }),
+      ]),
+      el("div", { class: "names" }, local.names.map((name, i) => el("label", { class: "fl" }, [
+        el("span", { text: "Player " + (i + 1) }),
+        el("input", { class: "in", maxlength: "20", value: name, oninput: (e) => { local.names[i] = e.target.value; } }),
+      ]))),
+      el("button", {
+        class: "btn btn--primary btn--lg btn--block", text: "Start game →",
+        disabled: local.names.length < MIN_PLAYERS ? "disabled" : false,
+        onclick: () => {
+          local.names = local.names.map((n, i) => (n || "").trim() || ("Player " + (i + 1)));
+          localStartGame();
+        },
+      }),
+      el("button", { class: "btn btn--ghost btn--block", text: "← Online rooms", onclick: () => { location.hash = ""; } }),
+    ]);
+  }
+
+  function localSelectScreen() {
+    const allViewed = local.viewed.length >= localPlayerCount();
+    const grid = el("div", { class: "pick-grid" },
+      local.names.map((name, i) => {
+        const done = local.viewed.includes(i);
+        return el("button", {
+          class: "btn pick" + (done ? " done" : ""),
+          onclick: () => { local.current = i; local.screen = "reveal"; renderLocal(); },
+        }, [
+          done ? el("span", { class: "check", text: "✓", "aria-label": "viewed" }) : null,
+          el("span", { text: name }),
+        ]);
+      })
+    );
+    return el("div", { class: "panel" }, [
+      el("span", { class: "eyebrow", text: "Pass the phone" }),
+      el("p", { class: "note", text: "Only tap your own name. No peeking." }),
+      grid,
+      allViewed ? el("p", { class: "note", text: "Everyone's seen their identity. Time to guess!" }) : null,
+      allViewed ? el("button", {
+        class: "btn btn--primary btn--lg btn--block", text: "Start guessing →",
+        onclick: () => { local.screen = "play"; renderLocal(); },
+      }) : null,
+      el("button", { class: "btn btn--ghost btn--block", text: "← Setup", onclick: () => { local.screen = "setup"; renderLocal(); } }),
+    ]);
+  }
+
+  function localRevealScreen() {
+    const i = local.current;
+    return el("div", { class: "panel" }, [
+      el("div", { class: "reveal" }, [
+        el("span", { class: "who", text: local.names[i] }),
+        el("span", { class: "role-cap tiny muted", text: "Your identity" }),
+        el("div", { class: "role charade", text: local.chars[i] || "…" }),
+        el("p", { class: "role-sub", text: "Remember it — others will see everyone else's card, not their own." }),
+        el("button", {
+          class: "btn btn--primary btn--lg btn--block", text: "Hide →",
+          onclick: () => {
+            if (!local.viewed.includes(i)) local.viewed.push(i);
+            local.screen = "select";
+            renderLocal();
+          },
+        }),
+      ]),
+    ]);
+  }
+
+  function localPlayScreen() {
+    const p = local.perspective;
+    const bits = [
+      el("span", { class: "eyebrow", text: "Round" }),
+      el("label", { class: "fl" }, [
+        el("span", { text: "Who's asking?" }),
+        el("div", { class: "seg" }, local.names.map((name, i) => el("button", {
+          class: local.perspective === i ? "on" : "",
+          text: name,
+          onclick: () => { local.perspective = i; renderLocal(); },
+        }))),
+      ]),
+      el("p", { class: "note", text: "Ask yes/no questions out loud. When someone guesses right, tap They got it! on their card." }),
+      el("div", { class: "card-grid" }, local.names.map((name, i) => {
+        const isYou = i === p;
+        const claimed = local.claimed.includes(i);
+        const confirmed = local.confirmed[i] || new Set();
+        const charText = isYou && !claimed ? "???  (ask the others)" : (local.chars[i] || "…");
+        const actions = [];
+        if (!isYou && !claimed) {
+          const byYou = confirmed.has(p);
+          actions.push(el("button", {
+            class: "btn btn--sm" + (byYou ? " btn--got" : " btn--ghost"),
+            text: byYou ? "✓ Confirmed (tap to undo)" : "They got it!",
+            onclick: () => {
+              const set = localConfirmedSet(i);
+              if (set.has(p)) set.delete(p);
+              else set.add(p);
+              renderLocal();
+            },
+          }));
+        }
+        return el("div", { class: "wai-card" + (isYou ? " you" : "") + (claimed ? " done" : "") }, [
+          el("div", { class: "wai-card__who" }, [
+            el("div", { class: "wai-card__name", text: name }),
+            el("div", { class: "wai-card__tag", text: isYou ? "That's you" : (claimed ? "Guessed!" : "Their identity") }),
+          ]),
+          el("div", { class: "wai-card__char reveal" + (isYou && !claimed ? " hidden" : ""), text: charText }),
+          el("div", { class: "wai-card__meta" }, actions),
+        ]);
+      })),
+    ];
+
+    if (localCanClaim(p) && !local.claimed.includes(p)) {
+      bits.push(el("button", {
+        class: "btn btn--got btn--lg btn--block", text: "I got it! →",
+        onclick: () => { local.claimed.push(p); renderLocal(); },
+      }));
+    }
+
+    if (localAllClaimed()) {
+      bits.push(el("p", { class: "note", text: "Everyone guessed!" }));
+      bits.push(el("button", { class: "btn btn--primary btn--block", text: "Next round →", onclick: localNewRound }));
+    }
+
+    bits.push(el("button", { class: "btn btn--ghost btn--block", text: "New game", onclick: () => { local.screen = "setup"; renderLocal(); } }));
+    return el("div", { class: "panel" }, bits);
+  }
+
+  function renderLocal() {
+    const screen = local.screen === "setup" ? localSetupScreen()
+      : local.screen === "reveal" ? localRevealScreen()
+      : local.screen === "play" ? localPlayScreen()
+      : localSelectScreen();
+    app.replaceChildren(screen);
   }
 
   function lobbyScreen() {
@@ -479,6 +756,10 @@
 
   function render() {
     app.replaceChildren();
+    if (localMode) {
+      renderLocal();
+      return;
+    }
     if (!state.room) {
       if (routeCode) {
         app.append(el("div", { class: "panel" }, [
@@ -496,7 +777,14 @@
 
   async function boot() {
     await loadPacks();
+    readNameFromUrl();
     parseRoute();
+    if (localMode && ws) {
+      try { ws.close(); } catch (_) {}
+      ws = null;
+      state.room = null;
+      state.you = null;
+    }
     if (routeCode !== lastRouteCode) {
       clearTimeout(reconnectTimer);
       lastRouteCode = routeCode;

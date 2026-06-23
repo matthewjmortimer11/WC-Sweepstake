@@ -320,3 +320,20 @@ CELEBS: list[str] = [
     'Bob the Builder',
     'Thomas the Tank Engine',
 ]
+
+
+def _dedupe(names: list[str]) -> list[str]:
+    seen: set[str] = set()
+    out: list[str] = []
+    for name in names:
+        if name not in seen:
+            seen.add(name)
+            out.append(name)
+    return out
+
+
+try:
+    from whoami.packs import UK_CELEBS as _UK_CELEBS
+    CELEBS = _dedupe(CELEBS + list(_UK_CELEBS))
+except ImportError:  # pragma: no cover
+    pass

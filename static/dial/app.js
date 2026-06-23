@@ -157,8 +157,17 @@
     clueSendTimer = setTimeout(() => send({ type: "setClue", text: (text || "").trim() }), 180);
   }
 
+  function readNameFromUrl() {
+    try {
+      const n = (new URLSearchParams(location.search).get("name") || "").trim();
+      if (n) saveName(n);
+    } catch (_) {}
+  }
+
   function roomInviteUrl(code) {
-    return `${location.origin}/wheel#/room/${code}`;
+    const n = playerName();
+    const q = n ? `?name=${encodeURIComponent(n)}` : "";
+    return `${location.origin}/wheel${q}#/room/${code}`;
   }
 
   function fallbackCopy(text, done) {
@@ -356,6 +365,7 @@
   }
 
   function homeScreen() {
+    readNameFromUrl();
     const nameIn = el("input", { class: "in", maxlength: "24", value: playerName(), placeholder: "Your name" });
     const joinIn = el("input", { class: "in", maxlength: "6", placeholder: "Room code", style: "text-transform:uppercase;letter-spacing:.15em" });
     return el("div", { class: "panel" }, [
@@ -380,6 +390,10 @@
         el("button", { class: "on", text: "Teams", onclick: () => createRoom("teams") }),
         el("button", { text: "Free-for-all", onclick: () => createRoom("ffa") }),
       ]),
+      el("button", {
+        class: "btn btn--ghost btn--block", text: "One phone — pass it around",
+        onclick: () => { location.hash = "#/local"; },
+      }),
     ]);
   }
 
@@ -950,6 +964,7 @@
   }
 
   function boot() {
+    readNameFromUrl();
     parseRoute();
     if (localMode && ws) {
       try { ws.close(); } catch (_) {}

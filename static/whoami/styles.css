@@ -70,7 +70,20 @@ input.in:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 4px rgba
 .pack-opt[disabled]{opacity:.7;cursor:default}
 .pack-opt__emoji{font-size:1.2rem;line-height:1}
 .pack-opt__name{font-family:var(--head);font-weight:700;font-size:.88rem}
-.pack-opt__meta{font-size:.72rem;color:var(--ink-3)}
+.pack-opt__blurb{font-size:.72rem;color:var(--ink-2);line-height:1.3}
+.pick-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px}
+.pick.done{opacity:.55}
+.check{margin-right:4px;color:var(--got)}
+.seg{display:flex;flex-wrap:wrap;gap:6px}
+.seg button{appearance:none;cursor:pointer;font:inherit;font-weight:700;font-family:var(--head);
+  background:var(--panel-2);border:1.5px solid var(--line);border-radius:10px;padding:.5em .85em;color:var(--ink-2)}
+.seg button.on{border-color:var(--accent);color:var(--accent-ink);background:rgba(255,197,61,.12)}
+.names{display:grid;gap:10px}
+.role.charade{font-size:clamp(1.4rem,6vw,2rem)}
+.role-cap{display:block;margin-bottom:4px}
+.role-sub{color:var(--ink-2);font-size:.9rem;margin:0}
+.reveal{display:grid;gap:12px;text-align:center}
+.reveal .who{font-family:var(--head);font-size:1.1rem}
 .tiny{font-size:.78rem}
 .muted{color:var(--ink-3)}
 .toast{position:fixed;left:50%;bottom:max(16px,env(safe-area-inset-bottom));transform:translateX(-50%);

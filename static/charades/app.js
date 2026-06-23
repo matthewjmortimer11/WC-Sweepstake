@@ -79,16 +79,36 @@
     return (state.room && state.room.players || []).find((p) => p.id === id);
   }
 
+  function readNameFromUrl() {
+    try {
+      const n = (new URLSearchParams(location.search).get("name") || "").trim();
+      if (n) saveName(n);
+    } catch (_) {}
+  }
+
   function roomInviteUrl(code) {
-    return `${location.origin}/charades#/room/${code}`;
+    const n = playerName();
+    const q = n ? `?name=${encodeURIComponent(n)}` : "";
+    return `${location.origin}/charades${q}#/room/${code}`;
+  }
+
+  function fallbackCopy(text, done) {
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.style.position = "fixed";
+    ta.style.opacity = "0";
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand("copy"); if (done) done(); } catch (_) { toast(text); }
+    ta.remove();
   }
 
   function copyText(text, okMsg) {
     const done = () => toast(okMsg);
     if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(text).then(done).catch(() => toast(text));
+      navigator.clipboard.writeText(text).then(done).catch(() => fallbackCopy(text, done));
     } else {
-      toast(text);
+      fallbackCopy(text, done);
     }
   }
 
@@ -218,6 +238,7 @@
   }
 
   function homeScreen() {
+    readNameFromUrl();
     const nameIn = el("input", { class: "in", maxlength: "24", value: playerName(), placeholder: "Your name" });
     const joinIn = el("input", { class: "in", maxlength: "6", placeholder: "Room code", style: "text-transform:uppercase;letter-spacing:.15em" });
     return el("div", { class: "panel" }, [
@@ -242,6 +263,10 @@
         }),
       ]),
       el("p", { class: "note", text: `Works with ${MIN_PLAYERS}+ players. Share the game link so friends join on their phones.` }),
+      el("button", {
+        class: "btn btn--ghost btn--block", text: "One phone — pass it around",
+        onclick: () => { location.hash = "#/local"; },
+      }),
     ]);
   }
 
@@ -520,6 +545,7 @@
   }
 
   function boot() {
+    readNameFromUrl();
     parseRoute();
     if (localMode && ws) {
       try { ws.close(); } catch (_) {}

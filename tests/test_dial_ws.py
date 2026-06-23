@@ -178,7 +178,7 @@ def test_clue_hidden_until_guess_phase(client):
 
 
 def test_party_games_routes_all_serve(client):
-    for path in ("/games", "/play", "/imposter", "/charades", "/wheel"):
+    for path in ("/games", "/play", "/imposter", "/charades", "/wheel", "/whoami"):
         assert client.get(path).status_code == 200
 
 
