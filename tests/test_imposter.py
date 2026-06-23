@@ -56,5 +56,5 @@ def test_imposter_assets_served(client):
 
 
 def test_party_games_routes_all_serve(client):
-    for path in ("/games", "/play", "/imposter", "/charades", "/wheel"):
+    for path in ("/games", "/play", "/imposter", "/charades", "/wheel", "/whoami"):
         assert client.get(path).status_code == 200

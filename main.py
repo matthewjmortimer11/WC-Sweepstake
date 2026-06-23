@@ -1013,11 +1013,13 @@ from codenames import router as cipher_router  # noqa: E402
 from charades import router as charades_router  # noqa: E402
 from dial import router as dial_router  # noqa: E402
 from imposter import router as imposter_router  # noqa: E402
+from whoami import router as whoami_router  # noqa: E402
 
 app.include_router(cipher_router)
 app.include_router(dial_router)
 app.include_router(imposter_router)
 app.include_router(charades_router)
+app.include_router(whoami_router)
 
 _GAMES_TEMPLATE = Path("templates/games.html")
 

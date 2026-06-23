@@ -39,6 +39,6 @@ def test_charades_has_multiplayer_api(client):
 
 def test_games_hub_lists_all_party_games(client):
     t = client.get("/games").text
-    for marker in ("Party", "Cipher", "Imposter", "Dial", "Charades", 'href="/play"', 'href="/charades"'):
+    for marker in ("Party", "Cipher", "Imposter", "Dial", "Charades", "Who Am I?", 'href="/play"', 'href="/charades"', 'href="/whoami"'):
         assert marker in t, f"missing games hub marker: {marker!r}"
     assert 'href="/"' not in t or "Open Wheesht" not in t
