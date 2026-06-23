@@ -75,6 +75,9 @@
   let reconnectDelay = 800;
   let localGuess = 50;
   let routeCode = null;
+  let guessDragActive = false;
+  let guessSendTimer = null;
+  let pendingGuessValue = null;
 
   const state = {
     connected: false,
@@ -95,26 +98,12 @@
     try { return (localStorage.getItem(LS.name) || "").trim(); } catch (_) { return ""; }
   }
 
-  function nameFromUrl() {
-    try {
-      const q = new URLSearchParams(location.search).get("name");
-      return q ? q.trim().slice(0, 24) : "";
-    } catch (_) { return ""; }
-  }
-
-  function initNameFromUrl() {
-    const fromUrl = nameFromUrl();
-    if (fromUrl && !playerName()) saveName(fromUrl);
-  }
-
   function saveName(n) {
     try { localStorage.setItem(LS.name, n); } catch (_) {}
   }
 
   function roomInviteUrl(code) {
-    const name = playerName();
-    const q = name ? `?name=${encodeURIComponent(name)}` : "";
-    return `${location.origin}/wheel${q}#/room/${code}`;
+    return `${location.origin}/wheel#/room/${code}`;
   }
 
   function fallbackCopy(text, done) {
@@ -147,6 +136,60 @@
       return;
     }
     copyText(url, "Invite link copied");
+  }
+
+  function updateNeedle(value) {
+    const ln = document.getElementById("needle");
+    if (!ln) return;
+    const p = polar(R - 6, degForVal(value));
+    ln.setAttribute("x2", p.x.toFixed(1));
+    ln.setAttribute("y2", p.y.toFixed(1));
+  }
+
+  function flushGuessSend() {
+    if (pendingGuessValue == null) return;
+    send({ type: "setGuess", value: pendingGuessValue });
+    pendingGuessValue = null;
+  }
+
+  function queueGuessSend(value) {
+    pendingGuessValue = value;
+    clearTimeout(guessSendTimer);
+    guessSendTimer = setTimeout(flushGuessSend, 120);
+  }
+
+  function syncLiveNeedles(liveGuesses) {
+    const gauge = document.querySelector(".gauge svg");
+    if (!gauge) return;
+    gauge.querySelectorAll(".needle--alt").forEach((n) => n.remove());
+    const hub = gauge.querySelector(".hub");
+    Object.values(liveGuesses || {}).forEach((v, i) => {
+      const p = polar(R - 6, degForVal(v));
+      const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+      line.setAttribute("class", "needle--alt");
+      line.setAttribute("x1", String(CX));
+      line.setAttribute("y1", String(CY));
+      line.setAttribute("x2", p.x.toFixed(1));
+      line.setAttribute("y2", p.y.toFixed(1));
+      if (hub) gauge.insertBefore(line, hub);
+      else gauge.appendChild(line);
+    });
+  }
+
+  function updateGuessHud(game) {
+    const live = game.liveGuesses || {};
+    const locked = game.myLocked;
+    const guessers = (game.guesserIds || []).length;
+    const lockedCount = Object.keys(live).length + (locked ? 1 : 0);
+    const note = document.querySelector("[data-dial-hint]");
+    if (note) {
+      note.textContent = locked
+        ? "Locked in — waiting for others…"
+        : "Move the dial, then lock in your guess.";
+    }
+    const tally = document.querySelector("[data-dial-tally]");
+    if (tally) tally.textContent = `${lockedCount} of ${guessers} locked in`;
+    syncLiveNeedles(live);
   }
 
   function copyRoomCode(code) {
@@ -193,6 +236,11 @@
       if (msg.type === "state") {
         state.room = msg.room;
         state.you = msg.you;
+        const game = msg.room.game;
+        if (guessDragActive && game.phase === "guess" && state.you.role === "guesser") {
+          updateGuessHud(game);
+          return;
+        }
         render();
       }
     };
@@ -414,15 +462,23 @@
     const slider = el("input", {
       type: "range", min: "0", max: "100", step: "1", value: String(val),
       class: "slider", "aria-label": "Turn the dial",
+      onpointerdown: () => { guessDragActive = true; },
+      onpointerup: (e) => {
+        guessDragActive = false;
+        localGuess = Number(e.target.value);
+        clearTimeout(guessSendTimer);
+        flushGuessSend();
+      },
+      onchange: (e) => {
+        guessDragActive = false;
+        localGuess = Number(e.target.value);
+        clearTimeout(guessSendTimer);
+        flushGuessSend();
+      },
       oninput: (e) => {
         localGuess = Number(e.target.value);
-        send({ type: "setGuess", value: localGuess });
-        const ln = document.getElementById("needle");
-        if (ln) {
-          const p = polar(R - 6, degForVal(localGuess));
-          ln.setAttribute("x2", p.x.toFixed(1));
-          ln.setAttribute("y2", p.y.toFixed(1));
-        }
+        updateNeedle(localGuess);
+        queueGuessSend(localGuess);
       },
     });
 
@@ -436,15 +492,19 @@
       spectrumEl(game.spectrum),
       gauge,
       slider,
-      el("p", { class: "note", text: locked
+      el("p", { class: "note", "data-dial-hint": "", text: locked
         ? "Locked in — waiting for others…"
         : "Move the dial, then lock in your guess." }),
       locked ? null : el("button", {
         class: "btn btn--primary btn--lg btn--block",
         text: "Lock in guess",
-        onclick: () => send({ type: "lockGuess" }),
+        onclick: () => {
+          clearTimeout(guessSendTimer);
+          flushGuessSend();
+          send({ type: "lockGuess" });
+        },
       }),
-      el("p", { class: "note", text: `${lockedCount} of ${guessers} locked in` }),
+      el("p", { class: "note", "data-dial-tally": "", text: `${lockedCount} of ${guessers} locked in` }),
     ]);
   }
 
@@ -561,7 +621,6 @@
   }
 
   function boot() {
-    initNameFromUrl();
     parseRoute();
     render();
     if (routeCode) connect(routeCode);

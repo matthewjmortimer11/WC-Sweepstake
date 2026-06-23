@@ -72,7 +72,7 @@ input.in:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 4px rgba
 .gauge .hub{fill:var(--needle)}
 .slider{width:100%}
 input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:10px;border-radius:999px;
-  background:linear-gradient(90deg,var(--t1),var(--t2));outline:none}
+  background:linear-gradient(90deg,var(--t1),var(--t2));outline:none;touch-action:none}
 input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:30px;height:30px;border-radius:50%;
   background:var(--needle);border:3px solid #0a0a08;box-shadow:0 3px 8px rgba(0,0,0,.5);cursor:pointer}
 input[type=range]::-moz-range-thumb{width:30px;height:30px;border-radius:50%;background:var(--needle);
