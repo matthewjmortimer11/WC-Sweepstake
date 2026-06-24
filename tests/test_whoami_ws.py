@@ -198,9 +198,20 @@ def test_settings_pack_change_in_lobby(client):
 
 
 def test_start_blocked_when_pool_too_small(client):
-    from whoami.game import MoveError
+    from whoami.game import MAX_PLAYERS, MoveError
+    from whoami.packs import PACKS, characters_for_packs
 
-    code = client.post("/whoami/api/rooms", json={"packIds": ["objects"]}).json()["code"]
-    room, pids = _room_with_players(code, 45)
+    # Use the smallest pack and field one more player than it has identities,
+    # so the guard trips regardless of how the rosters grow over time.
+    smallest = min(PACKS, key=lambda pid: len(PACKS[pid]["words"]))
+    pool = len(characters_for_packs([smallest]))
+    players = pool + 1
+    assert players <= MAX_PLAYERS, (
+        f"smallest pack {smallest!r} ({pool}) is too big to outnumber under "
+        f"MAX_PLAYERS={MAX_PLAYERS}"
+    )
+
+    code = client.post("/whoami/api/rooms", json={"packIds": [smallest]}).json()["code"]
+    room, pids = _room_with_players(code, players)
     with pytest.raises(MoveError, match="Not enough identities"):
         manager.start_game(room)
