@@ -72,6 +72,27 @@
     return n;
   };
 
+  // Preserve the focused field (value + caret) across a full re-render, so an
+  // incoming state broadcast doesn't wipe what you're typing (e.g. your name).
+  function captureFocus() {
+    const a = document.activeElement;
+    if (a && a.dataset && a.dataset.fkey != null && app.contains(a)) {
+      const cap = { key: a.dataset.fkey, value: "value" in a ? a.value : null };
+      try { cap.start = a.selectionStart; cap.end = a.selectionEnd; } catch (_) {}
+      return cap;
+    }
+    return null;
+  }
+
+  function restoreFocus(cap) {
+    if (!cap) return;
+    const next = app.querySelector(`[data-fkey="${cap.key}"]`);
+    if (!next) return;
+    if (cap.value != null && "value" in next) next.value = cap.value;
+    try { next.focus({ preventScroll: true }); } catch (_) { try { next.focus(); } catch (_) {} }
+    if (cap.start != null) { try { next.setSelectionRange(cap.start, cap.end); } catch (_) {} }
+  }
+
   let ws = null;
   let reconnectTimer = null;
   let reconnectDelay = 800;
@@ -83,6 +104,7 @@
   let guessSendTimer = null;
   let pendingGuessValue = null;
   let clueSendTimer = null;
+  let renameTimer = null;
 
   const state = {
     connected: false,
@@ -105,6 +127,15 @@
 
   function saveName(n) {
     try { localStorage.setItem(LS.name, n); } catch (_) {}
+  }
+
+  // Commit the name to the room as the player types (debounced), so it saves
+  // without needing to blur the field.
+  function queueRename(name) {
+    clearTimeout(renameTimer);
+    renameTimer = setTimeout(() => {
+      if (name) send({ type: "rename", name });
+    }, 250);
   }
 
   function clueBoxVisible() {
@@ -142,6 +173,7 @@
       class: "in",
       maxlength: "200",
       rows: "2",
+      "data-fkey": "clue",
       placeholder: "One-line clue — don't use the dial words",
       oninput: (e) => onDraft(e.target.value),
     });
@@ -366,7 +398,8 @@
 
   function homeScreen() {
     readNameFromUrl();
-    const nameIn = el("input", { class: "in", maxlength: "24", value: playerName(), placeholder: "Your name" });
+    const nameIn = el("input", { class: "in", maxlength: "24", value: playerName(), placeholder: "Your name",
+      "data-fkey": "home-name", oninput: (e) => saveName(e.target.value.trim()) });
     const joinIn = el("input", { class: "in", maxlength: "6", placeholder: "Room code", style: "text-transform:uppercase;letter-spacing:.15em" });
     return el("div", { class: "panel" }, [
       el("span", { class: "eyebrow", text: "Online" }),
@@ -411,7 +444,9 @@
     };
 
     const nameIn = el("input", { class: "in", maxlength: "24", value: you.name || playerName(),
-      onchange: (e) => send({ type: "rename", name: e.target.value.trim() }) });
+      "data-fkey": "lobby-name",
+      oninput: (e) => { const v = e.target.value.trim(); saveName(v); queueRename(v); },
+      onchange: (e) => { clearTimeout(renameTimer); send({ type: "rename", name: e.target.value.trim() }); } });
 
     const teamSeg = settings.mode === "teams" ? el("div", { class: "seg seg--2" }, [
       el("button", { class: you.team === "team0" ? "on" : "", text: names[0],
@@ -931,7 +966,15 @@
     ]);
   }
 
+  // Restore the field being typed in; only scroll to top on a genuine screen
+  // change (no field focused), so re-renders don't yank the view mid-type.
+  function finishRender(cap) {
+    if (cap) restoreFocus(cap);
+    else window.scrollTo(0, 0);
+  }
+
   function renderLocal() {
+    const cap = captureFocus();
     const screen = local.screen === "setup" ? localSetupScreen()
       : local.screen === "pass" ? localPassScreen()
       : local.screen === "psychic" ? localPsychicScreen()
@@ -939,7 +982,7 @@
       : local.screen === "reveal" ? localRevealScreen()
       : localWinScreen();
     app.replaceChildren(screen);
-    window.scrollTo(0, 0);
+    finishRender(cap);
   }
 
   function render() {
@@ -947,20 +990,23 @@
       renderLocal();
       return;
     }
+    const cap = captureFocus();
     if (!routeCode) {
       app.replaceChildren(homeScreen());
+      if (cap) restoreFocus(cap);
       return;
     }
     if (!state.room) {
       app.replaceChildren(el("div", { class: "panel" }, [
         el("p", { class: "note", text: "Connecting to room…" }),
       ]));
+      if (cap) restoreFocus(cap);
       return;
     }
     const game = state.room.game;
     if (game.status === "lobby") app.replaceChildren(lobbyScreen());
     else app.replaceChildren(gameScreen());
-    window.scrollTo(0, 0);
+    finishRender(cap);
   }
 
   function boot() {

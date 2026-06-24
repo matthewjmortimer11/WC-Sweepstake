@@ -12,6 +12,7 @@
   let reconnectTimer = null;
   let reconnectDelay = 800;
   let pingTimer = null;
+  let renameTimer = null;
   let routeCode = null;
   let lastRouteCode = null;
   let localMode = false;
@@ -77,6 +78,16 @@
 
   function saveName(n) {
     try { localStorage.setItem(LS.name, n); } catch (_) {}
+  }
+
+  // Commit the name to the room as the player types (debounced), so it saves
+  // without needing to blur the field — a player can set their name and just
+  // wait in the lobby, and it still sticks through to the game.
+  function queueRename(name) {
+    clearTimeout(renameTimer);
+    renameTimer = setTimeout(() => {
+      if (name) send({ type: "rename", name });
+    }, 250);
   }
 
   function toast(msg) {
@@ -652,10 +663,11 @@
     const nameIn = el("input", {
       class: "in", maxlength: "24", value: you.name || playerName(),
       "data-fkey": "lobby-name",
-      // Save every keystroke locally so a reconnect re-sends the latest name
-      // (instead of reverting to a stale one); commit to the room on blur.
-      oninput: (e) => saveName(e.target.value.trim()),
-      onchange: (e) => send({ type: "rename", name: e.target.value.trim() }),
+      // Save locally (so a reconnect re-sends the latest name) and commit to
+      // the room as they type — no blur required — with an immediate commit
+      // on blur as a backstop.
+      oninput: (e) => { const v = e.target.value.trim(); saveName(v); queueRename(v); },
+      onchange: (e) => { clearTimeout(renameTimer); send({ type: "rename", name: e.target.value.trim() }); },
     });
 
     const packIds = (room.settings && room.settings.packIds) || ["uk_celebs"];
