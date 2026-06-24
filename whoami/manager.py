@@ -22,7 +22,7 @@ from .game import (
 from .packs import characters_for_packs
 
 _CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
-_ROOM_TTL_EMPTY = 120
+_ROOM_TTL_EMPTY = 900
 _ROOM_TTL_IDLE = 60 * 60 * 6
 _MAX_ROOMS = 2000
 _MAX_NAME = 24

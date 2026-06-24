@@ -11,6 +11,7 @@
   let ws = null;
   let reconnectTimer = null;
   let reconnectDelay = 800;
+  let pingTimer = null;
   let routeCode = null;
   let lastRouteCode = null;
   let localMode = false;
@@ -34,6 +35,28 @@
     (Array.isArray(kids) ? kids : [kids]).forEach((c) => c != null && n.append(c));
     return n;
   };
+
+  // Preserve the focused field (and its in-progress text + caret) across a
+  // full re-render. Without this, an incoming state broadcast rebuilds the DOM
+  // and wipes whatever you're typing — e.g. your name in the lobby.
+  function captureFocus() {
+    const a = document.activeElement;
+    if (a && a.dataset && a.dataset.fkey != null && app.contains(a)) {
+      const cap = { key: a.dataset.fkey, value: "value" in a ? a.value : null };
+      try { cap.start = a.selectionStart; cap.end = a.selectionEnd; } catch (_) {}
+      return cap;
+    }
+    return null;
+  }
+
+  function restoreFocus(cap) {
+    if (!cap) return;
+    const next = app.querySelector(`[data-fkey="${cap.key}"]`);
+    if (!next) return;
+    if (cap.value != null && "value" in next) next.value = cap.value;
+    try { next.focus({ preventScroll: true }); } catch (_) { try { next.focus(); } catch (_) {} }
+    if (cap.start != null) { try { next.setSelectionRange(cap.start, cap.end); } catch (_) {} }
+  }
 
   function pid() {
     try {
@@ -247,12 +270,22 @@
     input.click();
   }
 
+  function startPing() {
+    clearInterval(pingTimer);
+    // A periodic ping keeps the socket alive through idle proxy timeouts, so
+    // the lobby doesn't churn through reconnect → re-render loops.
+    pingTimer = setInterval(() => {
+      if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: "ping" }));
+    }, 25000);
+  }
+
   function connect(code) {
     if (ws) { try { ws.close(); } catch (_) {} ws = null; }
+    clearInterval(pingTimer);
     const proto = location.protocol === "https:" ? "wss:" : "ws:";
     const url = `${proto}//${location.host}/whoami/ws/${code}?pid=${encodeURIComponent(pid())}&name=${encodeURIComponent(playerName())}`;
     ws = new WebSocket(url);
-    ws.onopen = () => { reconnectDelay = 800; };
+    ws.onopen = () => { reconnectDelay = 800; startPing(); };
     ws.onmessage = (ev) => {
       let msg;
       try { msg = JSON.parse(ev.data); } catch (_) { return; }
@@ -276,6 +309,7 @@
       }
     };
     ws.onclose = () => {
+      clearInterval(pingTimer);
       if (routeCode) {
         clearTimeout(reconnectTimer);
         reconnectTimer = setTimeout(() => {
@@ -321,9 +355,10 @@
     readNameFromUrl();
     const nameIn = el("input", {
       class: "in", maxlength: "24", value: playerName(), placeholder: "Your name",
+      "data-fkey": "home-name",
       oninput: (e) => saveName(e.target.value.trim()),
     });
-    const joinIn = el("input", { class: "in", maxlength: "6", placeholder: "Room code", style: "text-transform:uppercase;letter-spacing:.15em" });
+    const joinIn = el("input", { class: "in", maxlength: "6", placeholder: "Room code", "data-fkey": "home-join", style: "text-transform:uppercase;letter-spacing:.15em" });
     return el("div", { class: "panel" }, [
       el("span", { class: "eyebrow", text: "Online" }),
       el("h1", {}, [document.createTextNode("Who "), el("span", { class: "em", text: "am I?" })]),
@@ -476,7 +511,7 @@
       ]),
       el("div", { class: "names" }, local.names.map((name, i) => el("label", { class: "fl" }, [
         el("span", { text: "Player " + (i + 1) }),
-        el("input", { class: "in", maxlength: "20", value: name, oninput: (e) => { local.names[i] = e.target.value; } }),
+        el("input", { class: "in", maxlength: "20", value: name, "data-fkey": "local-name-" + i, oninput: (e) => { local.names[i] = e.target.value; } }),
       ]))),
       el("button", {
         class: "btn btn--primary btn--lg btn--block", text: "Start game →",
@@ -597,11 +632,13 @@
   }
 
   function renderLocal() {
+    const cap = captureFocus();
     const screen = local.screen === "setup" ? localSetupScreen()
       : local.screen === "reveal" ? localRevealScreen()
       : local.screen === "play" ? localPlayScreen()
       : localSelectScreen();
     app.replaceChildren(screen);
+    restoreFocus(cap);
   }
 
   function lobbyScreen() {
@@ -614,6 +651,10 @@
 
     const nameIn = el("input", {
       class: "in", maxlength: "24", value: you.name || playerName(),
+      "data-fkey": "lobby-name",
+      // Save every keystroke locally so a reconnect re-sends the latest name
+      // (instead of reverting to a stale one); commit to the room on blur.
+      oninput: (e) => saveName(e.target.value.trim()),
       onchange: (e) => send({ type: "rename", name: e.target.value.trim() }),
     });
 
@@ -755,11 +796,12 @@
   }
 
   function render() {
-    app.replaceChildren();
     if (localMode) {
       renderLocal();
       return;
     }
+    const cap = captureFocus();
+    app.replaceChildren();
     if (!state.room) {
       if (routeCode) {
         app.append(el("div", { class: "panel" }, [
@@ -768,11 +810,13 @@
       } else {
         app.append(homeScreen());
       }
+      restoreFocus(cap);
       return;
     }
     const status = state.room.game && state.room.game.status;
     if (status === "playing") app.append(gameScreen());
     else app.append(lobbyScreen());
+    restoreFocus(cap);
   }
 
   async function boot() {
