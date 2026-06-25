@@ -7,6 +7,9 @@ venv/
 # Runtime data (participant store is generated at runtime)
 data/
 
+# Local dev SQLite database (created when running with DATABASE_URL=sqlite+aiosqlite:///./dev.db)
+dev.db
+
 # Build vendor deps (large third-party; see scripts/vendor/README.md)
 scripts/vendor/react.development.js
 scripts/vendor/react-dom.development.js
