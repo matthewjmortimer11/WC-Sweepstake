@@ -57,7 +57,19 @@ def _load_team_meta() -> Dict[str, Dict[str, Any]]:
     return {t["code"]: t for t in data["teams"]}
 
 
+def _config_cutoff() -> int:
+    """How many third-placed teams advance — from the tournament config, not
+    hardcoded, so a different tournament just needs a different config file."""
+    try:
+        q = generate_wc_data().get("meta", {}).get("qualification", {})
+        n = int(q.get("best_third_qualifiers", engine.DEFAULT_CUTOFF))
+        return n if n > 0 else engine.DEFAULT_CUTOFF
+    except Exception:
+        return engine.DEFAULT_CUTOFF
+
+
 _TEAM_META: Dict[str, Dict[str, Any]] = _load_team_meta()
+_CUTOFF: int = _config_cutoff()
 _DEFAULT_TARGET = engine.DEFAULT_TARGET if engine.DEFAULT_TARGET in _TEAM_META else (
     next(iter(_TEAM_META), engine.DEFAULT_TARGET)
 )
@@ -303,7 +315,7 @@ def _build_payload(target: str) -> Dict[str, Any]:
     rows = _base_fixtures()
     fixtures = _engine_fixtures(rows)
     row_by_id = {str(f.get("id")): f for f in rows}
-    cutoff = engine.DEFAULT_CUTOFF
+    cutoff = _CUTOFF
 
     tables = engine.build_group_tables(teams, fixtures)
     status = engine.get_target_team_status(teams, fixtures, target_team_id=target, cutoff=cutoff)
@@ -336,8 +348,9 @@ def _build_payload(target: str) -> Dict[str, Any]:
     as_it_stands = None
     if live_ids and not guaranteed:
         locked = [replace(f, status="done") if f.id in live_ids else f for f in fixtures]
+        # Secondary single number — fewer trials keep the live endpoint snappy.
         proj_now = projection.project(
-            teams, locked, target_team_id=target, cutoff=cutoff, ratings=_RATINGS, trials=6000
+            teams, locked, target_team_id=target, cutoff=cutoff, ratings=_RATINGS, trials=2500
         )
         as_it_stands = round(proj_now.chance * 100)
 
