@@ -1,0 +1,386 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Scotland — World Cup 2026 Qualification Tracker</title>
+<meta name="description" content="Live tracker for Scotland's route to the World Cup 2026 knockouts as one of the best third-placed teams." />
+<meta name="color-scheme" content="dark" />
+<style>
+  :root {
+    --navy-900: #050d1f;
+    --navy-800: #0a1733;
+    --navy-700: #102043;
+    --navy-600: #16264f;
+    --line: #1f3262;
+    --sco-blue: #0a5bd6;
+    --sco-blue-deep: #0a3b8c;
+    --white: #f5f8ff;
+    --muted: #93a6cc;
+    --good: #2fbf71;
+    --bad: #e0556b;
+    --warn: #e6a23c;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; }
+  body {
+    background: radial-gradient(120% 90% at 50% -10%, #11305f 0%, var(--navy-900) 60%) fixed;
+    color: var(--white);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.45;
+    padding: env(safe-area-inset-top) 0 calc(env(safe-area-inset-bottom) + 32px);
+    min-height: 100vh;
+  }
+  .wrap { max-width: 540px; margin: 0 auto; padding: 0 16px; }
+  header.top {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 12px; padding: 18px 0 10px;
+  }
+  header.top .title { font-size: 15px; font-weight: 700; letter-spacing: .2px; }
+  header.top .title span { color: var(--muted); font-weight: 500; display: block; font-size: 12px; }
+  .refresh {
+    border: 1px solid var(--line); background: var(--navy-700); color: var(--white);
+    border-radius: 999px; padding: 8px 14px; font-size: 13px; font-weight: 600;
+    display: inline-flex; align-items: center; gap: 7px; cursor: pointer;
+  }
+  .refresh:active { transform: scale(.96); }
+  .refresh[aria-busy="true"] .spin { animation: spin .8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Hero status panel */
+  .hero {
+    border-radius: 20px; padding: 22px 20px;
+    background: linear-gradient(160deg, var(--sco-blue-deep), #07254f 70%);
+    border: 1px solid var(--line);
+    box-shadow: 0 18px 40px -24px rgba(0,0,0,.8);
+    position: relative; overflow: hidden;
+  }
+  .hero::after {
+    content: ""; position: absolute; inset: 0;
+    background: radial-gradient(80% 60% at 100% 0%, rgba(47,191,113,.12), transparent 60%);
+    pointer-events: none;
+  }
+  .hero .flag { font-size: 40px; line-height: 1; }
+  .hero .pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 12px; font-weight: 700; letter-spacing: .4px; text-transform: uppercase;
+    padding: 5px 11px; border-radius: 999px; margin-bottom: 12px;
+  }
+  .pill.in { background: rgba(47,191,113,.16); color: var(--good); border: 1px solid rgba(47,191,113,.4); }
+  .pill.out { background: rgba(224,85,107,.16); color: var(--bad); border: 1px solid rgba(224,85,107,.4); }
+  .pill.safe { background: rgba(47,191,113,.22); color: #6ff0a6; border: 1px solid rgba(47,191,113,.5); }
+  .pill.gone { background: rgba(147,166,204,.16); color: var(--muted); border: 1px solid var(--line); }
+  .hero h1 { margin: 4px 0 8px; font-size: 22px; line-height: 1.25; }
+  .hero p.sub { margin: 0; color: #cdddff; font-size: 14px; }
+  .statline { display: flex; gap: 18px; margin-top: 16px; flex-wrap: wrap; }
+  .statline .stat { font-size: 13px; color: var(--muted); }
+  .statline .stat b { display: block; color: var(--white); font-size: 19px; font-weight: 700; }
+
+  section.card {
+    margin-top: 16px; background: var(--navy-800); border: 1px solid var(--line);
+    border-radius: 18px; overflow: hidden;
+  }
+  section.card > h2 {
+    margin: 0; padding: 16px 18px 6px; font-size: 15px; font-weight: 700;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  section.card > h2 small { color: var(--muted); font-weight: 500; font-size: 12px; }
+  .card-body { padding: 8px 14px 16px; }
+
+  /* Third-place table */
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { text-align: right; padding: 9px 6px; }
+  th:first-child, td:first-child { text-align: left; }
+  thead th { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .4px; font-weight: 600; }
+  tbody tr { border-top: 1px solid rgba(31,50,98,.5); }
+  tbody td .teamcell { display: flex; align-items: center; gap: 9px; }
+  .teamcell .fl { font-size: 18px; }
+  .teamcell .nm { font-weight: 600; }
+  .teamcell .gp { color: var(--muted); font-size: 11px; }
+  tr.is-target td { background: rgba(10,91,214,.16); }
+  tr.is-target .nm { color: #9ec2ff; }
+  td .rk { color: var(--muted); width: 22px; display: inline-block; }
+  .qbadge { font-size: 11px; padding: 2px 7px; border-radius: 999px; font-weight: 700; }
+  .qbadge.y { background: rgba(47,191,113,.18); color: var(--good); }
+  .qbadge.n { background: rgba(147,166,204,.14); color: var(--muted); }
+  tr.cutline td { border-bottom: 2px dashed rgba(47,191,113,.55); }
+  .cutrow td {
+    text-align: center; color: var(--good); font-size: 11px; font-weight: 700;
+    letter-spacing: .5px; text-transform: uppercase; padding: 7px 6px; background: rgba(47,191,113,.06);
+  }
+
+  /* Checklist */
+  ul.checklist { list-style: none; margin: 0; padding: 0; }
+  ul.checklist li {
+    display: flex; gap: 12px; align-items: flex-start; padding: 12px 4px;
+    border-top: 1px solid rgba(31,50,98,.5);
+  }
+  ul.checklist li:first-child { border-top: none; }
+  .tick {
+    flex: none; width: 22px; height: 22px; border-radius: 7px; margin-top: 1px;
+    background: var(--navy-600); border: 1px solid var(--line);
+    display: grid; place-items: center; font-size: 12px; color: var(--sco-blue);
+  }
+  .req .rtext { font-weight: 600; font-size: 14px; }
+  .req .rmeta { color: var(--muted); font-size: 12px; margin-top: 2px; }
+  .andtag { font-size: 10px; color: var(--muted); border: 1px solid var(--line); border-radius: 5px; padding: 1px 5px; margin-left: 6px; vertical-align: middle; }
+
+  .empty { color: var(--muted); font-size: 14px; padding: 8px 4px 4px; }
+
+  /* Status banners */
+  .banner {
+    margin-top: 14px; border-radius: 12px; padding: 11px 14px; font-size: 13px;
+    display: flex; align-items: center; gap: 9px;
+  }
+  .banner.stale { background: rgba(230,162,60,.12); border: 1px solid rgba(230,162,60,.4); color: #f0c987; }
+  .banner.err { background: rgba(224,85,107,.12); border: 1px solid rgba(224,85,107,.4); color: #f0a3b0; }
+  .live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--bad); box-shadow: 0 0 0 0 rgba(224,85,107,.6); animation: pulse 1.4s infinite; }
+  @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(224,85,107,.5);} 70%{ box-shadow: 0 0 0 7px rgba(224,85,107,0);} 100%{box-shadow:0 0 0 0 rgba(224,85,107,0);} }
+  .updated { color: var(--muted); font-size: 12px; text-align: center; margin-top: 18px; }
+  .updated .live-dot { display: inline-block; margin-right: 4px; vertical-align: middle; }
+  .skeleton { opacity: .5; }
+  footer.note { color: var(--muted); font-size: 11px; text-align: center; margin-top: 14px; line-height: 1.5; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="title">Qualification Tracker<span id="subtitle">World Cup 2026 · best third-placed teams</span></div>
+    <button class="refresh" id="refreshBtn" type="button" aria-busy="false">
+      <span class="spin">↻</span><span>Refresh</span>
+    </button>
+  </header>
+
+  <div id="errBanner" class="banner err" hidden></div>
+  <div id="staleBanner" class="banner stale" hidden></div>
+
+  <main id="hero-mount">
+    <section class="hero skeleton" aria-live="polite">
+      <div class="flag">🏴󠁧󠁢󠁳󠁣󠁴󠁿</div>
+      <h1>Loading Scotland's qualification picture…</h1>
+    </section>
+  </main>
+
+  <section class="card" id="thirds-card" hidden>
+    <h2>Best third-placed teams <small>top <span id="cutoffLabel">8</span> advance</small></h2>
+    <div class="card-body">
+      <table>
+        <thead>
+          <tr><th>Team</th><th>Pts</th><th>GD</th><th>GF</th><th></th></tr>
+        </thead>
+        <tbody id="thirdsBody"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="card" id="needs-card" hidden>
+    <h2 id="needsTitle">What Scotland need</h2>
+    <div class="card-body">
+      <ul class="checklist" id="needsList"></ul>
+    </div>
+  </section>
+
+  <section class="card" id="group-card" hidden>
+    <h2 id="groupTitle">Group standings</h2>
+    <div class="card-body">
+      <table>
+        <thead>
+          <tr><th>Team</th><th>P</th><th>GD</th><th>Pts</th></tr>
+        </thead>
+        <tbody id="groupBody"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <div class="updated" id="updated"></div>
+  <footer class="note">
+    Tables are recomputed from match results, not taken from a feed. Third-placed
+    teams are ranked by points, then goal difference, goals scored and fair play.
+  </footer>
+</div>
+
+<script>
+(function () {
+  "use strict";
+  var TARGET = new URLSearchParams(location.search).get("target") || "SCO";
+  var pollTimer = null;
+  var pollMs = 300000;
+
+  var el = function (id) { return document.getElementById(id); };
+  var esc = function (s) {
+    return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  };
+  var fmtGD = function (n) { return (n > 0 ? "+" : "") + n; };
+
+  function pillFor(state) {
+    if (state === "qualified") return { cls: "safe", text: "Qualified" };
+    if (state === "third_in") return { cls: "in", text: "In the top 8" };
+    if (state === "third_out") return { cls: "out", text: "Outside the top 8" };
+    if (state === "eliminated") return { cls: "gone", text: "Eliminated" };
+    return { cls: "gone", text: "Still to play" };
+  }
+
+  function renderHero(d) {
+    var s = d.status;
+    var p = pillFor(s.state);
+    var thirdLine = s.thirdPlaceRank
+      ? ("#" + s.thirdPlaceRank + " of the third-placed teams")
+      : (s.positionLabel || "—");
+    el("hero-mount").innerHTML =
+      '<section class="hero" aria-live="polite">' +
+        '<div class="flag">' + esc(s.flag || "🏴") + '</div>' +
+        '<span class="pill ' + p.cls + '">' + esc(p.text) + '</span>' +
+        '<h1>' + esc(s.headline) + '</h1>' +
+        '<p class="sub">Group ' + esc(s.group) + ' · ' + esc(s.positionLabel) +
+          ' · ' + esc(thirdLine) + '</p>' +
+        '<div class="statline">' +
+          '<div class="stat"><b>' + s.points + '</b>points</div>' +
+          '<div class="stat"><b>' + fmtGD(s.goalDifference) + '</b>goal diff</div>' +
+          '<div class="stat"><b>' + s.goalsFor + '</b>scored</div>' +
+          (s.thirdPlaceRank ? '<div class="stat"><b>#' + s.thirdPlaceRank + '</b>3rd-place rank</div>' : '') +
+        '</div>' +
+      '</section>';
+  }
+
+  function renderThirds(d) {
+    el("cutoffLabel").textContent = d.cutoff;
+    var rows = d.thirdPlaceTable || [];
+    var html = "";
+    rows.forEach(function (t, i) {
+      var trCls = (t.isTarget ? "is-target " : "") + (t.rank === d.cutoff ? "cutline" : "");
+      html +=
+        '<tr class="' + trCls.trim() + '">' +
+          '<td><span class="rk">' + t.rank + '</span>' +
+            '<span class="teamcell"><span class="fl">' + esc(t.flag) + '</span>' +
+            '<span><span class="nm">' + esc(t.name) + '</span> ' +
+            '<span class="gp">Grp ' + esc(t.group) + '</span></span></span></td>' +
+          '<td>' + t.points + '</td>' +
+          '<td>' + fmtGD(t.goalDifference) + '</td>' +
+          '<td>' + t.goalsFor + '</td>' +
+          '<td><span class="qbadge ' + (t.qualifies ? "y" : "n") + '">' +
+            (t.qualifies ? "IN" : "OUT") + '</span></td>' +
+        '</tr>';
+      if (t.rank === d.cutoff) {
+        html += '<tr class="cutrow"><td colspan="5">— qualification cut line —</td></tr>';
+      }
+    });
+    if (!rows.length) {
+      html = '<tr><td colspan="5" class="empty">No completed groups yet — third-place table appears as results land.</td></tr>';
+    }
+    el("thirdsBody").innerHTML = html;
+    el("thirds-card").hidden = false;
+  }
+
+  function renderNeeds(d) {
+    el("needsTitle").textContent = "What " + d.targetName + " need";
+    var reqs = d.requirements || [];
+    var st = d.status.state;
+    var list = el("needsList");
+    if (st === "qualified") {
+      list.innerHTML = '<li class="empty">' + esc(d.targetName) +
+        ' are already through — nothing left to depend on. 🎉</li>';
+    } else if (!reqs.length) {
+      var msg = (st === "eliminated")
+        ? esc(d.targetName) + " can no longer qualify."
+        : "No results elsewhere change " + esc(d.targetName) +
+          "'s position right now — they hold their own fate.";
+      list.innerHTML = '<li class="empty">' + msg + '</li>';
+    } else {
+      list.innerHTML = reqs.map(function (r, i) {
+        var and = i > 0 ? '<span class="andtag">AND</span>' : '';
+        var sub = (r.home.name && r.away.name)
+          ? (esc(r.home.flag) + " " + esc(r.home.name) + " v " + esc(r.away.name) + " " + esc(r.away.flag) +
+             (r.group ? " · Group " + esc(r.group) : ""))
+          : "";
+        return '<li class="req">' +
+            '<span class="tick">✓</span>' +
+            '<span><span class="rtext">' + esc(r.text) + and + '</span>' +
+            (sub ? '<span class="rmeta">' + sub + '</span>' : '') + '</span>' +
+          '</li>';
+      }).join("");
+    }
+    el("needs-card").hidden = false;
+  }
+
+  function renderGroup(d) {
+    el("groupTitle").textContent = "Group " + d.status.group + " standings";
+    var rows = d.targetGroupTable || [];
+    el("groupBody").innerHTML = rows.map(function (t) {
+      return '<tr class="' + (t.isTarget ? "is-target" : "") + '">' +
+        '<td><span class="rk">' + t.rank + '</span>' +
+          '<span class="teamcell"><span class="fl">' + esc(t.flag) + '</span>' +
+          '<span class="nm">' + esc(t.name) + '</span></span></td>' +
+        '<td>' + t.played + '</td>' +
+        '<td>' + fmtGD(t.goalDifference) + '</td>' +
+        '<td>' + t.points + '</td>' +
+      '</tr>';
+    }).join("");
+    el("group-card").hidden = false;
+  }
+
+  function renderFreshness(d) {
+    var m = d.meta || {};
+    var stale = el("staleBanner");
+    if (m.stale) {
+      stale.hidden = false;
+      stale.innerHTML = '⚠ Showing the last data we have' +
+        (m.lastUpdated ? ' — results may be behind.' : ' — live feed unavailable.');
+    } else {
+      stale.hidden = true;
+    }
+    var u = el("updated");
+    var when = m.lastUpdated ? new Date(m.lastUpdated).toLocaleTimeString() : "—";
+    u.innerHTML = (m.live ? '<span class="live-dot"></span>LIVE · ' : '') +
+      'Updated ' + esc(when) + ' · refreshing every ' + Math.round((m.pollIntervalMs || pollMs) / 1000) + 's';
+  }
+
+  function render(d) {
+    el("errBanner").hidden = true;
+    el("subtitle").textContent = "World Cup 2026 · " + d.targetName + "'s third-place route";
+    renderHero(d);
+    renderThirds(d);
+    renderNeeds(d);
+    renderGroup(d);
+    renderFreshness(d);
+    pollMs = (d.meta && d.meta.pollIntervalMs) || pollMs;
+  }
+
+  function showError() {
+    var b = el("errBanner");
+    b.hidden = false;
+    b.textContent = "Couldn't reach the tracker — retrying shortly.";
+  }
+
+  function load() {
+    var btn = el("refreshBtn");
+    btn.setAttribute("aria-busy", "true");
+    fetch("/api/qualification?target=" + encodeURIComponent(TARGET), { headers: { "Accept": "application/json" } })
+      .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+      .then(function (d) { render(d); })
+      .catch(function () { showError(); })
+      .then(function () {
+        btn.setAttribute("aria-busy", "false");
+        schedule();
+      });
+  }
+
+  function schedule() {
+    if (pollTimer) clearTimeout(pollTimer);
+    pollTimer = setTimeout(load, pollMs);
+  }
+
+  el("refreshBtn").addEventListener("click", function () {
+    if (pollTimer) clearTimeout(pollTimer);
+    load();
+  });
+  document.addEventListener("visibilitychange", function () {
+    if (!document.hidden) { if (pollTimer) clearTimeout(pollTimer); load(); }
+  });
+
+  load();
+})();
+</script>
+</body>
+</html>
