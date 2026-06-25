@@ -249,37 +249,94 @@ def build_group_tables(
                     fair_play=fair_play.get(t.id),
                 )
             )
-        tables[group] = rank_group(rows)
+        tables[group] = rank_group(rows, fixtures, include_live)
     return tables
 
 
 # ── ranking ──────────────────────────────────────────────────────────────────
+#
+# Official FIFA group-stage tie-break ladder, applied in order:
+#   1. points
+#   2. goal difference (all group games)
+#   3. goals scored (all group games)
+#   4. head-to-head among the teams still level: points, then GD, then goals
+#      scored in the matches played between those teams only
+#   5. fair-play points (fewer is better)
+#   6. drawing of lots  — replaced here by a deterministic id fallback so the
+#      tracker never invents or randomises an order.
 
-def _standing_cmp(a: GroupStanding, b: GroupStanding) -> int:
-    """Order two group rows: points → GD → goals scored → fair-play → fallback.
+def _overall_key(s: GroupStanding) -> tuple:
+    return (-s.points, -s.goal_difference, -s.goals_for)
 
-    Returns negative if ``a`` ranks above ``b``. Fair-play (lower is better) is
-    only used when *both* teams have the data; otherwise we skip straight to the
-    deterministic alphabetical fallback so missing data can never crash or
-    silently invent an ordering.
+
+def _same_overall(a: GroupStanding, b: GroupStanding) -> bool:
+    return (
+        a.points == b.points
+        and a.goal_difference == b.goal_difference
+        and a.goals_for == b.goals_for
+    )
+
+
+def _head_to_head(
+    team_ids: set, fixtures: Optional[List[Fixture]], include_live: bool
+) -> Dict[str, tuple]:
+    """Mini-table (points, GD, goals) among ``team_ids`` from games between them."""
+    pts = {i: 0 for i in team_ids}
+    gd = {i: 0 for i in team_ids}
+    gf = {i: 0 for i in team_ids}
+    for fx in fixtures or []:
+        if fx.stage != "group" or not _has_result(fx, include_live):
+            continue
+        if fx.home in team_ids and fx.away in team_ids:
+            hg, ag = fx.home_goals, fx.away_goals
+            gf[fx.home] += hg; gf[fx.away] += ag
+            gd[fx.home] += hg - ag; gd[fx.away] += ag - hg
+            if hg > ag:
+                pts[fx.home] += 3
+            elif ag > hg:
+                pts[fx.away] += 3
+            else:
+                pts[fx.home] += 1; pts[fx.away] += 1
+    return {i: (pts[i], gd[i], gf[i]) for i in team_ids}
+
+
+def _break_group_tie(
+    block: List[GroupStanding], fixtures: Optional[List[Fixture]], include_live: bool
+) -> List[GroupStanding]:
+    """Order teams level on points/GD/goals: head-to-head, then fair play, then id."""
+    ids = {s.team_id for s in block}
+    h2h = _head_to_head(ids, fixtures, include_live)
+    # Fair play only applies if every level team has the data (else skip to id).
+    all_fp = all(s.fair_play is not None for s in block)
+
+    def key(s: GroupStanding) -> tuple:
+        hp, hgd, hgf = h2h[s.team_id]
+        return (-hp, -hgd, -hgf, (s.fair_play if all_fp else 0), s.team_id)
+
+    return sorted(block, key=key)
+
+
+def rank_group(
+    standings: List[GroupStanding],
+    fixtures: Optional[List[Fixture]] = None,
+    include_live: bool = True,
+) -> List[GroupStanding]:
+    """Rank a group with the full FIFA tie-break ladder and assign 1-based ``rank``.
+
+    ``fixtures`` are needed for the head-to-head step; if omitted, ranking uses
+    points → GD → goals → fair play → id only (head-to-head is skipped).
     """
-    if a.points != b.points:
-        return b.points - a.points
-    if a.goal_difference != b.goal_difference:
-        return b.goal_difference - a.goal_difference
-    if a.goals_for != b.goals_for:
-        return b.goals_for - a.goals_for
-    if a.fair_play is not None and b.fair_play is not None and a.fair_play != b.fair_play:
-        return a.fair_play - b.fair_play          # lower fair-play points rank higher
-    if a.team_id != b.team_id:                    # deterministic fallback
-        return -1 if a.team_id < b.team_id else 1
-    return 0
-
-
-def rank_group(standings: List[GroupStanding]) -> List[GroupStanding]:
-    """Sort a group's rows and assign 1-based ``rank``."""
-    ordered = sorted(standings, key=cmp_to_key(_standing_cmp))
-    return [replace(s, rank=i + 1) for i, s in enumerate(ordered)]
+    by_overall = sorted(standings, key=_overall_key)
+    ranked: List[GroupStanding] = []
+    i, n = 0, len(by_overall)
+    while i < n:
+        j = i
+        while j < n and _same_overall(by_overall[j], by_overall[i]):
+            j += 1
+        block = by_overall[i:j]
+        ranked.extend(_break_group_tie(block, fixtures, include_live) if len(block) > 1 else block)
+        i = j
+    return [replace(s, rank=k + 1) for k, s in enumerate(ranked)]
 
 
 def _third_cmp(a: ThirdPlaceStanding, b: ThirdPlaceStanding) -> int:

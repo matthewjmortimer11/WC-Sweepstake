@@ -31,6 +31,12 @@ def _upcoming(fid, group, home, away):
     return Fixture(id=fid, home=home, away=away, status="upcoming", group=group, stage="group")
 
 
+def _fx_done(home, away, hg, ag, group="A"):
+    """Completed group game in ``group`` (id derived from the teams)."""
+    return Fixture(id=f"{home}-{away}", home=home, away=away, status="done",
+                   group=group, home_goals=hg, away_goals=ag, stage="group")
+
+
 def _four(group, codes, fair_play=None):
     fair_play = fair_play or {}
     return [Team(id=c, name=c, group=group, fair_play=fair_play.get(c)) for c in codes]
@@ -75,6 +81,61 @@ def test_group_table_recomputed_from_results():
 
 
 # ── Third-place ranking ──────────────────────────────────────────────────────
+
+def test_head_to_head_breaks_group_tie_over_id_fallback():
+    """Two teams level on points, GD and goals scored are separated by their
+    head-to-head result — not by the alphabetical fallback.
+
+    'ZED' and 'ABE' finish identical overall (6 pts, +1 GD, 5 GF), but ZED beat
+    ABE. ZED must rank above ABE, even though the id fallback alone would put
+    ABE first.
+    """
+    teams = _four("A", ["ZED", "ABE", "MID", "LOW"])
+    fixtures = [
+        _fx_done("ZED", "ABE", 2, 1),   # ZED win the head-to-head
+        _fx_done("MID", "ZED", 2, 1),   # ZED lose to MID
+        _fx_done("ZED", "LOW", 2, 1),
+        _fx_done("ABE", "MID", 2, 1),
+        _fx_done("ABE", "LOW", 2, 1),
+        _fx_done("MID", "LOW", 1, 1),
+    ]
+    tables = build_group_tables(teams, fixtures)
+    rows = {r.team_id: r for r in tables["A"]}
+    # identical overall
+    assert (rows["ZED"].points, rows["ZED"].goal_difference, rows["ZED"].goals_for) == (6, 1, 5)
+    assert (rows["ABE"].points, rows["ABE"].goal_difference, rows["ABE"].goals_for) == (6, 1, 5)
+    # head-to-head puts ZED above ABE
+    assert rows["ZED"].rank == 1
+    assert rows["ABE"].rank == 2
+
+
+def test_head_to_head_decides_who_is_third():
+    """Head-to-head can change which team is third — and therefore who enters the
+    best-thirds race. MIDX and MIDY are level overall (4 pts, 0 GD, 2 GF), but
+    MIDY beat MIDX, so MIDY is runner-up and MIDX is the third-placed team.
+
+    The id fallback alone would (wrongly) put MIDX above MIDY, so this only comes
+    out right if head-to-head is applied.
+    """
+    teams = _four("A", ["TOP", "MIDX", "MIDY", "BOT"])
+    fixtures = [
+        _fx_done("MIDY", "MIDX", 1, 0),   # head-to-head: MIDY beat MIDX
+        _fx_done("TOP", "MIDY", 1, 0),
+        _fx_done("TOP", "MIDX", 1, 1),
+        _fx_done("MIDX", "BOT", 1, 0),
+        _fx_done("MIDY", "BOT", 1, 1),
+        _fx_done("TOP", "BOT", 1, 0),
+    ]
+    tables = build_group_tables(teams, fixtures)
+    rows = {r.team_id: r for r in tables["A"]}
+    # MIDX and MIDY level on points/GD/GF
+    assert (rows["MIDX"].points, rows["MIDX"].goal_difference, rows["MIDX"].goals_for) == (4, 0, 2)
+    assert (rows["MIDY"].points, rows["MIDY"].goal_difference, rows["MIDY"].goals_for) == (4, 0, 2)
+    assert rows["MIDY"].rank == 2          # won the head-to-head → runner-up
+    assert rows["MIDX"].rank == 3          # third-placed team
+    thirds = [t.team_id for t in get_third_placed_teams(tables)]
+    assert thirds == ["MIDX"]
+
 
 def test_third_place_ranking_by_points():
     thirds = [

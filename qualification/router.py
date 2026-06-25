@@ -144,44 +144,49 @@ def _serialise_group_row(s: engine.GroupStanding, target: str) -> Dict[str, Any]
     }
 
 
-def _impact_text(i: projection.GameImpact, target_name: str) -> str:
-    """A one-line steer on what result the target wants from this game."""
-    home = _team_card(i.home)["name"]
-    away = _team_card(i.away)["name"]
+def _impact_read(i: projection.GameImpact) -> tuple:
+    """Return (wants_text_template, good_outcomes) for one game.
+
+    ``good_outcomes`` are the results within a small margin of the best for the
+    target — these get highlighted together so the wording and the bars agree.
+    The text uses {home}/{away} placeholders filled in by the caller.
+    """
     rates = {"home": i.chance_if_home_win, "draw": i.chance_if_draw, "away": i.chance_if_away_win}
     best = max(rates.values())
-    worst = min(rates.values())
-    # Outcomes within 4 points of the best are "good"; the clearly-lowest is "bad".
     good = {k for k, v in rates.items() if v >= best - 0.04}
-    if "home" not in good and "draw" in good and "away" in good:
-        return f"{home} to avoid winning"
-    if "away" not in good and "draw" in good and "home" in good:
-        return f"{away} to avoid winning"
     if good == {"home"}:
-        return f"{home} to win"
-    if good == {"away"}:
-        return f"{away} to win"
-    if good == {"draw"}:
-        return f"{home} and {away} to draw"
-    if good == {"home", "draw"}:
-        return f"{home} to avoid defeat"
-    if good == {"away", "draw"}:
-        return f"{away} to avoid defeat"
-    return "result barely matters"
+        text = "{home} to win"
+    elif good == {"away"}:
+        text = "{away} to win"
+    elif good == {"draw"}:
+        text = "{home} and {away} to draw"
+    elif good == {"home", "draw"}:
+        text = "{home} to avoid defeat"
+    elif good == {"away", "draw"}:
+        text = "{away} to avoid defeat"
+    elif good == {"home", "away"}:          # a draw is the only bad result
+        text = "anything but a draw"
+    else:
+        text = "the result barely matters"
+    return text, sorted(good)
 
 
 def _serialise_impact(i: projection.GameImpact, target_name: str) -> Dict[str, Any]:
+    home = _team_card(i.home)
+    away = _team_card(i.away)
+    text, good = _impact_read(i)
     return {
         "fixtureId": i.fixture_id,
         "group": i.group,
-        "home": _team_card(i.home),
-        "away": _team_card(i.away),
+        "home": home,
+        "away": away,
         "chanceIfHomeWin": round(i.chance_if_home_win * 100),
         "chanceIfDraw": round(i.chance_if_draw * 100),
         "chanceIfAwayWin": round(i.chance_if_away_win * 100),
         "swing": round(i.swing * 100),
         "favouredOutcome": i.favoured_outcome,
-        "wants": _impact_text(i, target_name),
+        "goodOutcomes": good,
+        "wants": text.format(home=home["name"], away=away["name"]),
         "matters": i.matters,
     }
 

@@ -127,8 +127,10 @@ def project(
     ids = set(team_group)
     target_group = team_group[target_team_id]
 
-    # Base table from completed games — computed once, reused every trial.
+    # Base table from completed games — computed once, reused every trial. We also
+    # keep the completed games per group so head-to-head ties can be resolved.
     base: Dict[str, List[int]] = {i: [0, 0, 0] for i in ids}  # [pts, gf, ga]
+    base_group_matches: Dict[str, List[Tuple[str, str, int, int]]] = {}
     pending: List[Fixture] = []
     for fx in fixtures:
         if fx.stage != "group":
@@ -139,15 +141,21 @@ def project(
             pending.append(fx)
         elif fx.status == "done" and fx.home_goals is not None and fx.away_goals is not None:
             _apply(base, fx.home, fx.away, fx.home_goals, fx.away_goals)
+            base_group_matches.setdefault(team_group[fx.home], []).append(
+                (fx.home, fx.away, fx.home_goals, fx.away_goals)
+            )
         # cancelled / scoreless are ignored
 
-    def qualifies(stats: Dict[str, List[int]]) -> bool:
-        return _target_qualifies_fast(stats, groups, team_fp, target_team_id, target_group, cutoff)
+    def qualifies(stats, sampled_gm) -> bool:
+        return _target_qualifies_fast(
+            stats, groups, team_fp, target_team_id, target_group, cutoff,
+            base_group_matches, sampled_gm,
+        )
 
     # No games left: the outcome is fixed.
     if not pending:
         return Projection(
-            chance=1.0 if qualifies(base) else 0.0,
+            chance=1.0 if qualifies(base, {}) else 0.0,
             decided=True,
             trials=0,
             impacts=[],
@@ -163,11 +171,13 @@ def project(
     for _ in range(trials):
         stats = {i: base[i][:] for i in base}
         sampled: List[Tuple[str, str]] = []  # (fixture_id, outcome)
+        sampled_gm: Dict[str, List[Tuple[str, str, int, int]]] = {}
         for fx in pending:
             hg, ag = _sample_score(rng)
             _apply(stats, fx.home, fx.away, hg, ag)
+            sampled_gm.setdefault(team_group[fx.home], []).append((fx.home, fx.away, hg, ag))
             sampled.append((fx.id, "H" if hg > ag else ("D" if hg == ag else "A")))
-        q = 1 if qualifies(stats) else 0
+        q = 1 if qualifies(stats, sampled_gm) else 0
         qual_total += q
         for fid, outcome in sampled:
             bucket = cond[fid][outcome]
@@ -222,6 +232,50 @@ def _apply(stats: Dict[str, List[int]], home: str, away: str, hg: int, ag: int) 
         sa[0] += 1
 
 
+def _overall_sort_key(i, stats, team_fp):
+    return (-stats[i][0], -(stats[i][1] - stats[i][2]), -stats[i][1], team_fp[i], i)
+
+
+def _same_overall_stats(a: List[int], b: List[int]) -> bool:
+    return a[0] == b[0] and (a[1] - a[2]) == (b[1] - b[2]) and a[1] == b[1]
+
+
+def _h2h_sort(block, stats, team_fp, matches):
+    """Order a tied block by head-to-head points → GD → goals → fair play → id."""
+    bset = set(block)
+    pts = {i: 0 for i in block}
+    gd = {i: 0 for i in block}
+    gf = {i: 0 for i in block}
+    for h, a, hg, ag in matches:
+        if h in bset and a in bset:
+            gf[h] += hg; gf[a] += ag
+            gd[h] += hg - ag; gd[a] += ag - hg
+            if hg > ag:
+                pts[h] += 3
+            elif ag > hg:
+                pts[a] += 3
+            else:
+                pts[h] += 1; pts[a] += 1
+    return sorted(block, key=lambda i: (-pts[i], -gd[i], -gf[i], team_fp[i], i))
+
+
+def _rank_ids(members, stats, team_fp, matches):
+    """Rank a group's teams with the full FIFA ladder (overall → head-to-head …)."""
+    order = sorted(members, key=lambda i: _overall_sort_key(i, stats, team_fp))
+    ranked: List[str] = []
+    k, n = 0, len(order)
+    while k < n:
+        m = k
+        while m < n and _same_overall_stats(stats[order[m]], stats[order[k]]):
+            m += 1
+        if m - k > 1:
+            ranked.extend(_h2h_sort(order[k:m], stats, team_fp, matches))
+        else:
+            ranked.append(order[k])
+        k = m
+    return ranked
+
+
 def _target_qualifies_fast(
     stats: Dict[str, List[int]],
     groups: Dict[str, List[str]],
@@ -229,20 +283,23 @@ def _target_qualifies_fast(
     target: str,
     target_group: str,
     cutoff: int,
+    base_gm: Dict[str, List[Tuple[str, str, int, int]]],
+    sampled_gm: Dict[str, List[Tuple[str, str, int, int]]],
 ) -> bool:
     """Lean qualification check used inside the simulation loop.
 
-    Mirrors the engine's rule: top two of each group qualify; the target, if
-    third, must rank within ``cutoff`` of the third-placed teams. Sort key is
-    (−pts, −gd, −gf, fair_play, id) so higher points/GD/GF and lower fair-play
-    rank first, with the id as a deterministic fallback.
+    Mirrors the engine exactly: top two of each group qualify; the target, if
+    third, must rank within ``cutoff`` of the third-placed teams. Group order
+    uses the full tie-break ladder including head-to-head; third-placed teams
+    (from different groups) are ranked on points → GD → goals → fair play → id.
     """
     thirds: List[str] = []
     for group, members in groups.items():
-        ranked = sorted(
-            members,
-            key=lambda i: (-stats[i][0], -(stats[i][1] - stats[i][2]), -stats[i][1], team_fp[i], i),
-        )
+        matches = base_gm.get(group, ())
+        extra = sampled_gm.get(group)
+        if extra:
+            matches = list(matches) + extra
+        ranked = _rank_ids(members, stats, team_fp, matches)
         if target in members:
             pos = ranked.index(target)
             if pos <= 1:
@@ -251,8 +308,5 @@ def _target_qualifies_fast(
                 return False           # 4th (or lower) — out via the group
         thirds.append(ranked[2])       # this group's third-placed team
 
-    ranked_thirds = sorted(
-        thirds,
-        key=lambda i: (-stats[i][0], -(stats[i][1] - stats[i][2]), -stats[i][1], team_fp[i], i),
-    )
+    ranked_thirds = sorted(thirds, key=lambda i: _overall_sort_key(i, stats, team_fp))
     return target in ranked_thirds[:cutoff]
