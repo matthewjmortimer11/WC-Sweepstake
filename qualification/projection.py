@@ -40,11 +40,16 @@ from .engine import (
     Team,
 )
 
-# Goal expectation per side for an unplayed game. Symmetric (no home edge): World
-# Cup venues are essentially neutral, and an asymmetric model would bias a team's
-# chances purely by which fixtures list it as "home". Evenly-matched assumption.
-_LAMBDA_HOME = 1.35
-_LAMBDA_AWAY = 1.35
+# Goal model for an unplayed game. No home edge (World Cup venues are essentially
+# neutral). The two sides' expected goals are pulled apart by their strength
+# rating difference: the stronger team scores more, the weaker fewer, keeping the
+# total roughly stable. With no ratings (all 0) it collapses to an evenly-matched
+# 1.35 each. ``_STRENGTH_ALPHA`` is calibrated so a top side beats a weak one
+# ~85% of the time and evenly-rated sides are true coin-flips.
+_LAMBDA_BASE = 1.35
+_STRENGTH_ALPHA = 0.30
+_LAMBDA_MIN = 0.30
+_LAMBDA_MAX = 3.0
 
 _PENDING_STATUSES = ("upcoming", "live", "halfTime")
 
@@ -91,8 +96,16 @@ def _poisson(rng: random.Random, lam: float) -> int:
             return k - 1
 
 
-def _sample_score(rng: random.Random) -> Tuple[int, int]:
-    return _poisson(rng, _LAMBDA_HOME), _poisson(rng, _LAMBDA_AWAY)
+def _match_lambdas(rating_home: float, rating_away: float) -> Tuple[float, float]:
+    """Expected goals for each side given their strength ratings (0 = average)."""
+    edge = math.exp(_STRENGTH_ALPHA * (rating_home - rating_away))
+    lam_h = min(max(_LAMBDA_BASE * edge, _LAMBDA_MIN), _LAMBDA_MAX)
+    lam_a = min(max(_LAMBDA_BASE / edge, _LAMBDA_MIN), _LAMBDA_MAX)
+    return lam_h, lam_a
+
+
+def _sample_score(rng: random.Random, lam_home: float, lam_away: float) -> Tuple[int, int]:
+    return _poisson(rng, lam_home), _poisson(rng, lam_away)
 
 
 def _fair_play_key(fp: Optional[int]) -> int:
@@ -108,8 +121,14 @@ def project(
     cutoff: int = DEFAULT_CUTOFF,
     trials: int = 4000,
     seed: int = 20260611,
+    ratings: Optional[Dict[str, float]] = None,
 ) -> Projection:
     """Simulate the remaining group games and project the target's chances.
+
+    ``ratings`` maps team id → strength rating (0 = average); stronger teams are
+    sampled to score more. If omitted, every team is average and the model is a
+    true coin-flip — so ``ratings`` is what turns the chance from "evenly matched"
+    into "weighted by team strength".
 
     ``seed`` is fixed by default so the same tournament state always yields the
     same numbers (a poll doesn't make the percentage flicker); a new result
@@ -118,6 +137,7 @@ def project(
     if not any(t.id == target_team_id for t in teams):
         raise ValueError(f"target team {target_team_id!r} not in team list")
 
+    ratings = ratings or {}
     team_group: Dict[str, str] = {t.id: t.group for t in teams}
     team_fp: Dict[str, int] = {t.id: _fair_play_key(t.fair_play) for t in teams}
     groups: Dict[str, List[str]] = {}
@@ -167,13 +187,19 @@ def project(
     cond: Dict[str, Dict[str, List[int]]] = {
         fx.id: {"H": [0, 0], "D": [0, 0], "A": [0, 0]} for fx in pending
     }
+    # Per-fixture goal expectations from team strengths — constant across trials.
+    lambdas: Dict[str, Tuple[float, float]] = {
+        fx.id: _match_lambdas(ratings.get(fx.home, 0.0), ratings.get(fx.away, 0.0))
+        for fx in pending
+    }
 
     for _ in range(trials):
         stats = {i: base[i][:] for i in base}
         sampled: List[Tuple[str, str]] = []  # (fixture_id, outcome)
         sampled_gm: Dict[str, List[Tuple[str, str, int, int]]] = {}
         for fx in pending:
-            hg, ag = _sample_score(rng)
+            lam_h, lam_a = lambdas[fx.id]
+            hg, ag = _sample_score(rng, lam_h, lam_a)
             _apply(stats, fx.home, fx.away, hg, ag)
             sampled_gm.setdefault(team_group[fx.home], []).append((fx.home, fx.away, hg, ag))
             sampled.append((fx.id, "H" if hg > ag else ("D" if hg == ag else "A")))

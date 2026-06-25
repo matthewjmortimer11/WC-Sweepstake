@@ -11,6 +11,8 @@ page. No second provider, no API key on the client.
 
 from __future__ import annotations
 
+import math
+import statistics
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -67,6 +69,45 @@ def _engine_teams() -> List[Team]:
         Team(id=t["code"], name=t["name"], group=t["group"], fair_play=t.get("fairPlay"))
         for t in _TEAM_META.values()
     ]
+
+
+def _american_to_prob(odds: Any) -> Optional[float]:
+    """American moneyline odds → implied win probability. None if unparseable."""
+    if odds is None:
+        return None
+    s = str(odds).strip()
+    if not s:
+        return None
+    try:
+        n = int(s.lstrip("+-"))
+    except ValueError:
+        return None
+    if n <= 0:
+        return None
+    return n / (n + 100) if s.startswith("-") else 100 / (n + 100)
+
+
+def _team_ratings() -> Dict[str, float]:
+    """Strength ratings (mean 0, ~unit spread) from the config's title odds.
+
+    A team's tournament-winner price is a usable proxy for overall strength. We
+    take log(implied probability) and standardise it, so the Monte-Carlo model
+    weights matches by how good the teams actually are — Brazil are not Haiti.
+    Teams without odds get a neutral 0.
+    """
+    z: Dict[str, float] = {}
+    for code, meta in _TEAM_META.items():
+        p = _american_to_prob(meta.get("odds"))
+        if p is not None:
+            z[code] = math.log(p)
+    if len(z) < 2:
+        return {code: 0.0 for code in _TEAM_META}
+    mean = statistics.fmean(z.values())
+    sd = statistics.pstdev(z.values()) or 1.0
+    return {code: ((z[code] - mean) / sd if code in z else 0.0) for code in _TEAM_META}
+
+
+_RATINGS: Dict[str, float] = _team_ratings()
 
 
 def _base_fixtures() -> List[Dict[str, Any]]:
@@ -253,7 +294,9 @@ def _build_payload(target: str) -> Dict[str, Any]:
     # Monte-Carlo projection: the target's qualification chance and how each
     # remaining game swings it. This is what makes the tracker answer the real
     # question — which results elsewhere matter, and which way.
-    proj = projection.project(teams, fixtures, target_team_id=target, cutoff=cutoff)
+    proj = projection.project(
+        teams, fixtures, target_team_id=target, cutoff=cutoff, ratings=_RATINGS
+    )
 
     # Group games with a score to show: completed plus any in-progress (live /
     # half-time), so the results board reflects what's happening right now.

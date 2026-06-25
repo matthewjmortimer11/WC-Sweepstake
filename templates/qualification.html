@@ -252,8 +252,8 @@
     goals scored, then head-to-head between level teams, then fair play. The
     third-placed teams are ranked by points, goal difference, goals scored, then
     fair play. The <i>chance</i> and each game's impact come from simulating the
-    remaining games many times, treating them as evenly matched — an estimate, not
-    a betting price.
+    remaining games many times, weighting each match by team strength derived from
+    bookmakers' tournament odds — a model estimate, not a betting price.
   </footer>
 </div>
 
@@ -296,7 +296,8 @@
     } else {
       chanceLab = "Estimated chance to qualify";
       chanceSub = "From " + (c.trials ? c.trials.toLocaleString() : "many") +
-        " simulations of the remaining games, treated as 50/50. An estimate, not a betting price.";
+        " simulations of the remaining games, weighted by each team's strength " +
+        "(from bookmakers' tournament odds). A model estimate, not a betting price.";
     }
     el("hero-mount").innerHTML =
       '<section class="hero" aria-live="polite">' +
