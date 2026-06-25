@@ -400,7 +400,9 @@ function deckMoney(n){
 
 function DeckWire(){
   const meta = A_WC.meta || {};
-  const pot = A_S.pot ? A_S.pot() : (A_WC.POT || 0);
+  const split = A_S.charitySplit ? A_S.charitySplit() : ((A_WC.meta && A_WC.meta.charitySplit != null) ? A_WC.meta.charitySplit : 0.5);
+  const pot = A_S.pot ? A_S.pot() : ((A_WC.POT || 0) * (1 - split));
+  const potLabel = split > 0.99 ? 'to charity' : 'winner fund';
   const rows = (A_S.rankedByPred ? A_S.rankedByPred() : []).slice(0,6);
   return <aside className="deck-wire">
     <div className="wire-kk" style={{display:'flex',alignItems:'center',flexWrap:'wrap',gap:4}}>
@@ -409,7 +411,7 @@ function DeckWire(){
     </div>
     <div className="wire-card">
       <div className="wire-pot">{deckMoney(pot)}</div>
-      <div className="wire-pot__l">in the pot</div>
+      <div className="wire-pot__l">{potLabel}</div>
       <div className="wire-stats">
         <div><div className="wire-stat__n">{meta.stillIn!=null?meta.stillIn:'—'}</div><div className="wire-stat__l">still in</div></div>
         <div><div className="wire-stat__n">{meta.out!=null?meta.out:'—'}</div><div className="wire-stat__l">out</div></div>
@@ -883,7 +885,7 @@ function App(){
     if(nm && lg && lg.seeded && A_S.allSync){
       const dups=A_S.allSync().filter(p=>(p.name||'').trim().toLowerCase()===nm);
       const existing=dups.find(p=>(A_S.deviceIds?A_S.deviceIds():[]).indexOf(p.id)<0)||dups[0];
-      if(existing){ setOrganiser(false); claimOI(existing.id); return; }
+      if(existing){ setOrganiser(false); claimOI(existing.id, profile); return; }
     }
     const p=A_S.create(profile,{organiser:organiser});
     if(organiser && A_S.bindAdminTokenToActive) A_S.bindAdminTokenToActive();
@@ -911,18 +913,30 @@ function App(){
     }
   }
 
-  function claimOI(id){
+  function claimOI(id, profile){
     // A password-protected entry must be signed into before it can be claimed
     // on this device (cross-device takeover is the case this guards).
     const person=A_S.getSync(id);
     if(person && A_S.needsSignIn && A_S.needsSignIn(person)){
-      setSignIn({ id:id, name:(A_S.shownName?A_S.shownName(person):person.name), proceed:()=>doClaimOI(id) });
+      setSignIn({ id:id, name:(A_S.shownName?A_S.shownName(person):person.name), proceed:()=>doClaimOI(id, profile) });
       return;
     }
-    doClaimOI(id);
+    doClaimOI(id, profile);
   }
-  function doClaimOI(id){
+  function applyClaimProfile(id, profile){
+    if(!profile || !id || !A_S.update) return;
+    A_S.update(id, {
+      department: profile.department || '',
+      location: profile.location || '',
+      city: profile.location || '',
+      ltMember: !!profile.ltMember,
+      leadership: !!profile.ltMember,
+      customFields: profile.customFields || {},
+    });
+  }
+  function doClaimOI(id, profile){
     A_S.claimOI(id);
+    applyClaimProfile(id, profile);
     A_S.refresh&&A_S.refresh();
     const p=A_S.getSync(id);
     const t=p&&A_WC.TEAMS[p.team];

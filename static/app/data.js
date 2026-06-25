@@ -65,8 +65,9 @@
     WC.rate = rate;
     WC.FEE = d.fee;
     WC.POT = d.pot;
-    WC.charitySplit = d.charitySplit;
-    WC.CHARITY_SPLIT = d.charitySplit;
+    var cs = d.charitySplit != null ? d.charitySplit : (d.meta && d.meta.charitySplit);
+    WC.charitySplit = cs;
+    WC.CHARITY_SPLIT = cs;
     WC.PAYOUTS = d.payouts;
     WC.LINES = d.lines;
     WC.predictions = d.predictions || [];
