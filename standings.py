@@ -21,6 +21,43 @@ from __future__ import annotations
 from typing import Any, Dict, List, Optional
 
 
+def _first_knockout_round(stage_ladder: List[str]) -> Optional[str]:
+    for stage in stage_ladder:
+        if stage not in ("group", "winner"):
+            return stage
+    return None
+
+
+def _opening_knockout_draw_complete(
+    fixtures: List[Dict[str, Any]],
+    codes: set,
+    stage_ladder: List[str],
+) -> bool:
+    """True once the full opening knockout round is published.
+
+  World Cup 2026: 32 teams → 16 round-of-32 ties. We only treat the bracket
+  as authoritative for cutting group stragglers once every one of those ties
+  is in the feed. A lone later-round fixture (or a partial R32 list) must not
+  knock out group winners whose tie has not been published yet.
+    """
+    opening = _first_knockout_round(stage_ladder)
+    if not opening:
+        return False
+    opening_fx = [f for f in fixtures if f.get("stage") == opening]
+    # 48-team format: 32 advance, 16 first-knockout fixtures.
+    if len(opening_fx) < 16:
+        return False
+    paired = 0
+    teams: set = set()
+    for f in opening_fx:
+        a, b = f.get("a"), f.get("b")
+        if a in codes and b in codes:
+            paired += 1
+            teams.add(a)
+            teams.add(b)
+    return paired >= 16 and len(teams) >= 32
+
+
 def _winner_of(fx: Dict[str, Any]) -> Optional[str]:
     """Return HOME / AWAY / DRAW / None for a fixture.
 
@@ -48,7 +85,6 @@ def compute_team_status(
 ) -> List[Dict[str, Any]]:
     """Return a copy of `teams` with alive/stage/rounds recomputed from results."""
     ladder_index = {s: i for i, s in enumerate(stage_ladder)}
-    knockout_stages = {s for s in stage_ladder if s not in ("group", "winner")}
     codes = {t["code"] for t in teams}
 
     reached: Dict[str, str] = {c: "group" for c in codes}     # furthest stage seen
@@ -60,9 +96,7 @@ def compute_team_status(
         c: {"Pts": 0, "GF": 0, "GA": 0} for c in codes
     }
 
-    knockout_fixtures_exist = any(
-        f.get("stage") in knockout_stages for f in fixtures
-    )
+    knockout_draw_complete = _opening_knockout_draw_complete(fixtures, codes, stage_ladder)
 
     for f in fixtures:
         a, b, stage = f.get("a"), f.get("b"), f.get("stage")
@@ -123,24 +157,24 @@ def compute_team_status(
     for g, members in groups.items():
         if not group_done.get(g):
             continue
-        if knockout_fixtures_exist:
-            # Authoritative: anyone from a finished group who didn't make a
-            # knockout fixture is out (covers the best-thirds cut exactly).
+        ranked = sorted(
+            members,
+            key=lambda c: (
+                grec[c]["Pts"],
+                grec[c]["GF"] - grec[c]["GA"],
+                grec[c]["GF"],
+            ),
+            reverse=True,
+        )
+        if knockout_draw_complete:
+            # Full opening bracket published: anyone still only at "group" did
+            # not make the cut (covers best-thirds exactly once every tie exists).
             for c in members:
                 if reached[c] == "group":
                     eliminated[c] = True
         else:
-            # Provisional gap (group done, knockouts not drawn yet): only the
-            # bottom team is certainly gone. 3rd may still be a "best third".
-            ranked = sorted(
-                members,
-                key=lambda c: (
-                    grec[c]["Pts"],
-                    grec[c]["GF"] - grec[c]["GA"],
-                    grec[c]["GF"],
-                ),
-                reverse=True,
-            )
+            # Bracket incomplete or not drawn yet: only the bottom team is
+            # certainly gone. Top two and third may still advance.
             for c in ranked[3:]:
                 eliminated[c] = True
 
