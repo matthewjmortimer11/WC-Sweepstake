@@ -90,13 +90,15 @@
   .howto li .ic { flex: none; width: 22px; text-align: center; }
 
   /* Live & just played */
-  .recent-row { display: grid; grid-template-columns: auto 1fr auto 1fr; align-items: center; gap: 8px; padding: 8px 4px; border-top: 1px solid rgba(31,50,98,.45); font-size: 14px; }
-  .recent-row:first-child { border-top: none; }
-  .recent-row .gtag { font-size: 10px; color: var(--muted); border: 1px solid var(--line); border-radius: 5px; padding: 1px 5px; font-weight: 700; }
-  .recent-row .rh { text-align: right; font-weight: 600; } .recent-row .ra { text-align: left; font-weight: 600; }
-  .recent-row .sc { font-weight: 800; background: var(--navy-700); border-radius: 6px; padding: 2px 9px; font-variant-numeric: tabular-nums; white-space: nowrap; }
-  .recent-row.live .sc { background: rgba(224,85,107,.2); color: #ffb3c0; }
-  .recent-row .liveflag { color: var(--bad); font-weight: 800; font-size: 11px; }
+  .recent-item { padding: 9px 4px; border-top: 1px solid rgba(31,50,98,.45); }
+  .recent-item:first-child { border-top: none; }
+  .recent-item .ri-meta { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--muted); margin-bottom: 4px; }
+  .recent-item .gtag { border: 1px solid var(--line); border-radius: 5px; padding: 1px 5px; font-weight: 700; }
+  .recent-item.live .ri-when { color: var(--bad); font-weight: 800; }
+  .recent-item .ri-top { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 8px; font-size: 14px; }
+  .recent-item .rh { text-align: right; font-weight: 600; } .recent-item .ra { text-align: left; font-weight: 600; }
+  .recent-item .sc { font-weight: 800; background: var(--navy-700); border-radius: 6px; padding: 2px 10px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .recent-item.live .sc { background: rgba(224,85,107,.2); color: #ffb3c0; }
 
   /* ── What Scotland need (per game) ───────────────────────────────── */
   ul.needs { list-style: none; margin: 0; padding: 0; }
@@ -105,6 +107,8 @@
   .need-teams { font-size: 15px; font-weight: 700; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
   .need-teams .v { color: var(--muted); font-weight: 500; }
   .need-teams .grp { color: var(--muted); font-size: 11px; border: 1px solid var(--line); border-radius: 5px; padding: 1px 6px; font-weight: 600; }
+  .need-teams .when { font-size: 11px; color: var(--muted); font-weight: 600; white-space: nowrap; }
+  .need-teams .when.live { color: var(--bad); }
   .need-want { margin: 9px 0; font-size: 16px; font-weight: 800; padding: 9px 12px; border-radius: 11px;
                background: var(--good-soft); color: #8ff5b6; border: 1px solid rgba(47,191,113,.4);
                display: flex; align-items: center; gap: 9px; }
@@ -325,10 +329,24 @@
       '</div>';
   }
 
+  function whenLabel(g) {
+    if (g.live) return '<span class="when live">🔴 LIVE NOW</span>';
+    var bits = [];
+    if (g.dateLabel) bits.push(esc(g.dateLabel));
+    if (g.time) bits.push(esc(g.time));
+    return bits.length ? '<span class="when">🗓️ ' + bits.join(" · ") + '</span>' : "";
+  }
+
   function renderNeeds(d) {
     el("needTitle").textContent = "⚽ What do " + d.targetName + " need?";
+    // In the order they're played (live first, then soonest kick-off first).
     var games = (d.remainingGames || []).filter(function (g) { return g.matters; });
-    var shown = games.slice(0, 5);
+    games.sort(function (a, b) { return (a.kickoff || "").localeCompare(b.kickoff || ""); });
+    // Always show EVERY live game that matters (you're watching them now), then
+    // the next upcoming games in kick-off order.
+    var liveGames = games.filter(function (g) { return g.live; });
+    var upcoming = games.filter(function (g) { return !g.live; });
+    var shown = liveGames.concat(upcoming.slice(0, Math.max(3, 6 - liveGames.length)));
     var moreMatter = games.length - shown.length;   // affect them, just smaller
     var list = el("needList"), foot = el("needFoot"), help = el("needHelp");
 
@@ -353,9 +371,10 @@
       return;
     }
 
-    help.innerHTML = "These games still to be played change " + esc(d.targetName) +
-      "'s chances. The <b style='color:#6ff0a6'>green</b> result is the one we're cheering for. " +
-      "Each bar shows " + esc(d.targetName) + "'s chance of going through after that result.";
+    help.innerHTML = "The games still to come that change " + esc(d.targetName) +
+      "'s chances, <b>in the order they're played</b>. The <b style='color:#6ff0a6'>green</b> " +
+      "result is the one we're cheering for; each bar is " + esc(d.targetName) +
+      "'s chance of going through after that result.";
 
     list.innerHTML = shown.map(function (g) {
       var hn = esc(g.home.name), an = esc(g.away.name);
@@ -367,6 +386,7 @@
             '<span class="v">v</span>' +
             '<span>' + an + ' ' + esc(g.away.flag) + '</span>' +
             (g.group ? '<span class="grp">Group ' + esc(g.group) + '</span>' : '') +
+            whenLabel(g) +
           '</div>' +
           '<div class="need-want' + (meh ? ' meh' : '') + '">' +
             (meh ? '🤷' : '👍') + ' <span>' + (meh ? "Doesn't really matter" : "We want: " + esc(g.wants)) + '</span>' +
@@ -447,14 +467,18 @@
       el("recent-card").hidden = false;
       return;
     }
-    el("recentList").innerHTML = res.slice(0, 6).map(function (r) {
-      return '<div class="recent-row' + (r.live ? " live" : "") + '">' +
-          '<span class="gtag">' + esc(r.group) + '</span>' +
-          '<span class="rh">' + esc(r.home.name) + " " + esc(r.home.flag) + '</span>' +
-          '<span class="sc">' + (r.homeGoals == null ? "–" : r.homeGoals) + "–" +
-            (r.awayGoals == null ? "–" : r.awayGoals) + '</span>' +
-          '<span class="ra">' + esc(r.away.flag) + " " + esc(r.away.name) +
-            (r.live ? ' <span class="liveflag">LIVE</span>' : "") + '</span>' +
+    el("recentList").innerHTML = res.slice(0, 7).map(function (r) {
+      var when = r.live ? "🔴 LIVE NOW"
+        : [r.dateLabel, r.time].filter(Boolean).map(esc).join(" · ") || "full time";
+      return '<div class="recent-item' + (r.live ? " live" : "") + '">' +
+          '<div class="ri-meta"><span class="gtag">Group ' + esc(r.group) + '</span>' +
+            '<span class="ri-when">' + when + '</span></div>' +
+          '<div class="ri-top">' +
+            '<span class="rh">' + esc(r.home.name) + " " + esc(r.home.flag) + '</span>' +
+            '<span class="sc">' + (r.homeGoals == null ? "–" : r.homeGoals) + "–" +
+              (r.awayGoals == null ? "–" : r.awayGoals) + '</span>' +
+            '<span class="ra">' + esc(r.away.flag) + " " + esc(r.away.name) + '</span>' +
+          '</div>' +
         '</div>';
     }).join("");
     el("recent-card").hidden = false;
