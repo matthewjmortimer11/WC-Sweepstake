@@ -25,6 +25,7 @@ Python uses snake_case, so e.g. ``buildGroupTables`` is ``build_group_tables``.
 
 from __future__ import annotations
 
+import itertools
 from dataclasses import dataclass, field, replace
 from functools import cmp_to_key
 from typing import Dict, List, Literal, Optional, Protocol, Tuple
@@ -487,6 +488,85 @@ def _ordinal(n: Optional[int]) -> str:
     else:
         suffix = {1: "st", 2: "nd", 3: "rd"}.get(n % 10, "th")
     return f"{n}{suffix}"
+
+
+# ── Mathematical certainty (exact, not estimated) ────────────────────────────
+
+_CLINCH_MARGIN = 9      # an extreme scoreline used to probe worst/best cases
+
+
+def assess_group_certainty(
+    teams: List[Team],
+    fixtures: List[Fixture],
+    target_team_id: str = DEFAULT_TARGET,
+    include_live: bool = True,
+) -> str:
+    """Is the target's fate already settled by its OWN group, whatever else happens?
+
+    Returns one of:
+      ``"through"``     — guaranteed to finish in the group's top two (qualified
+                          no matter how every remaining game goes),
+      ``"eliminated"``  — guaranteed to finish 4th (can't even be a third-placed
+                          team, so cannot qualify),
+      ``"open"``        — not certain from the group alone.
+
+    This is *sound and conservative*: it probes the worst (and best) cases for the
+    target using extreme scorelines, so it never claims a certainty that isn't
+    real — though it may answer ``"open"`` when a subtle clinch exists. Third-place
+    qualification (the cross-group "best 8") is never claimed certain here, because
+    that genuinely depends on other groups.
+    """
+    team = next((t for t in teams if t.id == target_team_id), None)
+    if team is None:
+        return "open"
+
+    group_teams = [t for t in teams if t.group == team.group]
+    gids = {t.id for t in group_teams}
+    group_fx = [
+        fx for fx in fixtures
+        if fx.stage == "group" and fx.home in gids and fx.away in gids
+    ]
+    remaining = [fx for fx in group_fx if fx.status in ("upcoming", "live", "halfTime")]
+    settled = [fx for fx in group_fx if fx not in remaining]
+
+    target_games = [fx for fx in remaining if target_team_id in (fx.home, fx.away)]
+    rival_games = [fx for fx in remaining if fx not in target_games]
+    big = _CLINCH_MARGIN
+
+    def _target_score(fx: Fixture, target_wins: bool) -> Tuple[int, int]:
+        win, lose = (big, 0)
+        if (fx.home == target_team_id) == target_wins:
+            return win, lose
+        return lose, win
+
+    def _rank_when(rival_combo, target_wins: bool) -> int:
+        fxs = list(settled)
+        for fx in target_games:
+            hg, ag = _target_score(fx, target_wins)
+            fxs.append(replace(fx, home_goals=hg, away_goals=ag, status="done"))
+        for fx, outcome in zip(rival_games, rival_combo):
+            hg, ag = outcome
+            fxs.append(replace(fx, home_goals=hg, away_goals=ag, status="done"))
+        table = build_group_tables(group_teams, fxs, include_live)[team.group]
+        return next(r.rank for r in table if r.team_id == target_team_id)
+
+    # Every way a rival-vs-rival game can resolve, at extreme margins.
+    rival_outcomes = [(big, 0), (0, 0), (0, big)]
+    combos = list(itertools.product(rival_outcomes, repeat=len(rival_games)))
+
+    # Guaranteed through: even in the worst case (target loses everything heavily,
+    # rivals win heavily), is the target still top two?
+    worst_rank = max(_rank_when(combo, target_wins=False) for combo in combos)
+    if worst_rank <= 2:
+        return "through"
+
+    # Eliminated: even in the best case (target wins everything heavily), is the
+    # target still 4th — unable to even be a third-placed team?
+    best_rank = min(_rank_when(combo, target_wins=True) for combo in combos)
+    if best_rank >= 4:
+        return "eliminated"
+
+    return "open"
 
 
 # ── simulation ───────────────────────────────────────────────────────────────

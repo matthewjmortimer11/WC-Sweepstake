@@ -409,6 +409,56 @@ def test_simulate_fixture_outcome_is_pure():
     assert sim_fx.home_goals == 5 and sim_fx.status == "done"
 
 
+def test_certainty_clinched_top_two():
+    """Two early wins and the maths can't drop the target below 2nd → through."""
+    from qualification.engine import assess_group_certainty
+    teams = _four("C", ["SCO", "BRA", "MAR", "HAI"])
+    fixtures = [
+        _done("c1", "C", "SCO", "HAI", 3, 0),   # SCO win
+        _done("c2", "C", "SCO", "MAR", 2, 0),   # SCO win → 6 pts, +5
+        _done("c3", "C", "BRA", "HAI", 1, 0),
+        _done("c4", "C", "BRA", "MAR", 1, 0),   # BRA 6 pts
+        _upcoming("c5", "C", "SCO", "BRA"),     # SCO's last game
+        _upcoming("c6", "C", "MAR", "HAI"),     # MAR/HAI can reach at most 3 + 3
+    ]
+    # MAR and HAI can finish on 3 pts at best → can't catch SCO's 6. SCO are through
+    # even if they lose to BRA heavily.
+    assert assess_group_certainty(teams, fixtures, "SCO") == "through"
+
+
+def test_certainty_eliminated_when_stuck_bottom():
+    """The other three are all above the target on points and can't be caught even
+    by a big win → the target is locked into 4th and can't even be a third."""
+    from qualification.engine import assess_group_certainty
+    teams = _four("C", ["SCO", "BRA", "MAR", "HAI"])
+    fixtures = [
+        _done("c1", "C", "MAR", "SCO", 1, 0),   # SCO lost
+        _done("c2", "C", "HAI", "SCO", 1, 0),   # SCO lost → 0 pts, 2 games gone
+        _done("c3", "C", "BRA", "MAR", 1, 0),
+        _done("c4", "C", "BRA", "HAI", 1, 1),
+        _done("c5", "C", "MAR", "HAI", 1, 0),
+        _upcoming("c6", "C", "BRA", "SCO"),     # SCO's last game (vs BRA)
+    ]
+    # Before the last game: MAR 6, BRA 4, HAI 4, SCO 0. Even winning 9-0 SCO reach
+    # only 3 — below all three. Guaranteed 4th → can't even be a third place team.
+    assert assess_group_certainty(teams, fixtures, "SCO") == "eliminated"
+
+
+def test_certainty_open_when_still_in_play():
+    from qualification.engine import assess_group_certainty
+    teams, fixtures = _group_c_complete()
+    # Replace the last game with an unplayed one so the group isn't settled.
+    fixtures = fixtures[:-1] + [_upcoming("c6", "C", "SCO", "HAI")]
+    assert assess_group_certainty(teams, fixtures, "SCO") == "open"
+
+
+def test_certainty_matches_finished_group():
+    from qualification.engine import assess_group_certainty
+    teams, fixtures = _group_c_complete()       # SCO finish 3rd, group done
+    # 3rd in a finished group depends on other groups → open (not group-decided).
+    assert assess_group_certainty(teams, fixtures, "SCO") == "open"
+
+
 def test_target_team_must_exist():
     teams, fixtures = _group_c_complete()
     with pytest.raises(ValueError):

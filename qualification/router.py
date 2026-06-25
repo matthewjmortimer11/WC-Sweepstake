@@ -232,6 +232,10 @@ def _serialise_impact(i: projection.GameImpact, target_name: str) -> Dict[str, A
     }
 
 
+def _kickoff_key(f: Dict[str, Any]) -> str:
+    return (f.get("dateISO") or "") + "T" + (f.get("time") or "00:00")
+
+
 def _serialise_result(f: Dict[str, Any]) -> Dict[str, Any]:
     score = f.get("score") or [None, None]
     return {
@@ -243,7 +247,9 @@ def _serialise_result(f: Dict[str, Any]) -> Dict[str, Any]:
         "homeGoals": score[0],
         "awayGoals": score[1],
         "status": f.get("status"),
+        "live": f.get("status") in ("live", "halfTime"),
         "dateLabel": f.get("dateLabel"),
+        "kickoff": _kickoff_key(f),
     }
 
 
@@ -298,15 +304,28 @@ def _build_payload(target: str) -> Dict[str, Any]:
         teams, fixtures, target_team_id=target, cutoff=cutoff, ratings=_RATINGS
     )
 
+    # Exact certainty from the target's own group (overrides the estimate when the
+    # maths is settled): clinched top two, or can't even reach third.
+    certainty = engine.assess_group_certainty(teams, fixtures, target_team_id=target)
+    if certainty == "through":
+        chance_pct, decided, guaranteed = 100, True, True
+    elif certainty == "eliminated":
+        chance_pct, decided, guaranteed = 0, True, True
+    else:
+        chance_pct, decided, guaranteed = round(proj.chance * 100), proj.decided, False
+
     # Group games with a score to show: completed plus any in-progress (live /
-    # half-time), so the results board reflects what's happening right now.
+    # half-time), newest first — so the board shows what's just happened / live.
     results = [
         f for f in rows
         if f.get("stage") == "group"
         and f.get("status") in ("done", "live", "halfTime")
         and isinstance(f.get("score"), (list, tuple))
     ]
-    results.sort(key=lambda f: (f.get("group") or "~", f.get("matchday") or 0))
+    results.sort(
+        key=lambda f: (f.get("status") in ("live", "halfTime"), _kickoff_key(f)),
+        reverse=True,
+    )
     games_total = sum(1 for f in rows if f.get("stage") == "group")
     games_played = sum(
         1 for f in rows if f.get("stage") == "group" and f.get("status") == "done"
@@ -346,10 +365,12 @@ def _build_payload(target: str) -> Dict[str, Any]:
             "groupComplete": status.group_complete,
             "state": status.status,
             "headline": status.headline,
+            "certainty": certainty,
         },
         "chance": {
-            "percent": round(proj.chance * 100),
-            "decided": proj.decided,
+            "percent": chance_pct,
+            "decided": decided,
+            "guaranteed": guaranteed,
             "trials": proj.trials,
         },
         "thirdPlaceTable": [_serialise_third(s, target, played_by) for s in thirds],
