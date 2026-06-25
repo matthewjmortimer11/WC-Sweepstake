@@ -21,7 +21,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 import sync
 from wc_data import generate_wc_data
 
-from . import engine
+from . import engine, projection
 from .engine import Fixture, Team
 
 router = APIRouter()
@@ -109,11 +109,14 @@ def _team_card(team_id: str) -> Dict[str, Any]:
     return {"id": team_id, "name": meta.get("name", team_id), "flag": meta.get("flag", "")}
 
 
-def _serialise_third(s: engine.ThirdPlaceStanding, target: str) -> Dict[str, Any]:
+def _serialise_third(
+    s: engine.ThirdPlaceStanding, target: str, played_by: Dict[str, int]
+) -> Dict[str, Any]:
     card = _team_card(s.team_id)
     return {
         **card,
         "group": s.group,
+        "played": played_by.get(s.team_id),
         "points": s.points,
         "goalDifference": s.goal_difference,
         "goalsFor": s.goals_for,
@@ -141,15 +144,60 @@ def _serialise_group_row(s: engine.GroupStanding, target: str) -> Dict[str, Any]
     }
 
 
-def _serialise_requirement(r: engine.ScenarioRequirement) -> Dict[str, Any]:
+def _impact_text(i: projection.GameImpact, target_name: str) -> str:
+    """A one-line steer on what result the target wants from this game."""
+    home = _team_card(i.home)["name"]
+    away = _team_card(i.away)["name"]
+    rates = {"home": i.chance_if_home_win, "draw": i.chance_if_draw, "away": i.chance_if_away_win}
+    best = max(rates.values())
+    worst = min(rates.values())
+    # Outcomes within 4 points of the best are "good"; the clearly-lowest is "bad".
+    good = {k for k, v in rates.items() if v >= best - 0.04}
+    if "home" not in good and "draw" in good and "away" in good:
+        return f"{home} to avoid winning"
+    if "away" not in good and "draw" in good and "home" in good:
+        return f"{away} to avoid winning"
+    if good == {"home"}:
+        return f"{home} to win"
+    if good == {"away"}:
+        return f"{away} to win"
+    if good == {"draw"}:
+        return f"{home} and {away} to draw"
+    if good == {"home", "draw"}:
+        return f"{home} to avoid defeat"
+    if good == {"away", "draw"}:
+        return f"{away} to avoid defeat"
+    return "result barely matters"
+
+
+def _serialise_impact(i: projection.GameImpact, target_name: str) -> Dict[str, Any]:
     return {
-        "fixtureId": r.fixture_id,
-        "group": r.group,
-        "home": _team_card(r.home),
-        "away": _team_card(r.away),
-        "text": r.text,
-        "bandKind": r.band.kind,
-        "combine": r.combine,
+        "fixtureId": i.fixture_id,
+        "group": i.group,
+        "home": _team_card(i.home),
+        "away": _team_card(i.away),
+        "chanceIfHomeWin": round(i.chance_if_home_win * 100),
+        "chanceIfDraw": round(i.chance_if_draw * 100),
+        "chanceIfAwayWin": round(i.chance_if_away_win * 100),
+        "swing": round(i.swing * 100),
+        "favouredOutcome": i.favoured_outcome,
+        "wants": _impact_text(i, target_name),
+        "matters": i.matters,
+    }
+
+
+def _serialise_result(f: Dict[str, Any]) -> Dict[str, Any]:
+    score = f.get("score") or [None, None]
+    return {
+        "fixtureId": f.get("id"),
+        "group": f.get("group"),
+        "matchday": f.get("matchday"),
+        "home": _team_card(f.get("a")),
+        "away": _team_card(f.get("b")),
+        "homeGoals": score[0],
+        "awayGoals": score[1],
+        "status": f.get("status"),
+        "dateLabel": f.get("dateLabel"),
     }
 
 
@@ -196,9 +244,28 @@ def _build_payload(target: str) -> Dict[str, Any]:
     tables = engine.build_group_tables(teams, fixtures)
     status = engine.get_target_team_status(teams, fixtures, target_team_id=target, cutoff=cutoff)
     thirds = engine.rank_third_placed_teams(engine.get_third_placed_teams(tables), cutoff)
-    requirements = engine.calculate_what_target_needs(teams, fixtures, target_team_id=target, cutoff=cutoff)
+
+    # Monte-Carlo projection: the target's qualification chance and how each
+    # remaining game swings it. This is what makes the tracker answer the real
+    # question — which results elsewhere matter, and which way.
+    proj = projection.project(teams, fixtures, target_team_id=target, cutoff=cutoff)
+
+    # Group games with a score to show: completed plus any in-progress (live /
+    # half-time), so the results board reflects what's happening right now.
+    results = [
+        f for f in rows
+        if f.get("stage") == "group"
+        and f.get("status") in ("done", "live", "halfTime")
+        and isinstance(f.get("score"), (list, tuple))
+    ]
+    results.sort(key=lambda f: (f.get("group") or "~", f.get("matchday") or 0))
+    games_total = sum(1 for f in rows if f.get("stage") == "group")
+    games_played = sum(
+        1 for f in rows if f.get("stage") == "group" and f.get("status") == "done"
+    )
 
     target_group_rows = tables.get(status.group, [])
+    played_by = {row.team_id: row.played for grp in tables.values() for row in grp}
 
     # How much of the group stage is actually settled. The best-thirds table is
     # only final once all groups are complete; until then it's provisional and
@@ -232,9 +299,17 @@ def _build_payload(target: str) -> Dict[str, Any]:
             "state": status.status,
             "headline": status.headline,
         },
-        "thirdPlaceTable": [_serialise_third(s, target) for s in thirds],
+        "chance": {
+            "percent": round(proj.chance * 100),
+            "decided": proj.decided,
+            "trials": proj.trials,
+        },
+        "thirdPlaceTable": [_serialise_third(s, target, played_by) for s in thirds],
         "targetGroupTable": [_serialise_group_row(s, target) for s in target_group_rows],
-        "requirements": [_serialise_requirement(r) for r in requirements],
+        "remainingGames": [_serialise_impact(i, status.name) for i in proj.impacts],
+        "results": [_serialise_result(f) for f in results],
+        "gamesPlayed": games_played,
+        "gamesTotal": games_total,
         "meta": _data_freshness(rows),
         "generatedAt": datetime.now(tz=timezone.utc).isoformat(),
     }
