@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import math
 import statistics
+from dataclasses import replace
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -325,6 +326,21 @@ def _build_payload(target: str) -> Dict[str, Any]:
     else:
         chance_pct, decided, guaranteed = round(proj.chance * 100), proj.decided, False
 
+    # "As it stands": if the in-progress games ended at their current score right
+    # now, what would the chance be? We lock the live scores as final and project
+    # from there. Only meaningful while something is live and not already decided.
+    live_ids = {
+        f.id for f in fixtures
+        if f.status in ("live", "halfTime") and f.home_goals is not None and f.away_goals is not None
+    }
+    as_it_stands = None
+    if live_ids and not guaranteed:
+        locked = [replace(f, status="done") if f.id in live_ids else f for f in fixtures]
+        proj_now = projection.project(
+            teams, locked, target_team_id=target, cutoff=cutoff, ratings=_RATINGS, trials=6000
+        )
+        as_it_stands = round(proj_now.chance * 100)
+
     # Group games with a score to show: completed plus any in-progress (live /
     # half-time), newest first — so the board shows what's just happened / live.
     results = [
@@ -383,6 +399,8 @@ def _build_payload(target: str) -> Dict[str, Any]:
             "decided": decided,
             "guaranteed": guaranteed,
             "trials": proj.trials,
+            "asItStands": as_it_stands,
+            "hasLive": bool(live_ids),
         },
         "thirdPlaceTable": [_serialise_third(s, target, played_by) for s in thirds],
         "targetGroupTable": [_serialise_group_row(s, target) for s in target_group_rows],

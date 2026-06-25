@@ -70,6 +70,10 @@
   .verdict.good .gauge span { background: #6ff0a6; } .verdict.warn .gauge span { background: var(--warn); } .verdict.bad .gauge span { background: var(--bad); }
   .verdict .mean { margin: 14px 4px 0; font-size: 14.5px; color: #e7eeff; line-height: 1.5; }
   .verdict .tiny { margin-top: 10px; font-size: 11px; color: #9fb4d8; line-height: 1.45; }
+  .verdict .ais { margin: 13px auto 0; max-width: 360px; background: rgba(255,255,255,.10);
+    border: 1px solid rgba(110,160,255,.45); border-radius: 12px; padding: 9px 12px; font-size: 13.5px; color: #eaf1ff; }
+  .verdict .ais b { font-size: 16px; }
+  .verdict .ais span { display: block; margin-top: 3px; font-size: 11px; color: #bcccea; }
 
   /* ── Cards & explainers ──────────────────────────────────────────── */
   section.card {
@@ -104,6 +108,7 @@
   ul.needs { list-style: none; margin: 0; padding: 0; }
   ul.needs > li { padding: 14px 4px; border-top: 1px solid rgba(31,50,98,.6); }
   ul.needs > li:first-child { border-top: none; }
+  ul.needs > li.live { border-left: 3px solid var(--bad); padding-left: 10px; background: rgba(224,85,107,.05); border-radius: 0 8px 8px 0; }
   .need-teams { font-size: 15px; font-weight: 700; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
   .need-teams .v { color: var(--muted); font-weight: 500; }
   .need-teams .grp { color: var(--muted); font-size: 11px; border: 1px solid var(--line); border-radius: 5px; padding: 1px 6px; font-weight: 600; }
@@ -315,6 +320,11 @@
         '<div class="big">' + c.percent + '<span>%</span></div>' +
         '<div class="biglab">' + esc(lab) + '</div>' +
         '<div class="gauge"><span style="width:' + c.percent + '%"></span></div>' +
+        (c.asItStands != null
+          ? '<div class="ais">🔵 If the live score' + (d.meta && d.meta.live ? "s" : "") +
+              ' froze right now, it would be <b>' + c.asItStands + '%</b>' +
+              '<span>The big number already allows for those games finishing — live scores can still change.</span></div>'
+          : "") +
         '<div class="mean">' + standing(s, esc(s.name), (d.gamesPlayed || 0) > 0) + '</div>' +
         '<div class="tiny">' + esc(tiny) + '</div>' +
       '</section>';
@@ -339,15 +349,18 @@
 
   function renderNeeds(d) {
     el("needTitle").textContent = "⚽ What do " + d.targetName + " need?";
-    // In the order they're played (live first, then soonest kick-off first).
-    var games = (d.remainingGames || []).filter(function (g) { return g.matters; });
-    games.sort(function (a, b) { return (a.kickoff || "").localeCompare(b.kickoff || ""); });
-    // Always show EVERY live game that matters (you're watching them now), then
-    // the next upcoming games in kick-off order.
-    var liveGames = games.filter(function (g) { return g.live; });
-    var upcoming = games.filter(function (g) { return !g.live; });
+    var all = d.remainingGames || [];
+    // Show EVERY game in progress right now (you're watching them — even if the
+    // effect is small), most influential first; then the next upcoming games that
+    // matter, in kick-off order.
+    var liveGames = all.filter(function (g) { return g.live; })
+      .sort(function (a, b) { return (b.swing || 0) - (a.swing || 0); });
+    // Upcoming games worth listing have a clear preferred result (not "any").
+    var upcoming = all.filter(function (g) {
+      return !g.live && g.matters && (g.goodOutcomes || []).length < 3;
+    }).sort(function (a, b) { return (a.kickoff || "").localeCompare(b.kickoff || ""); });
     var shown = liveGames.concat(upcoming.slice(0, Math.max(3, 6 - liveGames.length)));
-    var moreMatter = games.length - shown.length;   // affect them, just smaller
+    var moreMatter = upcoming.length - (shown.length - liveGames.length);
     var list = el("needList"), foot = el("needFoot"), help = el("needHelp");
 
     if (d.chance && d.chance.decided) {
@@ -380,7 +393,7 @@
       var hn = esc(g.home.name), an = esc(g.away.name);
       var good = g.goodOutcomes || [];
       var meh = g.wants === "result barely matters" || g.wants === "the result barely matters";
-      return '<li>' +
+      return '<li' + (g.live ? ' class="live"' : '') + '>' +
           '<div class="need-teams">' +
             '<span>' + esc(g.home.flag) + ' ' + hn + '</span>' +
             '<span class="v">v</span>' +
