@@ -1015,11 +1015,16 @@ from dial import router as dial_router  # noqa: E402
 from imposter import router as imposter_router  # noqa: E402
 from whoami import router as whoami_router  # noqa: E402
 
+# Qualification tracker — a Wheesht extension served from /qualification. Reuses
+# the existing fixture data layer (sync.fixture_cache); see qualification/.
+from qualification.router import router as qualification_router  # noqa: E402
+
 app.include_router(cipher_router)
 app.include_router(dial_router)
 app.include_router(imposter_router)
 app.include_router(charades_router)
 app.include_router(whoami_router)
+app.include_router(qualification_router)
 
 _GAMES_TEMPLATE = Path("templates/games.html")
 
