@@ -33,12 +33,14 @@
 
   function LeftPanel() {
     var meta = (window.WC && window.WC.meta) || {};
-    var pot = (window.WC && window.WC.POT) || 0;
+    var split = (Ss && Ss.charitySplit) ? Ss.charitySplit() : ((window.WC && window.WC.meta && window.WC.meta.charitySplit != null) ? window.WC.meta.charitySplit : 0.5);
+    var pot = (Ss && Ss.pot) ? Ss.pot() : (((window.WC && window.WC.POT) || 0) * (1 - split));
+    var potLabel = split > 0.99 ? 'to charity' : 'winner fund';
     return h('div', { className: 'sp' },
       h('div', { className: 'sp-kicker' }, 'The Office Sweepstake'),
       h('div', { className: 'sp-title' }, 'World Cup 2026'),
       h('div', { className: 'sp-pot' }, money(pot)),
-      h('div', { className: 'sp-pot__l' }, 'in the pot'),
+      h('div', { className: 'sp-pot__l' }, potLabel),
       h('div', { className: 'sp-stats' },
         h(Stat, { value: meta.stillIn != null ? meta.stillIn : '—', label: 'still in' }),
         h(Stat, { value: meta.out != null ? meta.out : '—', label: 'out' }),

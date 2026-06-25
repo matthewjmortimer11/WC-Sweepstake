@@ -46,6 +46,58 @@ def test_group_bottom_eliminated_when_group_complete():
     assert by["A4"]["alive"] is False
 
 
+def test_group_winner_stays_alive_when_knockout_bracket_incomplete():
+    """A lone later-round fixture must not knock out group winners whose R32 tie
+    is not in the feed yet (the Brazil false-elimination bug)."""
+    teams = [_team("BRA", "D"), _team("D2", "D"), _team("D3", "D"), _team("D4", "D")]
+    fixtures = [
+        _fx("BRA", "D2", group="D", score=[2, 0]),
+        _fx("BRA", "D3", group="D", score=[3, 0]),
+        _fx("BRA", "D4", group="D", score=[1, 0]),
+        _fx("D2", "D3", group="D", score=[1, 1]),
+        _fx("D2", "D4", group="D", score=[2, 0]),
+        _fx("D3", "D4", group="D", score=[1, 0]),
+        _fx("X1", "X2", stage="r16", score=[1, 0]),
+    ]
+    out = standings.compute_team_status(teams, fixtures, LADDER)
+    by = {t["code"]: t for t in out}
+    assert by["BRA"]["alive"] is True
+    assert by["D4"]["alive"] is False
+
+
+def _full_r32_bracket(teams_codes):
+    """Build 16 R32 ties covering 32 distinct team codes."""
+    fixtures = []
+    for i in range(0, 32, 2):
+        a, b = teams_codes[i], teams_codes[i + 1]
+        # Home team wins each tie by default.
+        fixtures.append(_fx(a, b, stage="r32", score=[1, 0]))
+    return fixtures
+
+
+def test_group_straggler_out_once_opening_bracket_complete():
+    """Once all 16 R32 ties exist, a team that never appears is out."""
+    # Put T01 as home in the last tie so they advance.
+    ko_codes = [f"K{i:02d}" for i in range(1, 31)] + ["T01", "K31"]
+    teams = [_team(f"T{i:02d}", "A") for i in range(1, 5)]
+    teams += [_team(f"T{i:02d}", "B") for i in range(5, 9)]
+    teams += [_team(c, "Z") for c in ko_codes if c.startswith("K")]
+    ga = [
+        _fx("T01", "T02", group="A", score=[3, 0]),
+        _fx("T01", "T03", group="A", score=[3, 0]),
+        _fx("T01", "T04", group="A", score=[3, 0]),
+        _fx("T02", "T03", group="A", score=[1, 1]),
+        _fx("T02", "T04", group="A", score=[2, 0]),
+        _fx("T03", "T04", group="A", score=[1, 0]),
+    ]
+    fixtures = ga + _full_r32_bracket(ko_codes)
+    out = standings.compute_team_status(teams, fixtures, LADDER)
+    by = {t["code"]: t for t in out}
+    assert by["T01"]["alive"] is True
+    assert by["T01"]["stage"] == "r32"
+    assert by["T04"]["alive"] is False
+
+
 def test_grade_winner_prediction_when_champion_known():
     teams = [
         {**_team("WIN"), "stage": "winner", "alive": True, "rounds": 6},

@@ -512,7 +512,11 @@ function TrackerScreen(){
   else if(filter==='London'||filter==='Edinburgh') list=list.filter(p=>(p.location||p.city)===filter);
   else if(filter==='lt') list=list.filter(p=>p.ltMember||p.leadership);
   if(includeDept && dept) list=list.filter(p=>p.department===dept);
-  list.sort((a,b)=>{ if(a.id===youId)return -1; if(b.id===youId)return 1; return (WC.TEAMS[b.team]||{rounds:0}).rounds-(WC.TEAMS[a.team]||{rounds:0}).rounds; });
+  list.sort((a,b)=>{
+    if(a.id===youId)return -1; if(b.id===youId)return 1;
+    if(a.alive!==b.alive) return a.alive?-1:1;
+    return (WC.TEAMS[b.team]||{rounds:0}).rounds-(WC.TEAMS[a.team]||{rounds:0}).rounds;
+  });
   const stillIn = P.filter(p=>p.alive).length;
   const filtersShown = pre ? filters.filter(f=>f[0]!=='out') : filters;
   function selectPerson(p, open) {

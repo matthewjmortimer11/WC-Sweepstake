@@ -767,6 +767,7 @@ def _league_state(league: League, league_people: List[Dict[str, Any]], admin: Di
     meta.update(_fixture_health(fixtures))
     data["meta"] = meta
     data["pot"] = len(people) * fee
+    data["charitySplit"] = meta["charitySplit"]
     return data
 
 

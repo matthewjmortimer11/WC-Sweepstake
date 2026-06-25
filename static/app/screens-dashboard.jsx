@@ -83,6 +83,9 @@ function dashPickComplete(m, picks) {
 
 function overallRank(me) {
   const rows = Sd.allSync().slice().sort((a, b) => {
+    // Alive entrants always rank above eliminated ones, regardless of how far
+    // their team progressed before going out.
+    if (a.alive !== b.alive) return a.alive ? -1 : 1;
     const ta = dashTeam(a.team), tb = dashTeam(b.team);
     if (tb.rounds !== ta.rounds) return tb.rounds - ta.rounds;
     const oa = parseInt(String(ta.odds || '0').replace(/[^0-9]/g, ''), 10);
