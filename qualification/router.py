@@ -74,6 +74,10 @@ def _base_fixtures() -> List[Dict[str, Any]]:
     return sync.fixture_cache if sync.fixture_cache else generate_wc_data()["fixtures"]
 
 
+def _group_done_count(group: str, fixtures: List[Fixture]) -> int:
+    return sum(1 for f in fixtures if f.group == group and f.status == "done")
+
+
 def _engine_fixtures(rows: List[Dict[str, Any]]) -> List[Fixture]:
     out: List[Fixture] = []
     for f in rows:
@@ -196,10 +200,22 @@ def _build_payload(target: str) -> Dict[str, Any]:
 
     target_group_rows = tables.get(status.group, [])
 
+    # How much of the group stage is actually settled. The best-thirds table is
+    # only final once all groups are complete; until then it's provisional and
+    # the UI says so (a third on 3 pts can look "in" simply because rival groups
+    # haven't kicked off yet).
+    all_groups = {t.group for t in teams}
+    groups_complete = sum(
+        1 for g in all_groups if _group_done_count(g, fixtures) >= engine._GROUP_GAMES
+    )
+
     return {
         "target": target,
         "targetName": status.name,
         "cutoff": cutoff,
+        "groupsComplete": groups_complete,
+        "groupsTotal": len(all_groups),
+        "provisional": groups_complete < len(all_groups),
         "status": {
             "teamId": status.team_id,
             "name": status.name,

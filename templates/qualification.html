@@ -162,7 +162,7 @@
   </main>
 
   <section class="card" id="thirds-card" hidden>
-    <h2>Best third-placed teams <small>top <span id="cutoffLabel">8</span> advance</small></h2>
+    <h2>Best third-placed teams <small id="thirdsNote">top <span id="cutoffLabel">8</span> advance</small></h2>
     <div class="card-body">
       <table>
         <thead>
@@ -246,6 +246,9 @@
 
   function renderThirds(d) {
     el("cutoffLabel").textContent = d.cutoff;
+    el("thirdsNote").innerHTML = d.provisional
+      ? ('provisional · ' + d.groupsComplete + '/' + d.groupsTotal + ' groups final')
+      : ('final · top ' + d.cutoff + ' advance');
     var rows = d.thirdPlaceTable || [];
     var html = "";
     rows.forEach(function (t, i) {
@@ -282,21 +285,31 @@
       list.innerHTML = '<li class="empty">' + esc(d.targetName) +
         ' are already through — nothing left to depend on. 🎉</li>';
     } else if (!reqs.length) {
-      var msg = (st === "eliminated")
-        ? esc(d.targetName) + " can no longer qualify."
-        : "No results elsewhere change " + esc(d.targetName) +
-          "'s position right now — they hold their own fate.";
+      var nm = esc(d.targetName);
+      var msg;
+      if (st === "eliminated") {
+        msg = nm + " can no longer qualify.";
+      } else if (st === "third_out") {
+        msg = nm + " are outside the top 8 and need a combination of other " +
+          "results to go their way — no single match turns it around.";
+      } else if (st === "third_in") {
+        msg = nm + " hold a qualifying place and no single result elsewhere " +
+          "changes that right now.";
+      } else {
+        msg = nm + "'s own remaining games come first — results elsewhere don't " +
+          "matter until they reach the third-place places.";
+      }
       list.innerHTML = '<li class="empty">' + msg + '</li>';
     } else {
       list.innerHTML = reqs.map(function (r, i) {
-        var and = i > 0 ? '<span class="andtag">AND</span>' : '';
+        var and = i > 0 ? '<span class="andtag">AND</span> ' : '';
         var sub = (r.home.name && r.away.name)
           ? (esc(r.home.flag) + " " + esc(r.home.name) + " v " + esc(r.away.name) + " " + esc(r.away.flag) +
              (r.group ? " · Group " + esc(r.group) : ""))
           : "";
         return '<li class="req">' +
             '<span class="tick">✓</span>' +
-            '<span><span class="rtext">' + esc(r.text) + and + '</span>' +
+            '<span><span class="rtext">' + and + esc(r.text) + '</span>' +
             (sub ? '<span class="rmeta">' + sub + '</span>' : '') + '</span>' +
           '</li>';
       }).join("");

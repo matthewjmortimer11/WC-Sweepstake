@@ -311,6 +311,32 @@ def test_live_score_flips_qualification_status():
 
 # ── simulate_fixture_outcome purity ──────────────────────────────────────────
 
+def test_third_out_does_not_list_unhelpful_fixtures():
+    """A team just outside the cut must not get a checklist of 'no result helps'
+    lines — fixtures that can't single-handedly help are dropped, not listed."""
+    teams, fixtures = _group_c_complete()           # SCO third, 3 pts
+    # Eight stronger thirds (4 pts each) push Scotland to 9th, plus a pending
+    # dead-rubber in each of those groups that cannot rescue Scotland alone.
+    for i in range(8):
+        g = chr(ord("D") + i)
+        codes = [f"{g}W", f"{g}R", f"{g}T", f"{g}B"]
+        teams += _four(g, codes)
+        fixtures += [
+            _done(f"{g}1", g, codes[0], codes[3], 3, 0),
+            _done(f"{g}2", g, codes[0], codes[1], 1, 0),
+            _done(f"{g}3", g, codes[0], codes[2], 1, 0),
+            _done(f"{g}4", g, codes[1], codes[2], 1, 1),
+            _done(f"{g}5", g, codes[1], codes[3], 1, 0),
+            _done(f"{g}6", g, codes[2], codes[3], 2, 0),  # third on 4 pts
+            _upcoming(f"{g}p", g, codes[0], codes[1]),    # cannot help Scotland alone
+        ]
+    status = get_target_team_status(teams, fixtures, "SCO")
+    assert status.status == "third_out"
+    reqs = calculate_what_target_needs(teams, fixtures, "SCO")
+    assert all(r.band.kind != "none" for r in reqs)
+    assert not any("no realistic result" in r.text.lower() for r in reqs)
+
+
 def test_simulate_fixture_outcome_is_pure():
     teams, fixtures = _group_c_complete()
     upcoming = fixtures[:-1] + [_upcoming("c6", "C", "SCO", "HAI")]

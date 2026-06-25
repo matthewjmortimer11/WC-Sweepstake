@@ -601,8 +601,14 @@ def calculate_what_target_needs(
             continue
         grid = calculate_relevant_score_bands(teams, fixtures, fx.id, target_team_id, cutoff)
         band = _collapse_band(grid)
-        if band.kind == "any":
-            continue                       # this match can't change the target's fate
+        # "any"  → every result of this match keeps the target's fate unchanged.
+        # "none" → no result of this match alone helps (the target needs other
+        #          things to fall into place first). Neither is an actionable
+        #          single-match requirement, so don't list it — otherwise a team
+        #          just outside the cut gets a checklist full of "no result
+        #          helps" lines. The headline/status already conveys the bind.
+        if band.kind in ("any", "none"):
+            continue
         text = explain_requirement(band, name_of.get(fx.home, fx.home), name_of.get(fx.away, fx.away))
         requirements.append(
             ScenarioRequirement(
@@ -659,5 +665,7 @@ def _interval_text(band: Band, home_name: str, away_name: str) -> str:
             return f"{home_name} to win by exactly {lo}"
         return f"{home_name} to win by {lo}–{hi}"
     if hi <= -1:                           # lose by |hi|..|lo|
+        if lo == hi:
+            return f"{home_name} to lose by exactly {-lo}"
         return f"{home_name} to lose by {-hi}–{-lo}"
     return f"{home_name} v {away_name}: result between {lo:+d} and {hi:+d} goals"
