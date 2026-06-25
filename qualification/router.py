@@ -212,10 +212,13 @@ def _impact_read(i: projection.GameImpact) -> tuple:
     return text, sorted(good)
 
 
-def _serialise_impact(i: projection.GameImpact, target_name: str) -> Dict[str, Any]:
+def _serialise_impact(
+    i: projection.GameImpact, target_name: str, row: Optional[Dict[str, Any]] = None
+) -> Dict[str, Any]:
     home = _team_card(i.home)
     away = _team_card(i.away)
     text, good = _impact_read(i)
+    row = row or {}
     return {
         "fixtureId": i.fixture_id,
         "group": i.group,
@@ -229,6 +232,12 @@ def _serialise_impact(i: projection.GameImpact, target_name: str) -> Dict[str, A
         "goodOutcomes": good,
         "wants": text.format(home=home["name"], away=away["name"]),
         "matters": i.matters,
+        # When the game is — so the UI can order chronologically and show the time.
+        "kickoff": _kickoff_key(row),
+        "dateLabel": row.get("dateLabel"),
+        "time": row.get("time"),
+        "status": row.get("status", "upcoming"),
+        "live": row.get("status") in ("live", "halfTime"),
     }
 
 
@@ -249,6 +258,7 @@ def _serialise_result(f: Dict[str, Any]) -> Dict[str, Any]:
         "status": f.get("status"),
         "live": f.get("status") in ("live", "halfTime"),
         "dateLabel": f.get("dateLabel"),
+        "time": f.get("time"),
         "kickoff": _kickoff_key(f),
     }
 
@@ -291,6 +301,7 @@ def _build_payload(target: str) -> Dict[str, Any]:
 
     rows = _base_fixtures()
     fixtures = _engine_fixtures(rows)
+    row_by_id = {str(f.get("id")): f for f in rows}
     cutoff = engine.DEFAULT_CUTOFF
 
     tables = engine.build_group_tables(teams, fixtures)
@@ -301,7 +312,7 @@ def _build_payload(target: str) -> Dict[str, Any]:
     # remaining game swings it. This is what makes the tracker answer the real
     # question — which results elsewhere matter, and which way.
     proj = projection.project(
-        teams, fixtures, target_team_id=target, cutoff=cutoff, ratings=_RATINGS
+        teams, fixtures, target_team_id=target, cutoff=cutoff, ratings=_RATINGS, trials=6000
     )
 
     # Exact certainty from the target's own group (overrides the estimate when the
@@ -375,7 +386,9 @@ def _build_payload(target: str) -> Dict[str, Any]:
         },
         "thirdPlaceTable": [_serialise_third(s, target, played_by) for s in thirds],
         "targetGroupTable": [_serialise_group_row(s, target) for s in target_group_rows],
-        "remainingGames": [_serialise_impact(i, status.name) for i in proj.impacts],
+        "remainingGames": [
+            _serialise_impact(i, status.name, row_by_id.get(i.fixture_id)) for i in proj.impacts
+        ],
         "results": [_serialise_result(f) for f in results],
         "gamesPlayed": games_played,
         "gamesTotal": games_total,
