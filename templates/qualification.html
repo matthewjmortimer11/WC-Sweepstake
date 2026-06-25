@@ -127,6 +127,48 @@
 
   .empty { color: var(--muted); font-size: 14px; padding: 8px 4px 4px; }
 
+  /* Chance block (hero) */
+  .chance { margin-top: 18px; }
+  .chance-num { font-size: 44px; font-weight: 800; line-height: 1; letter-spacing: -1px; }
+  .chance-num span { font-size: 22px; font-weight: 700; margin-left: 2px; }
+  .chance-lab { font-size: 12px; color: #cdddff; text-transform: uppercase; letter-spacing: .5px; margin-top: 3px; }
+  .chance-bar { height: 7px; border-radius: 999px; background: rgba(255,255,255,.14); margin-top: 9px; overflow: hidden; }
+  .chance-bar span { display: block; height: 100%; border-radius: 999px; background: #6ff0a6; transition: width .5s ease; }
+  .chance.warn .chance-num { color: #ffd98a; } .chance.warn .chance-bar span { background: var(--warn); }
+  .chance.bad .chance-num { color: #ff9fb0; } .chance.bad .chance-bar span { background: var(--bad); }
+  .chance.good .chance-num { color: #8ff5b6; }
+
+  /* Games that affect the target */
+  .affect-help { color: var(--muted); font-size: 12.5px; margin: 0 4px 12px; line-height: 1.5; }
+  .affect-foot { color: var(--muted); font-size: 12px; margin-top: 10px; padding: 4px; }
+  ul.impacts { list-style: none; margin: 0; padding: 0; }
+  ul.impacts li.impact { padding: 12px 4px; border-top: 1px solid rgba(31,50,98,.5); }
+  ul.impacts li.impact:first-child { border-top: none; }
+  .impact-head { display: flex; align-items: center; gap: 8px; font-size: 13.5px; }
+  .impact-head .ig { color: var(--muted); font-size: 11px; border: 1px solid var(--line); border-radius: 5px; padding: 1px 5px; }
+  .impact-head .iteams { font-weight: 600; flex: 1; }
+  .impact-head .iteams .v { color: var(--muted); font-weight: 400; }
+  .impact-head .swing { color: #9ec2ff; font-size: 12px; font-weight: 700; }
+  .want { font-size: 13px; color: #cdddff; margin: 7px 0 9px; }
+  .want b { color: var(--white); }
+  .bars { display: flex; flex-direction: column; gap: 5px; }
+  .ob { display: flex; align-items: center; gap: 9px; }
+  .ob-lab { width: 84px; font-size: 11.5px; color: var(--muted); text-align: right; flex: none; }
+  .ob-track { position: relative; flex: 1; height: 16px; background: var(--navy-700); border-radius: 5px; overflow: hidden; }
+  .ob-track span { display: block; height: 100%; background: #2a467f; border-radius: 5px; transition: width .4s ease; }
+  .ob-track em { position: absolute; right: 6px; top: 0; line-height: 16px; font-style: normal; font-size: 10.5px; color: var(--white); }
+  .ob.fav .ob-track span { background: var(--good); }
+  .ob.fav .ob-lab { color: var(--white); font-weight: 600; }
+
+  /* Results so far */
+  .resgrp { margin-bottom: 14px; }
+  .resgrp h3 { margin: 0 0 6px; font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; }
+  .res { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 8px; padding: 6px 4px; font-size: 13.5px; border-top: 1px solid rgba(31,50,98,.4); }
+  .res:first-of-type { border-top: none; }
+  .res .rh { text-align: left; } .res .ra { text-align: right; }
+  .res .rs { font-weight: 700; background: var(--navy-700); border-radius: 6px; padding: 2px 9px; font-variant-numeric: tabular-nums; }
+  .res.live .rs { background: rgba(224,85,107,.2); color: #ffb3c0; }
+
   /* Status banners */
   .banner {
     margin-top: 14px; border-radius: 12px; padding: 11px 14px; font-size: 13px;
@@ -161,22 +203,24 @@
     </section>
   </main>
 
+  <section class="card" id="affect-card" hidden>
+    <h2 id="affectTitle">Games that affect Scotland <small id="affectNote"></small></h2>
+    <div class="card-body">
+      <p class="affect-help" id="affectHelp"></p>
+      <ul class="impacts" id="impactList"></ul>
+      <div class="affect-foot" id="affectFoot"></div>
+    </div>
+  </section>
+
   <section class="card" id="thirds-card" hidden>
     <h2>Best third-placed teams <small id="thirdsNote">top <span id="cutoffLabel">8</span> advance</small></h2>
     <div class="card-body">
       <table>
         <thead>
-          <tr><th>Team</th><th>Pts</th><th>GD</th><th>GF</th><th></th></tr>
+          <tr><th>Team</th><th>Pl</th><th>Pts</th><th>GD</th><th>GF</th><th></th></tr>
         </thead>
         <tbody id="thirdsBody"></tbody>
       </table>
-    </div>
-  </section>
-
-  <section class="card" id="needs-card" hidden>
-    <h2 id="needsTitle">What Scotland need</h2>
-    <div class="card-body">
-      <ul class="checklist" id="needsList"></ul>
     </div>
   </section>
 
@@ -185,17 +229,25 @@
     <div class="card-body">
       <table>
         <thead>
-          <tr><th>Team</th><th>P</th><th>GD</th><th>Pts</th></tr>
+          <tr><th>Team</th><th>Pl</th><th>GD</th><th>Pts</th></tr>
         </thead>
         <tbody id="groupBody"></tbody>
       </table>
     </div>
   </section>
 
+  <section class="card" id="results-card" hidden>
+    <h2>Results so far <small id="resultsNote"></small></h2>
+    <div class="card-body">
+      <div id="resultsList"></div>
+    </div>
+  </section>
+
   <div class="updated" id="updated"></div>
   <footer class="note">
-    Tables are recomputed from match results, not taken from a feed. Third-placed
-    teams are ranked by points, then goal difference, goals scored and fair play.
+    Tables are recomputed from results, not taken from a feed. Qualification chance
+    and each game's impact come from simulating the remaining group games many
+    times, assuming evenly-matched fixtures.
   </footer>
 </div>
 
@@ -225,9 +277,14 @@
   function renderHero(d) {
     var s = d.status;
     var p = pillFor(s.state);
+    var c = d.chance || { percent: 0, decided: false };
     var thirdLine = s.thirdPlaceRank
       ? ("#" + s.thirdPlaceRank + " of the third-placed teams")
       : (s.positionLabel || "—");
+    var chanceCls = c.percent >= 67 ? "good" : (c.percent >= 34 ? "warn" : "bad");
+    var chanceLabel = c.decided
+      ? (c.percent >= 50 ? "Qualified" : "Cannot qualify")
+      : "chance of qualifying";
     el("hero-mount").innerHTML =
       '<section class="hero" aria-live="polite">' +
         '<div class="flag">' + esc(s.flag || "🏴") + '</div>' +
@@ -235,6 +292,11 @@
         '<h1>' + esc(s.headline) + '</h1>' +
         '<p class="sub">Group ' + esc(s.group) + ' · ' + esc(s.positionLabel) +
           ' · ' + esc(thirdLine) + '</p>' +
+        '<div class="chance ' + chanceCls + '">' +
+          '<div class="chance-num">' + c.percent + '<span>%</span></div>' +
+          '<div class="chance-lab">' + esc(chanceLabel) + '</div>' +
+          '<div class="chance-bar"><span style="width:' + c.percent + '%"></span></div>' +
+        '</div>' +
         '<div class="statline">' +
           '<div class="stat"><b>' + s.points + '</b>points</div>' +
           '<div class="stat"><b>' + fmtGD(s.goalDifference) + '</b>goal diff</div>' +
@@ -259,6 +321,7 @@
             '<span class="teamcell"><span class="fl">' + esc(t.flag) + '</span>' +
             '<span><span class="nm">' + esc(t.name) + '</span> ' +
             '<span class="gp">Grp ' + esc(t.group) + '</span></span></span></td>' +
+          '<td>' + (t.played == null ? "–" : t.played) + '</td>' +
           '<td>' + t.points + '</td>' +
           '<td>' + fmtGD(t.goalDifference) + '</td>' +
           '<td>' + t.goalsFor + '</td>' +
@@ -266,55 +329,104 @@
             (t.qualifies ? "IN" : "OUT") + '</span></td>' +
         '</tr>';
       if (t.rank === d.cutoff) {
-        html += '<tr class="cutrow"><td colspan="5">— qualification cut line —</td></tr>';
+        html += '<tr class="cutrow"><td colspan="6">— qualification cut line —</td></tr>';
       }
     });
     if (!rows.length) {
-      html = '<tr><td colspan="5" class="empty">No completed groups yet — third-place table appears as results land.</td></tr>';
+      html = '<tr><td colspan="6" class="empty">No completed groups yet — third-place table appears as results land.</td></tr>';
     }
     el("thirdsBody").innerHTML = html;
     el("thirds-card").hidden = false;
   }
 
-  function renderNeeds(d) {
-    el("needsTitle").textContent = "What " + d.targetName + " need";
-    var reqs = d.requirements || [];
+  function outcomeBar(label, pct, favoured) {
+    var cls = "ob" + (favoured ? " fav" : "");
+    return '<div class="' + cls + '">' +
+        '<div class="ob-lab">' + esc(label) + '</div>' +
+        '<div class="ob-track"><span style="width:' + pct + '%"></span>' +
+          '<em>' + pct + '%</em></div>' +
+      '</div>';
+  }
+
+  function renderImpacts(d) {
+    el("affectTitle").textContent = "Games that affect " + d.targetName;
+    var games = d.remainingGames || [];
+    var matter = games.filter(function (g) { return g.matters; });
+    var shown = matter.slice(0, 10);
+    var rest = games.length - shown.length;
     var st = d.status.state;
-    var list = el("needsList");
-    if (st === "qualified") {
-      list.innerHTML = '<li class="empty">' + esc(d.targetName) +
-        ' are already through — nothing left to depend on. 🎉</li>';
-    } else if (!reqs.length) {
-      var nm = esc(d.targetName);
-      var msg;
-      if (st === "eliminated") {
-        msg = nm + " can no longer qualify.";
-      } else if (st === "third_out") {
-        msg = nm + " are outside the top 8 and need a combination of other " +
-          "results to go their way — no single match turns it around.";
-      } else if (st === "third_in") {
-        msg = nm + " hold a qualifying place and no single result elsewhere " +
-          "changes that right now.";
-      } else {
-        msg = nm + "'s own remaining games come first — results elsewhere don't " +
-          "matter until they reach the third-place places.";
-      }
-      list.innerHTML = '<li class="empty">' + msg + '</li>';
-    } else {
-      list.innerHTML = reqs.map(function (r, i) {
-        var and = i > 0 ? '<span class="andtag">AND</span> ' : '';
-        var sub = (r.home.name && r.away.name)
-          ? (esc(r.home.flag) + " " + esc(r.home.name) + " v " + esc(r.away.name) + " " + esc(r.away.flag) +
-             (r.group ? " · Group " + esc(r.group) : ""))
-          : "";
-        return '<li class="req">' +
-            '<span class="tick">✓</span>' +
-            '<span><span class="rtext">' + and + esc(r.text) + '</span>' +
-            (sub ? '<span class="rmeta">' + sub + '</span>' : '') + '</span>' +
-          '</li>';
-      }).join("");
+    var list = el("impactList");
+    var help = el("affectHelp");
+    var foot = el("affectFoot");
+
+    if (!games.length) {
+      help.textContent = (d.chance && d.chance.decided)
+        ? (st === "eliminated" || (d.chance.percent < 50)
+            ? d.targetName + " can no longer qualify — the group stage is over."
+            : d.targetName + " are through — the group stage is over.")
+        : "No group games left to play.";
+      list.innerHTML = "";
+      foot.textContent = "";
+      el("affect-card").hidden = false;
+      return;
     }
-    el("needs-card").hidden = false;
+
+    help.innerHTML = "Each bar is " + esc(d.targetName) +
+      "'s qualifying chance if that game ends in a home win, draw or away win. " +
+      "Sorted by how much the result swings things.";
+
+    list.innerHTML = shown.map(function (g) {
+      var hn = esc(g.home.name), an = esc(g.away.name);
+      return '<li class="impact">' +
+          '<div class="impact-head">' +
+            '<span class="ig">' + (g.group ? "Grp " + esc(g.group) : "") + '</span>' +
+            '<span class="iteams">' + esc(g.home.flag) + ' ' + hn +
+              ' <span class="v">v</span> ' + an + ' ' + esc(g.away.flag) + '</span>' +
+            '<span class="swing">±' + g.swing + '%</span>' +
+          '</div>' +
+          '<div class="want">Best for ' + esc(d.targetName) + ': <b>' + esc(g.wants) + '</b></div>' +
+          '<div class="bars">' +
+            outcomeBar(hn + " win", g.chanceIfHomeWin, g.favouredOutcome === "home") +
+            outcomeBar("Draw", g.chanceIfDraw, g.favouredOutcome === "draw") +
+            outcomeBar(an + " win", g.chanceIfAwayWin, g.favouredOutcome === "away") +
+          '</div>' +
+        '</li>';
+    }).join("");
+
+    if (!shown.length) {
+      list.innerHTML = '<li class="empty">No single remaining game moves ' +
+        esc(d.targetName) + "'s chances much — it comes down to the wider picture.</li>";
+    }
+    foot.textContent = rest > 0
+      ? ("+ " + rest + " more remaining game" + (rest === 1 ? "" : "s") + " with smaller or no impact.")
+      : "";
+    el("affect-card").hidden = false;
+  }
+
+  function renderResults(d) {
+    var res = d.results || [];
+    el("resultsNote").textContent = (d.gamesPlayed || 0) + " / " + (d.gamesTotal || 0) + " played";
+    if (!res.length) {
+      el("resultsList").innerHTML = '<p class="empty">No group games played yet.</p>';
+      el("results-card").hidden = false;
+      return;
+    }
+    var byGroup = {};
+    res.forEach(function (r) { (byGroup[r.group] = byGroup[r.group] || []).push(r); });
+    var html = Object.keys(byGroup).sort().map(function (g) {
+      var rows = byGroup[g].map(function (r) {
+        var live = r.status === "live" || r.status === "halfTime";
+        return '<div class="res' + (live ? " live" : "") + '">' +
+            '<span class="rh">' + esc(r.home.flag) + ' ' + esc(r.home.name) + '</span>' +
+            '<span class="rs">' + (r.homeGoals == null ? "–" : r.homeGoals) + ' : ' +
+              (r.awayGoals == null ? "–" : r.awayGoals) + '</span>' +
+            '<span class="ra">' + esc(r.away.name) + ' ' + esc(r.away.flag) + '</span>' +
+          '</div>';
+      }).join("");
+      return '<div class="resgrp"><h3>Group ' + esc(g) + '</h3>' + rows + '</div>';
+    }).join("");
+    el("resultsList").innerHTML = html;
+    el("results-card").hidden = false;
   }
 
   function renderGroup(d) {
@@ -353,9 +465,10 @@
     el("errBanner").hidden = true;
     el("subtitle").textContent = "World Cup 2026 · " + d.targetName + "'s third-place route";
     renderHero(d);
+    renderImpacts(d);
     renderThirds(d);
-    renderNeeds(d);
     renderGroup(d);
+    renderResults(d);
     renderFreshness(d);
     pollMs = (d.meta && d.meta.pollIntervalMs) || pollMs;
   }
