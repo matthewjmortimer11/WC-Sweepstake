@@ -80,11 +80,23 @@
   .explain { margin: 4px 18px 6px; color: var(--muted); font-size: 13px; line-height: 1.5; }
   .card-body { padding: 6px 14px 14px; }
 
-  .howto { margin-top: 16px; background: var(--navy-800); border: 1px solid var(--line); border-radius: 16px; padding: 14px 16px; }
-  .howto h2 { margin: 0 0 8px; font-size: 15px; font-weight: 800; }
-  .howto ul { margin: 0; padding-left: 4px; list-style: none; }
+  .howto { margin-top: 16px; background: var(--navy-800); border: 1px solid var(--line); border-radius: 16px; padding: 4px 16px; }
+  .howto > summary { cursor: pointer; padding: 12px 0; font-size: 14px; font-weight: 700; list-style: none; }
+  .howto > summary::-webkit-details-marker { display: none; }
+  .howto > summary::after { content: " ▾"; color: var(--muted); }
+  .howto[open] > summary::after { content: " ▴"; }
+  .howto ul { margin: 0 0 10px; padding-left: 2px; list-style: none; }
   .howto li { display: flex; gap: 10px; align-items: flex-start; font-size: 14px; margin: 7px 0; }
   .howto li .ic { flex: none; width: 22px; text-align: center; }
+
+  /* Live & just played */
+  .recent-row { display: grid; grid-template-columns: auto 1fr auto 1fr; align-items: center; gap: 8px; padding: 8px 4px; border-top: 1px solid rgba(31,50,98,.45); font-size: 14px; }
+  .recent-row:first-child { border-top: none; }
+  .recent-row .gtag { font-size: 10px; color: var(--muted); border: 1px solid var(--line); border-radius: 5px; padding: 1px 5px; font-weight: 700; }
+  .recent-row .rh { text-align: right; font-weight: 600; } .recent-row .ra { text-align: left; font-weight: 600; }
+  .recent-row .sc { font-weight: 800; background: var(--navy-700); border-radius: 6px; padding: 2px 9px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .recent-row.live .sc { background: rgba(224,85,107,.2); color: #ffb3c0; }
+  .recent-row .liveflag { color: var(--bad); font-weight: 800; font-size: 11px; }
 
   /* ── What Scotland need (per game) ───────────────────────────────── */
   ul.needs { list-style: none; margin: 0; padding: 0; }
@@ -183,15 +195,11 @@
     </section>
   </main>
 
-  <!-- How a team gets through (kid-simple) -->
-  <div class="howto" id="howto">
-    <h2>🏆 How do you get through?</h2>
-    <ul>
-      <li><span class="ic">①</span><span>Come <b>1st or 2nd</b> in your group of 4 → you go through. Easy.</span></li>
-      <li><span class="ic">②</span><span>Come <b>3rd</b>? You can still go through if you're one of the <b>8 best</b> teams that came 3rd (there are 12 groups).</span></li>
-      <li><span class="ic">🎯</span><span><b id="howtoTarget">Scotland</b> are chasing one of those spots.</span></li>
-    </ul>
-  </div>
+  <section class="card" id="recent-card" hidden>
+    <h2 id="recentTitle">🔴 Live &amp; just played</h2>
+    <p class="explain" id="recentNote"></p>
+    <div class="card-body"><div id="recentList"></div></div>
+  </section>
 
   <section class="card" id="need-card" hidden>
     <h2 id="needTitle">⚽ What do Scotland need?</h2>
@@ -218,12 +226,13 @@
     </div>
   </section>
 
-  <section class="card" id="results-card" hidden>
-    <h2>✅ Games already played <span id="resultsNote" style="font-size:13px;color:var(--muted);font-weight:600;"></span></h2>
-    <div class="card-body">
-      <div id="resultsList"></div>
-    </div>
-  </section>
+  <details class="howto" id="howto">
+    <summary>🏆 How do you get through? <span id="howtoTarget">Scotland</span>'s route — tap to read</summary>
+    <ul>
+      <li><span class="ic">①</span><span>Finish <b>1st or 2nd</b> in your group of 4 → straight through.</span></li>
+      <li><span class="ic">②</span><span>Finish <b>3rd</b>? You can still go through if you're one of the <b>8 best</b> 3rd-place teams (there are 12 groups).</span></li>
+    </ul>
+  </details>
 
   <div class="updated" id="updated"></div>
   <footer class="note" id="footnote"></footer>
@@ -247,9 +256,12 @@
   function verdict(d) {
     var c = d.chance || { percent: 0, decided: false };
     if (c.decided) {
-      return c.percent >= 50
-        ? { face: "🎉", word: "They're through!", cls: "good" }
-        : { face: "😢", word: "Out this time", cls: "bad" };
+      var thru = c.percent >= 50;
+      if (c.guaranteed)
+        return thru ? { face: "✅", word: "Guaranteed through!", cls: "good" }
+                    : { face: "❌", word: "Can't qualify", cls: "bad" };
+      return thru ? { face: "🎉", word: "They're through!", cls: "good" }
+                  : { face: "😢", word: "Out this time", cls: "bad" };
     }
     var p = c.percent;
     if (p >= 80) return { face: "😄", word: "Very likely!", cls: "good" };
@@ -279,11 +291,18 @@
     var s = d.status, c = d.chance || { percent: 0, decided: false };
     var v = verdict(d);
     var lab = c.decided ? "it's confirmed" : "chance of going through";
-    var tiny = c.decided
-      ? "The group stage is finished, so this is final."
-      : "This is our best guess from playing the rest of the tournament " +
+    var tiny;
+    if (c.guaranteed) {
+      tiny = c.percent >= 50
+        ? esc(s.name) + " have done enough — they can't be knocked out of the top 2 now, whatever happens."
+        : esc(s.name) + " can no longer finish high enough to go through.";
+    } else if (c.decided) {
+      tiny = "The group stage is finished, so this is final.";
+    } else {
+      tiny = "Our best guess from playing the rest of the tournament " +
         (c.trials ? c.trials.toLocaleString() : "thousands of") +
-        " times on the computer, using how strong each team is. It's a guess, not a betting tip!";
+        " times on the computer, using how strong each team is. A guess, not a betting tip!";
+    }
     el("verdict-mount").innerHTML =
       '<section class="verdict ' + v.cls + '">' +
         '<div class="flag">' + esc(s.flag || "🏴") + '</div>' +
@@ -309,7 +328,7 @@
   function renderNeeds(d) {
     el("needTitle").textContent = "⚽ What do " + d.targetName + " need?";
     var games = (d.remainingGames || []).filter(function (g) { return g.matters; });
-    var shown = games.slice(0, 8);
+    var shown = games.slice(0, 5);
     var moreMatter = games.length - shown.length;   // affect them, just smaller
     var list = el("needList"), foot = el("needFoot"), help = el("needHelp");
 
@@ -416,30 +435,29 @@
     el("group-card").hidden = false;
   }
 
-  // ── Results so far ────────────────────────────────────────────────
-  function renderResults(d) {
-    var res = d.results || [];
-    el("resultsNote").textContent = (d.gamesPlayed || 0) + " of " + (d.gamesTotal || 0) + " group games done";
+  // ── Live & just played (newest first) ─────────────────────────────
+  function renderRecent(d) {
+    var res = d.results || [];           // server sends newest first, live first
+    var anyLive = res.some(function (r) { return r.live; });
+    el("recentTitle").textContent = anyLive ? "🔴 Live & just played" : "⏱️ Just played";
+    el("recentNote").textContent = (d.gamesPlayed || 0) + " of " + (d.gamesTotal || 0) +
+      " group games played" + (res.length > 6 ? " · showing the latest" : "");
     if (!res.length) {
-      el("resultsList").innerHTML = '<p class="empty">No group games have been played yet.</p>';
-      el("results-card").hidden = false;
+      el("recentList").innerHTML = '<p class="empty">No group games have kicked off yet.</p>';
+      el("recent-card").hidden = false;
       return;
     }
-    var byGroup = {};
-    res.forEach(function (r) { (byGroup[r.group] = byGroup[r.group] || []).push(r); });
-    el("resultsList").innerHTML = Object.keys(byGroup).sort().map(function (g) {
-      var rows = byGroup[g].map(function (r) {
-        var live = r.status === "live" || r.status === "halfTime";
-        return '<div class="res' + (live ? " live" : "") + '">' +
-            '<span class="rh">' + esc(r.home.flag) + ' ' + esc(r.home.name) + '</span>' +
-            '<span class="rs">' + (r.homeGoals == null ? "–" : r.homeGoals) + " : " +
-              (r.awayGoals == null ? "–" : r.awayGoals) + (live ? " 🔴" : "") + '</span>' +
-            '<span class="ra">' + esc(r.away.name) + ' ' + esc(r.away.flag) + '</span>' +
-          '</div>';
-      }).join("");
-      return '<div class="resgrp"><h3>Group ' + esc(g) + '</h3>' + rows + '</div>';
+    el("recentList").innerHTML = res.slice(0, 6).map(function (r) {
+      return '<div class="recent-row' + (r.live ? " live" : "") + '">' +
+          '<span class="gtag">' + esc(r.group) + '</span>' +
+          '<span class="rh">' + esc(r.home.name) + " " + esc(r.home.flag) + '</span>' +
+          '<span class="sc">' + (r.homeGoals == null ? "–" : r.homeGoals) + "–" +
+            (r.awayGoals == null ? "–" : r.awayGoals) + '</span>' +
+          '<span class="ra">' + esc(r.away.flag) + " " + esc(r.away.name) +
+            (r.live ? ' <span class="liveflag">LIVE</span>' : "") + '</span>' +
+        '</div>';
     }).join("");
-    el("results-card").hidden = false;
+    el("recent-card").hidden = false;
   }
 
   function renderFreshness(d) {
@@ -450,9 +468,15 @@
       stale.innerHTML = "⚠️ Showing the last scores we have" +
         (m.lastUpdated ? " — they may be a little behind." : " — live scores aren't available right now.");
     } else { stale.hidden = true; }
-    var when = m.lastUpdated ? new Date(m.lastUpdated).toLocaleTimeString() : "—";
-    el("updated").innerHTML = (m.live ? '<span class="live-dot"></span>LIVE · ' : "") +
-      "Updated " + esc(when) + " · checks for new scores automatically";
+    var ago = "";
+    if (m.ageSeconds != null) {
+      var s = Math.max(0, Math.round(m.ageSeconds));
+      ago = s < 60 ? (s + "s ago") : (s < 3600 ? (Math.round(s / 60) + " min ago") : (Math.round(s / 3600) + "h ago"));
+    } else if (m.lastUpdated) {
+      ago = new Date(m.lastUpdated).toLocaleTimeString();
+    } else { ago = "—"; }
+    el("updated").innerHTML = (m.live ? '<span class="live-dot"></span>LIVE NOW · ' : "") +
+      "Scores updated " + esc(ago) + " · refreshes by itself";
   }
 
   function render(d) {
@@ -463,10 +487,10 @@
       "<b>%</b> is a computer guess from playing out the rest of the tournament many times " +
       "(stronger teams win more often) — a guess to help you follow along, not a betting tip.";
     renderVerdict(d);
+    renderRecent(d);
     renderNeeds(d);
     renderQueue(d);
     renderGroup(d);
-    renderResults(d);
     renderFreshness(d);
     pollMs = (d.meta && d.meta.pollIntervalMs) || pollMs;
   }
