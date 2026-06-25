@@ -42,9 +42,20 @@ Pure functions: `build_group_tables`, `rank_group`, `get_third_placed_teams`,
 - **Group tables are recomputed from results**, never trusted from a feed. A
   live/half-time score counts as the current provisional result, so the picture
   flips in real time.
+- **Group tables follow the official FIFA tie-break ladder**: points → goal
+  difference → goals scored → **head-to-head** (points, then GD, then goals among
+  the level teams) → fair play → deterministic fallback (in place of drawing lots).
 - **Third-placed teams are ranked** by points → goal difference → goals scored →
-  fair play → deterministic fallback. Missing fair-play data is skipped (it never
-  crashes or invents an order).
+  fair play → deterministic fallback (head-to-head doesn't apply across groups).
+  Missing fair-play data is skipped (it never crashes or invents an order).
+- **Qualification chance + per-game impact** (`projection.py`): a Monte-Carlo
+  simulation of the remaining group games using the exact same ranking rules,
+  reporting the target's chance and how each remaining game's result swings it.
+  Each match is **weighted by team strength** — a rating derived from the config's
+  bookmaker title odds (standardised log implied-probability), feeding a
+  strength-adjusted Poisson goal model (calibrated so a top side beats a weak one
+  ~85% of the time; equal sides are coin-flips). Clearly presented as a model
+  estimate, not a betting price. With no odds it falls back to evenly-matched.
 - **Scoreline bands (0–0 … 8–8) collapse** into human conditions: *any result
   works*, *no realistic result helps*, *avoid defeat*, *win*, *win by N+*,
   *draw only*, *must not win*, *must not win by N+*, *to lose*, bounded

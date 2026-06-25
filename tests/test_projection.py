@@ -133,3 +133,36 @@ def test_unknown_target_raises():
     teams, fixtures = _group_c_complete()
     with pytest.raises(ValueError):
         project(teams, fixtures, "NOPE")
+
+
+def test_ratings_favour_the_stronger_team():
+    """With strength ratings, the stronger team in a group has a higher chance
+    than a weaker one; with no ratings the model is symmetric."""
+    teams = _four("C", ["STRONG", "MID", "WEAK", "MINNOW"])
+    # All to play — a full round-robin still to come.
+    fixtures = [
+        _up("c1", "C", "STRONG", "MID"),
+        _up("c2", "C", "WEAK", "MINNOW"),
+        _up("c3", "C", "STRONG", "WEAK"),
+        _up("c4", "C", "MID", "MINNOW"),
+        _up("c5", "C", "STRONG", "MINNOW"),
+        _up("c6", "C", "MID", "WEAK"),
+    ]
+    ratings = {"STRONG": 1.5, "MID": 0.3, "WEAK": -0.6, "MINNOW": -1.4}
+    strong = project(teams, fixtures, "STRONG", cutoff=2, trials=3000, ratings=ratings).chance
+    minnow = project(teams, fixtures, "MINNOW", cutoff=2, trials=3000, ratings=ratings).chance
+    assert strong > minnow + 0.2          # clearly separated by strength
+
+    # Same fixtures, no ratings → roughly symmetric (within Monte-Carlo noise).
+    s2 = project(teams, fixtures, "STRONG", cutoff=2, trials=3000).chance
+    m2 = project(teams, fixtures, "MINNOW", cutoff=2, trials=3000).chance
+    assert abs(s2 - m2) < 0.08
+
+
+def test_american_odds_conversion():
+    from qualification.router import _american_to_prob
+    assert _american_to_prob("+100") == pytest.approx(0.5)
+    assert _american_to_prob("-200") == pytest.approx(200 / 300)
+    assert _american_to_prob("+900") == pytest.approx(0.1)
+    assert _american_to_prob("") is None
+    assert _american_to_prob(None) is None

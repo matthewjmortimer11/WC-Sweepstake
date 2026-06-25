@@ -40,11 +40,16 @@ from .engine import (
     Team,
 )
 
-# Goal expectation per side for an unplayed game. Symmetric (no home edge): World
-# Cup venues are essentially neutral, and an asymmetric model would bias a team's
-# chances purely by which fixtures list it as "home". Evenly-matched assumption.
-_LAMBDA_HOME = 1.35
-_LAMBDA_AWAY = 1.35
+# Goal model for an unplayed game. No home edge (World Cup venues are essentially
+# neutral). The two sides' expected goals are pulled apart by their strength
+# rating difference: the stronger team scores more, the weaker fewer, keeping the
+# total roughly stable. With no ratings (all 0) it collapses to an evenly-matched
+# 1.35 each. ``_STRENGTH_ALPHA`` is calibrated so a top side beats a weak one
+# ~85% of the time and evenly-rated sides are true coin-flips.
+_LAMBDA_BASE = 1.35
+_STRENGTH_ALPHA = 0.30
+_LAMBDA_MIN = 0.30
+_LAMBDA_MAX = 3.0
 
 _PENDING_STATUSES = ("upcoming", "live", "halfTime")
 
@@ -91,8 +96,16 @@ def _poisson(rng: random.Random, lam: float) -> int:
             return k - 1
 
 
-def _sample_score(rng: random.Random) -> Tuple[int, int]:
-    return _poisson(rng, _LAMBDA_HOME), _poisson(rng, _LAMBDA_AWAY)
+def _match_lambdas(rating_home: float, rating_away: float) -> Tuple[float, float]:
+    """Expected goals for each side given their strength ratings (0 = average)."""
+    edge = math.exp(_STRENGTH_ALPHA * (rating_home - rating_away))
+    lam_h = min(max(_LAMBDA_BASE * edge, _LAMBDA_MIN), _LAMBDA_MAX)
+    lam_a = min(max(_LAMBDA_BASE / edge, _LAMBDA_MIN), _LAMBDA_MAX)
+    return lam_h, lam_a
+
+
+def _sample_score(rng: random.Random, lam_home: float, lam_away: float) -> Tuple[int, int]:
+    return _poisson(rng, lam_home), _poisson(rng, lam_away)
 
 
 def _fair_play_key(fp: Optional[int]) -> int:
@@ -108,8 +121,14 @@ def project(
     cutoff: int = DEFAULT_CUTOFF,
     trials: int = 4000,
     seed: int = 20260611,
+    ratings: Optional[Dict[str, float]] = None,
 ) -> Projection:
     """Simulate the remaining group games and project the target's chances.
+
+    ``ratings`` maps team id → strength rating (0 = average); stronger teams are
+    sampled to score more. If omitted, every team is average and the model is a
+    true coin-flip — so ``ratings`` is what turns the chance from "evenly matched"
+    into "weighted by team strength".
 
     ``seed`` is fixed by default so the same tournament state always yields the
     same numbers (a poll doesn't make the percentage flicker); a new result
@@ -118,6 +137,7 @@ def project(
     if not any(t.id == target_team_id for t in teams):
         raise ValueError(f"target team {target_team_id!r} not in team list")
 
+    ratings = ratings or {}
     team_group: Dict[str, str] = {t.id: t.group for t in teams}
     team_fp: Dict[str, int] = {t.id: _fair_play_key(t.fair_play) for t in teams}
     groups: Dict[str, List[str]] = {}
@@ -127,8 +147,10 @@ def project(
     ids = set(team_group)
     target_group = team_group[target_team_id]
 
-    # Base table from completed games — computed once, reused every trial.
+    # Base table from completed games — computed once, reused every trial. We also
+    # keep the completed games per group so head-to-head ties can be resolved.
     base: Dict[str, List[int]] = {i: [0, 0, 0] for i in ids}  # [pts, gf, ga]
+    base_group_matches: Dict[str, List[Tuple[str, str, int, int]]] = {}
     pending: List[Fixture] = []
     for fx in fixtures:
         if fx.stage != "group":
@@ -139,15 +161,21 @@ def project(
             pending.append(fx)
         elif fx.status == "done" and fx.home_goals is not None and fx.away_goals is not None:
             _apply(base, fx.home, fx.away, fx.home_goals, fx.away_goals)
+            base_group_matches.setdefault(team_group[fx.home], []).append(
+                (fx.home, fx.away, fx.home_goals, fx.away_goals)
+            )
         # cancelled / scoreless are ignored
 
-    def qualifies(stats: Dict[str, List[int]]) -> bool:
-        return _target_qualifies_fast(stats, groups, team_fp, target_team_id, target_group, cutoff)
+    def qualifies(stats, sampled_gm) -> bool:
+        return _target_qualifies_fast(
+            stats, groups, team_fp, target_team_id, target_group, cutoff,
+            base_group_matches, sampled_gm,
+        )
 
     # No games left: the outcome is fixed.
     if not pending:
         return Projection(
-            chance=1.0 if qualifies(base) else 0.0,
+            chance=1.0 if qualifies(base, {}) else 0.0,
             decided=True,
             trials=0,
             impacts=[],
@@ -159,15 +187,23 @@ def project(
     cond: Dict[str, Dict[str, List[int]]] = {
         fx.id: {"H": [0, 0], "D": [0, 0], "A": [0, 0]} for fx in pending
     }
+    # Per-fixture goal expectations from team strengths — constant across trials.
+    lambdas: Dict[str, Tuple[float, float]] = {
+        fx.id: _match_lambdas(ratings.get(fx.home, 0.0), ratings.get(fx.away, 0.0))
+        for fx in pending
+    }
 
     for _ in range(trials):
         stats = {i: base[i][:] for i in base}
         sampled: List[Tuple[str, str]] = []  # (fixture_id, outcome)
+        sampled_gm: Dict[str, List[Tuple[str, str, int, int]]] = {}
         for fx in pending:
-            hg, ag = _sample_score(rng)
+            lam_h, lam_a = lambdas[fx.id]
+            hg, ag = _sample_score(rng, lam_h, lam_a)
             _apply(stats, fx.home, fx.away, hg, ag)
+            sampled_gm.setdefault(team_group[fx.home], []).append((fx.home, fx.away, hg, ag))
             sampled.append((fx.id, "H" if hg > ag else ("D" if hg == ag else "A")))
-        q = 1 if qualifies(stats) else 0
+        q = 1 if qualifies(stats, sampled_gm) else 0
         qual_total += q
         for fid, outcome in sampled:
             bucket = cond[fid][outcome]
@@ -222,6 +258,50 @@ def _apply(stats: Dict[str, List[int]], home: str, away: str, hg: int, ag: int) 
         sa[0] += 1
 
 
+def _overall_sort_key(i, stats, team_fp):
+    return (-stats[i][0], -(stats[i][1] - stats[i][2]), -stats[i][1], team_fp[i], i)
+
+
+def _same_overall_stats(a: List[int], b: List[int]) -> bool:
+    return a[0] == b[0] and (a[1] - a[2]) == (b[1] - b[2]) and a[1] == b[1]
+
+
+def _h2h_sort(block, stats, team_fp, matches):
+    """Order a tied block by head-to-head points → GD → goals → fair play → id."""
+    bset = set(block)
+    pts = {i: 0 for i in block}
+    gd = {i: 0 for i in block}
+    gf = {i: 0 for i in block}
+    for h, a, hg, ag in matches:
+        if h in bset and a in bset:
+            gf[h] += hg; gf[a] += ag
+            gd[h] += hg - ag; gd[a] += ag - hg
+            if hg > ag:
+                pts[h] += 3
+            elif ag > hg:
+                pts[a] += 3
+            else:
+                pts[h] += 1; pts[a] += 1
+    return sorted(block, key=lambda i: (-pts[i], -gd[i], -gf[i], team_fp[i], i))
+
+
+def _rank_ids(members, stats, team_fp, matches):
+    """Rank a group's teams with the full FIFA ladder (overall → head-to-head …)."""
+    order = sorted(members, key=lambda i: _overall_sort_key(i, stats, team_fp))
+    ranked: List[str] = []
+    k, n = 0, len(order)
+    while k < n:
+        m = k
+        while m < n and _same_overall_stats(stats[order[m]], stats[order[k]]):
+            m += 1
+        if m - k > 1:
+            ranked.extend(_h2h_sort(order[k:m], stats, team_fp, matches))
+        else:
+            ranked.append(order[k])
+        k = m
+    return ranked
+
+
 def _target_qualifies_fast(
     stats: Dict[str, List[int]],
     groups: Dict[str, List[str]],
@@ -229,20 +309,23 @@ def _target_qualifies_fast(
     target: str,
     target_group: str,
     cutoff: int,
+    base_gm: Dict[str, List[Tuple[str, str, int, int]]],
+    sampled_gm: Dict[str, List[Tuple[str, str, int, int]]],
 ) -> bool:
     """Lean qualification check used inside the simulation loop.
 
-    Mirrors the engine's rule: top two of each group qualify; the target, if
-    third, must rank within ``cutoff`` of the third-placed teams. Sort key is
-    (−pts, −gd, −gf, fair_play, id) so higher points/GD/GF and lower fair-play
-    rank first, with the id as a deterministic fallback.
+    Mirrors the engine exactly: top two of each group qualify; the target, if
+    third, must rank within ``cutoff`` of the third-placed teams. Group order
+    uses the full tie-break ladder including head-to-head; third-placed teams
+    (from different groups) are ranked on points → GD → goals → fair play → id.
     """
     thirds: List[str] = []
     for group, members in groups.items():
-        ranked = sorted(
-            members,
-            key=lambda i: (-stats[i][0], -(stats[i][1] - stats[i][2]), -stats[i][1], team_fp[i], i),
-        )
+        matches = base_gm.get(group, ())
+        extra = sampled_gm.get(group)
+        if extra:
+            matches = list(matches) + extra
+        ranked = _rank_ids(members, stats, team_fp, matches)
         if target in members:
             pos = ranked.index(target)
             if pos <= 1:
@@ -251,8 +334,5 @@ def _target_qualifies_fast(
                 return False           # 4th (or lower) — out via the group
         thirds.append(ranked[2])       # this group's third-placed team
 
-    ranked_thirds = sorted(
-        thirds,
-        key=lambda i: (-stats[i][0], -(stats[i][1] - stats[i][2]), -stats[i][1], team_fp[i], i),
-    )
+    ranked_thirds = sorted(thirds, key=lambda i: _overall_sort_key(i, stats, team_fp))
     return target in ranked_thirds[:cutoff]

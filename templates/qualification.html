@@ -137,6 +137,7 @@
   .chance.warn .chance-num { color: #ffd98a; } .chance.warn .chance-bar span { background: var(--warn); }
   .chance.bad .chance-num { color: #ff9fb0; } .chance.bad .chance-bar span { background: var(--bad); }
   .chance.good .chance-num { color: #8ff5b6; }
+  .chance-sub { font-size: 11px; color: #9fb4d8; margin-top: 7px; line-height: 1.45; }
 
   /* Games that affect the target */
   .affect-help { color: var(--muted); font-size: 12.5px; margin: 0 4px 12px; line-height: 1.5; }
@@ -245,9 +246,14 @@
 
   <div class="updated" id="updated"></div>
   <footer class="note">
-    Tables are recomputed from results, not taken from a feed. Qualification chance
-    and each game's impact come from simulating the remaining group games many
-    times, assuming evenly-matched fixtures.
+    <b>How qualifying works:</b> the top two of all 12 groups go through, plus the
+    8 best of the 12 third-placed teams. Group tables are recomputed from results
+    (never a feed) and ranked exactly by FIFA's order — points, goal difference,
+    goals scored, then head-to-head between level teams, then fair play. The
+    third-placed teams are ranked by points, goal difference, goals scored, then
+    fair play. The <i>chance</i> and each game's impact come from simulating the
+    remaining games many times, weighting each match by team strength derived from
+    bookmakers' tournament odds — a model estimate, not a betting price.
   </footer>
 </div>
 
@@ -282,26 +288,35 @@
       ? ("#" + s.thirdPlaceRank + " of the third-placed teams")
       : (s.positionLabel || "—");
     var chanceCls = c.percent >= 67 ? "good" : (c.percent >= 34 ? "warn" : "bad");
-    var chanceLabel = c.decided
-      ? (c.percent >= 50 ? "Qualified" : "Cannot qualify")
-      : "chance of qualifying";
+    var chanceLab, chanceSub;
+    if (c.decided) {
+      chanceCls = c.percent >= 50 ? "good" : "bad";
+      chanceLab = c.percent >= 50 ? "Qualified — it's confirmed" : "Cannot qualify — confirmed";
+      chanceSub = "The group stage is complete, so this is final.";
+    } else {
+      chanceLab = "Estimated chance to qualify";
+      chanceSub = "From " + (c.trials ? c.trials.toLocaleString() : "many") +
+        " simulations of the remaining games, weighted by each team's strength " +
+        "(from bookmakers' tournament odds). A model estimate, not a betting price.";
+    }
     el("hero-mount").innerHTML =
       '<section class="hero" aria-live="polite">' +
         '<div class="flag">' + esc(s.flag || "🏴") + '</div>' +
         '<span class="pill ' + p.cls + '">' + esc(p.text) + '</span>' +
         '<h1>' + esc(s.headline) + '</h1>' +
-        '<p class="sub">Group ' + esc(s.group) + ' · ' + esc(s.positionLabel) +
+        '<p class="sub">As it stands: Group ' + esc(s.group) + ' · ' + esc(s.positionLabel) +
           ' · ' + esc(thirdLine) + '</p>' +
         '<div class="chance ' + chanceCls + '">' +
           '<div class="chance-num">' + c.percent + '<span>%</span></div>' +
-          '<div class="chance-lab">' + esc(chanceLabel) + '</div>' +
+          '<div class="chance-lab">' + esc(chanceLab) + '</div>' +
           '<div class="chance-bar"><span style="width:' + c.percent + '%"></span></div>' +
+          '<div class="chance-sub">' + esc(chanceSub) + '</div>' +
         '</div>' +
         '<div class="statline">' +
           '<div class="stat"><b>' + s.points + '</b>points</div>' +
           '<div class="stat"><b>' + fmtGD(s.goalDifference) + '</b>goal diff</div>' +
           '<div class="stat"><b>' + s.goalsFor + '</b>scored</div>' +
-          (s.thirdPlaceRank ? '<div class="stat"><b>#' + s.thirdPlaceRank + '</b>3rd-place rank</div>' : '') +
+          (s.thirdPlaceRank ? '<div class="stat"><b>#' + s.thirdPlaceRank + '</b>of 12 thirds</div>' : '') +
         '</div>' +
       '</section>';
   }
@@ -371,9 +386,10 @@
       return;
     }
 
-    help.innerHTML = "Each bar is " + esc(d.targetName) +
-      "'s qualifying chance if that game ends in a home win, draw or away win. " +
-      "Sorted by how much the result swings things.";
+    help.innerHTML = "Every remaining game that can change " + esc(d.targetName) +
+      "'s fate, biggest swing first. Each bar shows their estimated qualifying " +
+      "chance if that game ends in a home win, draw, or away win — so the result " +
+      "<b>" + esc(d.targetName) + " want is the longest green bar</b>.";
 
     list.innerHTML = shown.map(function (g) {
       var hn = esc(g.home.name), an = esc(g.away.name);
@@ -386,9 +402,9 @@
           '</div>' +
           '<div class="want">Best for ' + esc(d.targetName) + ': <b>' + esc(g.wants) + '</b></div>' +
           '<div class="bars">' +
-            outcomeBar(hn + " win", g.chanceIfHomeWin, g.favouredOutcome === "home") +
-            outcomeBar("Draw", g.chanceIfDraw, g.favouredOutcome === "draw") +
-            outcomeBar(an + " win", g.chanceIfAwayWin, g.favouredOutcome === "away") +
+            outcomeBar(hn + " win", g.chanceIfHomeWin, (g.goodOutcomes || []).indexOf("home") >= 0) +
+            outcomeBar("Draw", g.chanceIfDraw, (g.goodOutcomes || []).indexOf("draw") >= 0) +
+            outcomeBar(an + " win", g.chanceIfAwayWin, (g.goodOutcomes || []).indexOf("away") >= 0) +
           '</div>' +
         '</li>';
     }).join("");
