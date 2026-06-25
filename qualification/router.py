@@ -226,7 +226,11 @@ def _build_payload(target: str) -> Dict[str, Any]:
 
 # ── Routes ───────────────────────────────────────────────────────────────────
 
+# Served at both the generic path and the Scotland-branded public URL
+# (wheesht.xyz/scotland-qualification). Same page either way — it defaults to
+# Scotland and accepts ?target= for any other team.
 @router.get("/qualification", response_class=HTMLResponse)
+@router.get("/scotland-qualification", response_class=HTMLResponse)
 async def qualification_page() -> HTMLResponse:
     if not _TEMPLATE.is_file():
         raise HTTPException(status_code=404, detail="not found")
