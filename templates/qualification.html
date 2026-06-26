@@ -115,6 +115,7 @@
   .kg-teams .kg-v { color: var(--muted); font-weight: 500; font-size: 14px; margin: 0 3px; }
   .kg-want { margin-top: 9px; font-size: 15px; font-weight: 800; color: #8ff5b6; line-height: 1.35; }
   .kg.meh .kg-want { color: var(--muted); font-weight: 600; }
+  .kg-fear { margin-top: 5px; font-size: 13px; font-weight: 700; color: #ff9fb0; line-height: 1.35; }
 
   /* In-play group: full-width with its remaining games */
   .llp { border-radius: 14px; padding: 12px 13px; margin-top: 9px; border: 1px solid var(--line); background: var(--navy-800); }
@@ -640,6 +641,7 @@
           '<div class="kg-teams">' + esc(gm.home.flag) + " " + esc(gm.home.name) +
             ' <span class="kg-v">v</span> ' + esc(gm.away.name) + " " + esc(gm.away.flag) + "</div>" +
           '<div class="kg-want">👍 We need ' + esc(gm.wants) + "</div>" +
+          (gm.fear ? '<div class="kg-fear">🚫 ' + esc(gm.fear) + "</div>" : "") +
         "</div>";
     }).join("") || '<p class="empty">No games left to play.</p>';
 

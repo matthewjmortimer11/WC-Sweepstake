@@ -196,3 +196,44 @@ def test_american_odds_conversion():
     assert _american_to_prob("+900") == pytest.approx(0.1)
     assert _american_to_prob("") is None
     assert _american_to_prob(None) is None
+
+
+def test_classify_outcomes_draw_can_also_be_fine():
+    """A draw that's nearly as good as the win counts as fine — we shouldn't say
+    'we need a win' when avoiding defeat is enough."""
+    from qualification.router import _classify_outcomes, _wants_text
+    # home win 84, draw 80 (within tolerance), away win 12 (the danger).
+    good, danger, worst = _classify_outcomes(84, 80, 12)
+    assert good == {"home", "draw"}
+    assert _wants_text(good) == "{home} to avoid defeat"
+    assert danger == "away"
+    assert worst == 12
+
+
+def test_classify_outcomes_only_a_win_will_do():
+    """When the draw is a real drop, only the win is 'fine' and the other results
+    are flagged as the danger."""
+    from qualification.router import _classify_outcomes, _wants_text
+    good, danger, worst = _classify_outcomes(70, 45, 30)
+    assert good == {"home"}
+    assert _wants_text(good) == "{home} to win"
+    assert danger == "away"           # the single worst result
+    assert worst == 30
+
+
+def test_classify_outcomes_barely_matters_has_no_danger():
+    """If every result lands within a few points, nothing is worth fearing."""
+    from qualification.router import _classify_outcomes, _wants_text, _fear_text
+    good, danger, _ = _classify_outcomes(61, 60, 58)
+    assert good == {"home", "draw", "away"}
+    assert _wants_text(good) == "the result barely matters"
+    assert danger is None
+    assert _fear_text(danger, 58) == ""
+
+
+def test_fear_text_scales_with_severity():
+    from qualification.router import _fear_text
+    assert _fear_text("home", 8).startswith("If {home} win, we're all but out")
+    assert "real trouble" in _fear_text("away", 25)
+    assert "nervy" in _fear_text("draw", 45)
+    assert _fear_text(None, 5) == ""
