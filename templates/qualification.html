@@ -370,8 +370,11 @@
     var c = d.chance || {}, s = d.status || {};
     if (c.decided || c.guaranteed) return "";
     if (s.state === "third_in" && s.qualified && s.thirdPlaceRank) {
-      return "📍 <b>In the cut right now</b> — " + ord(s.thirdPlaceRank) +
+      var line = "📍 <b>In the cut right now</b> — " + ord(s.thirdPlaceRank) +
         " of the best third-placed teams (top " + (d.cutoff || 8) + " go through).";
+      if (d.provisional)
+        line += " <span style='color:#bcccea'>Still provisional — most groups haven't finished.</span>";
+      return line;
     }
     if (s.state === "third_out" && s.thirdPlaceRank) {
       return "📍 <b>Outside the cut right now</b> — " + ord(s.thirdPlaceRank) +
@@ -801,7 +804,8 @@
       ago = new Date(m.lastUpdated).toLocaleTimeString();
     } else { ago = "—"; }
     el("updated").innerHTML = (m.live ? '<span class="live-dot"></span>LIVE NOW · ' : "") +
-      "Scores updated " + esc(ago) + " · refreshes by itself";
+      "Scores updated " + esc(ago) + " · refreshes every " +
+      (pollMs < 60000 ? Math.round(pollMs / 1000) + "s" : Math.round(pollMs / 60000) + " min");
   }
 
   function render(d) {
@@ -817,8 +821,8 @@
     renderNeeds(d);
     renderQueue(d);
     renderGroup(d);
-    renderFreshness(d);
     pollMs = (d.meta && d.meta.pollIntervalMs) || pollMs;
+    renderFreshness(d);
   }
 
   function showError() {

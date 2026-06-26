@@ -320,16 +320,23 @@ def _live_fixture_impact(
     rates: Dict[str, float] = {}
     rng = random.Random(seed ^ hash(fx.id))
 
+    # ``base`` already includes the live partial score. Strip it before applying
+    # each representative final — otherwise the partial is double-counted and the
+    # impact bars (and any H2H tie-break) are wrong.
+    impact_base = {i: base[i][:] for i in base}
+    _unapply(impact_base, fx.home, fx.away, fx.home_goals, fx.away_goals)
+    impact_gm = _gm_without_fixture(base_group_matches, fx.group, fx.home, fx.away)
+
     def qualifies(stats, sampled_gm) -> bool:
         return _target_qualifies_fast(
             stats, groups, team_fp, target_team_id, target_group, cutoff,
-            base_group_matches, sampled_gm,
+            impact_gm, sampled_gm,
         )
 
     for key, (fhg, fag) in reps.items():
         qual = 0
         for _ in range(trials):
-            stats = {i: base[i][:] for i in base}
+            stats = {i: impact_base[i][:] for i in impact_base}
             sampled_gm: Dict[str, List[Tuple[str, str, int, int]]] = {}
             _apply(stats, fx.home, fx.away, fhg, fag)
             _record_group_match(sampled_gm, fx.group or "", fx.home, fx.away, fhg, fag)
@@ -395,12 +402,19 @@ def third_place_group_odds(
     for fx in fixtures:
         if fx.stage != "group" or fx.home not in ids or fx.away not in ids:
             continue
-        if fx.status in _PENDING_STATUSES:
-            pending.append(fx)
-        elif fx.status == "done" and fx.home_goals is not None and fx.away_goals is not None:
+        if fx.status in _LIVE_STATUSES and _has_score(fx):
             _apply(base, fx.home, fx.away, fx.home_goals, fx.away_goals)
-            base_group_matches.setdefault(team_group[fx.home], []).append(
-                (fx.home, fx.away, fx.home_goals, fx.away_goals)
+            _record_group_match(
+                base_group_matches, team_group[fx.home], fx.home, fx.away,
+                fx.home_goals, fx.away_goals,
+            )
+        elif fx.status == "upcoming":
+            pending.append(fx)
+        elif fx.status == "done" and _has_score(fx):
+            _apply(base, fx.home, fx.away, fx.home_goals, fx.away_goals)
+            _record_group_match(
+                base_group_matches, team_group[fx.home], fx.home, fx.away,
+                fx.home_goals, fx.away_goals,
             )
 
     other = [g for g in groups if g != target_group]
@@ -447,6 +461,35 @@ def _apply(stats: Dict[str, List[int]], home: str, away: str, hg: int, ag: int) 
     else:
         sh[0] += 1
         sa[0] += 1
+
+
+def _unapply(stats: Dict[str, List[int]], home: str, away: str, hg: int, ag: int) -> None:
+    """Reverse ``_apply`` — used to strip a live partial before simulating the final."""
+    sh, sa = stats[home], stats[away]
+    sh[1] -= hg
+    sh[2] -= ag
+    sa[1] -= ag
+    sa[2] -= hg
+    if hg > ag:
+        sh[0] -= 3
+    elif ag > hg:
+        sa[0] -= 3
+    else:
+        sh[0] -= 1
+        sa[0] -= 1
+
+
+def _gm_without_fixture(
+    base_gm: Dict[str, List[Tuple[str, str, int, int]]],
+    group: Optional[str],
+    home: str,
+    away: str,
+) -> Dict[str, List[Tuple[str, str, int, int]]]:
+    g = group or ""
+    out = {grp: list(matches) for grp, matches in base_gm.items()}
+    if g in out:
+        out[g] = [m for m in out[g] if not (m[0] == home and m[1] == away)]
+    return out
 
 
 def _overall_sort_key(i, stats, team_fp):

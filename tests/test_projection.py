@@ -301,3 +301,65 @@ def test_chance_label_holding_when_in_cut():
     )
     assert _chance_label(status, games_started=54, decided=False, guaranteed=False) == "holding"
     assert _chance_label(status, games_started=0, decided=False, guaranteed=False) == "forecast"
+
+
+def test_unapply_reverses_apply():
+    from qualification.projection import _apply, _unapply
+
+    stats = {"A": [0, 0, 0], "B": [0, 0, 0]}
+    _apply(stats, "A", "B", 2, 1)
+    assert stats["A"] == [3, 2, 1]
+    _unapply(stats, "A", "B", 2, 1)
+    assert stats == {"A": [0, 0, 0], "B": [0, 0, 0]}
+
+
+def test_live_impact_strips_partial_before_final():
+    """Live impact must not add the partial score twice when simulating the whistle."""
+    teams_c, fixtures_c = _group_c_complete()
+    teams_d = _four("D", ["DW", "DX", "DY", "DB"])
+    base_d = [
+        _done("d1", "D", "DW", "DX", 0, 0),
+        _done("d2", "D", "DX", "DB", 3, 0),
+        _done("d3", "D", "DW", "DB", 3, 0),
+        _done("d4", "D", "DX", "DY", 3, 0),
+        _done("d5", "D", "DB", "DY", 2, 0),
+    ]
+    live_draw = base_d + [
+        Fixture(id="d6", home="DY", away="DW", status="live", group="D",
+                home_goals=0, away_goals=0, stage="group"),
+    ]
+    live_home = base_d + [
+        Fixture(id="d6", home="DY", away="DW", status="live", group="D",
+                home_goals=2, away_goals=0, stage="group"),
+    ]
+    teams = teams_c + teams_d
+    draw_proj = project(teams, fixtures_c + live_draw, "SCO", cutoff=1, trials=3000, seed=3)
+    home_proj = project(teams, fixtures_c + live_home, "SCO", cutoff=1, trials=3000, seed=3)
+    draw_imp = next(i for i in draw_proj.impacts if i.fixture_id == "d6")
+    home_imp = next(i for i in home_proj.impacts if i.fixture_id == "d6")
+    # A 2-0 live lead for the home side should be worse for Scotland than 0-0 live.
+    assert home_imp.chance_if_home_win < draw_imp.chance_if_home_win
+
+
+def test_third_place_group_odds_uses_live_score():
+    from qualification.projection import third_place_group_odds
+
+    teams_c, _ = _group_c_complete()
+    teams_d = _four("D", ["DW", "DX", "DY", "DB"])
+    done = [
+        _done("d1", "D", "DW", "DX", 0, 0),
+        _done("d2", "D", "DX", "DB", 3, 0),
+        _done("d3", "D", "DW", "DB", 3, 0),
+        _done("d4", "D", "DX", "DY", 3, 0),
+        _done("d5", "D", "DB", "DY", 2, 0),
+    ]
+    bench = (3, -3, 1)   # Scotland's third-place benchmark
+    with_live = done + [
+        Fixture(id="d6", home="DY", away="DW", status="live", group="D",
+                home_goals=0, away_goals=0, stage="group"),
+    ]
+    pending_only = done + [_up("d6", "D", "DY", "DW")]
+    teams = teams_c + teams_d
+    live_odds = third_place_group_odds(teams, with_live, "SCO", bench, trials=3000, seed=5)
+    pending_odds = third_place_group_odds(teams, pending_only, "SCO", bench, trials=3000, seed=5)
+    assert live_odds["D"] != pending_odds["D"]
