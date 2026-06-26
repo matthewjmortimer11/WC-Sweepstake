@@ -102,6 +102,20 @@
   .ll-counter .cnt b { color: var(--white); font-size: 15px; }
   .ll-above { color: var(--muted); font-size: 12.5px; line-height: 1.5; margin: 8px 2px 4px; }
   .ll-gh { font-size: 15px; font-weight: 800; margin: 16px 2px 2px; }
+  /* Key games — the deciding fixtures, standalone and in kick-off order */
+  .kg { background: var(--navy-800); border: 1px solid var(--line); border-left: 5px solid var(--sco-blue);
+    border-radius: 14px; padding: 13px 15px; margin-top: 10px; }
+  .kg.live { border-left-color: var(--bad); background: rgba(224,85,107,.07); box-shadow: 0 0 0 1px rgba(224,85,107,.25); }
+  .kg.meh { opacity: .68; border-left-color: var(--line); }
+  .kg-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
+  .kg-grp { font-size: 11px; font-weight: 800; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; white-space: nowrap; }
+  .kg-when { font-size: 14px; font-weight: 800; color: var(--white); text-align: right; }
+  .kg-live { font-size: 13px; font-weight: 900; color: var(--bad); letter-spacing: .3px; white-space: nowrap; }
+  .kg-teams { font-size: 16.5px; font-weight: 800; line-height: 1.3; }
+  .kg-teams .kg-v { color: var(--muted); font-weight: 500; font-size: 14px; margin: 0 3px; }
+  .kg-want { margin-top: 9px; font-size: 15px; font-weight: 800; color: #8ff5b6; line-height: 1.35; }
+  .kg.meh .kg-want { color: var(--muted); font-weight: 600; }
+
   /* In-play group: full-width with its remaining games */
   .llp { border-radius: 14px; padding: 12px 13px; margin-top: 9px; border: 1px solid var(--line); background: var(--navy-800); }
   .llp.good { border-color: rgba(47,191,113,.4); } .llp.warn { border-color: rgba(230,162,60,.45); } .llp.bad { border-color: rgba(224,85,107,.4); }
@@ -277,6 +291,9 @@
     <div class="ll-emote" id="llEmote"></div>
     <div class="ll-counter" id="llCounter"></div>
     <p class="ll-above" id="llAbove"></p>
+    <h3 class="ll-gh">🎯 The games that decide it</h3>
+    <p class="explain" id="llKeyNote"></p>
+    <div id="llKeyGames"></div>
     <h3 class="ll-gh">The groups that decide it</h3>
     <p class="explain" id="llGroupsNote"></p>
     <div id="llInPlay"></div>
@@ -595,24 +612,40 @@
          fmtGD(r.benchmark.goalDifference) + " GD · " + r.benchmark.goalsFor + " goals</b>.")
       : "We need other groups' third-placed teams to finish below our <b>" + r.benchmark.points + " pts</b>.";
 
-    el("llGroupsNote").innerHTML = "A group goes our way if its 3rd-place team finishes <b>below</b> Scotland. " +
-      "Each one auto-ticks ✓ or crosses ✗ as it finishes.";
+    // ── The key games, standalone and in kick-off order ──────────────
+    // The games that actually swing our fate: still to play, in a group that's
+    // in play, AND with a result that matters to us. List them on their own —
+    // live first, then by kick-off — so you can see exactly what we need and when.
+    var inPlayGroups = {};
+    (r.groups || []).forEach(function (g) { if (g.outcome === "pending") inPlayGroups[g.group] = true; });
+    function isMeh(gm) { return gm.wants === "the result barely matters" || gm.wants === "result barely matters"; }
+    var keyGames = (d.remainingGames || [])
+      .filter(function (gm) { return inPlayGroups[gm.group] && gm.matters && !isMeh(gm); })
+      .sort(function (a, b) {
+        if (!!a.live !== !!b.live) return a.live ? -1 : 1;          // live games first
+        return (a.kickoff || "").localeCompare(b.kickoff || "");     // then by kick-off
+      });
 
-    // Games still to play, grouped by their group, with kick-off time + what we want.
-    var gamesByGroup = {};
-    (d.remainingGames || []).forEach(function (gm) {
-      (gamesByGroup[gm.group] = gamesByGroup[gm.group] || []).push(gm);
-    });
-    function gameLine(gm) {
-      var when = gm.live ? '<span class="lg-live">🔴 LIVE</span>'
-        : '<span class="lg-when">' + [gm.dateLabel, gm.time].filter(Boolean).map(esc).join(" · ") + "</span>";
-      var meh = gm.wants === "the result barely matters" || gm.wants === "result barely matters";
-      return '<div class="lg">' + when +
-          '<div class="lg-teams">' + esc(gm.home.flag) + " " + esc(gm.home.name) +
-            ' <span class="lg-v">v</span> ' + esc(gm.away.name) + " " + esc(gm.away.flag) + "</div>" +
-          '<div class="lg-want' + (meh ? " meh" : "") + '">' + (meh ? "🤷 any result is fine" : "👍 " + esc(gm.wants)) + "</div>" +
+    el("llKeyNote").innerHTML = keyGames.length
+      ? "These <b>" + keyGames.length + "</b> game" + (keyGames.length === 1 ? "" : "s") +
+        " decide it — shown in the order they kick off. Get the result we want in enough of them and we’re through."
+      : "No games left that change anything — it’s down to the groups below.";
+
+    el("llKeyGames").innerHTML = keyGames.map(function (gm) {
+      var when = gm.live
+        ? '<span class="kg-live">🔴 LIVE NOW</span>'
+        : '<span class="kg-when">' + ([gm.dateLabel, gm.time].filter(Boolean).map(esc).join(" · ") || "TBC") + "</span>";
+      return '<div class="kg' + (gm.live ? " live" : "") + '">' +
+          '<div class="kg-head"><span class="kg-grp">Group ' + esc(gm.group) + "</span>" + when + "</div>" +
+          '<div class="kg-teams">' + esc(gm.home.flag) + " " + esc(gm.home.name) +
+            ' <span class="kg-v">v</span> ' + esc(gm.away.name) + " " + esc(gm.away.flag) + "</div>" +
+          '<div class="kg-want">👍 We need ' + esc(gm.wants) + "</div>" +
         "</div>";
-    }
+    }).join("") || '<p class="empty">No games left to play.</p>';
+
+    el("llGroupsNote").innerHTML = "Each group goes our way when its 3rd-place team finishes <b>below</b> Scotland. " +
+      "Auto-ticks ✓ or crosses ✗ as the games above finish.";
+
     function pendingWord(p) {
       if (p >= 60) return { t: "Leaning our way", c: "good" };
       if (p >= 38) return { t: "On a knife-edge", c: "warn" };
@@ -623,14 +656,10 @@
     el("llInPlay").innerHTML = inPlay.map(function (g) {
       var w = pendingWord(g.probGood);
       var third = g.third ? (esc(g.third.name) + " · " + g.third.points + " pts") : "—";
-      var games = (gamesByGroup[g.group] || [])
-        .sort(function (a, b) { return (a.kickoff || "").localeCompare(b.kickoff || ""); })
-        .map(gameLine).join("");
       return '<div class="llp ' + w.c + '">' +
           '<div class="llp-top"><span class="llp-g">Group ' + esc(g.group) + "</span>" +
             '<span class="llp-word ' + w.c + '">' + w.t + "</span></div>" +
           '<div class="llp-third">3rd as it stands: <b>' + third + "</b> — we need them to drop below us</div>" +
-          '<div class="llp-games">' + (games || '<div class="lg meh">No games left to play</div>') + "</div>" +
         "</div>";
     }).join("");
 
