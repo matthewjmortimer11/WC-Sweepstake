@@ -65,9 +65,88 @@
   .refresh[aria-busy="true"] .spin { animation: spin .8s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
 
-  /* ── The big verdict ─────────────────────────────────────────────── */
+  /* ── Hero: overall chance + standing (navy card) ─────────────────── */
+  .hero {
+    margin-top: 4px; border-radius: 22px; padding: 20px 18px 18px;
+    background: linear-gradient(165deg, var(--sco-blue-deep) 0%, var(--navy-800) 55%);
+    border: 1px solid var(--line);
+    box-shadow: 0 18px 40px -24px rgba(0,0,0,.85);
+  }
+  .hero-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+  .hero-copy { flex: 1; min-width: 0; }
+  .hero-word { font-size: 15px; font-weight: 800; color: #cdddff; margin: 0 0 4px; line-height: 1.3; }
+  .hero-rank { font-size: 13px; color: var(--muted); line-height: 1.4; margin: 0; }
+  .hero-pct {
+    flex: none; text-align: right; font-size: 52px; font-weight: 800;
+    line-height: 1; letter-spacing: -2px; font-variant-numeric: tabular-nums;
+  }
+  .hero-pct span { font-size: 24px; letter-spacing: 0; }
+  .hero.good .hero-pct { color: #8ff5b6; }
+  .hero.warn .hero-pct { color: #ffd98a; }
+  .hero.bad .hero-pct { color: #ff9fb0; }
+  .hero-lab {
+    margin: 0; font-size: 10px; font-weight: 800; text-transform: uppercase;
+    letter-spacing: .55px; color: var(--muted); text-align: right;
+  }
+  .hero-note {
+    margin: 14px 0 0; padding-top: 12px; border-top: 1px solid rgba(31,50,98,.65);
+    font-size: 13.5px; color: #e7eeff; line-height: 1.45;
+  }
+
+  /* ── Hybrid checklist: Sky headline + navy rows + checkboxes ───── */
+  .hybrid {
+    margin-top: 14px; border-radius: 20px; overflow: hidden;
+    border: 1px solid var(--line);
+    box-shadow: 0 16px 36px -22px rgba(0,0,0,.8);
+  }
+  .hybrid-head {
+    padding: 18px 18px 14px;
+    background: linear-gradient(180deg, #6b1428 0%, #4a0d1c 100%);
+    border-bottom: 1px solid rgba(255,255,255,.1);
+  }
+  .hybrid-head h2 { margin: 0; font-size: 22px; font-weight: 800; line-height: 1.2; letter-spacing: -.3px; }
+  .hybrid-head .sub { margin: 6px 0 0; font-size: 14px; font-style: italic; color: rgba(255,255,255,.85); line-height: 1.4; }
+  .hybrid-head .ctx { margin: 8px 0 0; font-size: 13px; font-style: normal; color: rgba(255,255,255,.68); line-height: 1.45; }
+  .hybrid-meter {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    padding: 10px 18px; background: var(--navy-800); border-bottom: 1px solid var(--line);
+    font-size: 13px; color: var(--muted);
+  }
+  .hybrid-meter b { color: var(--white); }
+  .hybrid-meter .ticks { font-weight: 800; color: #8ff5b6; font-variant-numeric: tabular-nums; }
+  .hybrid-list { list-style: none; margin: 0; padding: 0; background: var(--navy-800); }
+  .hybrid-list li {
+    display: flex; gap: 12px; align-items: flex-start;
+    padding: 14px 16px; border-top: 1px solid rgba(31,50,98,.55);
+  }
+  .hybrid-list li:first-child { border-top: none; }
+  .hybrid-list li.banked { background: rgba(47,191,113,.07); }
+  .hybrid-list li.lost { background: rgba(224,85,107,.06); opacity: .88; }
+  .hybrid-list li.level { background: rgba(230,162,60,.06); }
+  .chk {
+    flex: none; width: 24px; height: 24px; margin-top: 1px; border-radius: 7px;
+    border: 2px solid rgba(147,166,204,.45); background: var(--navy-700);
+    display: grid; place-items: center; font-size: 14px; font-weight: 900; line-height: 1;
+  }
+  .hybrid-list li.banked .chk { border-color: var(--good); background: rgba(47,191,113,.25); color: #8ff5b6; }
+  .hybrid-list li.banked .chk::before { content: "✓"; }
+  .hybrid-list li.lost .chk { border-color: var(--bad); background: rgba(224,85,107,.18); color: #ff9fb0; }
+  .hybrid-list li.lost .chk::before { content: "✕"; }
+  .hybrid-list li.level .chk { border-color: var(--warn); color: #ffd98a; }
+  .hybrid-list li.level .chk::before { content: "~"; }
+  .hybrid-body { flex: 1; min-width: 0; }
+  .hybrid-grp {
+    font-size: 11px; font-weight: 800; letter-spacing: .45px; text-transform: uppercase;
+    color: var(--muted); margin-bottom: 3px;
+  }
+  .hybrid-txt { font-size: 15px; font-weight: 700; line-height: 1.35; color: var(--white); }
+  .hybrid-meta { margin-top: 4px; font-size: 12px; color: var(--muted); line-height: 1.4; }
+  .hybrid-meta b { color: #9ec2ff; font-weight: 700; }
+  .hybrid-list li.lost .hybrid-txt { color: var(--muted); text-decoration: line-through; text-decoration-color: rgba(147,166,204,.35); }
+
+  /* Fallback verdict when checklist unavailable */
   .verdict {
-    border-radius: 22px; padding: 24px 20px; text-align: center;
+    margin-top: 14px; border-radius: 22px; padding: 24px 20px; text-align: center;
     background: var(--navy-800);
     border: 1px solid var(--line); box-shadow: 0 18px 40px -24px rgba(0,0,0,.8);
   }
@@ -79,36 +158,6 @@
   .verdict .subnote { margin: 10px 4px 0; font-size: 13.5px; color: var(--muted); line-height: 1.45; }
   .verdict .mean { margin: 14px 4px 0; font-size: 14.5px; color: var(--white); line-height: 1.5; }
   .verdict .tiny { margin-top: 10px; font-size: 11px; color: var(--muted); line-height: 1.45; }
-
-  /* ── Sky-style qualification checklist ───────────────────────────── */
-  .sky {
-    margin-top: 4px; border-radius: 20px; overflow: hidden;
-    background: linear-gradient(180deg, #6b1428 0%, #4a0d1c 100%);
-    border: 1px solid rgba(255,255,255,.12);
-    box-shadow: 0 16px 36px -20px rgba(0,0,0,.85);
-  }
-  .sky-head { padding: 22px 20px 8px; }
-  .sky-head h2 { margin: 0; font-size: 28px; font-weight: 800; line-height: 1.15; letter-spacing: -.4px; }
-  .sky-head p { margin: 8px 0 0; font-size: 15px; font-style: italic; color: rgba(255,255,255,.82); }
-  .sky-head .sky-ctx { margin: 10px 0 0; font-size: 13.5px; font-style: normal; color: rgba(255,255,255,.72); line-height: 1.45; }
-  .sky-progress {
-    margin: 0 20px 12px; padding: 10px 12px; border-radius: 12px;
-    background: rgba(0,0,0,.22); font-size: 13px; color: rgba(255,255,255,.88); line-height: 1.45;
-  }
-  .sky-progress b { color: #fff; }
-  .sky-list { list-style: none; margin: 0; padding: 8px 0 18px; }
-  .sky-list li {
-    display: flex; gap: 12px; align-items: flex-start;
-    padding: 13px 20px; border-top: 1px solid rgba(255,255,255,.08);
-    font-size: 16px; line-height: 1.4;
-  }
-  .sky-list li:first-child { border-top: none; }
-  .sky-grp {
-    flex: none; font-size: 11px; font-weight: 800; letter-spacing: .5px; text-transform: uppercase;
-    color: rgba(255,255,255,.55); min-width: 58px; padding-top: 3px;
-  }
-  .sky-txt { flex: 1; font-weight: 700; }
-  .sky-txt small { display: block; margin-top: 4px; font-size: 12px; font-weight: 600; color: rgba(255,255,255,.55); }
 
   /* ── Lifeline (third-place survival) ─────────────────────────────── */
   .lifeline {
@@ -307,17 +356,34 @@
   <div id="errBanner" class="banner err" hidden></div>
   <div id="staleBanner" class="banner stale" hidden></div>
 
-  <section class="sky" id="checklist-card" hidden>
-    <div class="sky-head">
-      <h2 id="checklistTitle">How do Scotland qualify?</h2>
-      <p id="checklistSubtitle">At least four of these need to happen</p>
-      <p class="sky-ctx" id="checklistContext" hidden></p>
+  <section class="hero skeleton" id="hero-card">
+    <div class="hero-top">
+      <div class="hero-copy">
+        <p class="hero-word" id="heroWord">Loading…</p>
+        <p class="hero-rank" id="heroRank"></p>
+      </div>
+      <div>
+        <div class="hero-pct" id="heroPct">—<span>%</span></div>
+        <p class="hero-lab" id="heroLab">chance</p>
+      </div>
     </div>
-    <div class="sky-progress" id="checklistProgress" hidden></div>
-    <ol class="sky-list" id="checklistList"></ol>
+    <div class="hero-note" id="heroNote"></div>
   </section>
 
-  <main id="verdict-mount">
+  <section class="hybrid" id="checklist-card" hidden>
+    <div class="hybrid-head">
+      <h2 id="checklistTitle">How do Scotland qualify?</h2>
+      <p class="sub" id="checklistSubtitle">At least four of these need to happen</p>
+      <p class="ctx" id="checklistContext" hidden></p>
+    </div>
+    <div class="hybrid-meter" id="checklistMeter" hidden>
+      <span id="checklistProgress"></span>
+      <span class="ticks" id="checklistTicks">0/4</span>
+    </div>
+    <ul class="hybrid-list" id="checklistList" role="list"></ul>
+  </section>
+
+  <main id="verdict-mount" hidden>
     <section class="verdict skeleton">
       <div class="word">Loading…</div>
     </section>
@@ -494,17 +560,54 @@
     return name + " are <b>" + pos + "</b> in their group, with games still to play.";
   }
 
+  function renderHero(d) {
+    var s = d.status || {}, c = d.chance || { percent: 0, decided: false };
+    var v = verdict(d);
+    var nm = d.targetName || "Scotland";
+    var hero = el("hero-card");
+    var fallback = el("verdict-mount");
+    var hasChecklist = d.checklist && d.checklist.applicable;
+
+    el("scoBadge").textContent = nm;
+    if (hasChecklist) {
+      el("pageTitle").childNodes[0].textContent = nm + " — knockout qualification";
+      hero.className = "hero " + v.cls;
+      hero.classList.remove("skeleton");
+      el("heroWord").textContent = v.word;
+      el("heroPct").innerHTML = c.percent + "<span>%</span>";
+      el("heroLab").textContent = chanceLabel(d);
+      var rank = "";
+      if (s.thirdPlaceRank && (s.state === "third_in" || s.state === "third_out")) {
+        rank = ord(s.thirdPlaceRank) + " among best third-placed teams right now";
+        if (s.qualified && s.state === "third_in") rank += " — in the cut";
+        else if (s.state === "third_out") rank += " — outside the cut";
+      } else if (s.groupRank) {
+        rank = ({1:"1st",2:"2nd",3:"3rd",4:"4th"})[s.groupRank] + " in Group " + s.group;
+      }
+      el("heroRank").textContent = rank;
+      var snap = snapshotLine(d);
+      el("heroNote").innerHTML = standing(
+        s, esc(s.name), (d.groupGamesStarted || 0) > 0, !!d.provisional, !!c.guaranteed
+      ) + (snap ? '<div style="margin-top:8px;color:var(--muted);font-size:13px">' + snap + "</div>" : "");
+      hero.hidden = false;
+      fallback.hidden = true;
+      return;
+    }
+
+    hero.hidden = true;
+    fallback.hidden = false;
+    el("pageTitle").childNodes[0].textContent = "Are " + nm + " going through?";
+    renderVerdict(d);
+  }
+
   function renderChecklist(d) {
     var c = d.checklist;
     var card = el("checklist-card");
     var nm = d.targetName || "Scotland";
-    el("scoBadge").textContent = nm;
     if (!c || !c.applicable || !(c.items || []).length) {
       card.hidden = true;
-      el("pageTitle").childNodes[0].textContent = "Are " + nm + " going through?";
       return;
     }
-    el("pageTitle").childNodes[0].textContent = nm + " — knockout qualification";
     el("checklistTitle").textContent = c.title || ("How do " + nm + " qualify?");
     el("checklistSubtitle").textContent = c.subtitle || "";
     var ctx = el("checklistContext");
@@ -514,24 +617,39 @@
     } else {
       ctx.hidden = true;
     }
+    var meter = el("checklistMeter");
+    var ticks = el("checklistTicks");
     var prog = el("checklistProgress");
     if (c.mode === "best_thirds") {
-      prog.hidden = false;
-      prog.innerHTML = "<b>" + (c.banked || 0) + " of " + (c.needTotal || 0) + "</b> groups already below " +
-        esc(nm) + (c.needMore > 0 ? " · still need <b>" + c.needMore + " more</b>" : " · we're there");
+      meter.hidden = false;
+      var checked = c.checkedCount != null ? c.checkedCount : (c.banked || 0);
+      var need = c.needTotal || 0;
+      ticks.textContent = checked + "/" + need;
+      prog.innerHTML = "<b>" + checked + "</b> groups below " + esc(nm) +
+        (c.needMore > 0 ? " · need <b>" + c.needMore + " more</b>" : " · holding on");
     } else {
-      prog.hidden = true;
+      meter.hidden = true;
     }
     el("checklistList").innerHTML = (c.items || []).map(function (item) {
-      var hint = "";
-      if (item.thirdTeam != null && c.mode === "best_thirds") {
-        hint = "<small>Group " + esc(item.group) + "'s 3rd right now: <b>" + esc(item.thirdTeam) +
-          "</b>" + (item.thirdPoints != null ? " (" + item.thirdPoints + " pts)" : "") + "</small>";
-      } else if (item.probGood != null && c.mode === "best_thirds") {
-        hint = "<small>~roughly " + item.probGood + "% chance this group finishes below us</small>";
+      var oc = item.outcome || "pending";
+      var meta = "";
+      if (oc === "pending" && item.thirdTeam != null) {
+        meta = "3rd now: <b>" + esc(item.thirdTeam) + "</b>" +
+          (item.thirdPoints != null ? " (" + item.thirdPoints + " pts)" : "");
+      } else if (oc === "banked") {
+        meta = "Done — counted for Scotland";
+      } else if (oc === "lost") {
+        meta = "Settled — hurt Scotland";
+      } else if (oc === "level") {
+        meta = "Tied on stats — tie-break decides";
       }
-      return '<li><span class="sky-grp">Group ' + esc(item.group) + '</span>' +
-        '<span class="sky-txt">' + esc(item.text) + hint + "</span></li>";
+      return '<li class="' + esc(oc) + '" role="listitem">' +
+          '<span class="chk" role="checkbox" aria-checked="' + (item.checked ? "true" : "false") + '"></span>' +
+          '<div class="hybrid-body">' +
+            '<div class="hybrid-grp">Group ' + esc(item.group) + "</div>" +
+            '<div class="hybrid-txt">' + esc(item.text) + "</div>" +
+            (meta ? '<div class="hybrid-meta">' + meta + "</div>" : "") +
+          "</div></li>";
     }).join("");
     card.hidden = false;
   }
@@ -898,8 +1016,8 @@
     el("footnote").innerHTML = "Everything here is worked out from the real match scores. The " +
       "<b>%</b> is a computer guess from playing out the rest of the tournament many times " +
       "(stronger teams win more often) — a guess to help you follow along, not a betting tip.";
+    renderHero(d);
     renderChecklist(d);
-    renderVerdict(d);
     renderLifeline(d);
     renderRecent(d);
     if (!d.checklist || !d.checklist.applicable) renderNeeds(d);

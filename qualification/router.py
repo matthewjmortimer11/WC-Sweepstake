@@ -635,39 +635,55 @@ def _build_checklist(
         bench_gd = int(benchmark["goalDifference"])
         items: List[Dict[str, Any]] = []
         for gr in race["groups"]:
-            if gr["outcome"] != "pending":
-                continue
-            text = _line_for_pending_group(
-                teams, fixtures, target_id, target_name, cutoff, gr, impacts, benchmark
-            )
             third = gr.get("third") or {}
+            outcome = gr["outcome"]
+            if outcome == "pending":
+                text = _line_for_pending_group(
+                    teams, fixtures, target_id, target_name, cutoff, gr, impacts, benchmark
+                )
+            elif outcome == "banked":
+                tname = third.get("name", "3rd place")
+                text = f"{tname} finished below {target_name} ({third.get('points', '?')} pts)"
+            elif outcome == "lost":
+                tname = third.get("name", "3rd place")
+                text = f"{tname} finished above {target_name} ({third.get('points', '?')} pts)"
+            elif outcome == "level":
+                tname = third.get("name", "3rd place")
+                text = f"{tname} tied {target_name} on stats — tie-break decides"
+            else:
+                text = _line_for_pending_group(
+                    teams, fixtures, target_id, target_name, cutoff, gr, impacts, benchmark
+                )
             items.append({
                 "group": gr["group"],
                 "text": text,
-                "outcome": "pending",
+                "outcome": outcome,
+                "checked": outcome == "banked",
                 "probGood": gr.get("probGood"),
                 "thirdTeam": third.get("name"),
                 "thirdPoints": third.get("points"),
             })
-        items.sort(key=lambda r: r["group"])
+        order = {"pending": 0, "banked": 1, "level": 2, "lost": 3}
+        items.sort(key=lambda r: (order.get(r["outcome"], 9), r["group"]))
+        pending_items = [i for i in items if i["outcome"] == "pending"]
         need_more = int(race.get("needMore") or 0)
-        n_items = len(items)
+        n_pending = len(pending_items)
         if need_more != 1:
             subtitle = (
-                f"At least {need_more} of these {n_items} groups need a 3rd-placed team "
+                f"At least {need_more} of these {n_pending} groups still playing need a 3rd-placed team "
                 f"below {target_name} ({bench_pts} pts, {_fmt_gd(bench_gd)} GD)"
             )
         else:
             subtitle = (
-                f"One of these groups must finish with a 3rd-placed team "
+                f"One remaining group must finish with a 3rd-placed team "
                 f"below {target_name} ({bench_pts} pts, {_fmt_gd(bench_gd)} GD)"
             )
         context = (
             f"{target_name} finished 3rd in Group {status.group} on "
             f"{bench_pts} pts ({_fmt_gd(bench_gd)} GD). "
-            f"Only the 8 best third-placed teams go through — these are the results "
-            f"elsewhere that help {target_name} stay in the cut."
+            f"Only the 8 best third-placed teams go through — tick the boxes as results land."
         )
+        banked = int(race.get("banked") or 0)
         return {
             "applicable": bool(items),
             "mode": "best_thirds",
@@ -677,7 +693,9 @@ def _build_checklist(
             "benchmark": benchmark,
             "needTotal": race.get("needTotal"),
             "needMore": need_more,
-            "banked": race.get("banked"),
+            "banked": banked,
+            "checkedCount": banked,
+            "pendingCount": n_pending,
             "items": items,
         }
 
@@ -696,6 +714,7 @@ def _build_checklist(
             "group": req.group,
             "text": text,
             "outcome": "pending",
+            "checked": False,
             "fixtureId": req.fixture_id,
         })
     return {
