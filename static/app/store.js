@@ -1111,7 +1111,10 @@
     proUpgradeAvailable: function () { return !!(WC.meta && WC.meta.proUpgradeAvailable); },
     startProCheckout: function (paths) {
       paths = paths || {};
-      if (!LIVE || !leagueCode()) return Promise.reject(new Error('Checkout requires a live league'));
+      if (!LIVE || !leagueCode()) {
+        toastError(new Error('Join a league first'), 'Could not start checkout');
+        return Promise.reject(new Error('Checkout requires a live league'));
+      }
       return fetch(api('/pro/checkout'), {
         method: 'POST',
         headers: adminHeaders(),
@@ -1123,8 +1126,20 @@
         if (j && j.url) {
           trackEvent('pro_checkout_started');
           window.location.href = j.url;
+          return j;
         }
+        if (j && j.alreadyPro) {
+          if (window.wcToast) window.wcToast('This league already has Pro.', 'confident');
+          return j;
+        }
+        toastError(new Error('No checkout URL returned'), 'Could not start checkout');
         return j;
+      }).catch(function (e) {
+        var msg = (e && e.message) || 'Could not start checkout';
+        if (e && e.status === 503) msg = 'Pro checkout is not configured on the server (check Stripe price ID).';
+        if (e && e.status === 403) msg = 'Admin sign-in required — open Admin and sign in again.';
+        toastError(e, msg);
+        throw e;
       });
     },
     finalizeDraw: finalizeDraw,

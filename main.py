@@ -1175,7 +1175,9 @@ def _pro_meta(league: League) -> Dict[str, Any]:
         "proStatus": "pro" if has_pro else "free",
         "hasPro": has_pro,
         "proGrandfathered": grandfathered,
-        "proUpgradeAvailable": bool(_stripe_ready() and not has_pro and not grandfathered),
+        "proUpgradeAvailable": bool(
+            _stripe_ready() and _pro_checkout_configured() and not has_pro and not grandfathered
+        ),
     }
 
 
