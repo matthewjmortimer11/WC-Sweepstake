@@ -58,24 +58,14 @@
   .verdict.good { border-color: rgba(47,191,113,.5); }
   .verdict.warn { border-color: rgba(230,162,60,.5); }
   .verdict.bad  { border-color: rgba(224,85,107,.5); }
-  .verdict .flag { font-size: 46px; line-height: 1; }
-  .verdict .face { font-size: 40px; margin-top: 2px; }
-  .verdict .word { font-size: 26px; font-weight: 800; margin: 6px 0 2px; letter-spacing: -.3px; }
+  .verdict .word { font-size: 26px; font-weight: 800; margin: 0 0 2px; letter-spacing: -.3px; }
   .verdict .big { font-size: 64px; font-weight: 800; line-height: 1; letter-spacing: -2px; margin-top: 8px; }
   .verdict .big span { font-size: 30px; }
   .verdict.good .big { color: #8ff5b6; } .verdict.warn .big { color: #ffd98a; } .verdict.bad .big { color: #ff9fb0; }
   .verdict .biglab { font-size: 13px; color: #cdddff; text-transform: uppercase; letter-spacing: .6px; }
+  .verdict .subnote { margin: 10px 4px 0; font-size: 13.5px; color: #cdddff; line-height: 1.45; }
   .verdict .mean { margin: 14px 4px 0; font-size: 14.5px; color: #e7eeff; line-height: 1.5; }
   .verdict .tiny { margin-top: 10px; font-size: 11px; color: #9fb4d8; line-height: 1.45; }
-  .verdict .ais { margin: 13px auto 0; max-width: 360px; background: rgba(255,255,255,.10);
-    border: 1px solid rgba(110,160,255,.45); border-radius: 12px; padding: 9px 12px; font-size: 13.5px; color: #eaf1ff; }
-  .verdict .ais b { font-size: 16px; }
-  .verdict .ais span { display: block; margin-top: 3px; font-size: 11px; color: #bcccea; }
-  .verdict .snap { margin: 12px auto 0; max-width: 360px; background: rgba(47,191,113,.14);
-    border: 1px solid rgba(47,191,113,.45); border-radius: 12px; padding: 9px 12px;
-    font-size: 13.5px; color: #d8ffe8; line-height: 1.45; }
-  .verdict .snap.out { background: rgba(224,85,107,.12); border-color: rgba(224,85,107,.4); color: #ffd6dc; }
-  .verdict .snap b { color: var(--white); }
 
   /* ── Lifeline (third-place survival) ─────────────────────────────── */
   .lifeline {
@@ -273,7 +263,6 @@
 
   <main id="verdict-mount">
     <section class="verdict skeleton">
-      <div class="flag">🏴󠁧󠁢󠁳󠁣󠁴󠁿</div>
       <div class="word">Loading…</div>
     </section>
   </main>
@@ -284,7 +273,7 @@
     <div class="ll-emote" id="llEmote"></div>
     <div class="ll-progress" id="llProgress"></div>
     <p class="ll-above" id="llAbove"></p>
-    <h3 class="ll-gh">🎯 The games that decide it</h3>
+    <h3 class="ll-gh">The games that decide it</h3>
     <p class="explain" id="llKeyNote"></p>
     <div id="llKeyGames"></div>
     <h3 class="ll-gh">The groups that decide it</h3>
@@ -294,13 +283,13 @@
   </section>
 
   <section class="card" id="recent-card" hidden>
-    <h2 id="recentTitle">🔴 Live &amp; just played</h2>
+    <h2 id="recentTitle">Live and just played</h2>
     <p class="explain" id="recentNote"></p>
     <div class="card-body"><div id="recentList"></div></div>
   </section>
 
   <section class="card" id="need-card" hidden>
-    <h2 id="needTitle">⚽ What do Scotland need?</h2>
+    <h2 id="needTitle">What do Scotland need?</h2>
     <p class="explain" id="needHelp"></p>
     <div class="card-body">
       <ul class="needs" id="needList"></ul>
@@ -309,7 +298,7 @@
   </section>
 
   <section class="card" id="queue-card" hidden>
-    <h2>🥉 The race for the last 8 spots</h2>
+    <h2>The race for the last 8 spots</h2>
     <p class="explain" id="queueHelp"></p>
     <div class="card-body">
       <ul class="queue" id="queueList"></ul>
@@ -317,7 +306,7 @@
   </section>
 
   <section class="card" id="group-card" hidden>
-    <h2 id="groupTitle">📊 Scotland's group</h2>
+    <h2 id="groupTitle">Scotland's group</h2>
     <p class="explain">Top 2 go straight through. 3rd place might still sneak in. 4th is out.</p>
     <div class="card-body">
       <ul class="grp" id="groupList"></ul>
@@ -325,10 +314,10 @@
   </section>
 
   <details class="howto" id="howto">
-    <summary>🏆 How do you get through? <span id="howtoTarget">Scotland</span>'s route — tap to read</summary>
+    <summary>How do you get through? <span id="howtoTarget">Scotland</span>'s route — tap to read</summary>
     <ul>
-      <li><span class="ic">①</span><span>Finish <b>1st or 2nd</b> in your group of 4 → straight through.</span></li>
-      <li><span class="ic">②</span><span>Finish <b>3rd</b>? You can still go through if you're one of the <b>8 best</b> 3rd-place teams (there are 12 groups).</span></li>
+      <li><span class="ic">1.</span><span>Finish <b>1st or 2nd</b> in your group of 4 → straight through.</span></li>
+      <li><span class="ic">2.</span><span>Finish <b>3rd</b>? You can still go through if you're one of the <b>8 best</b> 3rd-place teams (there are 12 groups).</span></li>
     </ul>
   </details>
 
@@ -370,14 +359,14 @@
     var c = d.chance || {}, s = d.status || {};
     if (c.decided || c.guaranteed) return "";
     if (s.state === "third_in" && s.qualified && s.thirdPlaceRank) {
-      var line = "📍 <b>In the cut right now</b> — " + ord(s.thirdPlaceRank) +
+      var line = "<b>In the cut right now</b> — " + ord(s.thirdPlaceRank) +
         " of the best third-placed teams (top " + (d.cutoff || 8) + " go through).";
       if (d.provisional)
-        line += " <span style='color:#bcccea'>Still provisional — most groups haven't finished.</span>";
+        line += " Still provisional — most groups haven't finished.";
       return line;
     }
     if (s.state === "third_out" && s.thirdPlaceRank) {
-      return "📍 <b>Outside the cut right now</b> — " + ord(s.thirdPlaceRank) +
+      return "<b>Outside the cut right now</b> — " + ord(s.thirdPlaceRank) +
         " among the thirds (only the top " + (d.cutoff || 8) + " go through).";
     }
     return "";
@@ -390,36 +379,36 @@
     if (c.decided) {
       var thru = c.percent >= 50;
       if (c.guaranteed)
-        return thru ? { face: "✅", word: "Guaranteed through!", cls: "good" }
-                    : { face: "❌", word: "Can't qualify", cls: "bad" };
-      return thru ? { face: "🎉", word: "They're through!", cls: "good" }
-                  : { face: "😢", word: "Out this time", cls: "bad" };
+        return thru ? { word: "Guaranteed through!", cls: "good" }
+                    : { word: "Can't qualify", cls: "bad" };
+      return thru ? { word: "They're through!", cls: "good" }
+                  : { word: "Out this time", cls: "bad" };
     }
     var p = c.percent;
     if (s.state === "third_in" && s.qualified && !c.decided) {
-      if (p >= 65) return { face: "🙂", word: "In — and holding", cls: "good" };
-      if (p >= 40) return { face: "😬", word: "In — but it's tight", cls: "warn" };
-      return { face: "😟", word: "In — for now", cls: "bad" };
+      if (p >= 65) return { word: "In — and holding", cls: "good" };
+      if (p >= 40) return { word: "In — but it's tight", cls: "warn" };
+      return { word: "In — for now", cls: "bad" };
     }
     if (s.state === "third_in") {
-      if (p >= 75) return { face: "😄", word: "Inside the cut", cls: "good" };
-      if (p >= 55) return { face: "🙂", word: "Holding a place", cls: "good" };
-      if (p >= 40) return { face: "😬", word: "On the bubble", cls: "warn" };
-      return { face: "😟", word: "Slipping down the queue", cls: "bad" };
+      if (p >= 75) return { word: "Inside the cut", cls: "good" };
+      if (p >= 55) return { word: "Holding a place", cls: "good" };
+      if (p >= 40) return { word: "On the bubble", cls: "warn" };
+      return { word: "Slipping down the queue", cls: "bad" };
     }
     if (s.state === "third_out") {
-      if (p >= 45) return { face: "😬", word: "Still a shot", cls: "warn" };
-      if (p >= 25) return { face: "😟", word: "Need a favour", cls: "bad" };
-      return { face: "🙏", word: "Long odds", cls: "bad" };
+      if (p >= 45) return { word: "Still a shot", cls: "warn" };
+      if (p >= 25) return { word: "Need a favour", cls: "bad" };
+      return { word: "Long odds", cls: "bad" };
     }
     if (s.state === "qualified" && !s.groupComplete) {
-      return { face: "✅", word: "Top two — for now", cls: "good" };
+      return { word: "Top two — for now", cls: "good" };
     }
-    if (p >= 80) return { face: "😄", word: "Very likely!", cls: "good" };
-    if (p >= 60) return { face: "🙂", word: "Looking good", cls: "good" };
-    if (p >= 45) return { face: "😬", word: "It's a coin flip", cls: "warn" };
-    if (p >= 25) return { face: "😟", word: "It's an uphill battle", cls: "bad" };
-    return { face: "🙏", word: "Needs a miracle", cls: "bad" };
+    if (p >= 80) return { word: "Very likely!", cls: "good" };
+    if (p >= 60) return { word: "Looking good", cls: "good" };
+    if (p >= 45) return { word: "It's a coin flip", cls: "warn" };
+    if (p >= 25) return { word: "It's an uphill battle", cls: "bad" };
+    return { word: "Needs a miracle", cls: "bad" };
   }
 
   // A plain "where they stand right now" sentence.
@@ -428,23 +417,23 @@
       return "The group games haven't kicked off yet — this is how it looks on paper, based on how strong the teams are.";
     if (s.state === "qualified") {
       if (s.groupComplete || guaranteed)
-        return "✅ " + name + " finished in the <b>top 2</b> of the group — safely through to the next round.";
-      return "✅ " + name + " are in the <b>top 2</b> on live standings — through if the group finishes like this.";
+        return name + " finished in the <b>top 2</b> of the group — safely through to the next round.";
+      return name + " are in the <b>top 2</b> on live standings — through if the group finishes like this.";
     }
     if (s.state === "third_in") {
       if (provisional)
-        return "🟡 " + name + " are <b>3rd</b> in their group — provisional best-third ranking until every group finishes.";
+        return name + " are <b>3rd</b> in their group — provisional best-third ranking until every group finishes.";
       if (s.qualified && s.thirdPlaceRank)
-        return "🟡 " + name + " are <b>3rd</b> in the group and <b>" + ord(s.thirdPlaceRank) + "</b> among the best thirds — inside the top 8 on today's table.";
-      return "🟡 " + name + " are <b>3rd</b> in the group right now — and currently sneaking in as one of the <b>8 best 3rd-placed teams</b>.";
+        return name + " are <b>3rd</b> in the group and <b>" + ord(s.thirdPlaceRank) + "</b> among the best thirds — inside the top 8 on today's table.";
+      return name + " are <b>3rd</b> in the group right now — and currently sneaking in as one of the <b>8 best 3rd-placed teams</b>.";
     }
     if (s.state === "third_out") {
       if (s.thirdPlaceRank)
-        return "🟡 " + name + " are <b>3rd</b> in the group but <b>" + ord(s.thirdPlaceRank) + "</b> among the best thirds — outside the top 8 for now.";
-      return "🟡 " + name + " are <b>3rd</b> in the group — but just <b>missing</b> the 8 best 3rd-placed teams for now.";
+        return name + " are <b>3rd</b> in the group but <b>" + ord(s.thirdPlaceRank) + "</b> among the best thirds — outside the top 8 for now.";
+      return name + " are <b>3rd</b> in the group — but just <b>missing</b> the 8 best 3rd-placed teams for now.";
     }
     if (s.state === "eliminated")
-      return "🔴 " + name + " finished bottom and can't go through this time.";
+      return name + " finished bottom and can't go through this time.";
     var pos = ({1:"1st",2:"2nd",3:"3rd",4:"4th"})[s.groupRank] || (s.positionLabel || "");
     return name + " are <b>" + pos + "</b> in their group, with games still to play.";
   }
@@ -464,7 +453,7 @@
     } else if (c.label === "forecast") {
       tiny = "No group games have kicked off yet. This % is a computer forecast from how strong each team is — not where anyone stands today.";
     } else if (c.label === "holding") {
-      tiny = "The green box above is where " + esc(s.name) + " stand on today's table. The big % is how often they " +
+      tiny = "On today's table, " + esc(s.name) + " are in the cut. The big % is how often they " +
         "<b>stay</b> in the top " + (d.cutoff || 8) + " after every remaining group game is played (" +
         (c.trials ? c.trials.toLocaleString() : "thousands of") + " simulations).";
     } else if (c.label === "catching") {
@@ -477,16 +466,12 @@
     }
     el("verdict-mount").innerHTML =
       '<section class="verdict ' + v.cls + '">' +
-        '<div class="flag">' + esc(s.flag || "🏴") + '</div>' +
-        '<div class="face">' + v.face + '</div>' +
         '<div class="word">' + esc(v.word) + '</div>' +
-        (snap ? '<div class="snap' + (s.state === "third_out" ? " out" : "") + '">' + snap + '</div>' : '') +
         '<div class="big">' + c.percent + '<span>%</span></div>' +
         '<div class="biglab">' + esc(lab) + '</div>' +
+        (snap ? '<p class="subnote">' + snap + '</p>' : '') +
         (c.asItStands != null
-          ? '<div class="ais">🔵 If the live score' + (d.meta && d.meta.live ? "s" : "") +
-              ' froze right now, it would be <b>' + c.asItStands + '%</b>' +
-              '<span>The big number already allows for those games finishing — live scores can still change.</span></div>'
+          ? '<p class="subnote">If live scores froze now: <b>' + c.asItStands + '%</b>.</p>'
           : "") +
         '<div class="mean">' + standing(s, esc(s.name), (d.groupGamesStarted || 0) > 0, !!d.provisional, !!c.guaranteed) + '</div>' +
         '<div class="tiny">' + esc(tiny) + '</div>' +
@@ -503,7 +488,7 @@
     else if (delta <= -2) { move = delta + "%"; mcls = "down"; }
     else { move = "±0"; mcls = "flat"; }
     return '<div class="out' + (good ? " good" : "") + '">' +
-        '<span class="oi">' + (good ? "✅" : "·") + '</span>' +
+        '<span class="oi">' + (good ? "+" : "·") + '</span>' +
         '<span class="otxt"><span class="ol">' + esc(label) + '</span> ' +
           '<span class="opct">→ about ' + pct + '% chance</span></span>' +
         '<span class="omove ' + mcls + '">' + move + '</span>' +
@@ -511,18 +496,18 @@
   }
 
   function whenLabel(g) {
-    if (g.live) return '<span class="when live">🔴 LIVE NOW</span>';
+    if (g.live) return '<span class="when live">LIVE NOW</span>';
     var bits = [];
     if (g.dateLabel) bits.push(esc(g.dateLabel));
     if (g.time) bits.push(esc(g.time));
-    return bits.length ? '<span class="when">🗓️ ' + bits.join(" · ") + '</span>' : "";
+    return bits.length ? '<span class="when">' + bits.join(" · ") + '</span>' : "";
   }
 
   function renderNeeds(d) {
     // When the Lifeline is showing, it already lays out the games we need by
     // group (with times) — so skip this card to avoid showing it all twice.
     if (d.race && d.race.applicable) { el("need-card").hidden = true; return; }
-    el("needTitle").textContent = "⚽ What do " + d.targetName + " need?";
+    el("needTitle").textContent = "What do " + d.targetName + " need?";
     var all = d.remainingGames || [];
     // Show EVERY game in progress right now (you're watching them — even if the
     // effect is small), most influential first; then the next upcoming games that
@@ -539,8 +524,7 @@
 
     if (d.chance && d.chance.decided) {
       help.textContent = "";
-      list.innerHTML = '<li class="big-msg"><span class="em">' +
-        (d.chance.percent >= 50 ? "🎉" : "😢") + '</span>' +
+      list.innerHTML = '<li class="big-msg">' +
         (d.chance.percent >= 50
           ? d.targetName + " are already through — sit back and enjoy it!"
           : d.targetName + " can't go through this time.") + '</li>';
@@ -550,7 +534,7 @@
     }
     if (!shown.length) {
       help.textContent = "";
-      list.innerHTML = '<li class="big-msg"><span class="em">🤞</span>' +
+      list.innerHTML = '<li class="big-msg">' +
         "No single game swings it much right now — " + esc(d.targetName) +
         " need the right mix of results across the groups still playing.</li>";
       foot.textContent = "";
@@ -569,20 +553,20 @@
       var meh = g.wants === "result barely matters" || g.wants === "the result barely matters";
       return '<li' + (g.live ? ' class="live"' : '') + '>' +
           '<div class="need-teams">' +
-            '<span>' + esc(g.home.flag) + ' ' + hn + '</span>' +
+            '<span>' + hn + '</span>' +
             '<span class="v">v</span>' +
-            '<span>' + an + ' ' + esc(g.away.flag) + '</span>' +
+            '<span>' + an + '</span>' +
             (g.group ? '<span class="grp">Group ' + esc(g.group) + '</span>' : '') +
             whenLabel(g) +
           '</div>' +
           '<div class="need-want' + (meh ? ' meh' : '') + '">' +
-            (meh ? '🤷' : '👍') + ' <span>' +
+            '<span>' +
               (meh ? "Barely moves the needle" :
                 (g.cheerFor ? "Cheer for: " + esc(g.cheerFor) : "We want: " + esc(g.wants))) +
             '</span>' +
           '</div>' +
           (g.fear ? '<div class="need-want meh" style="margin-top:6px;background:rgba(224,85,107,.1);border-color:rgba(224,85,107,.35);color:#ff9fb0">' +
-            '🚫 <span>' + esc(g.fear) + '</span></div>' : '') +
+            '<span>' + esc(g.fear) + '</span></div>' : '') +
           (g.matters && (g.swing || 0) >= 8
             ? '<div class="outs">' +
                 outRow(hn + " win", g.chanceIfHomeWin, good.indexOf("home") >= 0, base) +
@@ -615,11 +599,10 @@
     rows.forEach(function (t) {
       html += '<li class="' + (t.isTarget ? "me" : "") + '">' +
           '<span class="pos">' + t.rank + '</span>' +
-          '<span class="fl">' + esc(t.flag) + '</span>' +
-          '<span class="who"><span class="nm">' + esc(t.name) + (t.isTarget ? " 👈" : "") + '</span>' +
+          '<span class="who"><span class="nm">' + esc(t.name) + (t.isTarget ? " (you)" : "") + '</span>' +
             ' <span class="sm">Group ' + esc(t.group) + ' · ' + t.points + ' pts</span></span>' +
           '<span class="badge ' + (t.qualifies ? "in" : "out") + '">' +
-            (t.qualifies ? "IN ✅" : "OUT ❌") + '</span>' +
+            (t.qualifies ? "IN" : "OUT") + '</span>' +
         '</li>';
       if (t.rank === d.cutoff) {
         html += '<div class="cut">top ' + d.cutoff + ' go through</div>';
@@ -631,17 +614,16 @@
 
   // ── Scotland's group ──────────────────────────────────────────────
   function renderGroup(d) {
-    el("groupTitle").textContent = "📊 " + d.targetName + "'s group (Group " + d.status.group + ")";
+    el("groupTitle").textContent = d.targetName + "'s group (Group " + d.status.group + ")";
     var rows = d.targetGroupTable || [];
-    var medals = { 1: "🥇", 2: "🥈", 3: "🥉", 4: "4️⃣" };
+    var medals = { 1: "1st", 2: "2nd", 3: "3rd", 4: "4th" };
     el("groupList").innerHTML = rows.map(function (t) {
       var tag = t.rank <= 2 ? '<span class="tag thru">through</span>'
               : (t.rank === 3 ? '<span class="tag maybe">maybe (3rd)</span>'
                               : '<span class="tag out">out</span>');
       return '<li class="' + (t.isTarget ? "me" : "") + '">' +
           '<span class="medal">' + (medals[t.rank] || t.rank) + '</span>' +
-          '<span class="fl">' + esc(t.flag) + '</span>' +
-          '<span class="who">' + esc(t.name) + (t.isTarget ? " 👈" : "") + '</span>' +
+          '<span class="who">' + esc(t.name) + (t.isTarget ? " (you)" : "") + '</span>' +
           tag +
           '<span class="pts">' + t.points + ' <small>pts</small></span>' +
         '</li>';
@@ -656,7 +638,7 @@
     if (!r || !r.applicable) { el("lifeline-card").hidden = true; return; }
     var nm = esc(d.targetName);
     var map = {
-      qualified: { cls: "good", pill: "✅ Through", head: nm + " are <b>through</b> as one of the best third-placed teams!" },
+      qualified: { cls: "good", pill: "Through", head: nm + " are <b>through</b> as one of the best third-placed teams!" },
       alive:     { cls: "good", pill: "Still alive", head: nm + " need <b>" + r.needMore + " of the " + r.inPlay + "</b> remaining groups to go our way." },
       thread:    { cls: "warn", pill: "Hanging by a thread", head: nm + " need <b>" + r.needMore + " of the " + r.inPlay + "</b> remaining groups to go our way." },
       eliminated:{ cls: "bad", pill: "Eliminated", head: nm + " can't make the best-third places this time." }
@@ -684,7 +666,7 @@
     var above = r.aboveNow || [];
     el("llAbove").innerHTML = above.length
       ? ("Already ahead of us: " + above.map(function (t) {
-           return esc(t.flag) + " " + esc(t.name) + " (" + t.points + " pts, " + fmtGD(t.goalDifference) + " GD)";
+           return esc(t.name) + " (" + t.points + " pts, " + fmtGD(t.goalDifference) + " GD)";
          }).join("; ") +
          ". We need other groups' 3rd-place teams to finish on <b>fewer than " + r.benchmark.points +
          " pts</b> (or the same with worse GD/goals).")
@@ -712,19 +694,19 @@
 
     el("llKeyGames").innerHTML = keyGames.map(function (gm) {
       var when = gm.live
-        ? '<span class="kg-live">🔴 LIVE NOW</span>'
+        ? '<span class="kg-live">LIVE NOW</span>'
         : '<span class="kg-when">' + ([gm.dateLabel, gm.time].filter(Boolean).map(esc).join(" · ") || "TBC") + "</span>";
       return '<div class="kg' + (gm.live ? " live" : "") + '">' +
           '<div class="kg-head"><span class="kg-grp">Group ' + esc(gm.group) + "</span>" + when + "</div>" +
-          '<div class="kg-teams">' + esc(gm.home.flag) + " " + esc(gm.home.name) +
-            ' <span class="kg-v">v</span> ' + esc(gm.away.name) + " " + esc(gm.away.flag) + "</div>" +
-          '<div class="kg-want">👍 Cheer for: ' + esc(gm.cheerFor || gm.wants) + "</div>" +
-          (gm.fear ? '<div class="kg-fear">🚫 ' + esc(gm.fear) + "</div>" : "") +
+          '<div class="kg-teams">' + esc(gm.home.name) +
+            ' <span class="kg-v">v</span> ' + esc(gm.away.name) + "</div>" +
+          '<div class="kg-want">Cheer for: ' + esc(gm.cheerFor || gm.wants) + "</div>" +
+          (gm.fear ? '<div class="kg-fear">' + esc(gm.fear) + "</div>" : "") +
         "</div>";
     }).join("") || '<p class="empty">No games left to play.</p>';
 
     el("llGroupsNote").innerHTML = "Each group goes our way when its 3rd-place team finishes <b>below</b> Scotland. " +
-      "Auto-ticks ✓ or crosses ✗ as the games above finish.";
+      "Ticks or crosses update as the games above finish.";
 
     function pendingWord(p) {
       if (p >= 65) return { t: "~" + p + "% chance their 3rd finishes below us", c: "good" };
@@ -746,7 +728,7 @@
 
     var decided = (r.groups || []).filter(function (g) { return g.outcome !== "pending"; });
     el("llDecided").innerHTML = decided.map(function (g) {
-      var mark = g.outcome === "banked" ? "✓" : (g.outcome === "level" ? "≈" : "✗");
+      var mark = g.outcome === "banked" ? "+" : (g.outcome === "level" ? "~" : "-");
       var state = g.outcome === "banked" ? "Finished below us — counts"
         : (g.outcome === "level" ? "Tied on stats — tie-break decides" : "Finished above us");
       var third = g.third ? (esc(g.third.name) + " " + g.third.points + "pts") : "—";
@@ -763,7 +745,7 @@
   function renderRecent(d) {
     var res = d.results || [];           // server sends newest first, live first
     var anyLive = res.some(function (r) { return r.live; });
-    el("recentTitle").textContent = anyLive ? "🔴 Live & just played" : "⏱️ Just played";
+    el("recentTitle").textContent = anyLive ? "Live and just played" : "Just played";
     el("recentNote").textContent = (d.gamesPlayed || 0) + " of " + (d.gamesTotal || 0) +
       " group games played" + (res.length > 6 ? " · showing the latest" : "");
     if (!res.length) {
@@ -772,16 +754,16 @@
       return;
     }
     el("recentList").innerHTML = res.slice(0, 7).map(function (r) {
-      var when = r.live ? "🔴 LIVE NOW"
+      var when = r.live ? "LIVE NOW"
         : [r.dateLabel, r.time].filter(Boolean).map(esc).join(" · ") || "full time";
       return '<div class="recent-item' + (r.live ? " live" : "") + '">' +
           '<div class="ri-meta"><span class="gtag">Group ' + esc(r.group) + '</span>' +
             '<span class="ri-when">' + when + '</span></div>' +
           '<div class="ri-top">' +
-            '<span class="rh">' + esc(r.home.name) + " " + esc(r.home.flag) + '</span>' +
+            '<span class="rh">' + esc(r.home.name) + '</span>' +
             '<span class="sc">' + (r.homeGoals == null ? "–" : r.homeGoals) + "–" +
               (r.awayGoals == null ? "–" : r.awayGoals) + '</span>' +
-            '<span class="ra">' + esc(r.away.flag) + " " + esc(r.away.name) + '</span>' +
+            '<span class="ra">' + esc(r.away.name) + '</span>' +
           '</div>' +
         '</div>';
     }).join("");
@@ -793,7 +775,7 @@
     var stale = el("staleBanner");
     if (m.stale) {
       stale.hidden = false;
-      stale.innerHTML = "⚠️ Showing the last scores we have" +
+      stale.innerHTML = "Showing the last scores we have" +
         (m.lastUpdated ? " — they may be a little behind." : " — live scores aren't available right now.");
     } else { stale.hidden = true; }
     var ago = "";
