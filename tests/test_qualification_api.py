@@ -11,6 +11,9 @@ async def test_qualification_api_defaults_to_scotland(client):
     assert data["target"] == "SCO"
     assert "chance" in data
     assert "percent" in data["chance"]
+    if data.get("checklist", {}).get("applicable"):
+        assert "items" in data["checklist"]
+        assert data["checklist"]["title"].startswith("How do")
     assert "meta" in data
     assert "Cache-Control" in r.headers
     assert "max-age=" in r.headers["Cache-Control"]

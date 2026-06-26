@@ -74,6 +74,35 @@
   .verdict .mean { margin: 14px 4px 0; font-size: 14.5px; color: var(--white); line-height: 1.5; }
   .verdict .tiny { margin-top: 10px; font-size: 11px; color: var(--muted); line-height: 1.45; }
 
+  /* ── Sky-style qualification checklist ───────────────────────────── */
+  .sky {
+    margin-top: 4px; border-radius: 20px; overflow: hidden;
+    background: linear-gradient(180deg, #6b1428 0%, #4a0d1c 100%);
+    border: 1px solid rgba(255,255,255,.12);
+    box-shadow: 0 16px 36px -20px rgba(0,0,0,.85);
+  }
+  .sky-head { padding: 22px 20px 8px; }
+  .sky-head h2 { margin: 0; font-size: 28px; font-weight: 800; line-height: 1.15; letter-spacing: -.4px; }
+  .sky-head p { margin: 8px 0 0; font-size: 15px; font-style: italic; color: rgba(255,255,255,.82); }
+  .sky-progress {
+    margin: 0 20px 12px; padding: 10px 12px; border-radius: 12px;
+    background: rgba(0,0,0,.22); font-size: 13px; color: rgba(255,255,255,.88); line-height: 1.45;
+  }
+  .sky-progress b { color: #fff; }
+  .sky-list { list-style: none; margin: 0; padding: 8px 0 18px; }
+  .sky-list li {
+    display: flex; gap: 12px; align-items: flex-start;
+    padding: 13px 20px; border-top: 1px solid rgba(255,255,255,.08);
+    font-size: 16px; line-height: 1.4;
+  }
+  .sky-list li:first-child { border-top: none; }
+  .sky-grp {
+    flex: none; font-size: 11px; font-weight: 800; letter-spacing: .5px; text-transform: uppercase;
+    color: rgba(255,255,255,.55); min-width: 58px; padding-top: 3px;
+  }
+  .sky-txt { flex: 1; font-weight: 700; }
+  .sky-txt small { display: block; margin-top: 4px; font-size: 12px; font-weight: 600; color: rgba(255,255,255,.55); }
+
   /* ── Lifeline (third-place survival) ─────────────────────────────── */
   .lifeline {
     margin-top: 16px; border-radius: 20px; padding: 20px 18px;
@@ -259,7 +288,7 @@
 <body>
 <div class="wrap">
   <header class="top">
-    <div class="title">Are Scotland going through?<span id="subtitle">World Cup 2026</span></div>
+    <div class="title" id="pageTitle">Are Scotland going through?<span id="subtitle">World Cup 2026</span></div>
     <button class="refresh" id="refreshBtn" type="button" aria-busy="false">
       <span class="spin">↻</span><span>Refresh</span>
     </button>
@@ -267,6 +296,15 @@
 
   <div id="errBanner" class="banner err" hidden></div>
   <div id="staleBanner" class="banner stale" hidden></div>
+
+  <section class="sky" id="checklist-card" hidden>
+    <div class="sky-head">
+      <h2 id="checklistTitle">How do Scotland qualify?</h2>
+      <p id="checklistSubtitle">At least four of these need to happen</p>
+    </div>
+    <div class="sky-progress" id="checklistProgress" hidden></div>
+    <ol class="sky-list" id="checklistList"></ol>
+  </section>
 
   <main id="verdict-mount">
     <section class="verdict skeleton">
@@ -443,6 +481,36 @@
       return name + " finished bottom and can't go through this time.";
     var pos = ({1:"1st",2:"2nd",3:"3rd",4:"4th"})[s.groupRank] || (s.positionLabel || "");
     return name + " are <b>" + pos + "</b> in their group, with games still to play.";
+  }
+
+  function renderChecklist(d) {
+    var c = d.checklist;
+    var card = el("checklist-card");
+    if (!c || !c.applicable || !(c.items || []).length) {
+      card.hidden = true;
+      el("pageTitle").childNodes[0].textContent = "Are " + d.targetName + " going through?";
+      return;
+    }
+    el("pageTitle").childNodes[0].textContent = c.title || ("How do " + d.targetName + " qualify?");
+    el("checklistTitle").textContent = c.title || ("How do " + d.targetName + " qualify?");
+    el("checklistSubtitle").textContent = c.subtitle || "";
+    var prog = el("checklistProgress");
+    if (c.mode === "best_thirds") {
+      prog.hidden = false;
+      prog.innerHTML = "<b>" + (c.banked || 0) + " of " + (c.needTotal || 0) + "</b> groups already below " +
+        esc(d.targetName) + (c.needMore > 0 ? " · still need <b>" + c.needMore + " more</b>" : " · we're there");
+    } else {
+      prog.hidden = true;
+    }
+    el("checklistList").innerHTML = (c.items || []).map(function (item) {
+      var hint = "";
+      if (item.probGood != null && c.mode === "best_thirds") {
+        hint = "<small>~roughly " + item.probGood + "% chance this group finishes below us</small>";
+      }
+      return '<li><span class="sky-grp">Group ' + esc(item.group) + '</span>' +
+        '<span class="sky-txt">' + esc(item.text) + hint + "</span></li>";
+    }).join("");
+    card.hidden = false;
   }
 
   function renderVerdict(d) {
@@ -642,7 +710,10 @@
   // ── Lifeline: the "we need N of the other groups to go our way" view ──
   function renderLifeline(d) {
     var r = d.race;
-    if (!r || !r.applicable) { el("lifeline-card").hidden = true; return; }
+    if (!r || !r.applicable || (d.checklist && d.checklist.applicable)) {
+      el("lifeline-card").hidden = true;
+      return;
+    }
     var nm = esc(d.targetName);
     var map = {
       qualified: { cls: "good", pill: "Through", head: nm + " are <b>through</b> as one of the best third-placed teams!" },
@@ -804,10 +875,11 @@
     el("footnote").innerHTML = "Everything here is worked out from the real match scores. The " +
       "<b>%</b> is a computer guess from playing out the rest of the tournament many times " +
       "(stronger teams win more often) — a guess to help you follow along, not a betting tip.";
+    renderChecklist(d);
     renderVerdict(d);
     renderLifeline(d);
     renderRecent(d);
-    renderNeeds(d);
+    if (!d.checklist || !d.checklist.applicable) renderNeeds(d);
     renderQueue(d);
     renderGroup(d);
     pollMs = (d.meta && d.meta.pollIntervalMs) || pollMs;

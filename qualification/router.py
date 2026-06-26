@@ -416,6 +416,186 @@ def _build_race(teams, fixtures, status, tables, cutoff: int) -> Optional[Dict[s
     }
 
 
+def _band_to_sky_line(band: engine.Band, home_name: str, away_name: str) -> str:
+    """Sky Sports-style phrasing — who to cheer for in plain fan language."""
+    if band.kind == "win":
+        return f"{away_name} lose to {home_name}"
+    if band.kind == "lose":
+        return f"{home_name} lose to {away_name}"
+    if band.kind == "avoid_defeat":
+        return f"{away_name} fail to beat {home_name}"
+    if band.kind == "avoid_win":
+        return f"{home_name} fail to beat {away_name}"
+    if band.kind == "win_by":
+        return f"{home_name} beat {away_name} by {band.k}+ goals"
+    if band.kind == "not_win_by":
+        return f"{home_name} must not beat {away_name} by {band.k}+ goals"
+    if band.kind == "lose_by":
+        return f"{home_name} lose to {away_name} by {band.k}+ goals"
+    if band.kind == "draw_only":
+        return f"{home_name} and {away_name} draw"
+    return engine.explain_requirement(band, home_name, away_name)
+
+
+def _wants_to_sky_line(wants: str, home_name: str, away_name: str) -> str:
+    """Turn a wants string (from Monte-Carlo classification) into Sky-style copy."""
+    w = (wants or "").strip()
+    if not w or "barely matters" in w:
+        return ""
+    if w.endswith(" to win"):
+        team = w[: -len(" to win")]
+        if team == home_name:
+            return f"{away_name} lose to {home_name}"
+        if team == away_name:
+            return f"{home_name} lose to {away_name}"
+    if w.endswith(" to avoid defeat"):
+        team = w[: -len(" to avoid defeat")]
+        if team == home_name:
+            return f"{away_name} fail to beat {home_name}"
+        if team == away_name:
+            return f"{home_name} fail to beat {away_name}"
+    if w.endswith(" must not win"):
+        team = w[: -len(" must not win")]
+        if team == home_name:
+            return f"{home_name} fail to beat {away_name}"
+        if team == away_name:
+            return f"{away_name} fail to beat {home_name}"
+    if w == "anything but a draw":
+        return f"{home_name} or {away_name} to win"
+    if w.endswith(" to draw"):
+        return f"{home_name} and {away_name} draw"
+    return w
+
+
+def _line_from_impact(
+    impact: projection.GameImpact,
+    teams: List[Team],
+    fixtures: List[Fixture],
+    target_id: str,
+    cutoff: int,
+) -> str:
+    """Best Sky-style one-liner for a single decisive fixture."""
+    name_of = {t.id: t.name for t in teams}
+    home = name_of.get(impact.home, impact.home)
+    away = name_of.get(impact.away, impact.away)
+    h = round(impact.chance_if_home_win * 100)
+    dr = round(impact.chance_if_draw * 100)
+    a = round(impact.chance_if_away_win * 100)
+    good, _, _, _ = _classify_outcomes(h, dr, a)
+    wants = _wants_text(good).format(home=home, away=away)
+    sky = _wants_to_sky_line(wants, home, away)
+    if sky:
+        grid = engine.calculate_relevant_score_bands(
+            teams, fixtures, impact.fixture_id, target_id, cutoff
+        )
+        band = engine._collapse_band(grid)
+        if band.kind == "win_by":
+            return _band_to_sky_line(band, home, away)
+        if band.kind == "not_win_by":
+            return _band_to_sky_line(band, home, away)
+        return sky
+    if impact.favoured_outcome == "home":
+        return f"{away} lose to {home}"
+    if impact.favoured_outcome == "away":
+        return f"{home} lose to {away}"
+    return f"{home} v {away}: a draw helps"
+
+
+def _pick_group_impact(
+    impacts: List[projection.GameImpact], group: str
+) -> Optional[projection.GameImpact]:
+    candidates = [i for i in impacts if i.group == group and i.matters]
+    if not candidates:
+        candidates = [i for i in impacts if i.group == group]
+    if not candidates:
+        return None
+    return max(candidates, key=lambda i: i.swing)
+
+
+def _build_checklist(
+    teams: List[Team],
+    fixtures: List[Fixture],
+    target_id: str,
+    target_name: str,
+    cutoff: int,
+    status: engine.QualificationStatus,
+    race: Optional[Dict[str, Any]],
+    impacts: List[projection.GameImpact],
+) -> Optional[Dict[str, Any]]:
+    """Sky-style checklist — what needs to happen for the target to qualify."""
+    name_of = {t.id: t.name for t in teams}
+
+    if race and race.get("applicable"):
+        items: List[Dict[str, Any]] = []
+        for gr in race["groups"]:
+            if gr["outcome"] != "pending":
+                continue
+            group = gr["group"]
+            imp = _pick_group_impact(impacts, group)
+            if imp:
+                text = _line_from_impact(imp, teams, fixtures, target_id, cutoff)
+            else:
+                text = ""
+            if not text:
+                third = (gr.get("third") or {}).get("name")
+                text = (
+                    f"We need Group {group}'s 3rd place"
+                    + (f" ({third})" if third else "")
+                    + " to finish below Scotland"
+                )
+            items.append({
+                "group": group,
+                "text": text,
+                "outcome": "pending",
+                "probGood": gr.get("probGood"),
+            })
+        items.sort(key=lambda r: r["group"])
+        need_more = int(race.get("needMore") or 0)
+        subtitle = (
+            f"At least {need_more} of these need to happen"
+            if need_more != 1
+            else "This needs to happen"
+        )
+        return {
+            "applicable": bool(items),
+            "mode": "best_thirds",
+            "title": f"How do {target_name} qualify?",
+            "subtitle": subtitle,
+            "needTotal": race.get("needTotal"),
+            "needMore": need_more,
+            "banked": race.get("banked"),
+            "items": items,
+        }
+
+    reqs = engine.calculate_what_target_needs(teams, fixtures, target_id, cutoff)
+    if not reqs:
+        return None
+    items = []
+    for req in reqs:
+        home = name_of.get(req.home, req.home)
+        away = name_of.get(req.away, req.away)
+        if req.band.kind in ("any", "none"):
+            text = req.text
+        else:
+            text = _band_to_sky_line(req.band, home, away)
+        items.append({
+            "group": req.group,
+            "text": text,
+            "outcome": "pending",
+            "fixtureId": req.fixture_id,
+        })
+    return {
+        "applicable": True,
+        "mode": "own_group",
+        "title": f"How do {target_name} qualify?",
+        "subtitle": "All of these must happen in their group",
+        "needTotal": len(items),
+        "needMore": len(items),
+        "banked": 0,
+        "items": items,
+    }
+
+
 def _serialise_result(f: Dict[str, Any]) -> Dict[str, Any]:
     score = f.get("score") or [None, None]
     return {
@@ -575,6 +755,9 @@ def _build_payload(target: str) -> Dict[str, Any]:
     # "Lifeline" survival view — the "we need N of the other groups to go our way"
     # framing, live and auto-resolving. Only when we've finished 3rd in our group.
     race = _build_race(teams, fixtures, status, tables, cutoff)
+    checklist = _build_checklist(
+        teams, fixtures, target, status.name, cutoff, status, race, proj.impacts
+    )
 
     # How much of the group stage is actually settled. The best-thirds table is
     # only final once all groups are complete; until then it's provisional and
@@ -640,6 +823,7 @@ def _build_payload(target: str) -> Dict[str, Any]:
         "groupGamesStarted": group_games_started,
         "gamesTotal": games_total,
         "race": race,
+        "checklist": checklist,
         "meta": _data_freshness(rows, games_played=games_played, games_total=games_total),
         "generatedAt": datetime.now(tz=timezone.utc).isoformat(),
     }
