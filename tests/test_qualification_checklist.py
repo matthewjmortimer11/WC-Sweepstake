@@ -75,3 +75,51 @@ def test_build_checklist_splits_pending_and_settled():
     assert cl["settledSummary"]["bankedCount"] == 1
     assert cl["settledSummary"]["lostCount"] == 1
     assert "context" not in cl
+
+
+def test_build_checklist_pending_sorted_by_kickoff():
+    from qualification.router import _build_checklist
+
+    race = {
+        "applicable": True,
+        "benchmark": {"points": 3, "goalDifference": -3, "goalsFor": 1},
+        "needTotal": 4,
+        "needMore": 2,
+        "banked": 0,
+        "groups": [
+            {
+                "group": "B",
+                "outcome": "pending",
+                "third": {"id": "B3", "name": "Team B", "points": 2},
+            },
+            {
+                "group": "A",
+                "outcome": "pending",
+                "third": {"id": "A3", "name": "Team A", "points": 1},
+            },
+        ],
+    }
+    rows_by_id = {
+        "fx-b": {"id": "fx-b", "dateISO": "2026-06-28", "time": "20:00", "status": "upcoming"},
+        "fx-a": {"id": "fx-a", "dateISO": "2026-06-27", "time": "15:00", "status": "upcoming"},
+    }
+    from qualification.engine import Fixture, Team
+
+    teams = [
+        Team(id="SCO", name="Scotland", group="C"),
+        Team(id="A3", name="Team A", group="A"),
+        Team(id="A1", name="A1", group="A"),
+        Team(id="B3", name="Team B", group="B"),
+        Team(id="B1", name="B1", group="B"),
+    ]
+    fixtures = [
+        Fixture(id="fx-a", home="A3", away="A1", status="upcoming", group="A"),
+        Fixture(id="fx-b", home="B3", away="B1", status="upcoming", group="B"),
+    ]
+    cl = _build_checklist(
+        teams, fixtures, "SCO", "Scotland", 8, None, race, [], rows_by_id
+    )
+    groups = [i["group"] for i in cl["pendingItems"]]
+    assert groups == ["A", "B"]
+    assert cl["pendingItems"][0]["time"] == "15:00"
+    assert cl["pendingItems"][1]["time"] == "20:00"

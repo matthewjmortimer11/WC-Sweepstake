@@ -158,9 +158,15 @@
   .hybrid-list li.pending .chk { border-color: rgba(147,166,204,.55); }
   .hybrid-body { flex: 1; min-width: 0; }
   .hybrid-grp {
+    display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
     font-size: 11px; font-weight: 800; letter-spacing: .45px; text-transform: uppercase;
     color: var(--muted); margin-bottom: 3px;
   }
+  .hybrid-when {
+    flex: none; font-size: 11px; font-weight: 700; letter-spacing: 0;
+    text-transform: none; color: #9ec2ff; white-space: nowrap;
+  }
+  .hybrid-when.live { color: var(--bad); font-weight: 800; }
   .hybrid-txt { font-size: 15px; font-weight: 700; line-height: 1.35; color: var(--white); }
   .hybrid-meta { margin-top: 4px; font-size: 12px; color: var(--muted); line-height: 1.4; }
   .hybrid-meta b { color: #9ec2ff; font-weight: 700; }
@@ -642,6 +648,24 @@
     renderVerdict(d);
   }
 
+  function checklistWhenLabel(item) {
+    if (item.live) return '<span class="hybrid-when live">LIVE NOW</span>';
+    var bits = [];
+    if (item.dateLabel) bits.push(esc(item.dateLabel));
+    if (item.time) bits.push(esc(item.time));
+    if (!bits.length) return "";
+    return '<span class="hybrid-when">' + bits.join(" · ") + "</span>";
+  }
+
+  function sortChecklistRows(rows) {
+    return rows.slice().sort(function (a, b) {
+      var ka = a.kickoff || "~~";
+      var kb = b.kickoff || "~~";
+      if (ka !== kb) return ka < kb ? -1 : 1;
+      return String(a.group || "").localeCompare(String(b.group || ""));
+    });
+  }
+
   function renderChecklistItem(item) {
     var oc = item.outcome || "pending";
     var meta = "";
@@ -651,10 +675,11 @@
     } else if (oc === "level") {
       meta = "Tied on stats — tie-break decides";
     }
+    var when = checklistWhenLabel(item);
     return '<li class="' + esc(oc) + '" role="listitem">' +
         '<span class="chk" role="checkbox" aria-checked="' + (item.checked ? "true" : "false") + '"></span>' +
         '<div class="hybrid-body">' +
-          '<div class="hybrid-grp">Group ' + esc(item.group) + "</div>" +
+          '<div class="hybrid-grp"><span>Group ' + esc(item.group) + "</span>" + when + "</div>" +
           '<div class="hybrid-txt">' + esc(item.text) + "</div>" +
           (meta ? '<div class="hybrid-meta">' + meta + "</div>" : "") +
         "</div></li>";
@@ -687,7 +712,7 @@
     var c = d.checklist;
     var card = el("checklist-card");
     var nm = d.targetName || "Scotland";
-    var rows = (c && (c.pendingItems || c.items)) || [];
+    var rows = sortChecklistRows((c && (c.pendingItems || c.items)) || []);
     if (!c || !c.applicable || !rows.length) {
       card.hidden = true;
       return;

@@ -335,6 +335,28 @@ def _kickoff_key(f: Dict[str, Any]) -> str:
     return (f.get("dateISO") or "") + "T" + (f.get("time") or "00:00")
 
 
+def _schedule_fields(row: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    if not row:
+        return {"kickoff": "", "dateLabel": None, "time": None, "live": False}
+    return {
+        "kickoff": _kickoff_key(row),
+        "dateLabel": row.get("dateLabel"),
+        "time": row.get("time"),
+        "live": row.get("status") in ("live", "halfTime"),
+    }
+
+
+def _attach_fixture_schedule(
+    item: Dict[str, Any],
+    fixture_id: Optional[str],
+    row_by_id: Dict[str, Dict[str, Any]],
+) -> None:
+    row = row_by_id.get(str(fixture_id)) if fixture_id else None
+    item.update(_schedule_fields(row))
+    if fixture_id:
+        item["fixtureId"] = fixture_id
+
+
 def _build_race(teams, fixtures, status, tables, cutoff: int) -> Optional[Dict[str, Any]]:
     """The "lifeline" survival view: how many of the other groups still need to
     produce a third-placed team below the target. Only applies when the target
@@ -537,6 +559,55 @@ def _pick_group_impact(
     return max(candidates, key=lambda i: i.swing)
 
 
+def _pending_group_decisive_fixture(
+    teams: List[Team],
+    fixtures: List[Fixture],
+    target_id: str,
+    cutoff: int,
+    group_row: Dict[str, Any],
+) -> Optional[Fixture]:
+    """The pending fixture the checklist line is about — usually the 3rd's last game."""
+    group = group_row["group"]
+    third = group_row.get("third") or {}
+    third_id = third.get("id")
+
+    third_fixtures = [
+        f for f in fixtures
+        if f.group == group
+        and f.status in ("upcoming", "live", "halfTime")
+        and third_id
+        and third_id in (f.home, f.away)
+    ]
+    all_pending = [
+        f for f in fixtures
+        if f.group == group and f.status in ("upcoming", "live", "halfTime")
+    ]
+
+    def sky_from_fx(fx: Fixture) -> Optional[str]:
+        grid = engine.calculate_relevant_score_bands(
+            teams, fixtures, fx.id, target_id, cutoff
+        )
+        band = engine._collapse_band(grid)
+        if band.kind in ("any", "none"):
+            return None
+        name_of = {t.id: t.name for t in teams}
+        return _band_to_sky_line(
+            band, name_of.get(fx.home, fx.home), name_of.get(fx.away, fx.away)
+        )
+
+    for fx in third_fixtures:
+        if sky_from_fx(fx):
+            return fx
+    for fx in all_pending:
+        if sky_from_fx(fx):
+            return fx
+    if third_fixtures:
+        return third_fixtures[0]
+    if all_pending:
+        return all_pending[0]
+    return None
+
+
 def _line_for_pending_group(
     teams: List[Team],
     fixtures: List[Fixture],
@@ -558,6 +629,21 @@ def _line_for_pending_group(
     gf = int(third.get("goalsFor") or 0)
     bench = (benchmark["points"], benchmark["goalDifference"], benchmark["goalsFor"])
 
+    decisive = _pending_group_decisive_fixture(
+        teams, fixtures, target_id, cutoff, group_row
+    )
+    if decisive:
+        grid = engine.calculate_relevant_score_bands(
+            teams, fixtures, decisive.id, target_id, cutoff
+        )
+        band = engine._collapse_band(grid)
+        if band.kind not in ("any", "none"):
+            return _band_to_sky_line(
+                band,
+                name_of.get(decisive.home, decisive.home),
+                name_of.get(decisive.away, decisive.away),
+            )
+
     third_fixtures = [
         f for f in fixtures
         if f.group == group
@@ -565,31 +651,6 @@ def _line_for_pending_group(
         and third_id
         and third_id in (f.home, f.away)
     ]
-    all_pending = [
-        f for f in fixtures
-        if f.group == group and f.status in ("upcoming", "live", "halfTime")
-    ]
-
-    def sky_from_fx(fx: Fixture) -> Optional[str]:
-        grid = engine.calculate_relevant_score_bands(
-            teams, fixtures, fx.id, target_id, cutoff
-        )
-        band = engine._collapse_band(grid)
-        if band.kind in ("any", "none"):
-            return None
-        return _band_to_sky_line(
-            band, name_of.get(fx.home, fx.home), name_of.get(fx.away, fx.away)
-        )
-
-    for fx in third_fixtures:
-        line = sky_from_fx(fx)
-        if line:
-            return line
-
-    for fx in all_pending:
-        line = sky_from_fx(fx)
-        if line:
-            return line
 
     for fx in third_fixtures:
         home = name_of.get(fx.home, fx.home)
@@ -621,9 +682,11 @@ def _build_checklist(
     status: engine.QualificationStatus,
     race: Optional[Dict[str, Any]],
     impacts: List[projection.GameImpact],
+    row_by_id: Optional[Dict[str, Dict[str, Any]]] = None,
 ) -> Optional[Dict[str, Any]]:
     """Sky-style checklist — what needs to happen for the target to qualify."""
     name_of = {t.id: t.name for t in teams}
+    rows_by_id = row_by_id or {}
 
     if race and race.get("applicable"):
         benchmark = race.get("benchmark") or {
@@ -663,9 +726,17 @@ def _build_checklist(
                 "thirdTeam": third.get("name"),
                 "thirdPoints": third.get("points"),
             })
+            if outcome == "pending":
+                dec = _pending_group_decisive_fixture(
+                    teams, fixtures, target_id, cutoff, gr
+                )
+                _attach_fixture_schedule(items[-1], dec.id if dec else None, rows_by_id)
         order = {"pending": 0, "banked": 1, "level": 2, "lost": 3}
         items.sort(key=lambda r: (order.get(r["outcome"], 9), r["group"]))
-        pending_items = [i for i in items if i["outcome"] == "pending"]
+        pending_items = sorted(
+            (i for i in items if i["outcome"] == "pending"),
+            key=lambda i: (i.get("kickoff") or "~~", i["group"]),
+        )
         settled_banked = [i for i in items if i["outcome"] == "banked"]
         settled_lost = [i for i in items if i["outcome"] == "lost"]
         settled_level = [i for i in items if i["outcome"] == "level"]
@@ -723,6 +794,8 @@ def _build_checklist(
             "checked": False,
             "fixtureId": req.fixture_id,
         })
+        _attach_fixture_schedule(items[-1], req.fixture_id, rows_by_id)
+    items.sort(key=lambda i: (i.get("kickoff") or "~~", i["group"]))
     return {
         "applicable": True,
         "mode": "own_group",
@@ -897,7 +970,7 @@ def _build_payload(target: str) -> Dict[str, Any]:
     # framing, live and auto-resolving. Only when we've finished 3rd in our group.
     race = _build_race(teams, fixtures, status, tables, cutoff)
     checklist = _build_checklist(
-        teams, fixtures, target, status.name, cutoff, status, race, proj.impacts
+        teams, fixtures, target, status.name, cutoff, status, race, proj.impacts, row_by_id
     )
 
     # How much of the group stage is actually settled. The best-thirds table is
