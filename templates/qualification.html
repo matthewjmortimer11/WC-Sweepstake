@@ -55,7 +55,7 @@
     color: #9ec2ff; font-size: 11px; font-weight: 800; letter-spacing: .7px; text-transform: uppercase;
   }
   header.top .title { font-size: 22px; font-weight: 800; line-height: 1.15; }
-  header.top .title span { color: var(--muted); font-weight: 500; display: block; font-size: 12px; margin-top: 4px; }
+  header.top .title span#subtitle { color: var(--muted); font-weight: 500; display: block; font-size: 12px; margin-top: 4px; }
   .refresh {
     border: 1px solid var(--line); background: var(--navy-700); color: var(--white);
     border-radius: 999px; padding: 9px 15px; font-size: 14px; font-weight: 700;
@@ -81,9 +81,10 @@
     line-height: 1; letter-spacing: -2px; font-variant-numeric: tabular-nums;
   }
   .hero-pct span { font-size: 24px; letter-spacing: 0; }
-  .hero.good .hero-pct { color: #8ff5b6; }
-  .hero.warn .hero-pct { color: #ffd98a; }
-  .hero.bad .hero-pct { color: #ff9fb0; }
+  .hero-pct.is-loading { font-size: 15px; font-weight: 700; color: var(--muted); letter-spacing: 0; }
+  .hero.good .hero-pct:not(.is-loading) { color: #8ff5b6; }
+  .hero.warn .hero-pct:not(.is-loading) { color: #ffd98a; }
+  .hero.bad .hero-pct:not(.is-loading) { color: #ff9fb0; }
   .hero-lab {
     margin: 0; font-size: 10px; font-weight: 800; text-transform: uppercase;
     letter-spacing: .55px; color: var(--muted); text-align: right;
@@ -106,7 +107,17 @@
   }
   .hybrid-head h2 { margin: 0; font-size: 22px; font-weight: 800; line-height: 1.2; letter-spacing: -.3px; }
   .hybrid-head .sub { margin: 6px 0 0; font-size: 14px; font-style: italic; color: rgba(255,255,255,.85); line-height: 1.4; }
-  .hybrid-head .ctx { margin: 8px 0 0; font-size: 13px; font-style: normal; color: rgba(255,255,255,.68); line-height: 1.45; }
+  .hybrid-settled {
+    padding: 10px 16px; background: var(--navy-700); border-bottom: 1px solid var(--line);
+    font-size: 12.5px; line-height: 1.5; color: var(--muted);
+  }
+  .hybrid-settled b { font-weight: 800; }
+  .hybrid-settled .good-bit { color: #8ff5b6; }
+  .hybrid-settled .bad-bit { color: #ff9fb0; }
+  .hybrid-settled .grp-tag {
+    display: inline-block; margin: 0 2px; padding: 1px 6px; border-radius: 5px;
+    border: 1px solid var(--line); font-size: 11px; font-weight: 800; color: var(--white);
+  }
   .hybrid-meter {
     display: flex; align-items: center; justify-content: space-between; gap: 10px;
     padding: 10px 18px; background: var(--navy-800); border-bottom: 1px solid var(--line);
@@ -126,14 +137,25 @@
   .chk {
     flex: none; width: 24px; height: 24px; margin-top: 1px; border-radius: 7px;
     border: 2px solid rgba(147,166,204,.45); background: var(--navy-700);
-    display: grid; place-items: center; font-size: 14px; font-weight: 900; line-height: 1;
+    display: grid; place-items: center; position: relative;
   }
-  .hybrid-list li.banked .chk { border-color: var(--good); background: rgba(47,191,113,.25); color: #8ff5b6; }
-  .hybrid-list li.banked .chk::before { content: "✓"; }
-  .hybrid-list li.lost .chk { border-color: var(--bad); background: rgba(224,85,107,.18); color: #ff9fb0; }
-  .hybrid-list li.lost .chk::before { content: "✕"; }
-  .hybrid-list li.level .chk { border-color: var(--warn); color: #ffd98a; }
-  .hybrid-list li.level .chk::before { content: "~"; }
+  .hybrid-list li.banked .chk { border-color: var(--good); background: rgba(47,191,113,.25); }
+  .hybrid-list li.banked .chk::after {
+    content: ""; width: 6px; height: 10px; margin-top: -2px;
+    border: solid #8ff5b6; border-width: 0 2.5px 2.5px 0; transform: rotate(45deg);
+  }
+  .hybrid-list li.lost .chk { border-color: var(--bad); background: rgba(224,85,107,.18); }
+  .hybrid-list li.lost .chk::before,
+  .hybrid-list li.lost .chk::after {
+    content: ""; position: absolute; width: 12px; height: 2px; background: #ff9fb0; border-radius: 1px;
+  }
+  .hybrid-list li.lost .chk::before { transform: rotate(45deg); }
+  .hybrid-list li.lost .chk::after { transform: rotate(-45deg); }
+  .hybrid-list li.level .chk { border-color: var(--warn); background: rgba(230,162,60,.12); }
+  .hybrid-list li.level .chk::after {
+    content: ""; width: 10px; height: 2px; background: #ffd98a; border-radius: 1px;
+  }
+  .hybrid-list li.pending .chk { border-color: rgba(147,166,204,.55); }
   .hybrid-body { flex: 1; min-width: 0; }
   .hybrid-grp {
     font-size: 11px; font-weight: 800; letter-spacing: .45px; text-transform: uppercase;
@@ -338,6 +360,16 @@
   .updated .live-dot { display: inline-block; margin-right: 4px; vertical-align: middle; }
   .empty { color: var(--muted); font-size: 14px; padding: 10px 4px; text-align: center; }
   .skeleton { opacity: .55; }
+  @media (max-width: 420px) {
+    header.top { align-items: flex-start; }
+    header.top .title { font-size: 19px; }
+    .hero-top { flex-direction: column; gap: 10px; }
+    .hero-pct { text-align: left; font-size: 44px; }
+    .hero-lab { text-align: left; }
+    .hybrid-head h2 { font-size: 19px; }
+    .hybrid-list li { padding: 12px 14px; }
+    .hybrid-txt { font-size: 14px; }
+  }
   footer.note { color: var(--muted); font-size: 11.5px; text-align: center; margin-top: 16px; line-height: 1.6; }
 </style>
 </head>
@@ -346,7 +378,10 @@
   <header class="top">
     <div class="brand">
       <div class="sco-badge" id="scoBadge">Scotland</div>
-      <div class="title" id="pageTitle">Knockout qualification<span id="subtitle">World Cup 2026 · live tracker</span></div>
+      <div class="title" id="pageTitle">
+        <span id="pageTitleMain">Scotland qualification</span>
+        <span id="subtitle">World Cup 2026 · live tracker</span>
+      </div>
     </div>
     <button class="refresh" id="refreshBtn" type="button" aria-busy="false">
       <span class="spin">↻</span><span>Refresh</span>
@@ -359,23 +394,23 @@
   <section class="hero skeleton" id="hero-card">
     <div class="hero-top">
       <div class="hero-copy">
-        <p class="hero-word" id="heroWord">Loading…</p>
+        <p class="hero-word" id="heroWord">Loading latest scores…</p>
         <p class="hero-rank" id="heroRank"></p>
       </div>
       <div>
-        <div class="hero-pct" id="heroPct">—<span>%</span></div>
-        <p class="hero-lab" id="heroLab">chance</p>
+        <div class="hero-pct is-loading" id="heroPct">…</div>
+        <p class="hero-lab" id="heroLab">updating</p>
       </div>
     </div>
-    <div class="hero-note" id="heroNote"></div>
+    <p class="hero-note" id="heroNote" hidden></p>
   </section>
 
   <section class="hybrid" id="checklist-card" hidden>
     <div class="hybrid-head">
       <h2 id="checklistTitle">How do Scotland qualify?</h2>
       <p class="sub" id="checklistSubtitle">At least four of these need to happen</p>
-      <p class="ctx" id="checklistContext" hidden></p>
     </div>
+    <div class="hybrid-settled" id="checklistSettled" hidden></div>
     <div class="hybrid-meter" id="checklistMeter" hidden>
       <span id="checklistProgress"></span>
       <span class="ticks" id="checklistTicks">0/4</span>
@@ -567,28 +602,35 @@
     var hero = el("hero-card");
     var fallback = el("verdict-mount");
     var hasChecklist = d.checklist && d.checklist.applicable;
+    var pctEl = el("heroPct");
 
     el("scoBadge").textContent = nm;
     if (hasChecklist) {
-      el("pageTitle").childNodes[0].textContent = nm + " — knockout qualification";
+      el("pageTitleMain").textContent = nm + " qualification";
       hero.className = "hero " + v.cls;
       hero.classList.remove("skeleton");
       el("heroWord").textContent = v.word;
-      el("heroPct").innerHTML = c.percent + "<span>%</span>";
+      pctEl.className = "hero-pct";
+      pctEl.innerHTML = c.percent + "<span>%</span>";
       el("heroLab").textContent = chanceLabel(d);
       var rank = "";
       if (s.thirdPlaceRank && (s.state === "third_in" || s.state === "third_out")) {
-        rank = ord(s.thirdPlaceRank) + " among best third-placed teams right now";
+        rank = ord(s.thirdPlaceRank) + " among best third-placed teams";
         if (s.qualified && s.state === "third_in") rank += " — in the cut";
         else if (s.state === "third_out") rank += " — outside the cut";
       } else if (s.groupRank) {
         rank = ({1:"1st",2:"2nd",3:"3rd",4:"4th"})[s.groupRank] + " in Group " + s.group;
       }
       el("heroRank").textContent = rank;
+      var note = el("heroNote");
       var snap = snapshotLine(d);
-      el("heroNote").innerHTML = standing(
-        s, esc(s.name), (d.groupGamesStarted || 0) > 0, !!d.provisional, !!c.guaranteed
-      ) + (snap ? '<div style="margin-top:8px;color:var(--muted);font-size:13px">' + snap + "</div>" : "");
+      if (snap) {
+        note.innerHTML = snap;
+        note.hidden = false;
+      } else {
+        note.hidden = true;
+        note.innerHTML = "";
+      }
       hero.hidden = false;
       fallback.hidden = true;
       return;
@@ -596,26 +638,70 @@
 
     hero.hidden = true;
     fallback.hidden = false;
-    el("pageTitle").childNodes[0].textContent = "Are " + nm + " going through?";
+    el("pageTitleMain").textContent = "Are " + nm + " going through?";
     renderVerdict(d);
+  }
+
+  function renderChecklistItem(item) {
+    var oc = item.outcome || "pending";
+    var meta = "";
+    if (oc === "pending" && item.thirdTeam != null) {
+      meta = "3rd now: <b>" + esc(item.thirdTeam) + "</b>" +
+        (item.thirdPoints != null ? " (" + item.thirdPoints + " pts)" : "");
+    } else if (oc === "level") {
+      meta = "Tied on stats — tie-break decides";
+    }
+    return '<li class="' + esc(oc) + '" role="listitem">' +
+        '<span class="chk" role="checkbox" aria-checked="' + (item.checked ? "true" : "false") + '"></span>' +
+        '<div class="hybrid-body">' +
+          '<div class="hybrid-grp">Group ' + esc(item.group) + "</div>" +
+          '<div class="hybrid-txt">' + esc(item.text) + "</div>" +
+          (meta ? '<div class="hybrid-meta">' + meta + "</div>" : "") +
+        "</div></li>";
+  }
+
+  function renderSettledSummary(summary, nm) {
+    if (!summary) return "";
+    var bits = [];
+    if (summary.bankedCount > 0) {
+      var bg = (summary.banked || []).map(function (i) {
+        return '<span class="grp-tag">' + esc(i.group) + "</span>";
+      }).join(" ");
+      bits.push('<span class="good-bit"><b>' + summary.bankedCount + "</b> group" +
+        (summary.bankedCount === 1 ? "" : "s") + " already below " + esc(nm) + "</span> " + bg);
+    }
+    if (summary.lostCount > 0) {
+      var lg = (summary.lost || []).map(function (i) {
+        return '<span class="grp-tag">' + esc(i.group) + "</span>";
+      }).join(" ");
+      bits.push('<span class="bad-bit"><b>' + summary.lostCount + "</b> settled against " +
+        esc(nm) + "</span> " + lg);
+    }
+    if (summary.levelCount > 0) {
+      bits.push("<b>" + summary.levelCount + "</b> tied on stats — tie-break pending");
+    }
+    return bits.join(" · ");
   }
 
   function renderChecklist(d) {
     var c = d.checklist;
     var card = el("checklist-card");
     var nm = d.targetName || "Scotland";
-    if (!c || !c.applicable || !(c.items || []).length) {
+    var rows = (c && (c.pendingItems || c.items)) || [];
+    if (!c || !c.applicable || !rows.length) {
       card.hidden = true;
       return;
     }
     el("checklistTitle").textContent = c.title || ("How do " + nm + " qualify?");
     el("checklistSubtitle").textContent = c.subtitle || "";
-    var ctx = el("checklistContext");
-    if (c.context) {
-      ctx.textContent = c.context;
-      ctx.hidden = false;
+    var settledEl = el("checklistSettled");
+    var settledHtml = renderSettledSummary(c.settledSummary, nm);
+    if (settledHtml) {
+      settledEl.innerHTML = settledHtml;
+      settledEl.hidden = false;
     } else {
-      ctx.hidden = true;
+      settledEl.hidden = true;
+      settledEl.innerHTML = "";
     }
     var meter = el("checklistMeter");
     var ticks = el("checklistTicks");
@@ -630,27 +716,7 @@
     } else {
       meter.hidden = true;
     }
-    el("checklistList").innerHTML = (c.items || []).map(function (item) {
-      var oc = item.outcome || "pending";
-      var meta = "";
-      if (oc === "pending" && item.thirdTeam != null) {
-        meta = "3rd now: <b>" + esc(item.thirdTeam) + "</b>" +
-          (item.thirdPoints != null ? " (" + item.thirdPoints + " pts)" : "");
-      } else if (oc === "banked") {
-        meta = "Done — counted for Scotland";
-      } else if (oc === "lost") {
-        meta = "Settled — hurt Scotland";
-      } else if (oc === "level") {
-        meta = "Tied on stats — tie-break decides";
-      }
-      return '<li class="' + esc(oc) + '" role="listitem">' +
-          '<span class="chk" role="checkbox" aria-checked="' + (item.checked ? "true" : "false") + '"></span>' +
-          '<div class="hybrid-body">' +
-            '<div class="hybrid-grp">Group ' + esc(item.group) + "</div>" +
-            '<div class="hybrid-txt">' + esc(item.text) + "</div>" +
-            (meta ? '<div class="hybrid-meta">' + meta + "</div>" : "") +
-          "</div></li>";
-    }).join("");
+    el("checklistList").innerHTML = rows.map(renderChecklistItem).join("");
     card.hidden = false;
   }
 
@@ -801,6 +867,10 @@
 
   // ── The 3rd-place queue ───────────────────────────────────────────
   function renderQueue(d) {
+    if (d.checklist && d.checklist.applicable && d.checklist.mode === "best_thirds") {
+      el("queue-card").hidden = true;
+      return;
+    }
     var rows = d.thirdPlaceTable || [];
     el("queueHelp").innerHTML = "Every team currently sitting 3rd in its group, best at the top. " +
       "The top " + d.cutoff + " (above the green line) go through; the rest miss out." +
@@ -1021,6 +1091,7 @@
     renderLifeline(d);
     renderRecent(d);
     if (!d.checklist || !d.checklist.applicable) renderNeeds(d);
+    else el("need-card").hidden = true;
     renderQueue(d);
     renderGroup(d);
     pollMs = (d.meta && d.meta.pollIntervalMs) || pollMs;

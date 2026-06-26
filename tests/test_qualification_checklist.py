@@ -48,4 +48,30 @@ def test_build_checklist_own_group_mode():
     assert cl is not None
     assert cl["mode"] == "own_group"
     assert cl["items"]
+    assert cl["pendingItems"] == cl["items"]
+    assert cl["settledSummary"] is None
     assert all(item["outcome"] == "pending" for item in cl["items"])
+
+
+def test_build_checklist_splits_pending_and_settled():
+    from qualification.router import _build_checklist
+
+    race = {
+        "applicable": True,
+        "benchmark": {"points": 3, "goalDifference": -3, "goalsFor": 1},
+        "needTotal": 4,
+        "needMore": 2,
+        "banked": 2,
+        "groups": [
+            {"group": "A", "outcome": "banked", "third": {"name": "Wales", "points": 2}},
+            {"group": "B", "outcome": "pending", "third": {"name": "France", "points": 3}, "probGood": 55},
+            {"group": "C", "outcome": "lost", "third": {"name": "Spain", "points": 6}},
+        ],
+    }
+    cl = _build_checklist([], [], "SCO", "Scotland", 8, None, race, [])
+    assert cl["mode"] == "best_thirds"
+    assert len(cl["pendingItems"]) == 1
+    assert cl["pendingItems"][0]["group"] == "B"
+    assert cl["settledSummary"]["bankedCount"] == 1
+    assert cl["settledSummary"]["lostCount"] == 1
+    assert "context" not in cl

@@ -666,6 +666,9 @@ def _build_checklist(
         order = {"pending": 0, "banked": 1, "level": 2, "lost": 3}
         items.sort(key=lambda r: (order.get(r["outcome"], 9), r["group"]))
         pending_items = [i for i in items if i["outcome"] == "pending"]
+        settled_banked = [i for i in items if i["outcome"] == "banked"]
+        settled_lost = [i for i in items if i["outcome"] == "lost"]
+        settled_level = [i for i in items if i["outcome"] == "level"]
         need_more = int(race.get("needMore") or 0)
         n_pending = len(pending_items)
         if need_more != 1:
@@ -678,18 +681,12 @@ def _build_checklist(
                 f"One remaining group must finish with a 3rd-placed team "
                 f"below {target_name} ({bench_pts} pts, {_fmt_gd(bench_gd)} GD)"
             )
-        context = (
-            f"{target_name} finished 3rd in Group {status.group} on "
-            f"{bench_pts} pts ({_fmt_gd(bench_gd)} GD). "
-            f"Only the 8 best third-placed teams go through — tick the boxes as results land."
-        )
         banked = int(race.get("banked") or 0)
         return {
-            "applicable": bool(items),
+            "applicable": bool(pending_items or settled_banked or settled_lost or settled_level),
             "mode": "best_thirds",
             "title": f"How do {target_name} qualify?",
             "subtitle": subtitle,
-            "context": context,
             "benchmark": benchmark,
             "needTotal": race.get("needTotal"),
             "needMore": need_more,
@@ -697,6 +694,15 @@ def _build_checklist(
             "checkedCount": banked,
             "pendingCount": n_pending,
             "items": items,
+            "pendingItems": pending_items,
+            "settledSummary": {
+                "banked": [{"group": i["group"], "text": i["text"]} for i in settled_banked],
+                "lost": [{"group": i["group"], "text": i["text"]} for i in settled_lost],
+                "level": [{"group": i["group"], "text": i["text"]} for i in settled_level],
+                "bankedCount": len(settled_banked),
+                "lostCount": len(settled_lost),
+                "levelCount": len(settled_level),
+            },
         }
 
     reqs = engine.calculate_what_target_needs(teams, fixtures, target_id, cutoff)
@@ -726,6 +732,8 @@ def _build_checklist(
         "needMore": len(items),
         "banked": 0,
         "items": items,
+        "pendingItems": items,
+        "settledSummary": None,
     }
 
 
