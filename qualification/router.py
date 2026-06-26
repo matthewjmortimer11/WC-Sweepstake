@@ -198,48 +198,53 @@ def _serialise_group_row(s: engine.GroupStanding, target: str) -> Dict[str, Any]
     }
 
 
-def _impact_read(i: projection.GameImpact) -> tuple:
-    """Return (wants_text_template, good_outcomes) for one game.
-
-    ``good_outcomes`` are the results within a small margin of the best for the
-    target — these get highlighted together so the wording and the bars agree.
-    The text uses {home}/{away} placeholders filled in by the caller.
-    """
-    rates = {"home": i.chance_if_home_win, "draw": i.chance_if_draw, "away": i.chance_if_away_win}
-    best = max(rates.values())
-    good = {k for k, v in rates.items() if v >= best - 0.04}
+def _wants_text(good: set) -> str:
     if good == {"home"}:
-        text = "{home} to win"
-    elif good == {"away"}:
-        text = "{away} to win"
-    elif good == {"draw"}:
-        text = "{home} and {away} to draw"
-    elif good == {"home", "draw"}:
-        text = "{home} to avoid defeat"
-    elif good == {"away", "draw"}:
-        text = "{away} to avoid defeat"
-    elif good == {"home", "away"}:          # a draw is the only bad result
-        text = "anything but a draw"
-    else:
-        text = "the result barely matters"
-    return text, sorted(good)
+        return "{home} to win"
+    if good == {"away"}:
+        return "{away} to win"
+    if good == {"draw"}:
+        return "{home} and {away} to draw"
+    if good == {"home", "draw"}:
+        return "{home} to avoid defeat"
+    if good == {"away", "draw"}:
+        return "{away} to avoid defeat"
+    if good == {"home", "away"}:            # a draw is the only result that hurts
+        return "anything but a draw"
+    return "the result barely matters"      # nothing clearly improves the chance
 
 
 def _serialise_impact(
-    i: projection.GameImpact, target_name: str, row: Optional[Dict[str, Any]] = None
+    i: projection.GameImpact,
+    target_name: str,
+    base_pct: int,
+    row: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     home = _team_card(i.home)
     away = _team_card(i.away)
-    text, good = _impact_read(i)
+    h = round(i.chance_if_home_win * 100)
+    dr = round(i.chance_if_draw * 100)
+    a = round(i.chance_if_away_win * 100)
+    # The result(s) we're cheering for = the best outcome(s) for the target (a
+    # 1-point tolerance for ties). The best outcome is always at least the current
+    # chance, so a "good"/green result never shows a downward move — fixing the
+    # confusion where a desired result still dropped the chance. The guard keeps
+    # it never more than a point below now even with simulation noise.
+    best = max(h, dr, a)
+    good = sorted(
+        key for key, pct in (("home", h), ("draw", dr), ("away", a))
+        if pct >= best - 1 and pct - base_pct >= -1
+    )
+    text = _wants_text(set(good))
     row = row or {}
     return {
         "fixtureId": i.fixture_id,
         "group": i.group,
         "home": home,
         "away": away,
-        "chanceIfHomeWin": round(i.chance_if_home_win * 100),
-        "chanceIfDraw": round(i.chance_if_draw * 100),
-        "chanceIfAwayWin": round(i.chance_if_away_win * 100),
+        "chanceIfHomeWin": h,
+        "chanceIfDraw": dr,
+        "chanceIfAwayWin": a,
         "swing": round(i.swing * 100),
         "favouredOutcome": i.favoured_outcome,
         "goodOutcomes": good,
@@ -418,7 +423,8 @@ def _build_payload(target: str) -> Dict[str, Any]:
         "thirdPlaceTable": [_serialise_third(s, target, played_by) for s in thirds],
         "targetGroupTable": [_serialise_group_row(s, target) for s in target_group_rows],
         "remainingGames": [
-            _serialise_impact(i, status.name, row_by_id.get(i.fixture_id)) for i in proj.impacts
+            _serialise_impact(i, status.name, chance_pct, row_by_id.get(i.fixture_id))
+            for i in proj.impacts
         ],
         "results": [_serialise_result(f) for f in results],
         "gamesPlayed": games_played,
