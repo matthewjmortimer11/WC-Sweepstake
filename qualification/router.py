@@ -43,11 +43,14 @@ _CSP = (
     "base-uri 'self'; form-action 'self'; object-src 'none'; frame-ancestors 'none'"
 )
 
-# Poll cadence: brisk while anything is live, relaxed otherwise.
+# Poll cadence: brisk while anything is live, steady during the group stage.
 _LIVE_POLL_MS = 30_000          # 30 s
-_IDLE_POLL_MS = 5 * 60_000      # 5 min
+_TOURNAMENT_POLL_MS = 60_000    # 1 min while the group stage is in progress
+_IDLE_POLL_MS = 5 * 60_000      # 5 min before/after the tournament
 # Data older than this (and no live games) is surfaced as stale in the UI.
 _STALE_AFTER_S = 15 * 60
+# Lifeline: a group only counts as "could still help" above this prob threshold.
+_RACE_POSSIBLE_PCT = 20
 
 
 # ── Tournament team list (static per process; read once from config) ─────────
@@ -378,7 +381,7 @@ def _build_race(teams, fixtures, status, tables, cutoff: int) -> Optional[Dict[s
         })
 
     in_play = [r for r in group_rows if r["outcome"] == "pending"]
-    possible = sum(1 for r in in_play if r["probGood"] >= 1)
+    possible = sum(1 for r in in_play if r["probGood"] >= _RACE_POSSIBLE_PCT)
     need_more = max(0, need_total - banked)
 
     if banked >= need_total:
@@ -427,7 +430,12 @@ def _serialise_result(f: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-def _data_freshness(rows: List[Dict[str, Any]]) -> Dict[str, Any]:
+def _data_freshness(
+    rows: List[Dict[str, Any]],
+    *,
+    games_played: int = 0,
+    games_total: int = 0,
+) -> Dict[str, Any]:
     stamps = []
     for f in rows:
         ts = f.get("updatedAt")
@@ -448,13 +456,19 @@ def _data_freshness(rows: List[Dict[str, Any]]) -> Dict[str, Any]:
         age = (datetime.now(tz=timezone.utc) - last).total_seconds()
         if not live and age > _STALE_AFTER_S:
             stale = True
+    if live:
+        poll_ms = _LIVE_POLL_MS
+    elif 0 < games_played < games_total:
+        poll_ms = _TOURNAMENT_POLL_MS
+    else:
+        poll_ms = _IDLE_POLL_MS
     return {
         "lastUpdated": last.isoformat() if last else None,
         "ageSeconds": age,
         "live": live,
         "stale": stale,
         "usingLiveData": using_cache,
-        "pollIntervalMs": _LIVE_POLL_MS if live else _IDLE_POLL_MS,
+        "pollIntervalMs": poll_ms,
     }
 
 
@@ -622,7 +636,7 @@ def _build_payload(target: str) -> Dict[str, Any]:
         "groupGamesStarted": group_games_started,
         "gamesTotal": games_total,
         "race": race,
-        "meta": _data_freshness(rows),
+        "meta": _data_freshness(rows, games_played=games_played, games_total=games_total),
         "generatedAt": datetime.now(tz=timezone.utc).isoformat(),
     }
 
