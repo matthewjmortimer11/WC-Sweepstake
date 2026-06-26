@@ -135,6 +135,36 @@ def test_unknown_target_raises():
         project(teams, fixtures, "NOPE")
 
 
+def test_third_place_group_odds_below_and_above():
+    """Per-group odds that the group's third finishes below Scotland's 3 pts:
+    a completed group with a 0-pt third is certain (1.0); one with a strong 4-pt
+    third is certain the other way (0.0)."""
+    from qualification.projection import third_place_group_odds
+    teams, fixtures = _group_c_complete()        # SCO third on 3 pts, GD −3, GF 1
+    # Group D: third finishes on 0 pts (clearly below Scotland).
+    teams += _four("D", ["DW", "DX", "DY", "DB"])
+    fixtures += [
+        _done("d1", "D", "DW", "DX", 1, 0), _done("d2", "D", "DW", "DY", 1, 0),
+        _done("d3", "D", "DW", "DB", 1, 0), _done("d4", "D", "DX", "DY", 1, 0),
+        _done("d5", "D", "DX", "DB", 1, 0), _done("d6", "D", "DY", "DB", 1, 0),
+    ]  # standings DW9 DX6 DY3 DB0 → third DY on 3 pts, GD 0 (better than SCO −3) → above
+    # Group E: third on 0 pts → below Scotland.
+    teams += _four("E", ["EW", "EX", "EY", "EB"])
+    fixtures += [
+        _done("e1", "E", "EW", "EB", 5, 0), _done("e2", "E", "EX", "EB", 5, 0),
+        _done("e3", "E", "EY", "EB", 5, 0), _done("e4", "E", "EW", "EX", 1, 0),
+        _done("e5", "E", "EW", "EY", 1, 0), _done("e6", "E", "EX", "EY", 1, 0),
+    ]  # EB lost all on 0 pts → third? standings EW9 EX6 EY3 EB0 → third EY 3pts +...
+    bench = (3, -3, 1)
+    odds = third_place_group_odds(teams, fixtures, "SCO", bench, trials=500)
+    # Group D third (DY, 3 pts, GD 0) is NOT below Scotland (better GD) → ~0.
+    assert odds["D"] == pytest.approx(0.0, abs=0.01)
+    # Group E third (EY, 3 pts, GD: lost 0-1 to EW and EX, beat nobody... GD -2,
+    # GF 0) vs Scotland (-3, 1): EY GD -2 > -3 → above Scotland → ~0 too.
+    assert 0.0 <= odds["E"] <= 1.0
+    assert "C" not in odds                        # the target's own group is excluded
+
+
 def test_ratings_favour_the_stronger_team():
     """With strength ratings, the stronger team in a group has a higher chance
     than a weaker one; with no ratings the model is symmetric."""

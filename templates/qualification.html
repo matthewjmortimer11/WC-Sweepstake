@@ -75,6 +75,50 @@
   .verdict .ais b { font-size: 16px; }
   .verdict .ais span { display: block; margin-top: 3px; font-size: 11px; color: #bcccea; }
 
+  /* ── Lifeline (third-place survival) ─────────────────────────────── */
+  .lifeline {
+    margin-top: 16px; border-radius: 20px; padding: 20px 18px;
+    background:
+      repeating-linear-gradient(135deg, rgba(255,255,255,.018) 0 2px, transparent 2px 22px),
+      linear-gradient(160deg, #0c1c3e, #081530 80%);
+    border: 1px solid var(--line);
+  }
+  .lifeline.good { border-color: rgba(47,191,113,.5); }
+  .lifeline.warn { border-color: rgba(230,162,60,.55); }
+  .lifeline.bad  { border-color: rgba(224,85,107,.5); }
+  .ll-status { display: inline-flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 800;
+    letter-spacing: .5px; text-transform: uppercase; padding: 5px 12px; border-radius: 999px; }
+  .lifeline.good .ll-status { background: rgba(47,191,113,.18); color: #8ff5b6; }
+  .lifeline.warn .ll-status { background: rgba(230,162,60,.18); color: #ffd98a; }
+  .lifeline.bad  .ll-status { background: rgba(224,85,107,.18); color: #ff9fb0; }
+  .ll-headline { font-size: 21px; font-weight: 800; line-height: 1.25; margin: 12px 0 4px; }
+  .ll-headline b { color: #9ec2ff; }
+  .ll-emote { color: var(--muted); font-size: 13px; font-style: italic; margin-bottom: 14px; }
+  .ll-counter { display: flex; align-items: center; gap: 6px; margin: 2px 0 6px; flex-wrap: wrap; }
+  .ll-pip { width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center;
+    font-weight: 800; font-size: 15px; background: var(--navy-700); border: 1px solid var(--line); color: var(--muted); }
+  .ll-pip.on { background: rgba(47,191,113,.22); border-color: rgba(47,191,113,.55); color: #8ff5b6; }
+  .ll-counter .cnt { margin-left: 6px; font-size: 13px; color: var(--muted); }
+  .ll-counter .cnt b { color: var(--white); font-size: 15px; }
+  .ll-above { color: var(--muted); font-size: 12.5px; line-height: 1.5; margin: 8px 2px 4px; }
+  .ll-gh { font-size: 15px; font-weight: 800; margin: 16px 2px 2px; }
+  .ll-groups { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; margin-top: 8px; }
+  .llg { border-radius: 13px; padding: 11px 12px; border: 1px solid var(--line); background: var(--navy-800); }
+  .llg.banked { background: rgba(47,191,113,.10); border-color: rgba(47,191,113,.45); }
+  .llg.lost { background: rgba(224,85,107,.08); border-color: rgba(224,85,107,.4); opacity: .85; }
+  .llg.level { background: rgba(230,162,60,.10); border-color: rgba(230,162,60,.45); }
+  .llg-top { display: flex; align-items: center; justify-content: space-between; }
+  .llg-g { font-size: 13px; font-weight: 800; }
+  .llg-mark { font-size: 18px; }
+  .llg-third { color: var(--muted); font-size: 12px; margin-top: 5px; }
+  .llg-third b { color: var(--white); font-weight: 700; }
+  .llg-state { font-size: 12px; font-weight: 700; margin-top: 6px; }
+  .llg.banked .llg-state { color: #6ff0a6; } .llg.lost .llg-state { color: #ff9fb0; }
+  .llg.level .llg-state { color: #ffd98a; }
+  .llg.pending .llg-state { color: #9ec2ff; }
+  .llg-bar { height: 5px; border-radius: 999px; background: var(--navy-700); margin-top: 7px; overflow: hidden; }
+  .llg-bar span { display: block; height: 100%; border-radius: 999px; background: var(--sco-blue); }
+
   /* ── Cards & explainers ──────────────────────────────────────────── */
   section.card {
     margin-top: 16px; background: var(--navy-800); border: 1px solid var(--line);
@@ -208,6 +252,17 @@
     </section>
   </main>
 
+  <section class="lifeline" id="lifeline-card" hidden>
+    <div class="ll-status" id="llStatus"></div>
+    <div class="ll-headline" id="llHeadline"></div>
+    <div class="ll-emote" id="llEmote"></div>
+    <div class="ll-counter" id="llCounter"></div>
+    <p class="ll-above" id="llAbove"></p>
+    <h3 class="ll-gh">The groups that decide it</h3>
+    <p class="explain" id="llGroupsNote"></p>
+    <div class="ll-groups" id="llGroups"></div>
+  </section>
+
   <section class="card" id="recent-card" hidden>
     <h2 id="recentTitle">🔴 Live &amp; just played</h2>
     <p class="explain" id="recentNote"></p>
@@ -264,6 +319,7 @@
       return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
     });
   };
+  var fmtGD = function (n) { return (n > 0 ? "+" : "") + n; };
 
   // ── The headline verdict, in plain words ──────────────────────────
   function verdict(d) {
@@ -482,6 +538,61 @@
   }
 
   // ── Live & just played (newest first) ─────────────────────────────
+  // ── Lifeline: the "we need N of the other groups to go our way" view ──
+  function renderLifeline(d) {
+    var r = d.race;
+    if (!r || !r.applicable) { el("lifeline-card").hidden = true; return; }
+    var nm = esc(d.targetName);
+    var map = {
+      qualified: { cls: "good", pill: "✅ Through", head: nm + " are <b>through</b> as one of the best third-placed teams!" },
+      alive:     { cls: "good", pill: "Still alive", head: nm + " need <b>" + r.needMore + " of the " + r.inPlay + "</b> remaining groups to go our way." },
+      thread:    { cls: "warn", pill: "Hanging by a thread", head: nm + " need <b>" + r.needMore + " of the " + r.inPlay + "</b> remaining groups to go our way." },
+      eliminated:{ cls: "bad", pill: "Eliminated", head: nm + " can't make the best-third places this time." }
+    };
+    var s = map[r.survival] || map.thread;
+    var card = el("lifeline-card");
+    card.className = "lifeline " + s.cls;
+    el("llStatus").textContent = s.pill;
+    el("llHeadline").innerHTML = s.head;
+    el("llEmote").textContent = (r.survival === "eliminated" || r.survival === "qualified")
+      ? "" : "No more " + d.targetName + " games. Just calculators, chaos, and blind faith.";
+
+    var pips = "";
+    for (var i = 0; i < r.needTotal; i++) {
+      pips += '<span class="ll-pip' + (i < r.banked ? " on" : "") + '">' + (i < r.banked ? "✓" : "") + "</span>";
+    }
+    el("llCounter").innerHTML = pips + '<span class="cnt"><b>' + r.banked + "/" + r.needTotal +
+      "</b> banked" + (r.needMore > 0 ? " · need " + r.needMore + " more" : "") + "</span>";
+
+    var above = r.aboveNow || [];
+    el("llAbove").innerHTML = above.length
+      ? ("<b>" + above.length + "</b> third-placed team" + (above.length === 1 ? "" : "s") +
+         " already sit above us: " + above.map(function (t) { return esc(t.flag) + " " + esc(t.name); }).join(", ") +
+         ". We need the others to fall short of our <b>" + r.benchmark.points + " pts · " +
+         fmtGD(r.benchmark.goalDifference) + " GD · " + r.benchmark.goalsFor + " goals</b>.")
+      : "We need other groups' third-placed teams to finish below our <b>" + r.benchmark.points + " pts</b>.";
+
+    el("llGroupsNote").innerHTML = "A group goes our way if its 3rd-place team finishes <b>below</b> Scotland. " +
+      "✓ banked, ✗ above us, the rest still live — these update as games finish.";
+
+    el("llGroups").innerHTML = (r.groups || []).map(function (g) {
+      var mark, state;
+      if (g.outcome === "banked") { mark = "✓"; state = "That’ll do — below us"; }
+      else if (g.outcome === "lost") { mark = "✗"; state = "Finished above us"; }
+      else if (g.outcome === "level") { mark = "≈"; state = "Level — tie-break needed"; }
+      else { mark = "⏳"; state = g.probGood + "% to go our way"; }
+      var third = g.third ? (esc(g.third.name) + " " + g.third.points + "pts") : "—";
+      return '<div class="llg ' + g.outcome + '">' +
+          '<div class="llg-top"><span class="llg-g">Group ' + esc(g.group) + '</span>' +
+            '<span class="llg-mark">' + mark + "</span></div>" +
+          '<div class="llg-third">3rd now: <b>' + third + "</b></div>" +
+          '<div class="llg-state">' + state + "</div>" +
+          (g.outcome === "pending" ? '<div class="llg-bar"><span style="width:' + g.probGood + '%"></span></div>' : "") +
+        "</div>";
+    }).join("");
+    card.hidden = false;
+  }
+
   function renderRecent(d) {
     var res = d.results || [];           // server sends newest first, live first
     var anyLive = res.some(function (r) { return r.live; });
@@ -537,6 +648,7 @@
       "<b>%</b> is a computer guess from playing out the rest of the tournament many times " +
       "(stronger teams win more often) — a guess to help you follow along, not a betting tip.";
     renderVerdict(d);
+    renderLifeline(d);
     renderRecent(d);
     renderNeeds(d);
     renderQueue(d);

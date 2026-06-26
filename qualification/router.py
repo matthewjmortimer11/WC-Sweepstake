@@ -263,6 +263,87 @@ def _kickoff_key(f: Dict[str, Any]) -> str:
     return (f.get("dateISO") or "") + "T" + (f.get("time") or "00:00")
 
 
+def _build_race(teams, fixtures, status, tables, cutoff: int) -> Optional[Dict[str, Any]]:
+    """The "lifeline" survival view: how many of the other groups still need to
+    produce a third-placed team below the target. Only applies when the target
+    has finished its group in 3rd — that's when its fate is purely in other
+    groups' hands. Auto-resolves as groups finish (✓ banked / ✗ lost / pending).
+    """
+    if not (status.group_rank == 3 and status.group_complete):
+        return None
+
+    bench = (status.group_points, status.group_goal_difference, status.group_goals_for)
+    all_groups = sorted(tables.keys())
+    others = [g for g in all_groups if g != status.group]
+    need_total = max(0, len(all_groups) - cutoff)   # 12 − 8 = 4 must finish below us
+
+    odds = projection.third_place_group_odds(
+        teams, fixtures, status.team_id, bench, ratings=_RATINGS, trials=5000
+    )
+
+    banked = lost = level = 0
+    above_now: List[Dict[str, Any]] = []
+    group_rows: List[Dict[str, Any]] = []
+    for g in others:
+        rows = tables.get(g, [])
+        third = next((r for r in rows if r.rank == 3), None)
+        complete = _group_done_count(g, fixtures) >= engine._GROUP_GAMES
+        prob = odds.get(g, 0.0)
+        tstat = (third.points, third.goal_difference, third.goals_for) if third else None
+        if complete and third and tstat is not None:
+            if tstat < bench:
+                outcome, banked = "banked", banked + 1
+            elif tstat > bench:
+                outcome, lost = "lost", lost + 1
+                above_now.append({**_team_card(third.team_id), "group": g,
+                                  "points": third.points, "goalDifference": third.goal_difference,
+                                  "goalsFor": third.goals_for})
+            else:
+                outcome, level = "level", level + 1
+        else:
+            outcome = "pending"
+        group_rows.append({
+            "group": g,
+            "complete": complete,
+            "outcome": outcome,                  # banked | lost | level | pending
+            "third": ({**_team_card(third.team_id), "points": third.points,
+                       "goalDifference": third.goal_difference, "goalsFor": third.goals_for}
+                      if third else None),
+            "probGood": round(prob * 100),       # chance this group ends up below us
+        })
+
+    in_play = [r for r in group_rows if r["outcome"] == "pending"]
+    possible = sum(1 for r in in_play if r["probGood"] >= 1)
+    need_more = max(0, need_total - banked)
+
+    if banked >= need_total:
+        survival = "qualified"
+    elif banked + possible < need_total:
+        survival = "eliminated"
+    else:
+        likely = sum(1 for r in in_play if r["probGood"] >= 50)
+        expected = banked + sum(r["probGood"] / 100 for r in in_play)
+        survival = "alive" if (likely >= need_more or expected >= need_total) else "thread"
+
+    # Order the cards: still-in-play first (biggest hope first), then settled.
+    order = {"pending": 0, "banked": 1, "level": 2, "lost": 3}
+    group_rows.sort(key=lambda r: (order[r["outcome"]], -r["probGood"], r["group"]))
+
+    return {
+        "applicable": True,
+        "benchmark": {"points": bench[0], "goalDifference": bench[1], "goalsFor": bench[2]},
+        "needTotal": need_total,
+        "needMore": need_more,
+        "banked": banked,
+        "lost": lost,
+        "level": level,
+        "inPlay": len(in_play),
+        "survival": survival,            # qualified | alive | thread | eliminated
+        "aboveNow": above_now,
+        "groups": group_rows,
+    }
+
+
 def _serialise_result(f: Dict[str, Any]) -> Dict[str, Any]:
     score = f.get("score") or [None, None]
     return {
@@ -379,6 +460,10 @@ def _build_payload(target: str) -> Dict[str, Any]:
     target_group_rows = tables.get(status.group, [])
     played_by = {row.team_id: row.played for grp in tables.values() for row in grp}
 
+    # "Lifeline" survival view — the "we need N of the other groups to go our way"
+    # framing, live and auto-resolving. Only when we've finished 3rd in our group.
+    race = _build_race(teams, fixtures, status, tables, cutoff)
+
     # How much of the group stage is actually settled. The best-thirds table is
     # only final once all groups are complete; until then it's provisional and
     # the UI says so (a third on 3 pts can look "in" simply because rival groups
@@ -429,6 +514,7 @@ def _build_payload(target: str) -> Dict[str, Any]:
         "results": [_serialise_result(f) for f in results],
         "gamesPlayed": games_played,
         "gamesTotal": games_total,
+        "race": race,
         "meta": _data_freshness(rows),
         "generatedAt": datetime.now(tz=timezone.utc).isoformat(),
     }

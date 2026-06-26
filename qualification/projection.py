@@ -243,6 +243,78 @@ def project(
     return Projection(chance=chance, decided=False, trials=trials, impacts=impacts)
 
 
+def third_place_group_odds(
+    teams: List[Team],
+    fixtures: List[Fixture],
+    target_team_id: str,
+    benchmark: Tuple[int, int, int],
+    ratings: Optional[Dict[str, float]] = None,
+    trials: int = 5000,
+    seed: int = 20260611,
+) -> Dict[str, float]:
+    """For each group OTHER than the target's, the chance its third-placed team
+    finishes *below* the target on (points, goal difference, goals scored).
+
+    This is the heart of the "we need N of the remaining groups to go our way"
+    survival framing: the target (a third-placed team whose own group is done)
+    qualifies if enough other groups produce a weaker third. ``benchmark`` is the
+    target's own (points, goal difference, goals scored). Completed groups come
+    out at exactly 0.0 or 1.0; only unfinished groups are uncertain.
+    """
+    ratings = ratings or {}
+    team_group = {t.id: t.group for t in teams}
+    team_fp = {t.id: _fair_play_key(t.fair_play) for t in teams}
+    groups: Dict[str, List[str]] = {}
+    for t in teams:
+        groups.setdefault(t.group, []).append(t.id)
+    target_group = team_group[target_team_id]
+    ids = set(team_group)
+
+    base: Dict[str, List[int]] = {i: [0, 0, 0] for i in ids}
+    base_group_matches: Dict[str, List[Tuple[str, str, int, int]]] = {}
+    pending: List[Fixture] = []
+    for fx in fixtures:
+        if fx.stage != "group" or fx.home not in ids or fx.away not in ids:
+            continue
+        if fx.status in _PENDING_STATUSES:
+            pending.append(fx)
+        elif fx.status == "done" and fx.home_goals is not None and fx.away_goals is not None:
+            _apply(base, fx.home, fx.away, fx.home_goals, fx.away_goals)
+            base_group_matches.setdefault(team_group[fx.home], []).append(
+                (fx.home, fx.away, fx.home_goals, fx.away_goals)
+            )
+
+    other = [g for g in groups if g != target_group]
+    bench = benchmark  # (pts, gd, gf)
+    rng = random.Random(seed)
+    below = {g: 0 for g in other}
+    lambdas = {
+        fx.id: _match_lambdas(ratings.get(fx.home, 0.0), ratings.get(fx.away, 0.0))
+        for fx in pending
+    }
+
+    for _ in range(trials):
+        stats = {i: base[i][:] for i in base}
+        sampled_gm: Dict[str, List[Tuple[str, str, int, int]]] = {}
+        for fx in pending:
+            hg, ag = _sample_score(rng, *lambdas[fx.id])
+            _apply(stats, fx.home, fx.away, hg, ag)
+            sampled_gm.setdefault(team_group[fx.home], []).append((fx.home, fx.away, hg, ag))
+        for g in other:
+            matches = base_group_matches.get(g, ())
+            extra = sampled_gm.get(g)
+            if extra:
+                matches = list(matches) + extra
+            third = _rank_ids(groups[g], stats, team_fp, matches)[2]
+            tp = stats[third][0]
+            tgd = stats[third][1] - stats[third][2]
+            tgf = stats[third][1]
+            if (tp, tgd, tgf) < bench:      # strictly worse than the target → good
+                below[g] += 1
+
+    return {g: below[g] / trials for g in other}
+
+
 def _apply(stats: Dict[str, List[int]], home: str, away: str, hg: int, ag: int) -> None:
     sh, sa = stats[home], stats[away]
     sh[1] += hg
