@@ -65,9 +65,6 @@
   .verdict .big span { font-size: 30px; }
   .verdict.good .big { color: #8ff5b6; } .verdict.warn .big { color: #ffd98a; } .verdict.bad .big { color: #ff9fb0; }
   .verdict .biglab { font-size: 13px; color: #cdddff; text-transform: uppercase; letter-spacing: .6px; }
-  .gauge { height: 12px; border-radius: 999px; background: rgba(255,255,255,.14); margin: 12px auto 0; overflow: hidden; max-width: 320px; }
-  .gauge span { display: block; height: 100%; border-radius: 999px; transition: width .5s ease; }
-  .verdict.good .gauge span { background: #6ff0a6; } .verdict.warn .gauge span { background: var(--warn); } .verdict.bad .gauge span { background: var(--bad); }
   .verdict .mean { margin: 14px 4px 0; font-size: 14.5px; color: #e7eeff; line-height: 1.5; }
   .verdict .tiny { margin-top: 10px; font-size: 11px; color: #9fb4d8; line-height: 1.45; }
   .verdict .ais { margin: 13px auto 0; max-width: 360px; background: rgba(255,255,255,.10);
@@ -78,9 +75,7 @@
   /* ── Lifeline (third-place survival) ─────────────────────────────── */
   .lifeline {
     margin-top: 16px; border-radius: 20px; padding: 20px 18px;
-    background:
-      repeating-linear-gradient(135deg, rgba(255,255,255,.018) 0 2px, transparent 2px 22px),
-      linear-gradient(160deg, #0c1c3e, #081530 80%);
+    background: linear-gradient(160deg, #0c1c3e, #081530 80%);
     border: 1px solid var(--line);
   }
   .lifeline.good { border-color: rgba(47,191,113,.5); }
@@ -94,12 +89,8 @@
   .ll-headline { font-size: 21px; font-weight: 800; line-height: 1.25; margin: 12px 0 4px; }
   .ll-headline b { color: #9ec2ff; }
   .ll-emote { color: var(--muted); font-size: 13px; font-style: italic; margin-bottom: 14px; }
-  .ll-counter { display: flex; align-items: center; gap: 6px; margin: 2px 0 6px; flex-wrap: wrap; }
-  .ll-pip { width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center;
-    font-weight: 800; font-size: 15px; background: var(--navy-700); border: 1px solid var(--line); color: var(--muted); }
-  .ll-pip.on { background: rgba(47,191,113,.22); border-color: rgba(47,191,113,.55); color: #8ff5b6; }
-  .ll-counter .cnt { margin-left: 6px; font-size: 13px; color: var(--muted); }
-  .ll-counter .cnt b { color: var(--white); font-size: 15px; }
+  .ll-progress { font-size: 14px; color: #cdddff; margin: 4px 2px 12px; line-height: 1.45; }
+  .ll-progress b { color: var(--white); }
   .ll-above { color: var(--muted); font-size: 12.5px; line-height: 1.5; margin: 8px 2px 4px; }
   .ll-gh { font-size: 15px; font-weight: 800; margin: 16px 2px 2px; }
   /* Key games — the deciding fixtures, standalone and in kick-off order */
@@ -150,8 +141,6 @@
   .llg.banked .llg-state { color: #6ff0a6; } .llg.lost .llg-state { color: #ff9fb0; }
   .llg.level .llg-state { color: #ffd98a; }
   .llg.pending .llg-state { color: #9ec2ff; }
-  .llg-bar { height: 5px; border-radius: 999px; background: var(--navy-700); margin-top: 7px; overflow: hidden; }
-  .llg-bar span { display: block; height: 100%; border-radius: 999px; background: var(--sco-blue); }
 
   /* ── Cards & explainers ──────────────────────────────────────────── */
   section.card {
@@ -197,15 +186,13 @@
                display: flex; align-items: center; gap: 9px; }
   .need-want.meh { background: var(--navy-700); color: var(--muted); border-color: var(--line); }
   .outs { display: flex; flex-direction: column; gap: 6px; }
-  .out { display: flex; align-items: center; gap: 8px; }
-  .out .oi { flex: none; width: 18px; text-align: center; font-size: 14px; }
-  .out .ol { flex: none; width: 78px; font-size: 12px; color: var(--muted); }
-  .out .obar { position: relative; flex: 1; height: 20px; background: var(--navy-700); border-radius: 6px; overflow: hidden; }
-  .out .obar span { display: block; height: 100%; background: #2a467f; border-radius: 6px; transition: width .4s ease; }
-  .out .obar em { position: absolute; right: 7px; top: 0; line-height: 20px; font-style: normal; font-size: 12px; font-weight: 700; }
-  .out.good .obar span { background: var(--good); }
-  .out.good .ol { color: var(--white); font-weight: 700; }
-  .out .omove { flex: none; width: 62px; text-align: right; font-size: 12px; font-weight: 800; font-variant-numeric: tabular-nums; }
+  .out { display: flex; align-items: flex-start; gap: 8px; padding: 4px 0; }
+  .out .oi { flex: none; width: 18px; text-align: center; font-size: 14px; margin-top: 1px; }
+  .out .otxt { flex: 1; font-size: 13.5px; line-height: 1.4; }
+  .out .otxt .ol { font-weight: 700; color: var(--white); }
+  .out .otxt .opct { color: var(--muted); font-size: 12.5px; }
+  .out .omove { flex: none; font-size: 12px; font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .out.good .otxt .ol { color: #8ff5b6; }
   .out .omove.up { color: #6ff0a6; }
   .out .omove.down { color: #ff9fb0; }
   .out .omove.flat { color: var(--muted); font-weight: 600; }
@@ -290,7 +277,7 @@
     <div class="ll-status" id="llStatus"></div>
     <div class="ll-headline" id="llHeadline"></div>
     <div class="ll-emote" id="llEmote"></div>
-    <div class="ll-counter" id="llCounter"></div>
+    <div class="ll-progress" id="llProgress"></div>
     <p class="ll-above" id="llAbove"></p>
     <h3 class="ll-gh">🎯 The games that decide it</h3>
     <p class="explain" id="llKeyNote"></p>
@@ -362,6 +349,7 @@
   // ── The headline verdict, in plain words ──────────────────────────
   function verdict(d) {
     var c = d.chance || { percent: 0, decided: false };
+    var s = d.status || {};
     if (c.decided) {
       var thru = c.percent >= 50;
       if (c.guaranteed)
@@ -371,6 +359,20 @@
                   : { face: "😢", word: "Out this time", cls: "bad" };
     }
     var p = c.percent;
+    if (s.state === "third_in") {
+      if (p >= 75) return { face: "😄", word: "Inside the cut", cls: "good" };
+      if (p >= 55) return { face: "🙂", word: "Holding a place", cls: "good" };
+      if (p >= 40) return { face: "😬", word: "On the bubble", cls: "warn" };
+      return { face: "😟", word: "Slipping down the queue", cls: "bad" };
+    }
+    if (s.state === "third_out") {
+      if (p >= 45) return { face: "😬", word: "Still a shot", cls: "warn" };
+      if (p >= 25) return { face: "😟", word: "Need a favour", cls: "bad" };
+      return { face: "🙏", word: "Long odds", cls: "bad" };
+    }
+    if (s.state === "qualified" && !s.groupComplete) {
+      return { face: "✅", word: "Top two — for now", cls: "good" };
+    }
     if (p >= 80) return { face: "😄", word: "Very likely!", cls: "good" };
     if (p >= 60) return { face: "🙂", word: "Looking good", cls: "good" };
     if (p >= 45) return { face: "😬", word: "It's a coin flip", cls: "warn" };
@@ -423,7 +425,6 @@
         '<div class="word">' + esc(v.word) + '</div>' +
         '<div class="big">' + c.percent + '<span>%</span></div>' +
         '<div class="biglab">' + esc(lab) + '</div>' +
-        '<div class="gauge"><span style="width:' + c.percent + '%"></span></div>' +
         (c.asItStands != null
           ? '<div class="ais">🔵 If the live score' + (d.meta && d.meta.live ? "s" : "") +
               ' froze right now, it would be <b>' + c.asItStands + '%</b>' +
@@ -440,13 +441,13 @@
   function outRow(label, pct, good, base) {
     var delta = pct - base;
     var move, mcls;
-    if (delta >= 2) { move = "▲ +" + delta; mcls = "up"; }
-    else if (delta <= -2) { move = "▼ " + delta; mcls = "down"; }
-    else { move = "≈ no change"; mcls = "flat"; }
+    if (delta >= 2) { move = "+" + delta + "%"; mcls = "up"; }
+    else if (delta <= -2) { move = delta + "%"; mcls = "down"; }
+    else { move = "±0"; mcls = "flat"; }
     return '<div class="out' + (good ? " good" : "") + '">' +
         '<span class="oi">' + (good ? "✅" : "·") + '</span>' +
-        '<span class="ol">' + esc(label) + '</span>' +
-        '<span class="obar"><span style="width:' + pct + '%"></span><em>' + pct + '%</em></span>' +
+        '<span class="otxt"><span class="ol">' + esc(label) + '</span> ' +
+          '<span class="opct">→ about ' + pct + '% chance</span></span>' +
         '<span class="omove ' + mcls + '">' + move + '</span>' +
       '</div>';
   }
@@ -492,8 +493,8 @@
     if (!shown.length) {
       help.textContent = "";
       list.innerHTML = '<li class="big-msg"><span class="em">🤞</span>' +
-        "No single game decides it right now — " + esc(d.targetName) +
-        " just need the results to fall their way.</li>";
+        "No single game swings it much right now — " + esc(d.targetName) +
+        " need the right mix of results across the groups still playing.</li>";
       foot.textContent = "";
       el("need-card").hidden = false;
       return;
@@ -501,9 +502,8 @@
 
     var base = (d.chance && typeof d.chance.percent === "number") ? d.chance.percent : 0;
     help.innerHTML = esc(d.targetName) + " are on <b>" + base + "%</b> right now. " +
-      "These games (in the order they're played) move that number up or down — " +
-      "each row shows where it lands and the <b>change</b>. The " +
-      "<b style='color:#6ff0a6'>green</b> result is the one we're cheering for.";
+      "Each line is what happens to that number if a game ends a certain way — " +
+      "the <b style='color:#6ff0a6'>green</b> results are the ones we're cheering for.";
 
     list.innerHTML = shown.map(function (g) {
       var hn = esc(g.home.name), an = esc(g.away.name);
@@ -518,8 +518,13 @@
             whenLabel(g) +
           '</div>' +
           '<div class="need-want' + (meh ? ' meh' : '') + '">' +
-            (meh ? '🤷' : '👍') + ' <span>' + (meh ? "Doesn't really matter" : "We want: " + esc(g.wants)) + '</span>' +
+            (meh ? '🤷' : '👍') + ' <span>' +
+              (meh ? "Barely moves the needle" :
+                (g.cheerFor ? "Cheer for: " + esc(g.cheerFor) : "We want: " + esc(g.wants))) +
+            '</span>' +
           '</div>' +
+          (g.fear ? '<div class="need-want meh" style="margin-top:6px;background:rgba(224,85,107,.1);border-color:rgba(224,85,107,.35);color:#ff9fb0">' +
+            '🚫 <span>' + esc(g.fear) + '</span></div>' : '') +
           '<div class="outs">' +
             outRow(hn + " win", g.chanceIfHomeWin, good.indexOf("home") >= 0, base) +
             outRow("Draw", g.chanceIfDraw, good.indexOf("draw") >= 0, base) +
@@ -602,22 +607,29 @@
     el("llStatus").textContent = s.pill;
     el("llHeadline").innerHTML = s.head;
     el("llEmote").textContent = (r.survival === "eliminated" || r.survival === "qualified")
-      ? "" : "No more " + d.targetName + " games. Just calculators, chaos, and blind faith.";
+      ? ""
+      : (r.needMore === 1
+          ? "One more group needs to finish below us — that's all."
+          : r.needMore <= 0
+            ? "Every group we needed has come good."
+            : "We're watching " + r.inPlay + " groups where the 3rd-place team still has games to play.");
 
-    var pips = "";
-    for (var i = 0; i < r.needTotal; i++) {
-      pips += '<span class="ll-pip' + (i < r.banked ? " on" : "") + '">' + (i < r.banked ? "✓" : "") + "</span>";
-    }
-    el("llCounter").innerHTML = pips + '<span class="cnt"><b>' + r.banked + "/" + r.needTotal +
-      "</b> banked" + (r.needMore > 0 ? " · need " + r.needMore + " more" : "") + "</span>";
+    var prog = "<b>" + r.banked + " of " + r.needTotal + "</b> groups already below us";
+    if (r.needMore > 0)
+      prog += " · need <b>" + r.needMore + " more</b> from the <b>" + r.inPlay + "</b> still playing";
+    else if (r.survival === "qualified")
+      prog = "<b>All " + r.needTotal + " groups</b> we needed are below us — we're through.";
+    el("llProgress").innerHTML = prog;
 
     var above = r.aboveNow || [];
     el("llAbove").innerHTML = above.length
-      ? ("<b>" + above.length + "</b> third-placed team" + (above.length === 1 ? "" : "s") +
-         " already sit above us: " + above.map(function (t) { return esc(t.flag) + " " + esc(t.name); }).join(", ") +
-         ". We need the others to fall short of our <b>" + r.benchmark.points + " pts · " +
-         fmtGD(r.benchmark.goalDifference) + " GD · " + r.benchmark.goalsFor + " goals</b>.")
-      : "We need other groups' third-placed teams to finish below our <b>" + r.benchmark.points + " pts</b>.";
+      ? ("Already ahead of us: " + above.map(function (t) {
+           return esc(t.flag) + " " + esc(t.name) + " (" + t.points + " pts, " + fmtGD(t.goalDifference) + " GD)";
+         }).join("; ") +
+         ". We need other groups' 3rd-place teams to finish on <b>fewer than " + r.benchmark.points +
+         " pts</b> (or the same with worse GD/goals).")
+      : "We need other groups' 3rd-place teams to finish below our <b>" + r.benchmark.points +
+        " pts · " + fmtGD(r.benchmark.goalDifference) + " GD · " + r.benchmark.goalsFor + " goals</b>.";
 
     // ── The key games, standalone and in kick-off order ──────────────
     // The games that actually swing our fate: still to play, in a group that's
@@ -635,7 +647,7 @@
 
     el("llKeyNote").innerHTML = keyGames.length
       ? "These <b>" + keyGames.length + "</b> game" + (keyGames.length === 1 ? "" : "s") +
-        " decide it — shown in the order they kick off. Get the result we want in enough of them and we’re through."
+        " can still move us — kick-off order below. Each card says what result helps and what to dread."
       : "No games left that change anything — it’s down to the groups below.";
 
     el("llKeyGames").innerHTML = keyGames.map(function (gm) {
@@ -646,7 +658,7 @@
           '<div class="kg-head"><span class="kg-grp">Group ' + esc(gm.group) + "</span>" + when + "</div>" +
           '<div class="kg-teams">' + esc(gm.home.flag) + " " + esc(gm.home.name) +
             ' <span class="kg-v">v</span> ' + esc(gm.away.name) + " " + esc(gm.away.flag) + "</div>" +
-          '<div class="kg-want">👍 We need ' + esc(gm.wants) + "</div>" +
+          '<div class="kg-want">👍 Cheer for: ' + esc(gm.cheerFor || gm.wants) + "</div>" +
           (gm.fear ? '<div class="kg-fear">🚫 ' + esc(gm.fear) + "</div>" : "") +
         "</div>";
     }).join("") || '<p class="empty">No games left to play.</p>';
@@ -655,9 +667,9 @@
       "Auto-ticks ✓ or crosses ✗ as the games above finish.";
 
     function pendingWord(p) {
-      if (p >= 60) return { t: "Leaning our way", c: "good" };
-      if (p >= 38) return { t: "On a knife-edge", c: "warn" };
-      return { t: "Needs a favour", c: "bad" };
+      if (p >= 65) return { t: "~" + p + "% chance their 3rd finishes below us", c: "good" };
+      if (p >= 40) return { t: "~" + p + "% chance they finish below us", c: "warn" };
+      return { t: "Only ~" + p + "% chance they finish below us", c: "bad" };
     }
 
     var inPlay = (r.groups || []).filter(function (g) { return g.outcome === "pending"; });
@@ -667,15 +679,16 @@
       return '<div class="llp ' + w.c + '">' +
           '<div class="llp-top"><span class="llp-g">Group ' + esc(g.group) + "</span>" +
             '<span class="llp-word ' + w.c + '">' + w.t + "</span></div>" +
-          '<div class="llp-third">3rd as it stands: <b>' + third + "</b> — we need them to drop below us</div>" +
+          '<div class="llp-third">3rd as it stands: <b>' + third + "</b> — need them below " +
+            r.benchmark.points + " pts</div>" +
         "</div>";
     }).join("");
 
     var decided = (r.groups || []).filter(function (g) { return g.outcome !== "pending"; });
     el("llDecided").innerHTML = decided.map(function (g) {
       var mark = g.outcome === "banked" ? "✓" : (g.outcome === "level" ? "≈" : "✗");
-      var state = g.outcome === "banked" ? "Below us — that’ll do"
-        : (g.outcome === "level" ? "Level — tie-break" : "Above us");
+      var state = g.outcome === "banked" ? "Finished below us — counts"
+        : (g.outcome === "level" ? "Tied on stats — tie-break decides" : "Finished above us");
       var third = g.third ? (esc(g.third.name) + " " + g.third.points + "pts") : "—";
       return '<div class="llg ' + g.outcome + '">' +
           '<div class="llg-top"><span class="llg-g">Group ' + esc(g.group) + "</span>" +

@@ -221,6 +221,24 @@ def _wants_text(good: set) -> str:
     return "the result barely matters"      # nothing clearly improves the chance
 
 
+def _cheer_text(good: set, h: int, dr: int, a: int) -> str:
+    """Plain-language summary of the result(s) that keep us on track, with odds."""
+    labels = [("home", h, "{home} win"), ("draw", dr, "a draw"), ("away", a, "{away} win")]
+    fine = [(key, pct, tpl) for key, pct, tpl in labels if key in good]
+    if not fine:
+        return ""
+    if len(fine) == 3:
+        lo, hi = min(h, dr, a), max(h, dr, a)
+        return f"any result keeps us around {lo}–{hi}%"
+    if len(fine) == 1:
+        _, pct, tpl = fine[0]
+        return f"{tpl} (~{pct}%)"
+    parts = []
+    for _, pct, tpl in fine:
+        parts.append(f"{tpl} (~{pct}%)")
+    return " or ".join(parts)
+
+
 # How close to the best available result an outcome must land to count as "fine"
 # for us: within a few points of qualification chance is practically as good, so
 # a draw that's nearly as useful as a win is acknowledged, not ignored.
@@ -245,24 +263,20 @@ def _classify_outcomes(h: int, dr: int, a: int):
     good = {k for k, p in outcomes if p >= best - _GOOD_TOL}
     worst_key, worst = min(outcomes, key=lambda kv: kv[1])
     danger = worst_key if (best - worst >= _DANGER_DROP and worst_key not in good) else None
-    return good, danger, worst
+    return good, danger, worst, best
 
 
-def _fear_text(danger: Optional[str], worst_pct: int) -> str:
-    """A short 'the result that hurts us' line, e.g. 'If {home} win, we're in real
-    trouble'. Severity scales with how low our chance falls in that case."""
+def _fear_text(danger: Optional[str], worst_pct: int, best_pct: int) -> str:
+    """The single result that hurts us — with the projected chance, not vague doom."""
     if not danger:
         return ""
-    clause = {"home": "{home} win", "away": "{away} win", "draw": "it's a draw"}[danger]
-    if worst_pct <= 10:
-        sev = "we're all but out"
-    elif worst_pct <= 30:
-        sev = "we're in real trouble"
-    elif worst_pct <= 50:
-        sev = "it gets nervy"
-    else:
-        sev = "we take a hit"
-    return "If " + clause + ", " + sev
+    clause = {"home": "{home} win", "away": "{away} win", "draw": "a draw"}[danger]
+    drop = max(0, best_pct - worst_pct)
+    if drop >= 25:
+        return f"If {clause}, chance falls to about {worst_pct}% (−{drop})"
+    if drop >= 10:
+        return f"If {clause}, we'd be at about {worst_pct}% (−{drop})"
+    return f"If {clause}, chance slips to about {worst_pct}%"
 
 
 def _serialise_impact(
@@ -280,10 +294,11 @@ def _serialise_impact(
     # best available — so a draw that's nearly as good as a win is shown as fine,
     # rather than insisting on a win. We also surface the single result to fear,
     # so "if Belgium win, are we screwed?" is answered on the card itself.
-    good_set, danger, worst_pct = _classify_outcomes(h, dr, a)
+    good_set, danger, worst_pct, best_pct = _classify_outcomes(h, dr, a)
     good = sorted(good_set)
     text = _wants_text(good_set)
-    fear = _fear_text(danger, worst_pct).format(home=home["name"], away=away["name"])
+    cheer = _cheer_text(good_set, h, dr, a)
+    fear = _fear_text(danger, worst_pct, best_pct).format(home=home["name"], away=away["name"])
     row = row or {}
     return {
         "fixtureId": i.fixture_id,
@@ -297,6 +312,7 @@ def _serialise_impact(
         "favouredOutcome": i.favoured_outcome,
         "goodOutcomes": good,
         "wants": text.format(home=home["name"], away=away["name"]),
+        "cheerFor": cheer.format(home=home["name"], away=away["name"]),
         "fear": fear,
         "matters": i.matters,
         # When the game is — so the UI can order chronologically and show the time.
