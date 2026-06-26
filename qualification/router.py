@@ -52,6 +52,10 @@ _STALE_AFTER_S = 15 * 60
 # Lifeline: a group only counts as "could still help" above this prob threshold.
 _RACE_POSSIBLE_PCT = 20
 
+# Server-side payload cache — one Monte-Carlo run per fixture revision, not per
+# visitor. Invalidated when sync bumps ``fixture_cache_revision``.
+_payload_cache: Dict[str, tuple[int, Dict[str, Any]]] = {}
+
 
 # ── Tournament team list (static per process; read once from config) ─────────
 
@@ -641,6 +645,29 @@ def _build_payload(target: str) -> Dict[str, Any]:
     }
 
 
+def _get_payload(target: str) -> Dict[str, Any]:
+    """Return a cached qualification payload, recomputing only when fixtures change."""
+    rev = sync.fixture_cache_revision
+    cached = _payload_cache.get(target)
+    if cached and cached[0] == rev:
+        return cached[1]
+    payload = _build_payload(target)
+    _payload_cache[target] = (rev, payload)
+    return payload
+
+
+def _response_cache_seconds(payload: Dict[str, Any]) -> int:
+    """HTTP cache TTL aligned with the page poll cadence."""
+    meta = payload.get("meta") or {}
+    if meta.get("live"):
+        return _LIVE_POLL_MS // 1000
+    games_started = int(payload.get("gamesStarted") or 0)
+    games_total = int(payload.get("gamesTotal") or 0)
+    if 0 < games_started < games_total:
+        return _TOURNAMENT_POLL_MS // 1000
+    return _IDLE_POLL_MS // 1000
+
+
 # ── Routes ───────────────────────────────────────────────────────────────────
 
 # Served at both the generic path and the Scotland-branded public URL
@@ -662,4 +689,9 @@ async def qualification_state(
     target: Optional[str] = Query(default=None, max_length=8),
 ) -> JSONResponse:
     team = (target or _DEFAULT_TARGET).upper()
-    return JSONResponse(_build_payload(team))
+    payload = _get_payload(team)
+    max_age = _response_cache_seconds(payload)
+    return JSONResponse(
+        payload,
+        headers={"Cache-Control": f"public, max-age={max_age}"},
+    )

@@ -27,6 +27,9 @@ log = logging.getLogger(__name__)
 
 # ── In-memory cache (read by main.py's _state()) ─────────────────────────────
 fixture_cache: list[dict] = []
+# Bumped on every cache rebuild so hot-path readers (e.g. qualification API)
+# can invalidate their own derived caches without hashing fixture rows.
+fixture_cache_revision: int = 0
 
 # ── Date/time helpers ─────────────────────────────────────────────────────────
 _BST = timedelta(hours=1)
@@ -92,10 +95,11 @@ def _next_sleep(fixtures: list[CanonicalFixture]) -> int:
 
 def _rebuild_cache(fixtures: list[CanonicalFixture]) -> None:
     """Sort fixtures by (dateISO, time) and repopulate fixture_cache."""
-    global fixture_cache
+    global fixture_cache, fixture_cache_revision
     frontend = [_to_frontend(f) for f in fixtures]
     frontend.sort(key=lambda d: (d["dateISO"], d["time"]))
     fixture_cache = frontend
+    fixture_cache_revision += 1
 
 
 async def _upsert(fixtures: list[CanonicalFixture], session) -> None:
