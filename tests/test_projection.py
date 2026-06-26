@@ -286,3 +286,18 @@ def test_cheer_text_lists_outcomes_with_odds():
     from qualification.router import _cheer_text
     assert _cheer_text({"home", "draw"}, 84, 80, 12) == "{home} win (~84%) or a draw (~80%)"
     assert "around 58–61%" in _cheer_text({"home", "draw", "away"}, 61, 60, 58)
+
+
+def test_chance_label_holding_when_in_cut():
+    from qualification.router import _chance_label
+    from qualification.engine import QualificationStatus
+
+    status = QualificationStatus(
+        team_id="SCO", name="Scotland", group="C", group_rank=3,
+        group_points=3, group_goal_difference=-3, group_goals_for=1,
+        position_label="3rd place", third_place_rank=6, qualify_cutoff=8,
+        qualified=True, group_complete=True, status="third_in",
+        headline="",
+    )
+    assert _chance_label(status, games_started=54, decided=False, guaranteed=False) == "holding"
+    assert _chance_label(status, games_started=0, decided=False, guaranteed=False) == "forecast"

@@ -470,7 +470,10 @@ def _headline(
     if status == "third_in":
         nth = _ordinal(third_rank) if third_rank else "—"
         if group_complete:
-            return f"{name} are {nth} of the third-placed teams — inside the top {cutoff} and through, pending other groups."
+            return (
+                f"{name} are {nth} among third-placed teams on today's table — "
+                f"inside the top {cutoff} for now, with other groups still playing."
+            )
         return f"{name} sit {nth} among the third-placed teams — currently inside the top {cutoff}."
     if status == "third_out":
         nth = _ordinal(third_rank) if third_rank else "—"

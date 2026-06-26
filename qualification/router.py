@@ -458,6 +458,25 @@ def _data_freshness(rows: List[Dict[str, Any]]) -> Dict[str, Any]:
     }
 
 
+def _chance_label(
+    status: engine.QualificationStatus,
+    *,
+    games_started: int,
+    decided: bool,
+    guaranteed: bool,
+) -> str:
+    """UI label for the headline % — separates snapshot position from projection."""
+    if guaranteed or decided:
+        return "confirmed"
+    if games_started == 0:
+        return "forecast"
+    if status.status == "third_in" and status.qualified:
+        return "holding"
+    if status.status == "third_out":
+        return "catching"
+    return "default"
+
+
 def _build_payload(target: str) -> Dict[str, Any]:
     teams = _engine_teams()
     if target not in {t.id for t in teams}:
@@ -521,6 +540,16 @@ def _build_payload(target: str) -> Dict[str, Any]:
     games_played = sum(
         1 for f in rows if f.get("stage") == "group" and f.get("status") == "done"
     )
+    games_started = sum(
+        1 for f in rows
+        if f.get("stage") == "group" and f.get("status") in ("done", "live", "halfTime")
+    )
+    group_games_started = sum(
+        1 for f in rows
+        if f.get("stage") == "group"
+        and f.get("group") == status.group
+        and f.get("status") in ("done", "live", "halfTime")
+    )
 
     target_group_rows = tables.get(status.group, [])
     played_by = {row.team_id: row.played for grp in tables.values() for row in grp}
@@ -570,6 +599,14 @@ def _build_payload(target: str) -> Dict[str, Any]:
             "trials": proj.trials,
             "asItStands": as_it_stands,
             "hasLive": bool(live_ids),
+            "snapshotIn": status.qualified,
+            "thirdRank": status.third_place_rank,
+            "label": _chance_label(
+                status,
+                games_started=games_started,
+                decided=decided,
+                guaranteed=guaranteed,
+            ),
         },
         "thirdPlaceTable": [
             _serialise_third(s, target, played_by, provisional=provisional) for s in thirds
@@ -581,6 +618,8 @@ def _build_payload(target: str) -> Dict[str, Any]:
         ],
         "results": [_serialise_result(f) for f in results],
         "gamesPlayed": games_played,
+        "gamesStarted": games_started,
+        "groupGamesStarted": group_games_started,
         "gamesTotal": games_total,
         "race": race,
         "meta": _data_freshness(rows),
