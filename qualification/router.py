@@ -164,8 +164,15 @@ def _team_card(team_id: str) -> Dict[str, Any]:
 
 
 def _serialise_third(
-    s: engine.ThirdPlaceStanding, target: str, played_by: Dict[str, int]
+    s: engine.ThirdPlaceStanding,
+    target: str,
+    played_by: Dict[str, int],
+    *,
+    provisional: bool,
 ) -> Dict[str, Any]:
+    # Until every group has finished, a small set of thirds can all look "inside
+    # the cut" — mask qualifies so the queue badges stay honest.
+    qualifies = s.qualifies and not provisional
     card = _team_card(s.team_id)
     return {
         **card,
@@ -176,7 +183,7 @@ def _serialise_third(
         "goalsFor": s.goals_for,
         "fairPlay": s.fair_play,
         "rank": s.rank,
-        "qualifies": s.qualifies,
+        "qualifies": qualifies,
         "isTarget": s.team_id == target,
     }
 
@@ -514,6 +521,7 @@ def _build_payload(target: str) -> Dict[str, Any]:
     groups_complete = sum(
         1 for g in all_groups if _group_done_count(g, fixtures) >= engine._GROUP_GAMES
     )
+    provisional = groups_complete < len(all_groups)
 
     return {
         "target": target,
@@ -521,7 +529,7 @@ def _build_payload(target: str) -> Dict[str, Any]:
         "cutoff": cutoff,
         "groupsComplete": groups_complete,
         "groupsTotal": len(all_groups),
-        "provisional": groups_complete < len(all_groups),
+        "provisional": provisional,
         "status": {
             "teamId": status.team_id,
             "name": status.name,
@@ -547,7 +555,9 @@ def _build_payload(target: str) -> Dict[str, Any]:
             "asItStands": as_it_stands,
             "hasLive": bool(live_ids),
         },
-        "thirdPlaceTable": [_serialise_third(s, target, played_by) for s in thirds],
+        "thirdPlaceTable": [
+            _serialise_third(s, target, played_by, provisional=provisional) for s in thirds
+        ],
         "targetGroupTable": [_serialise_group_row(s, target) for s in target_group_rows],
         "remainingGames": [
             _serialise_impact(i, status.name, chance_pct, row_by_id.get(i.fixture_id))

@@ -189,6 +189,47 @@ def test_ratings_favour_the_stronger_team():
     assert abs(s2 - m2) < 0.08
 
 
+def test_live_scores_feed_projection_base_table():
+    """Live scores must count in the headline % — not be re-sampled as if unplayed."""
+    teams_c, fixtures_c = _group_c_complete()   # SCO third, 3 pts
+    teams_d = _four("D", ["DW", "DX", "DY", "DB"])
+    base_d = [
+        _done("d1", "D", "DW", "DX", 0, 0),
+        _done("d2", "D", "DX", "DB", 3, 0),
+        _done("d3", "D", "DW", "DB", 3, 0),
+        _done("d4", "D", "DX", "DY", 3, 0),
+        _done("d5", "D", "DB", "DY", 2, 0),
+    ]
+    teams = teams_c + teams_d
+
+    def _live(hg, ag):
+        return base_d + [
+            Fixture(id="d6", home="DY", away="DW", status="live", group="D",
+                    home_goals=hg, away_goals=ag, stage="group"),
+        ]
+
+    in_live = project(teams, fixtures_c + _live(0, 0), "SCO", cutoff=1, trials=4000, seed=11)
+    out_live = project(teams, fixtures_c + _live(2, 0), "SCO", cutoff=1, trials=4000, seed=11)
+    assert in_live.chance > out_live.chance + 0.5
+    assert any(i.fixture_id == "d6" for i in in_live.impacts)
+
+
+def test_provisional_third_place_badges_not_all_in():
+    from qualification.router import _serialise_third
+    from qualification.engine import ThirdPlaceStanding
+
+    thirds = [
+        ThirdPlaceStanding("AAA", "A", 3, 1, 4, rank=1, qualifies=True),
+        ThirdPlaceStanding("BBB", "B", 3, 0, 3, rank=2, qualifies=True),
+        ThirdPlaceStanding("CCC", "C", 3, -1, 2, rank=3, qualifies=True),
+    ]
+    rows = [_serialise_third(s, "CCC", {}, provisional=True) for s in thirds]
+    assert all(not r["qualifies"] for r in rows)
+    rows_final = [_serialise_third(s, "CCC", {}, provisional=False) for s in thirds]
+    assert rows_final[0]["qualifies"] is True
+    assert rows_final[2]["qualifies"] is True
+
+
 def test_american_odds_conversion():
     from qualification.router import _american_to_prob
     assert _american_to_prob("+100") == pytest.approx(0.5)
