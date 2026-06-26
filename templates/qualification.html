@@ -3,15 +3,15 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<title>Are Scotland going through? — World Cup 2026</title>
-<meta name="description" content="A dead-simple live tracker for whether Scotland reach the World Cup 2026 knockouts — and exactly what they need." />
-<meta property="og:title" content="Are Scotland going through? — World Cup 2026" />
+<title>Scotland World Cup 2026 qualification tracker</title>
+<meta name="description" content="Live tracker for Scotland's World Cup 2026 knockout qualification — where they stand among the best third-placed teams and exactly what they need." />
+<meta property="og:title" content="Scotland World Cup 2026 qualification tracker" />
 <meta property="og:description" content="Live tracker for Scotland's World Cup 2026 knockout qualification — where they stand among the best third-placed teams and exactly what they need." />
 <meta property="og:type" content="website" />
 <meta property="og:url" content="https://wheesht.xyz/scotland-qualification" />
 <meta property="og:image" content="https://wheesht.xyz/icons/icon-512.png" />
 <meta name="twitter:card" content="summary" />
-<meta name="twitter:title" content="Are Scotland going through? — World Cup 2026" />
+<meta name="twitter:title" content="Scotland World Cup 2026 qualification tracker" />
 <meta name="twitter:description" content="Live tracker for Scotland's World Cup 2026 knockout qualification — where they stand and what they need." />
 <meta name="twitter:image" content="https://wheesht.xyz/icons/icon-512.png" />
 <meta name="color-scheme" content="dark" />
@@ -48,8 +48,14 @@
     display: flex; align-items: center; justify-content: space-between;
     gap: 12px; padding: 16px 0 10px;
   }
-  header.top .title { font-size: 16px; font-weight: 800; }
-  header.top .title span { color: var(--muted); font-weight: 500; display: block; font-size: 12px; }
+  header.top .brand { flex: 1; min-width: 0; }
+  header.top .sco-badge {
+    display: inline-block; margin-bottom: 6px; padding: 4px 10px; border-radius: 999px;
+    background: rgba(10,91,214,.22); border: 1px solid rgba(10,91,214,.55);
+    color: #9ec2ff; font-size: 11px; font-weight: 800; letter-spacing: .7px; text-transform: uppercase;
+  }
+  header.top .title { font-size: 22px; font-weight: 800; line-height: 1.15; }
+  header.top .title span { color: var(--muted); font-weight: 500; display: block; font-size: 12px; margin-top: 4px; }
   .refresh {
     border: 1px solid var(--line); background: var(--navy-700); color: var(--white);
     border-radius: 999px; padding: 9px 15px; font-size: 14px; font-weight: 700;
@@ -84,6 +90,7 @@
   .sky-head { padding: 22px 20px 8px; }
   .sky-head h2 { margin: 0; font-size: 28px; font-weight: 800; line-height: 1.15; letter-spacing: -.4px; }
   .sky-head p { margin: 8px 0 0; font-size: 15px; font-style: italic; color: rgba(255,255,255,.82); }
+  .sky-head .sky-ctx { margin: 10px 0 0; font-size: 13.5px; font-style: normal; color: rgba(255,255,255,.72); line-height: 1.45; }
   .sky-progress {
     margin: 0 20px 12px; padding: 10px 12px; border-radius: 12px;
     background: rgba(0,0,0,.22); font-size: 13px; color: rgba(255,255,255,.88); line-height: 1.45;
@@ -288,7 +295,10 @@
 <body>
 <div class="wrap">
   <header class="top">
-    <div class="title" id="pageTitle">Are Scotland going through?<span id="subtitle">World Cup 2026</span></div>
+    <div class="brand">
+      <div class="sco-badge" id="scoBadge">Scotland</div>
+      <div class="title" id="pageTitle">Knockout qualification<span id="subtitle">World Cup 2026 · live tracker</span></div>
+    </div>
     <button class="refresh" id="refreshBtn" type="button" aria-busy="false">
       <span class="spin">↻</span><span>Refresh</span>
     </button>
@@ -301,6 +311,7 @@
     <div class="sky-head">
       <h2 id="checklistTitle">How do Scotland qualify?</h2>
       <p id="checklistSubtitle">At least four of these need to happen</p>
+      <p class="sky-ctx" id="checklistContext" hidden></p>
     </div>
     <div class="sky-progress" id="checklistProgress" hidden></div>
     <ol class="sky-list" id="checklistList"></ol>
@@ -486,25 +497,37 @@
   function renderChecklist(d) {
     var c = d.checklist;
     var card = el("checklist-card");
+    var nm = d.targetName || "Scotland";
+    el("scoBadge").textContent = nm;
     if (!c || !c.applicable || !(c.items || []).length) {
       card.hidden = true;
-      el("pageTitle").childNodes[0].textContent = "Are " + d.targetName + " going through?";
+      el("pageTitle").childNodes[0].textContent = "Are " + nm + " going through?";
       return;
     }
-    el("pageTitle").childNodes[0].textContent = c.title || ("How do " + d.targetName + " qualify?");
-    el("checklistTitle").textContent = c.title || ("How do " + d.targetName + " qualify?");
+    el("pageTitle").childNodes[0].textContent = nm + " — knockout qualification";
+    el("checklistTitle").textContent = c.title || ("How do " + nm + " qualify?");
     el("checklistSubtitle").textContent = c.subtitle || "";
+    var ctx = el("checklistContext");
+    if (c.context) {
+      ctx.textContent = c.context;
+      ctx.hidden = false;
+    } else {
+      ctx.hidden = true;
+    }
     var prog = el("checklistProgress");
     if (c.mode === "best_thirds") {
       prog.hidden = false;
       prog.innerHTML = "<b>" + (c.banked || 0) + " of " + (c.needTotal || 0) + "</b> groups already below " +
-        esc(d.targetName) + (c.needMore > 0 ? " · still need <b>" + c.needMore + " more</b>" : " · we're there");
+        esc(nm) + (c.needMore > 0 ? " · still need <b>" + c.needMore + " more</b>" : " · we're there");
     } else {
       prog.hidden = true;
     }
     el("checklistList").innerHTML = (c.items || []).map(function (item) {
       var hint = "";
-      if (item.probGood != null && c.mode === "best_thirds") {
+      if (item.thirdTeam != null && c.mode === "best_thirds") {
+        hint = "<small>Group " + esc(item.group) + "'s 3rd right now: <b>" + esc(item.thirdTeam) +
+          "</b>" + (item.thirdPoints != null ? " (" + item.thirdPoints + " pts)" : "") + "</small>";
+      } else if (item.probGood != null && c.mode === "best_thirds") {
         hint = "<small>~roughly " + item.probGood + "% chance this group finishes below us</small>";
       }
       return '<li><span class="sky-grp">Group ' + esc(item.group) + '</span>' +
@@ -870,7 +893,7 @@
 
   function render(d) {
     el("errBanner").hidden = true;
-    el("subtitle").textContent = "World Cup 2026 · " + d.targetName;
+    el("subtitle").textContent = "World Cup 2026 · " + d.targetName + " live tracker";
     el("howtoTarget").textContent = d.targetName;
     el("footnote").innerHTML = "Everything here is worked out from the real match scores. The " +
       "<b>%</b> is a computer guess from playing out the rest of the tournament many times " +

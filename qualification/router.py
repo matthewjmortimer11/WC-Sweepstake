@@ -416,6 +416,19 @@ def _build_race(teams, fixtures, status, tables, cutoff: int) -> Optional[Dict[s
     }
 
 
+def _fmt_gd(n: int) -> str:
+    return f"+{n}" if n > 0 else str(n)
+
+
+def _stat_above(pts: int, gd: int, gf: int, bench: tuple[int, int, int]) -> bool:
+    return (pts, gd, gf) > bench
+
+
+def _win_would_exceed_bench(pts: int, gd: int, gf: int, bench: tuple[int, int, int]) -> bool:
+    """True if three points from a win would put this team above Scotland's benchmark."""
+    return _stat_above(pts + 3, gd, gf, bench)
+
+
 def _band_to_sky_line(band: engine.Band, home_name: str, away_name: str) -> str:
     """Sky Sports-style phrasing — who to cheer for in plain fan language."""
     if band.kind == "win":
@@ -434,6 +447,11 @@ def _band_to_sky_line(band: engine.Band, home_name: str, away_name: str) -> str:
         return f"{home_name} lose to {away_name} by {band.k}+ goals"
     if band.kind == "draw_only":
         return f"{home_name} and {away_name} draw"
+    if band.kind == "interval" and band.lo is not None and band.hi is not None:
+        if band.hi <= 0:
+            return f"{home_name} fail to beat {away_name}"
+        if band.lo >= 1:
+            return f"{home_name} beat {away_name} by {band.lo}+ goals"
     return engine.explain_requirement(band, home_name, away_name)
 
 
@@ -502,14 +520,96 @@ def _line_from_impact(
 
 
 def _pick_group_impact(
-    impacts: List[projection.GameImpact], group: str
+    impacts: List[projection.GameImpact], group: str, third_id: Optional[str] = None
 ) -> Optional[projection.GameImpact]:
     candidates = [i for i in impacts if i.group == group and i.matters]
     if not candidates:
         candidates = [i for i in impacts if i.group == group]
     if not candidates:
         return None
+    if third_id:
+        involving = [i for i in candidates if third_id in (i.home, i.away)]
+        if involving:
+            best = max(involving, key=lambda i: i.swing)
+            overall = max(candidates, key=lambda i: i.swing)
+            if best.swing >= overall.swing * 0.5:
+                return best
     return max(candidates, key=lambda i: i.swing)
+
+
+def _line_for_pending_group(
+    teams: List[Team],
+    fixtures: List[Fixture],
+    target_id: str,
+    target_name: str,
+    cutoff: int,
+    group_row: Dict[str, Any],
+    impacts: List[projection.GameImpact],
+    benchmark: Dict[str, int],
+) -> str:
+    """One Sky-style line for a pending group — centred on its 3rd-placed team."""
+    name_of = {t.id: t.name for t in teams}
+    group = group_row["group"]
+    third = group_row.get("third") or {}
+    third_id = third.get("id")
+    third_name = third.get("name", "3rd place")
+    pts = int(third.get("points") or 0)
+    gd = int(third.get("goalDifference") or 0)
+    gf = int(third.get("goalsFor") or 0)
+    bench = (benchmark["points"], benchmark["goalDifference"], benchmark["goalsFor"])
+
+    third_fixtures = [
+        f for f in fixtures
+        if f.group == group
+        and f.status in ("upcoming", "live", "halfTime")
+        and third_id
+        and third_id in (f.home, f.away)
+    ]
+    all_pending = [
+        f for f in fixtures
+        if f.group == group and f.status in ("upcoming", "live", "halfTime")
+    ]
+
+    def sky_from_fx(fx: Fixture) -> Optional[str]:
+        grid = engine.calculate_relevant_score_bands(
+            teams, fixtures, fx.id, target_id, cutoff
+        )
+        band = engine._collapse_band(grid)
+        if band.kind in ("any", "none"):
+            return None
+        return _band_to_sky_line(
+            band, name_of.get(fx.home, fx.home), name_of.get(fx.away, fx.away)
+        )
+
+    for fx in third_fixtures:
+        line = sky_from_fx(fx)
+        if line:
+            return line
+
+    for fx in all_pending:
+        line = sky_from_fx(fx)
+        if line:
+            return line
+
+    for fx in third_fixtures:
+        home = name_of.get(fx.home, fx.home)
+        away = name_of.get(fx.away, fx.away)
+        opp = away if fx.home == third_id else home
+        if _stat_above(pts, gd, gf, bench):
+            return f"{opp} beat {third_name}"
+        if _win_would_exceed_bench(pts, gd, gf, bench):
+            return f"{third_name} fail to beat {opp}"
+
+    imp = _pick_group_impact(impacts, group, third_id)
+    if imp:
+        line = _line_from_impact(imp, teams, fixtures, target_id, cutoff)
+        if line:
+            return line
+
+    return (
+        f"{third_name} must finish below {target_name} "
+        f"({benchmark['points']} pts, {_fmt_gd(benchmark['goalDifference'])} GD)"
+    )
 
 
 def _build_checklist(
@@ -526,41 +626,55 @@ def _build_checklist(
     name_of = {t.id: t.name for t in teams}
 
     if race and race.get("applicable"):
+        benchmark = race.get("benchmark") or {
+            "points": status.group_points,
+            "goalDifference": status.group_goal_difference,
+            "goalsFor": status.group_goals_for,
+        }
+        bench_pts = int(benchmark["points"])
+        bench_gd = int(benchmark["goalDifference"])
         items: List[Dict[str, Any]] = []
         for gr in race["groups"]:
             if gr["outcome"] != "pending":
                 continue
-            group = gr["group"]
-            imp = _pick_group_impact(impacts, group)
-            if imp:
-                text = _line_from_impact(imp, teams, fixtures, target_id, cutoff)
-            else:
-                text = ""
-            if not text:
-                third = (gr.get("third") or {}).get("name")
-                text = (
-                    f"We need Group {group}'s 3rd place"
-                    + (f" ({third})" if third else "")
-                    + " to finish below Scotland"
-                )
+            text = _line_for_pending_group(
+                teams, fixtures, target_id, target_name, cutoff, gr, impacts, benchmark
+            )
+            third = gr.get("third") or {}
             items.append({
-                "group": group,
+                "group": gr["group"],
                 "text": text,
                 "outcome": "pending",
                 "probGood": gr.get("probGood"),
+                "thirdTeam": third.get("name"),
+                "thirdPoints": third.get("points"),
             })
         items.sort(key=lambda r: r["group"])
         need_more = int(race.get("needMore") or 0)
-        subtitle = (
-            f"At least {need_more} of these need to happen"
-            if need_more != 1
-            else "This needs to happen"
+        n_items = len(items)
+        if need_more != 1:
+            subtitle = (
+                f"At least {need_more} of these {n_items} groups need a 3rd-placed team "
+                f"below {target_name} ({bench_pts} pts, {_fmt_gd(bench_gd)} GD)"
+            )
+        else:
+            subtitle = (
+                f"One of these groups must finish with a 3rd-placed team "
+                f"below {target_name} ({bench_pts} pts, {_fmt_gd(bench_gd)} GD)"
+            )
+        context = (
+            f"{target_name} finished 3rd in Group {status.group} on "
+            f"{bench_pts} pts ({_fmt_gd(bench_gd)} GD). "
+            f"Only the 8 best third-placed teams go through — these are the results "
+            f"elsewhere that help {target_name} stay in the cut."
         )
         return {
             "applicable": bool(items),
             "mode": "best_thirds",
             "title": f"How do {target_name} qualify?",
             "subtitle": subtitle,
+            "context": context,
+            "benchmark": benchmark,
             "needTotal": race.get("needTotal"),
             "needMore": need_more,
             "banked": race.get("banked"),

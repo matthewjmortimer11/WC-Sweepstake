@@ -23,6 +23,19 @@ def test_band_to_sky_line_win_by():
     assert _band_to_sky_line(band, "Austria", "Algeria") == "Austria beat Algeria by 2+ goals"
 
 
+def test_band_to_sky_line_interval():
+    band = engine.Band(kind="interval", lo=-2, hi=0, goal_dependent=False)
+    assert _band_to_sky_line(band, "Senegal", "Iraq") == "Senegal fail to beat Iraq"
+
+
+def test_win_would_exceed_bench():
+    from qualification.router import _win_would_exceed_bench
+
+    bench = (3, -3, 1)
+    assert _win_would_exceed_bench(2, 0, 1, bench) is True
+    assert _win_would_exceed_bench(0, -4, 1, bench) is False
+
+
 def test_build_checklist_own_group_mode():
     from qualification.router import _engine_teams, _base_fixtures, _engine_fixtures, _CUTOFF
     from qualification import projection
