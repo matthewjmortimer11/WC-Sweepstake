@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'wheesht-pwa-20260621-polish-1';
+const CACHE_VERSION = 'wheesht-pwa-20260626-qual-1';
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const PAGE_CACHE = `${CACHE_VERSION}-pages`;
 
@@ -57,6 +57,11 @@ self.addEventListener('activate', (event) => {
       .then(() => self.clients.claim())
   );
 });
+
+function isQualificationPage(url) {
+  return url.pathname === '/qualification' ||
+    url.pathname === '/scotland-qualification';
+}
 
 function isApiRequest(url) {
   return url.origin === self.location.origin && url.pathname.startsWith('/api/');
@@ -126,6 +131,12 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(request.url);
 
   if (isApiRequest(url)) {
+    event.respondWith(fetch(request, { cache: 'no-store' }));
+    return;
+  }
+
+  // Qualification tracker is self-contained HTML — never serve a stale cached copy.
+  if (request.mode === 'navigate' && isQualificationPage(url)) {
     event.respondWith(fetch(request, { cache: 'no-store' }));
     return;
   }

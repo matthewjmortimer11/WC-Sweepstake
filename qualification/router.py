@@ -680,7 +680,10 @@ async def qualification_page() -> HTMLResponse:
         raise HTTPException(status_code=404, detail="not found")
     return HTMLResponse(
         _TEMPLATE.read_text(encoding="utf-8"),
-        headers={"Content-Security-Policy": _CSP},
+        headers={
+            "Content-Security-Policy": _CSP,
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+        },
     )
 
 

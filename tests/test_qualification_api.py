@@ -27,6 +27,7 @@ async def test_scotland_qualification_page(client):
     assert 'property="og:title"' in r.text
     assert "scotland-qualification" in r.text or "Scotland" in r.text
     assert "Content-Security-Policy" in r.headers
+    assert "no-store" in r.headers.get("Cache-Control", "")
 
 
 def test_payload_cache_reuses_until_fixture_revision_changes():

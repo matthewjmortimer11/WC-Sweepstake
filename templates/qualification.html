@@ -33,9 +33,10 @@
     --warn: #e6a23c;
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  [hidden] { display: none !important; }
   html, body { margin: 0; }
   body {
-    background: radial-gradient(120% 90% at 50% -10%, #11305f 0%, var(--navy-900) 60%) fixed;
+    background: var(--navy-900);
     color: var(--white);
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     line-height: 1.5;
@@ -61,20 +62,17 @@
   /* ── The big verdict ─────────────────────────────────────────────── */
   .verdict {
     border-radius: 22px; padding: 24px 20px; text-align: center;
-    background: linear-gradient(160deg, var(--sco-blue-deep), #07254f 75%);
+    background: var(--navy-800);
     border: 1px solid var(--line); box-shadow: 0 18px 40px -24px rgba(0,0,0,.8);
   }
-  .verdict.good { border-color: rgba(47,191,113,.5); }
-  .verdict.warn { border-color: rgba(230,162,60,.5); }
-  .verdict.bad  { border-color: rgba(224,85,107,.5); }
   .verdict .word { font-size: 26px; font-weight: 800; margin: 0 0 2px; letter-spacing: -.3px; }
   .verdict .big { font-size: 64px; font-weight: 800; line-height: 1; letter-spacing: -2px; margin-top: 8px; }
   .verdict .big span { font-size: 30px; }
   .verdict.good .big { color: #8ff5b6; } .verdict.warn .big { color: #ffd98a; } .verdict.bad .big { color: #ff9fb0; }
-  .verdict .biglab { font-size: 13px; color: #cdddff; text-transform: uppercase; letter-spacing: .6px; }
-  .verdict .subnote { margin: 10px 4px 0; font-size: 13.5px; color: #cdddff; line-height: 1.45; }
-  .verdict .mean { margin: 14px 4px 0; font-size: 14.5px; color: #e7eeff; line-height: 1.5; }
-  .verdict .tiny { margin-top: 10px; font-size: 11px; color: #9fb4d8; line-height: 1.45; }
+  .verdict .biglab { font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: .6px; }
+  .verdict .subnote { margin: 10px 4px 0; font-size: 13.5px; color: var(--muted); line-height: 1.45; }
+  .verdict .mean { margin: 14px 4px 0; font-size: 14.5px; color: var(--white); line-height: 1.5; }
+  .verdict .tiny { margin-top: 10px; font-size: 11px; color: var(--muted); line-height: 1.45; }
 
   /* ── Lifeline (third-place survival) ─────────────────────────────── */
   .lifeline {
