@@ -281,13 +281,19 @@
   }
 
   // A plain "where they stand right now" sentence.
-  function standing(s, name, started) {
+  function standing(s, name, started, provisional, guaranteed) {
     if (!started)
       return "The group games haven't kicked off yet — this is how it looks on paper, based on how strong the teams are.";
-    if (s.state === "qualified")
-      return "✅ " + name + " finished in the <b>top 2</b> of the group — safely through to the next round.";
-    if (s.state === "third_in")
+    if (s.state === "qualified") {
+      if (s.groupComplete || guaranteed)
+        return "✅ " + name + " finished in the <b>top 2</b> of the group — safely through to the next round.";
+      return "✅ " + name + " are in the <b>top 2</b> on live standings — through if the group finishes like this.";
+    }
+    if (s.state === "third_in") {
+      if (provisional)
+        return "🟡 " + name + " are <b>3rd</b> in their group — provisional best-third ranking until every group finishes.";
       return "🟡 " + name + " are <b>3rd</b> in the group right now — and currently sneaking in as one of the <b>8 best 3rd-placed teams</b>.";
+    }
     if (s.state === "third_out")
       return "🟡 " + name + " are <b>3rd</b> in the group — but just <b>missing</b> the 8 best 3rd-placed teams for now.";
     if (s.state === "eliminated")
@@ -325,7 +331,7 @@
               ' froze right now, it would be <b>' + c.asItStands + '%</b>' +
               '<span>The big number already allows for those games finishing — live scores can still change.</span></div>'
           : "") +
-        '<div class="mean">' + standing(s, esc(s.name), (d.gamesPlayed || 0) > 0) + '</div>' +
+        '<div class="mean">' + standing(s, esc(s.name), (d.gamesPlayed || 0) > 0, !!d.provisional, !!c.guaranteed) + '</div>' +
         '<div class="tiny">' + esc(tiny) + '</div>' +
       '</section>';
   }

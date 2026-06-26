@@ -52,6 +52,32 @@ _LAMBDA_MIN = 0.30
 _LAMBDA_MAX = 3.0
 
 _PENDING_STATUSES = ("upcoming", "live", "halfTime")
+_LIVE_STATUSES = ("live", "halfTime")
+
+
+def _has_score(fx: Fixture) -> bool:
+    return fx.home_goals is not None and fx.away_goals is not None
+
+
+def _representative_final_scores(hg: int, ag: int) -> Dict[str, Tuple[int, int]]:
+    """One clear home-win / draw / away-win final score for a live game."""
+    peak = max(hg, ag)
+    return {
+        "H": (peak + 1, ag),
+        "D": (peak, peak),
+        "A": (hg, peak + 1),
+    }
+
+
+def _record_group_match(
+    base_group_matches: Dict[str, List[Tuple[str, str, int, int]]],
+    group: str,
+    home: str,
+    away: str,
+    hg: int,
+    ag: int,
+) -> None:
+    base_group_matches.setdefault(group, []).append((home, away, hg, ag))
 
 
 @dataclass(frozen=True)
@@ -152,17 +178,29 @@ def project(
     base: Dict[str, List[int]] = {i: [0, 0, 0] for i in ids}  # [pts, gf, ga]
     base_group_matches: Dict[str, List[Tuple[str, str, int, int]]] = {}
     pending: List[Fixture] = []
+    live_fixtures: List[Fixture] = []
     for fx in fixtures:
         if fx.stage != "group":
             continue
         if fx.home not in ids or fx.away not in ids:
             continue
-        if fx.status in _PENDING_STATUSES:
-            pending.append(fx)
-        elif fx.status == "done" and fx.home_goals is not None and fx.away_goals is not None:
+        if fx.status in _LIVE_STATUSES and _has_score(fx):
+            # Live scores feed the table and the main % — only unplayed games are
+            # re-sampled. (Previously live games were treated as pending and
+            # randomly re-rolled, so the headline % ignored the score on the board.)
             _apply(base, fx.home, fx.away, fx.home_goals, fx.away_goals)
-            base_group_matches.setdefault(team_group[fx.home], []).append(
-                (fx.home, fx.away, fx.home_goals, fx.away_goals)
+            _record_group_match(
+                base_group_matches, team_group[fx.home], fx.home, fx.away,
+                fx.home_goals, fx.away_goals,
+            )
+            live_fixtures.append(fx)
+        elif fx.status == "upcoming":
+            pending.append(fx)
+        elif fx.status == "done" and _has_score(fx):
+            _apply(base, fx.home, fx.away, fx.home_goals, fx.away_goals)
+            _record_group_match(
+                base_group_matches, team_group[fx.home], fx.home, fx.away,
+                fx.home_goals, fx.away_goals,
             )
         # cancelled / scoreless are ignored
 
@@ -172,8 +210,8 @@ def project(
             base_group_matches, sampled_gm,
         )
 
-    # No games left: the outcome is fixed.
-    if not pending:
+    # No unplayed games left: outcome is fixed unless something is still live.
+    if not pending and not live_fixtures:
         return Projection(
             chance=1.0 if qualifies(base, {}) else 0.0,
             decided=True,
@@ -193,24 +231,27 @@ def project(
         for fx in pending
     }
 
-    for _ in range(trials):
-        stats = {i: base[i][:] for i in base}
-        sampled: List[Tuple[str, str]] = []  # (fixture_id, outcome)
-        sampled_gm: Dict[str, List[Tuple[str, str, int, int]]] = {}
-        for fx in pending:
-            lam_h, lam_a = lambdas[fx.id]
-            hg, ag = _sample_score(rng, lam_h, lam_a)
-            _apply(stats, fx.home, fx.away, hg, ag)
-            sampled_gm.setdefault(team_group[fx.home], []).append((fx.home, fx.away, hg, ag))
-            sampled.append((fx.id, "H" if hg > ag else ("D" if hg == ag else "A")))
-        q = 1 if qualifies(stats, sampled_gm) else 0
-        qual_total += q
-        for fid, outcome in sampled:
-            bucket = cond[fid][outcome]
-            bucket[0] += q
-            bucket[1] += 1
+    if pending:
+        for _ in range(trials):
+            stats = {i: base[i][:] for i in base}
+            sampled: List[Tuple[str, str]] = []  # (fixture_id, outcome)
+            sampled_gm: Dict[str, List[Tuple[str, str, int, int]]] = {}
+            for fx in pending:
+                lam_h, lam_a = lambdas[fx.id]
+                hg, ag = _sample_score(rng, lam_h, lam_a)
+                _apply(stats, fx.home, fx.away, hg, ag)
+                _record_group_match(sampled_gm, team_group[fx.home], fx.home, fx.away, hg, ag)
+                sampled.append((fx.id, "H" if hg > ag else ("D" if hg == ag else "A")))
+            q = 1 if qualifies(stats, sampled_gm) else 0
+            qual_total += q
+            for fid, outcome in sampled:
+                bucket = cond[fid][outcome]
+                bucket[0] += q
+                bucket[1] += 1
 
-    chance = qual_total / trials
+        chance = qual_total / trials
+    else:
+        chance = 1.0 if qualifies(base, {}) else 0.0
 
     impacts: List[GameImpact] = []
     for fx in pending:
@@ -239,8 +280,86 @@ def project(
             )
         )
 
+    for fx in live_fixtures:
+        impacts.append(
+            _live_fixture_impact(
+                fx, base, base_group_matches, pending, groups, team_fp,
+                target_team_id, target_group, cutoff, ratings, trials, seed,
+            )
+        )
+
     impacts.sort(key=lambda g: g.swing, reverse=True)
-    return Projection(chance=chance, decided=False, trials=trials, impacts=impacts)
+    return Projection(
+        chance=chance,
+        decided=not pending and not live_fixtures,
+        trials=trials if pending else 0,
+        impacts=impacts,
+    )
+
+
+def _live_fixture_impact(
+    fx: Fixture,
+    base: Dict[str, List[int]],
+    base_group_matches: Dict[str, List[Tuple[str, str, int, int]]],
+    other_pending: List[Fixture],
+    groups: Dict[str, List[str]],
+    team_fp: Dict[str, int],
+    target_team_id: str,
+    target_group: str,
+    cutoff: int,
+    ratings: Dict[str, float],
+    trials: int,
+    seed: int,
+) -> GameImpact:
+    """Impact bars for an in-progress game: how the final whistle (H/D/A) shifts chance."""
+    reps = _representative_final_scores(fx.home_goals, fx.away_goals)
+    lambdas = {
+        p.id: _match_lambdas(ratings.get(p.home, 0.0), ratings.get(p.away, 0.0))
+        for p in other_pending
+    }
+    rates: Dict[str, float] = {}
+    rng = random.Random(seed ^ hash(fx.id))
+
+    def qualifies(stats, sampled_gm) -> bool:
+        return _target_qualifies_fast(
+            stats, groups, team_fp, target_team_id, target_group, cutoff,
+            base_group_matches, sampled_gm,
+        )
+
+    for key, (fhg, fag) in reps.items():
+        qual = 0
+        for _ in range(trials):
+            stats = {i: base[i][:] for i in base}
+            sampled_gm: Dict[str, List[Tuple[str, str, int, int]]] = {}
+            _apply(stats, fx.home, fx.away, fhg, fag)
+            _record_group_match(sampled_gm, fx.group or "", fx.home, fx.away, fhg, fag)
+            for pfx in other_pending:
+                lam_h, lam_a = lambdas[pfx.id]
+                hg, ag = _sample_score(rng, lam_h, lam_a)
+                _apply(stats, pfx.home, pfx.away, hg, ag)
+                _record_group_match(
+                    sampled_gm, pfx.group or "", pfx.home, pfx.away, hg, ag,
+                )
+            if qualifies(stats, sampled_gm):
+                qual += 1
+        rates[key] = qual / trials
+
+    r_home, r_draw, r_away = rates["H"], rates["D"], rates["A"]
+    options = (("home", r_home), ("draw", r_draw), ("away", r_away))
+    swing = max(r for _, r in options) - min(r for _, r in options)
+    favoured = max(options, key=lambda o: o[1])[0]
+    return GameImpact(
+        fixture_id=fx.id,
+        group=fx.group,
+        home=fx.home,
+        away=fx.away,
+        chance_if_home_win=r_home,
+        chance_if_draw=r_draw,
+        chance_if_away_win=r_away,
+        swing=swing,
+        favoured_outcome=favoured,
+        matters=swing >= _MATTERS_THRESHOLD,
+    )
 
 
 def _apply(stats: Dict[str, List[int]], home: str, away: str, hg: int, ag: int) -> None:
