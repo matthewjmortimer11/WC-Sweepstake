@@ -71,6 +71,11 @@
     border: 1px solid rgba(110,160,255,.45); border-radius: 12px; padding: 9px 12px; font-size: 13.5px; color: #eaf1ff; }
   .verdict .ais b { font-size: 16px; }
   .verdict .ais span { display: block; margin-top: 3px; font-size: 11px; color: #bcccea; }
+  .verdict .snap { margin: 12px auto 0; max-width: 360px; background: rgba(47,191,113,.14);
+    border: 1px solid rgba(47,191,113,.45); border-radius: 12px; padding: 9px 12px;
+    font-size: 13.5px; color: #d8ffe8; line-height: 1.45; }
+  .verdict .snap.out { background: rgba(224,85,107,.12); border-color: rgba(224,85,107,.4); color: #ffd6dc; }
+  .verdict .snap b { color: var(--white); }
 
   /* ── Lifeline (third-place survival) ─────────────────────────────── */
   .lifeline {
@@ -345,6 +350,35 @@
     });
   };
   var fmtGD = function (n) { return (n > 0 ? "+" : "") + n; };
+  var ord = function (n) {
+    if (n == null) return "—";
+    if (n >= 11 && n <= 13) return n + "th";
+    return n + ({1:"st",2:"nd",3:"rd"})[n % 10] || "th";
+  };
+
+  function chanceLabel(d) {
+    var c = d.chance || {}, s = d.status || {};
+    if (c.guaranteed || c.decided) return "it's confirmed";
+    if (c.label === "forecast") return "pre-tournament estimate from team strength";
+    if (c.label === "holding") return "chance of still qualifying after every group finishes";
+    if (c.label === "catching") return "chance of climbing into the top " + (d.cutoff || 8);
+    if (s.state === "third_in" || s.state === "third_out") return "chance of going through";
+    return "chance of going through";
+  }
+
+  function snapshotLine(d) {
+    var c = d.chance || {}, s = d.status || {};
+    if (c.decided || c.guaranteed) return "";
+    if (s.state === "third_in" && s.qualified && s.thirdPlaceRank) {
+      return "📍 <b>In the cut right now</b> — " + ord(s.thirdPlaceRank) +
+        " of the best third-placed teams (top " + (d.cutoff || 8) + " go through).";
+    }
+    if (s.state === "third_out" && s.thirdPlaceRank) {
+      return "📍 <b>Outside the cut right now</b> — " + ord(s.thirdPlaceRank) +
+        " among the thirds (only the top " + (d.cutoff || 8) + " go through).";
+    }
+    return "";
+  }
 
   // ── The headline verdict, in plain words ──────────────────────────
   function verdict(d) {
@@ -359,6 +393,11 @@
                   : { face: "😢", word: "Out this time", cls: "bad" };
     }
     var p = c.percent;
+    if (s.state === "third_in" && s.qualified && !c.decided) {
+      if (p >= 65) return { face: "🙂", word: "In — and holding", cls: "good" };
+      if (p >= 40) return { face: "😬", word: "In — but it's tight", cls: "warn" };
+      return { face: "😟", word: "In — for now", cls: "bad" };
+    }
     if (s.state === "third_in") {
       if (p >= 75) return { face: "😄", word: "Inside the cut", cls: "good" };
       if (p >= 55) return { face: "🙂", word: "Holding a place", cls: "good" };
@@ -392,10 +431,15 @@
     if (s.state === "third_in") {
       if (provisional)
         return "🟡 " + name + " are <b>3rd</b> in their group — provisional best-third ranking until every group finishes.";
+      if (s.qualified && s.thirdPlaceRank)
+        return "🟡 " + name + " are <b>3rd</b> in the group and <b>" + ord(s.thirdPlaceRank) + "</b> among the best thirds — inside the top 8 on today's table.";
       return "🟡 " + name + " are <b>3rd</b> in the group right now — and currently sneaking in as one of the <b>8 best 3rd-placed teams</b>.";
     }
-    if (s.state === "third_out")
+    if (s.state === "third_out") {
+      if (s.thirdPlaceRank)
+        return "🟡 " + name + " are <b>3rd</b> in the group but <b>" + ord(s.thirdPlaceRank) + "</b> among the best thirds — outside the top 8 for now.";
       return "🟡 " + name + " are <b>3rd</b> in the group — but just <b>missing</b> the 8 best 3rd-placed teams for now.";
+    }
     if (s.state === "eliminated")
       return "🔴 " + name + " finished bottom and can't go through this time.";
     var pos = ({1:"1st",2:"2nd",3:"3rd",4:"4th"})[s.groupRank] || (s.positionLabel || "");
@@ -405,7 +449,8 @@
   function renderVerdict(d) {
     var s = d.status, c = d.chance || { percent: 0, decided: false };
     var v = verdict(d);
-    var lab = c.decided ? "it's confirmed" : "chance of going through";
+    var lab = chanceLabel(d);
+    var snap = snapshotLine(d);
     var tiny;
     if (c.guaranteed) {
       tiny = c.percent >= 50
@@ -413,6 +458,15 @@
         : esc(s.name) + " can no longer finish high enough to go through.";
     } else if (c.decided) {
       tiny = "The group stage is finished, so this is final.";
+    } else if (c.label === "forecast") {
+      tiny = "No group games have kicked off yet. This % is a computer forecast from how strong each team is — not where anyone stands today.";
+    } else if (c.label === "holding") {
+      tiny = "The green box above is where " + esc(s.name) + " stand on today's table. The big % is how often they " +
+        "<b>stay</b> in the top " + (d.cutoff || 8) + " after every remaining group game is played (" +
+        (c.trials ? c.trials.toLocaleString() : "thousands of") + " simulations).";
+    } else if (c.label === "catching") {
+      tiny = "They need other groups' results to go their way. The % is from playing out the rest of the tournament " +
+        (c.trials ? c.trials.toLocaleString() : "thousands of") + " times on the computer.";
     } else {
       tiny = "Our best guess from playing the rest of the tournament " +
         (c.trials ? c.trials.toLocaleString() : "thousands of") +
@@ -423,6 +477,7 @@
         '<div class="flag">' + esc(s.flag || "🏴") + '</div>' +
         '<div class="face">' + v.face + '</div>' +
         '<div class="word">' + esc(v.word) + '</div>' +
+        (snap ? '<div class="snap' + (s.state === "third_out" ? " out" : "") + '">' + snap + '</div>' : '') +
         '<div class="big">' + c.percent + '<span>%</span></div>' +
         '<div class="biglab">' + esc(lab) + '</div>' +
         (c.asItStands != null
@@ -430,7 +485,7 @@
               ' froze right now, it would be <b>' + c.asItStands + '%</b>' +
               '<span>The big number already allows for those games finishing — live scores can still change.</span></div>'
           : "") +
-        '<div class="mean">' + standing(s, esc(s.name), (d.gamesPlayed || 0) > 0, !!d.provisional, !!c.guaranteed) + '</div>' +
+        '<div class="mean">' + standing(s, esc(s.name), (d.groupGamesStarted || 0) > 0, !!d.provisional, !!c.guaranteed) + '</div>' +
         '<div class="tiny">' + esc(tiny) + '</div>' +
       '</section>';
   }
@@ -525,11 +580,13 @@
           '</div>' +
           (g.fear ? '<div class="need-want meh" style="margin-top:6px;background:rgba(224,85,107,.1);border-color:rgba(224,85,107,.35);color:#ff9fb0">' +
             '🚫 <span>' + esc(g.fear) + '</span></div>' : '') +
-          '<div class="outs">' +
-            outRow(hn + " win", g.chanceIfHomeWin, good.indexOf("home") >= 0, base) +
-            outRow("Draw", g.chanceIfDraw, good.indexOf("draw") >= 0, base) +
-            outRow(an + " win", g.chanceIfAwayWin, good.indexOf("away") >= 0, base) +
-          '</div>' +
+          (g.matters && (g.swing || 0) >= 8
+            ? '<div class="outs">' +
+                outRow(hn + " win", g.chanceIfHomeWin, good.indexOf("home") >= 0, base) +
+                outRow("Draw", g.chanceIfDraw, good.indexOf("draw") >= 0, base) +
+                outRow(an + " win", g.chanceIfAwayWin, good.indexOf("away") >= 0, base) +
+              '</div>'
+            : '') +
         '</li>';
     }).join("");
 
