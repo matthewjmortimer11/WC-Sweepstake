@@ -15,6 +15,22 @@ var KB_COL_W = 128;
 var KB_GAP_W = 32;
 var KB_LABEL_H = 26;
 
+function kbFirstRound(rounds) {
+  var kr = WCkb.meta && WCkb.meta.knockoutRound;
+  if (kr && (rounds[kr] || []).length) return kr;
+  var found = KB_LIST_ORDER.find(function (k) { return (rounds[k] || []).length; });
+  return found || 'r32';
+}
+
+function kbTreeValid(rounds) {
+  var counts = KB_ROUND_ORDER.map(function (k) { return (rounds[k] || []).length; }).filter(function (n) { return n > 0; });
+  if (counts.length <= 1) return true;
+  for (var i = 1; i < counts.length; i++) {
+    if (counts[i] !== counts[i - 1] / 2) return false;
+  }
+  return true;
+}
+
 function kbLayoutTree(rounds) {
   var active = KB_ROUND_ORDER.filter(function (k) { return (rounds[k] || []).length; });
   if (!active.length) return null;
@@ -165,12 +181,12 @@ function BracketPanel(props) {
   var prefs = kbLoadPrefs(prefScope);
   var hasTree = KB_ROUND_ORDER.some(function (k) { return (rounds[k] || []).length; });
   var hasThird = (rounds.third || []).length > 0;
-  var layout = hasTree ? kbLayoutTree(rounds) : null;
+  var layout = hasTree && kbTreeValid(rounds) ? kbLayoutTree(rounds) : null;
   var [view, setView] = kbState(prefs.view || (layout ? 'tree' : 'list'));
+  var effectiveView = (view === 'tree' && layout) ? 'tree' : 'list';
   var [round, setRound] = kbState(function () {
     if (prefs.round && rounds[prefs.round] && rounds[prefs.round].length) return prefs.round;
-    var kr = WCkb.meta.knockoutRound;
-    return kr && rounds[kr] && rounds[kr].length ? kr : (KB_ROUND_ORDER.find(function (k) { return (rounds[k] || []).length; }) || 'r32');
+    return kbFirstRound(rounds);
   });
   var roundAuto = kbRef(WCkb.meta.knockoutRound || null);
   kbEffect(function () {
@@ -200,8 +216,8 @@ function BracketPanel(props) {
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           {layout && <div className="ko-bracket-view-toggle" role="tablist" aria-label="Bracket view">
-            <button type="button" role="tab" aria-selected={view === 'tree'} className={'ko-bracket-view-btn' + (view === 'tree' ? ' is-active' : '')} onClick={function () { setViewPref('tree'); }}>Tree</button>
-            <button type="button" role="tab" aria-selected={view === 'list'} className={'ko-bracket-view-btn' + (view === 'list' ? ' is-active' : '')} onClick={function () { setViewPref('list'); }}>By round</button>
+            <button type="button" role="tab" aria-selected={effectiveView === 'tree'} className={'ko-bracket-view-btn' + (effectiveView === 'tree' ? ' is-active' : '')} onClick={function () { setViewPref('tree'); }}>Tree</button>
+            <button type="button" role="tab" aria-selected={effectiveView === 'list'} className={'ko-bracket-view-btn' + (effectiveView === 'list' ? ' is-active' : '')} onClick={function () { setViewPref('list'); }}>By round</button>
           </div>}
           {props.onOpen && <button onClick={props.onOpen} style={{ background: 'none', border: 'none', color: 'var(--red)', fontWeight: 800, fontSize: 13, cursor: 'pointer', whiteSpace: 'nowrap' }}>All fixtures →</button>}
         </div>
@@ -211,7 +227,7 @@ function BracketPanel(props) {
         <span><span style={{ display: 'inline-block', width: 10, height: 10, border: '2px solid var(--red)', borderRadius: 2, verticalAlign: 'middle', marginRight: 4 }} /> Entrant in tie</span>
         {fromStandings && <span><span style={{ display: 'inline-block', width: 10, height: 10, border: '2px dashed var(--ink2)', borderRadius: 2, verticalAlign: 'middle', marginRight: 4 }} /> Pairing from standings</span>}
       </div>
-      {view === 'tree' && layout
+      {effectiveView === 'tree'
         ? <React.Fragment>
             <BracketTreeView layout={layout} labels={labels} focusStage={focusStage} fromStandings={fromStandings} />
             {hasThird && <div style={{ marginTop: 12, maxWidth: 280 }}>
@@ -254,11 +270,10 @@ function BracketListView(props) {
 }
 
 function KnockoutBracket(props) {
+  if (!(window.WheeshtFixtures && window.WheeshtFixtures.knockoutsVisible && window.WheeshtFixtures.knockoutsVisible(WCkb.meta))) return null;
   var rounds = (Skb && Skb.buildKnockoutBracket) ? Skb.buildKnockoutBracket() : {};
-  var hasTree = KB_ROUND_ORDER.some(function (k) { return (rounds[k] || []).length; });
-  var hasThird = (rounds.third || []).length > 0;
-  var layout = hasTree ? kbLayoutTree(rounds) : null;
-  if (!(window.WheeshtFixtures && window.WheeshtFixtures.knockoutsVisible && window.WheeshtFixtures.knockoutsVisible(WCkb.meta)) || (!hasTree && !hasThird) || (!layout && !hasThird)) return null;
+  var hasKo = KB_ROUND_ORDER.concat(['third']).some(function (k) { return (rounds[k] || []).length; });
+  if (!hasKo) return null;
   return <BracketPanel rounds={rounds} title="The bracket" onOpen={props.onOpen} />;
 }
 

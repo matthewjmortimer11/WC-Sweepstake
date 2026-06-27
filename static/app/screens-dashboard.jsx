@@ -480,7 +480,7 @@ function GroupRivalCard(props) {
   const allGroupsDone = !!(WCd.meta && WCd.meta.groupsComplete);
   const inKnockouts = (t.rounds || 0) >= 1;
   const throughKnockouts = inKnockouts || allGroupsDone;
-  const projOppCode = allGroupsDone && !inKnockouts && Sd.projectedR32Opponent ? Sd.projectedR32Opponent(t.code) : null;
+  const projOppCode = allGroupsDone && !inKnockouts && Sd.projectedBracketVisible && Sd.projectedBracketVisible() && Sd.projectedR32Opponent ? Sd.projectedR32Opponent(t.code) : null;
   const projOpp = projOppCode ? WCd.TEAMS[projOppCode] : null;
   const koTie = throughKnockouts && Sd.nextFixtureForTeam ? Sd.nextFixtureForTeam(t.code) : null;
   const next = throughKnockouts ? null : G.fixtures.filter(f => (f.a === t.code || f.b === t.code) && comp.compFixturePlayable(f)).sort(comp.compFixtureSort)[0];

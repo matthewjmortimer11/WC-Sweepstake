@@ -227,7 +227,8 @@
           var ownersA = ownersOf(t.a);
           var ownersB = ownersOf(t.b);
           var you = !!(myCode && (t.a === myCode || t.b === myCode));
-          var winner = t.winner || null;
+          var done = !!t.done || fixtureDone(t);
+          var winner = done ? (fixtureWinnerSide(t) || (t.winner === 'HOME' ? t.a : t.winner === 'AWAY' ? t.b : (t.winner && t.winner !== 'DRAW' ? t.winner : null))) : null;
           return {
             id: t.id || ('proj-' + st + '-' + t.a + '-' + t.b),
             a: t.a,
@@ -235,7 +236,7 @@
             teamA: TEAMS[t.a],
             teamB: TEAMS[t.b],
             score: t.score,
-            done: !!t.done,
+            done: done,
             winner: winner,
             stageLabel: stageLabelForFixture(t),
             afterExtraTime: !!t.afterExtraTime,
@@ -260,7 +261,7 @@
       var raw = WC.projectedBracket;
       if (!raw || !raw.rounds) return false;
       var meta = WC.meta || {};
-      if (meta.groupsComplete && meta.r32Published) return false;
+      if (meta.groupsComplete && (meta.r32Published || meta.knockoutsInFeed)) return false;
       var ko = ['r32', 'r16', 'qf', 'sf', 'final', 'third'];
       for (var i = 0; i < ko.length; i++) {
         if ((raw.rounds[ko[i]] || []).length > 0) return true;

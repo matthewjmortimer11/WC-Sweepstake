@@ -218,6 +218,10 @@ function DashTeamOut(props){
   );
 }
 
+function hubFeedBracketVisible() {
+  return !!(window.KnockoutBracket && window.WheeshtFixtures && window.WheeshtFixtures.knockoutsVisible && window.WheeshtFixtures.knockoutsVisible(WC.meta));
+}
+
 function DashboardScreen(props){
   const potShare = winnerPotShare();
   return (
@@ -234,8 +238,10 @@ function DashboardScreen(props){
         '1.3 Michelin stars in Tokyo. Or the whole pub a cracking night.',
         'A frankly ridiculous telly to watch the final on.',
       ]}/>
-      <SectionHead>The Bracket</SectionHead>
-      <BracketSnapshot onOpen={props.goTracker}/>
+      {hubFeedBracketVisible() && <>
+        <SectionHead>The Bracket</SectionHead>
+        <BracketSnapshot onOpen={props.goTracker}/>
+      </>}
       {window.ProjectedKnockoutBracket && window.Store && window.Store.projectedBracketVisible && window.Store.projectedBracketVisible() && <>
         <SectionHead aside="from group standings">Knockout bracket</SectionHead>
         <window.ProjectedKnockoutBracket onOpen={props.goTracker}/>

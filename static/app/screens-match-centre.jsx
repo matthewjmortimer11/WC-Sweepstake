@@ -447,7 +447,7 @@ function MatchCentreScreen() {
         </div>
       </div>
 
-      {window.ProjectedKnockoutBracket &&
+      {window.ProjectedKnockoutBracket && window.Store && window.Store.projectedBracketVisible && window.Store.projectedBracketVisible() &&
         <div style={{ marginBottom: 12 }}>
           <window.ProjectedKnockoutBracket />
         </div>}
