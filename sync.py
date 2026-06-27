@@ -198,6 +198,7 @@ async def _load_from_db(tournament_id: str) -> None:
         for r in rows
     ]
     _rebuild_cache(canonical)
+    sync_status["lastSyncAt"] = datetime.now(tz=timezone.utc).isoformat()
     log.info("Loaded %d fixtures from DB into cache for %s", len(canonical), tournament_id)
 
 

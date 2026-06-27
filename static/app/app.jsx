@@ -890,12 +890,15 @@ function App(){
       if(!t) return;
       if(!ready){ prevStage = t.stage || 'group'; ready = true; return; }
       var st = t.stage || 'group';
-      if(st !== prevStage && st !== 'group' && st !== 'out-group' && st !== 'out' && t.alive !== false){
+      var fromGroup = !prevStage || prevStage === 'group';
+      var wonCup = st === 'winner' && prevStage !== 'winner';
+      if(st !== prevStage && t.alive !== false && st !== 'group' && st !== 'out-group' && st !== 'out'
+          && String(st).indexOf('out-') !== 0 && (fromGroup || wonCup)){
         var labels = { r32: 'Round of 32', r16: 'Round of 16', qf: 'Quarter-finals', sf: 'Semi-finals', final: 'the Final', winner: 'champions' };
         var lbl = labels[st] || st;
         var tn = t.name || code;
         window.wcToast && window.wcToast(tn + (st === 'winner' ? ' are ' : ' are into ') + lbl + '.', st === 'winner' ? 'celebrating' : 'confident');
-        if(st === 'winner' || st === 'final') window.wcConfetti && window.wcConfetti({ y: .35, count: 90 });
+        if(st === 'winner') window.wcConfetti && window.wcConfetti({ y: .35, count: 90 });
       }
       prevStage = st;
     });

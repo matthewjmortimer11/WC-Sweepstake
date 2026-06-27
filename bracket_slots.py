@@ -12,8 +12,6 @@ from __future__ import annotations
 from typing import Any, Dict, List, Optional, Tuple
 
 from qualification.engine import (
-    Fixture,
-    Team,
     ThirdPlaceStanding,
     build_group_tables,
     get_third_placed_teams,
