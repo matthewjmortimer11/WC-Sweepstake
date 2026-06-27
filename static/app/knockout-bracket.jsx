@@ -83,9 +83,9 @@ function BracketCell(props) {
   var tie = props.tie;
   var compact = props.compact;
   var fromStandings = props.fromStandings;
-  var pairingOnly = fromStandings && !!tie.projectedPairing && !tie.done;
-  var A = tie.teamA || { code: tie.a, flag: '🏳️', name: tie.a };
-  var B = tie.teamB || { code: tie.b, flag: '🏳️', name: tie.b };
+  var pairingOnly = fromStandings && !!tie.projectedPairing && !tie.done && tie.a !== 'TBD' && tie.b !== 'TBD';
+  var A = tie.teamA || { code: tie.a, flag: '🏳️', name: tie.a === 'TBD' ? 'TBD' : tie.a };
+  var B = tie.teamB || { code: tie.b, flag: '🏳️', name: tie.b === 'TBD' ? 'TBD' : tie.b };
   var aw = tie.done && tie.winner === tie.a;
   var bw = tie.done && tie.winner === tie.b;
   var border = tie.you ? '2.5px solid var(--ink)' : (tie.entrant ? '2px solid var(--red)' : '2px solid var(--line)');
@@ -287,28 +287,25 @@ function BracketListView(props) {
 }
 
 function KnockoutBracket(props) {
-  if (!(window.WheeshtFixtures && window.WheeshtFixtures.knockoutsVisible && window.WheeshtFixtures.knockoutsVisible(WCkb.meta))) return null;
-  var rounds = (Skb && Skb.buildKnockoutBracket) ? Skb.buildKnockoutBracket() : {};
+  if (!(Skb && Skb.knockoutBracketVisible && Skb.knockoutBracketVisible())) return null;
+  var rounds = (Skb && Skb.buildMergedKnockoutBracket) ? Skb.buildMergedKnockoutBracket() : {};
   var hasKo = KB_ROUND_ORDER.concat(['third']).some(function (k) { return (rounds[k] || []).length; });
   if (!hasKo) return null;
-  return <BracketPanel rounds={rounds} title="The bracket" embedded={props.embedded} onOpen={props.onOpen} />;
-}
-
-function ProjectedKnockoutBracket(props) {
-  if (!(Skb && Skb.projectedBracketVisible && Skb.projectedBracketVisible())) return null;
-  var rounds = Skb.buildProjectedKnockoutBracket ? Skb.buildProjectedKnockoutBracket() : {};
-  var hasKo = KB_ROUND_ORDER.concat(['third']).some(function (k) { return (rounds[k] || []).length; });
-  if (!hasKo) return null;
+  var fromStandings = !(WCkb.meta && WCkb.meta.r32Published);
   return (
     <BracketPanel
       rounds={rounds}
       title="Knockout bracket"
-      subtitle="Round of 32 pairings from live group standings; later rounds from the feed as they publish. No winner picks — results only."
-      fromStandings={true}
+      subtitle={fromStandings ? 'Round of 32 pairings from live group standings; later rounds from the feed as they publish. No winner picks — results only.' : null}
+      fromStandings={fromStandings}
       embedded={props.embedded}
       onOpen={props.onOpen}
     />
   );
+}
+
+function ProjectedKnockoutBracket(props) {
+  return <KnockoutBracket embedded={props.embedded} onOpen={props.onOpen} />;
 }
 
 window.KnockoutBracket = KnockoutBracket;

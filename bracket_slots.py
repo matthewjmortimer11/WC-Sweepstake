@@ -124,10 +124,8 @@ def build_r32_ties_from_standings(
 
     ties: List[Dict[str, Any]] = []
     for match_id, home_slot, away_slot, third_key in R32_TEMPLATE:
-        a = _resolve_slot(home_slot, winners, runners, third_by_match, third_key)
-        b = _resolve_slot(away_slot, winners, runners, third_by_match, third_key)
-        if not a or not b:
-            continue
+        a = _resolve_slot(home_slot, winners, runners, third_by_match, third_key) or "TBD"
+        b = _resolve_slot(away_slot, winners, runners, third_by_match, third_key) or "TBD"
         ties.append({
             "id": f"proj-{match_id}",
             "a": a,
@@ -136,6 +134,6 @@ def build_r32_ties_from_standings(
             "status": "upcoming",
             "score": None,
             "winner": None,
-            "projectedPairing": True,
+            "projectedPairing": a != "TBD" or b != "TBD",
         })
     return ties

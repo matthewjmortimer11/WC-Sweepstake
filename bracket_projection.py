@@ -146,33 +146,37 @@ def _synth_r32_ties(
     return legacy
 
 
+def _r32_sort_key(f: Dict[str, Any]) -> Tuple[int, Tuple[str, str]]:
+    fid = str(f.get("id") or "")
+    slot = 9999
+    if fid.startswith("proj-r32-"):
+        try:
+            slot = int(fid.split("proj-r32-", 1)[1])
+        except ValueError:
+            pass
+    return slot, _kickoff_key(f)
+
+
 def _merge_r32_feed(
     synth: List[Dict[str, Any]],
     feed: List[Dict[str, Any]],
 ) -> List[Dict[str, Any]]:
     """Fill all 16 R32 slots from standings; overlay feed fixtures when published."""
     if not synth:
-        return sorted(feed, key=_kickoff_key)
-    by_pair: Dict[Tuple[str, str], Dict[str, Any]] = {}
-    for t in synth:
-        by_pair[_pair_key(t)] = dict(t)
+        return sorted(feed, key=_r32_sort_key)
+    merged: List[Dict[str, Any]] = [dict(t) for t in synth]
     for f in feed:
-        by_pair[_pair_key(f)] = dict(f)
-    merged: List[Dict[str, Any]] = []
-    seen: set[Tuple[str, str]] = set()
-    for t in synth:
-        key = _pair_key(t)
-        if key in seen:
-            continue
-        seen.add(key)
-        merged.append(by_pair[key])
-    for f in feed:
-        key = _pair_key(f)
-        if key in seen:
-            continue
-        seen.add(key)
-        merged.append(dict(f))
-    return sorted(merged, key=_kickoff_key)
+        fa, fb = f.get("a"), f.get("b")
+        placed = False
+        for i, t in enumerate(merged):
+            ta, tb = t.get("a"), t.get("b")
+            if {fa, fb} == {ta, tb}:
+                merged[i] = dict(f)
+                placed = True
+                break
+        if not placed:
+            merged.append(dict(f))
+    return sorted(merged, key=_r32_sort_key)
 
 
 def _resolve_tie(f: Dict[str, Any]) -> Dict[str, Any]:

@@ -35,6 +35,17 @@ def test_r32_template_has_sixteen_matches():
     assert len(R32_TEMPLATE) == 16
 
 
+def test_r32_emits_sixteen_template_rows():
+    from bracket_slots import build_r32_ties_from_standings
+    from bracket_projection import _to_qual_fixture, _to_qual_team
+
+    teams, fixtures = _four_group("A", ["A1", "A2", "A3", "A4"])
+    ties = build_r32_ties_from_standings(
+        teams, fixtures, to_qual_team=_to_qual_team, to_qual_fixture=_to_qual_fixture,
+    )
+    assert len(ties) == 16
+
+
 def test_projected_r32_uses_2a_vs_2b():
     teams_a, fix_a = _four_group("A", ["A1", "A2", "A3", "A4"])
     teams_b, fix_b = _four_group("B", ["B1", "B2", "B3", "B4"])
@@ -42,6 +53,7 @@ def test_projected_r32_uses_2a_vs_2b():
     fixtures = fix_a + fix_b
     proj = build_projected_bracket(teams, fixtures)
     r32 = proj["rounds"]["r32"]
+    assert len(r32) == 16
     match_73 = next(t for t in r32 if t["a"] == "A2" and t["b"] == "B2")
     assert match_73["a"] == "A2"
     assert match_73["b"] == "B2"

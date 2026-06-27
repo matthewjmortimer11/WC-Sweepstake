@@ -1338,6 +1338,14 @@
       var fx = window.WheeshtFixtures;
       return fx && fx.nextForTeam ? fx.nextForTeam(code) : null;
     },
+    buildMergedKnockoutBracket: function () {
+      var fx = window.WheeshtFixtures;
+      return fx && fx.buildMergedKnockoutBracket ? fx.buildMergedKnockoutBracket() : {};
+    },
+    knockoutBracketVisible: function () {
+      var fx = window.WheeshtFixtures;
+      return fx && fx.knockoutBracketVisible ? fx.knockoutBracketVisible() : false;
+    },
     buildKnockoutBracket: function () {
       var fx = window.WheeshtFixtures;
       return fx && fx.buildKnockoutBracket ? fx.buildKnockoutBracket() : {};

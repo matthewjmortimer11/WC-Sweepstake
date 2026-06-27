@@ -167,10 +167,14 @@ function MatchdayCard(){
 }
 
 function BracketSnapshot(props){
-  if (hubFeedBracketVisible()) {
+  if (hubKnockoutBracketVisible()) {
     return <window.KnockoutBracket embedded onOpen={props.onOpen} />;
   }
   return null;
+}
+
+function hubKnockoutBracketVisible() {
+  return !!(window.Store && window.Store.knockoutBracketVisible && window.Store.knockoutBracketVisible());
 }
 
 function SegmentPanel(){
@@ -219,7 +223,7 @@ function DashTeamOut(props){
 }
 
 function hubFeedBracketVisible() {
-  return !!(window.KnockoutBracket && window.WheeshtFixtures && window.WheeshtFixtures.knockoutsVisible && window.WheeshtFixtures.knockoutsVisible(WC.meta));
+  return hubKnockoutBracketVisible();
 }
 
 function DashboardScreen(props){
@@ -238,13 +242,9 @@ function DashboardScreen(props){
         '1.3 Michelin stars in Tokyo. Or the whole pub a cracking night.',
         'A frankly ridiculous telly to watch the final on.',
       ]}/>
-      {hubFeedBracketVisible() && <>
-        <SectionHead>The Bracket</SectionHead>
-        <BracketSnapshot onOpen={props.goTracker}/>
-      </>}
-      {window.ProjectedKnockoutBracket && window.Store && window.Store.projectedBracketVisible && window.Store.projectedBracketVisible() && <>
-        <SectionHead aside="from group standings">Knockout bracket</SectionHead>
-        <window.ProjectedKnockoutBracket embedded onOpen={props.goTracker}/>
+      {hubKnockoutBracketVisible() && <>
+        <SectionHead aside={WC.meta && WC.meta.r32Published ? 'from the feed' : 'from group standings'}>Knockout bracket</SectionHead>
+        <window.KnockoutBracket embedded onOpen={props.goTracker}/>
       </>}
       <SectionHead>Matchday</SectionHead>
       <MatchdayCard/>
@@ -543,9 +543,9 @@ function TrackerScreen(){
       </div>
       {pre ? <FieldCard/> : <StageFunnel/>}
       {!pre && window.GroupsDoneBanner && <window.GroupsDoneBanner />}
-      {!pre && window.ProjectedKnockoutBracket && window.Store && window.Store.projectedBracketVisible && window.Store.projectedBracketVisible() && <>
-        <SectionHead aside="from group standings">Knockout bracket</SectionHead>
-        <window.ProjectedKnockoutBracket embedded />
+      {!pre && hubKnockoutBracketVisible() && <>
+        <SectionHead aside={WC.meta && WC.meta.r32Published ? 'from the feed' : 'from group standings'}>Knockout bracket</SectionHead>
+        <window.KnockoutBracket embedded />
       </>}
       <div style={{height:12}}/>
       {pre

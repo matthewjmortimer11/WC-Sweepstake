@@ -33,9 +33,11 @@ def test_projected_bracket_synthesises_r32_without_winner_pick():
     teams, fixtures = _four_group("A", ["A1", "A2", "A3", "A4"])
     proj = build_projected_bracket(teams, fixtures)
     assert "r32" in proj["rounds"]
-    first = proj["rounds"]["r32"][0]
-    assert first["winner"] is None
-    assert not first["projectedWinner"]
+    assert len(proj["rounds"]["r32"]) == 16
+    resolved = [t for t in proj["rounds"]["r32"] if t["a"] != "TBD" or t["b"] != "TBD"]
+    assert resolved
+    assert resolved[0]["winner"] is None
+    assert not resolved[0]["projectedWinner"]
 
 
 def test_projected_bracket_uses_finished_r32_result():
@@ -48,9 +50,10 @@ def test_projected_bracket_uses_finished_r32_result():
         },
     ]
     proj = build_projected_bracket(teams, fixtures)
-    assert proj["rounds"]["r32"][0]["winner"] == "AAA"
-    assert proj["rounds"]["r32"][0]["done"] is True
-    assert not proj["rounds"]["r32"][0]["projectedWinner"]
+    tie = next(t for t in proj["rounds"]["r32"] if t["a"] == "AAA" and t["b"] == "BBB")
+    assert tie["winner"] == "AAA"
+    assert tie["done"] is True
+    assert not tie["projectedWinner"]
 
 
 def test_projected_bracket_includes_later_rounds_from_feed_only():
@@ -94,7 +97,7 @@ def test_done_flag_without_status_sets_winner():
         },
     ]
     proj = build_projected_bracket(teams, fixtures)
-    tie = proj["rounds"]["r32"][0]
+    tie = next(t for t in proj["rounds"]["r32"] if t["id"] == "ko1")
     assert tie["done"] is True
     assert tie["winner"] == "AAA"
 
@@ -109,6 +112,6 @@ def test_live_r32_has_no_projected_winner():
         },
     ]
     proj = build_projected_bracket(teams, fixtures)
-    tie = proj["rounds"]["r32"][0]
+    tie = next(t for t in proj["rounds"]["r32"] if t["id"] == "ko1")
     assert tie["winner"] is None
     assert not tie["projectedWinner"]
