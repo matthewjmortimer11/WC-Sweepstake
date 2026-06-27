@@ -370,10 +370,11 @@ function MatchCentreScreen() {
   });
   const upcoming = all.filter(f => mcStatus(f) === 'upcoming');
   const needsResultList = all.filter(f => mcStatus(f) === 'needsResult');
-  // hero: your team's next, else the most important upcoming, else the first
-  const nextMine = mineTeam ? upcoming.find(f => f.a === mineTeam || f.b === mineTeam) : null;
+  const myTie = mineTeam && Smc && Smc.nextFixtureForTeam ? Smc.nextFixtureForTeam(mineTeam) : null;
+  const myNextFix = myTie && myTie.fixture;
+  // hero: shared next-tie (live-aware, kickoff-sorted), else most important upcoming
   let heroPick = null;
-  if (!nextMine && upcoming.length) {
+  if (!myNextFix && upcoming.length) {
     heroPick = upcoming.slice().sort((a, b) => {
       const ia = mcImportance(a, me, mcStake(me, a).pts, owned).score;
       const ib = mcImportance(b, me, mcStake(me, b).pts, owned).score;
@@ -381,7 +382,11 @@ function MatchCentreScreen() {
       return (mcKickoffMs(a) || 0) - (mcKickoffMs(b) || 0);
     })[0];
   }
-  const hero = nextMine || heroPick;
+  const hero = myNextFix || heroPick;
+  const heroInLive = hero && liveList.some(function (f) { return f.id === hero.id; });
+  let heroLabel = 'Next up';
+  if (myTie && myTie.isLive && mineTeam) heroLabel = '● LIVE · Your ' + mcTeam(mineTeam).name;
+  else if (myNextFix && mineTeam) heroLabel = 'Your ' + mcTeam(mineTeam).name + ' · ' + (myTie.stageLabel || 'next tie');
 
   // filtered, dated list (live shown separately at top)
   let list = all.filter(f => {
@@ -448,9 +453,9 @@ function MatchCentreScreen() {
       </>}
 
       {/* NEXT UP hero with countdown */}
-      {filter === 'all' && hero &&
+      {filter === 'all' && hero && !heroInLive &&
         <div style={{ marginTop: liveList.length ? 6 : 0 }}>
-          <NextHero f={hero} me={me} owned={owned} label={nextMine ? 'Your ' + mcTeam(mineTeam).name + ' play next' : 'Next up'} />
+          <NextHero f={hero} me={me} owned={owned} label={heroLabel} />
         </div>}
 
       {!liveList.length && filter === 'all' &&

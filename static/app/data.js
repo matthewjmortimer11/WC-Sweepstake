@@ -230,6 +230,11 @@
       }).sort(function (a, b) { return (kickoffMs(a) || 0) - (kickoffMs(b) || 0); });
     }
 
+    function teamProgressMax() {
+      var ladder = (WC.meta && WC.meta.stageLadder) || ['group', 'r32', 'r16', 'qf', 'sf', 'final', 'winner'];
+      return Math.max(1, ladder.length - 1);
+    }
+
     WC.fixtures = {
       kickoffMs: kickoffMs,
       status: fixtureStatus,
@@ -240,6 +245,7 @@
       buildKnockoutBracket: buildKnockoutBracket,
       todaysEntrantFixtures: todaysEntrantFixtures,
       winnerSide: fixtureWinnerSide,
+      teamProgressMax: teamProgressMax,
     };
     window.WheeshtFixtures = WC.fixtures;
 

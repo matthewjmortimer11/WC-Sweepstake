@@ -427,7 +427,7 @@ function TeamCard(props) {
             <Chd style={t.alive ? null : { background: 'transparent', color: '#fff' }}>Odds {t.odds}</Chd>
           </div>
         </div>
-        {t.alive && !pre && <PRd value={t.rounds / 6} size={54} stroke={7} color={t.stage === 'qf' ? 'var(--green)' : 'var(--yellow)'}><span style={{ fontSize: 11 }}>{t.code}</span></PRd>}
+        {t.alive && !pre && <PRd value={t.rounds / ((window.WheeshtFixtures && window.WheeshtFixtures.teamProgressMax) ? window.WheeshtFixtures.teamProgressMax() : 6)} size={54} stroke={7} color={t.stage === 'qf' ? 'var(--green)' : 'var(--yellow)'}><span style={{ fontSize: 11 }}>{t.code}</span></PRd>}
       </div>
       {pre && nextFix && fixOpp &&
         <button onClick={props.onGames} style={{ width: '100%', marginTop: 14, display: 'flex', alignItems: 'center', gap: 10, background: 'var(--ink)', border: 'none', borderRadius: 14, padding: '11px 14px', color: '#fff', cursor: 'pointer', textAlign: 'left' }}>

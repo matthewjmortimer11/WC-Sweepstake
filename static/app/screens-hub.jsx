@@ -88,8 +88,11 @@ function ConverterCard(props){
 function DashTeam(){
   const me = WC.YOU; const t = WC.TEAMS[me.team];
   const ring = teamProgressRing(t);
-  const nextFix = nextFixtureForTeam(me.team);
-  const opp = nextFix ? WC.TEAMS[nextFix.a === me.team ? nextFix.b : nextFix.a] : null;
+  const tie = (window.Store && window.Store.nextFixtureForTeam)
+    ? window.Store.nextFixtureForTeam(me.team)
+    : null;
+  const nextFix = tie && tie.fixture;
+  const opp = tie && tie.opponent;
   return (
     <Card bordered className="pop">
       <div style={{display:'flex',alignItems:'center',gap:14}}>
@@ -109,7 +112,9 @@ function DashTeam(){
       {nextFix && opp ? (
         <div style={{marginTop:14,display:'flex',alignItems:'center',gap:10,background:'var(--ink)',borderRadius:14,padding:'11px 14px',color:'#fff'}}>
           <div style={{flex:1}}>
-            <div style={{fontSize:11,fontWeight:800,letterSpacing:'.06em',color:'var(--yellow)'}}>YOUR NEXT TIE · {nextFix.dateLabel} · {nextFix.time}</div>
+            <div style={{fontSize:11,fontWeight:800,letterSpacing:'.06em',color:'var(--yellow)'}}>
+              {(tie.isLive ? '● LIVE · ' : 'YOUR NEXT TIE · ') + (tie.stageLabel || '') + ' · ' + nextFix.dateLabel + ' · ' + nextFix.time}
+            </div>
             <div className="dh" style={{fontSize:19,marginTop:2}}>{t.name} <span style={{opacity:.5}}>vs</span> {opp.name} {opp.flag}</div>
           </div>
           <span className="flame" style={{fontSize:26}}>🔥</span>
@@ -142,10 +147,13 @@ function MatchdayCard(){
         {ties.map(function(f){
           const A=WC.TEAMS[f.a],B=WC.TEAMS[f.b];
           const you = WC.YOU && (f.a === WC.YOU.team || f.b === WC.YOU.team);
+          const stageLbl = (window.WheeshtFixtures && window.WheeshtFixtures.stageLabel)
+            ? window.WheeshtFixtures.stageLabel(f) : '';
           return (
             <div key={f.id} style={{display:'flex',alignItems:'center',gap:8,padding:'9px 11px',border:'2px solid var(--line)',borderRadius:13,background:you?'rgba(245,200,0,.16)':'#fff'}}>
               <Flag team={A} size={26}/>
               <div style={{flex:1,fontSize:13,fontWeight:700,lineHeight:1.15}}>
+                <div style={{fontSize:10,fontWeight:800,letterSpacing:'.05em',color:'var(--ink2)',marginBottom:2}}>{stageLbl} · {f.time}</div>
                 {ownerName(f.a)}'s {A.name} <span style={{color:'var(--ink2)',fontWeight:600}}>vs</span> {ownerName(f.b)}'s {B.name}
               </div>
               <Flag team={B} size={26}/>
@@ -478,7 +486,7 @@ function PersonRow(props){
       {p.alive
         ? (props.pre
             ? <span style={{width:32,textAlign:'center',fontSize:18}}>⚽</span>
-            : <ProgressRing value={t.rounds/6} size={32} stroke={5} color={t.stage==='qf'?'var(--green)':'var(--yellow)'}/>)
+            : <ProgressRing value={t.rounds / ((window.WheeshtFixtures && window.WheeshtFixtures.teamProgressMax) ? window.WheeshtFixtures.teamProgressMax() : 6)} size={32} stroke={5} color={t.stage==='qf'?'var(--green)':'var(--yellow)'}/>)
         : <Stamp tone="red" rotate={-6} style={{fontSize:10}}>OUT</Stamp>}
     </button>
   );
