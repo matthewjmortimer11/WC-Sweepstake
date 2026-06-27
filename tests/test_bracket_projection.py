@@ -38,21 +38,22 @@ def test_projected_bracket_synthesises_r32_from_standings():
     assert first["winner"] in (first["a"], first["b"])
 
 
-def test_projected_bracket_uses_finished_ko_result():
+def test_projected_bracket_uses_finished_r32_result():
     teams = [_team("AAA", "A", "+100"), _team("BBB", "B", "+500")]
     fixtures = [
         {
-            "id": "ko1", "a": "AAA", "b": "BBB", "stage": "qf", "group": None,
+            "id": "ko1", "a": "AAA", "b": "BBB", "stage": "r32", "group": None,
             "status": "done", "score": [2, 1], "winner": "HOME",
             "dateISO": "2026-07-01", "time": "20:00",
         },
     ]
     proj = build_projected_bracket(teams, fixtures)
-    assert proj["rounds"]["qf"][0]["winner"] == "AAA"
-    assert proj["rounds"]["qf"][0]["done"] is True
+    assert proj["rounds"]["r32"][0]["winner"] == "AAA"
+    assert proj["rounds"]["r32"][0]["done"] is True
+    assert not proj["rounds"]["r32"][0]["projectedWinner"]
 
 
-def test_projected_bracket_advances_to_final():
+def test_projected_bracket_r32_only_no_later_rounds():
     teams = [
         _team("W1", "A", "+100"), _team("L1", "A", "+900"),
         _team("W2", "B", "+100"), _team("L2", "B", "+900"),
@@ -62,6 +63,6 @@ def test_projected_bracket_advances_to_final():
          "score": None, "dateISO": "2026-07-10", "time": "20:00"},
     ]
     proj = build_projected_bracket(teams, fixtures)
-    assert "final" in proj["rounds"]
-    assert len(proj["rounds"]["final"]) == 1
-    assert proj["rounds"]["final"][0]["winner"] in ("W1", "W2")
+    assert "r32" in proj["rounds"]
+    assert "final" not in proj["rounds"]
+    assert "r16" not in proj["rounds"]

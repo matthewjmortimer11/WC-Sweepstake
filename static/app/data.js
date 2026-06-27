@@ -259,7 +259,7 @@
     function projectedBracketVisible() {
       var raw = WC.projectedBracket;
       if (!raw || !raw.rounds) return false;
-      return Object.keys(raw.rounds).some(function (k) { return (raw.rounds[k] || []).length > 0; });
+      return (raw.rounds.r32 || []).length > 0;
     }
 
     function projectedR32Opponent(teamCode) {

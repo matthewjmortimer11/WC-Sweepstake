@@ -22,7 +22,6 @@ from qualification.engine import (
     rank_third_placed_teams,
 )
 
-_KO_STAGES = ("r32", "r16", "qf", "sf", "final", "third")
 _DONE = frozenset({"done", "ft", "fulltime", "full_time", "full-time", "finished"})
 _LIVE = frozenset({"live", "halftime", "half_time", "half-time", "ht", "paused", "1h", "2h"})
 
@@ -161,25 +160,6 @@ def _synth_r32_ties(
     return legacy
 
 
-def _synth_next_round(prev: List[Dict[str, Any]], stage: str) -> List[Dict[str, Any]]:
-    winners = [t["winner"] for t in prev if t.get("winner")]
-    ties: List[Dict[str, Any]] = []
-    for i in range(0, len(winners), 2):
-        if i + 1 >= len(winners):
-            break
-        ties.append({
-            "id": f"proj-{stage}-{i // 2}",
-            "a": winners[i],
-            "b": winners[i + 1],
-            "stage": stage,
-            "status": "upcoming",
-            "score": None,
-            "winner": None,
-            "projectedPairing": True,
-        })
-    return ties
-
-
 def _resolve_tie(
     f: Dict[str, Any],
     by_code: Dict[str, Dict[str, Any]],
@@ -206,47 +186,25 @@ def build_projected_bracket(
     fixtures: List[Dict[str, Any]],
 ) -> Dict[str, Any]:
     """
-    Build a full projected knockout bracket from current group standings.
+    Predict Round of 32 pairings and winners from current group standings.
 
-    Returns {"rounds": {stage: [tie, ...]}, "qualifierCount": int}.
+    Pairings use FIFA slot rules (or feed R32 fixtures when published).
+    Unfinished ties get a predicted winner (pre-tournament odds favourite).
+    Later knockout rounds are intentionally omitted — this is a prediction,
+    not a projected path to the final.
+
+    Returns {"rounds": {"r32": [tie, ...]}, "qualifierCount": int}.
     """
     by_code = {t["code"]: t for t in teams}
     qualifiers = _projected_qualifiers(teams, fixtures)
-    feed_ko: Dict[str, List[Dict[str, Any]]] = {}
-    for st in _KO_STAGES:
-        rows = [f for f in fixtures if f.get("stage") == st]
-        feed_ko[st] = sorted(rows, key=_kickoff_key)
-
+    feed_r32 = sorted(
+        [f for f in fixtures if f.get("stage") == "r32"],
+        key=_kickoff_key,
+    )
+    feed = feed_r32 if feed_r32 else _synth_r32_ties(teams, fixtures)
     rounds: Dict[str, List[Dict[str, Any]]] = {}
-    prev_stage: Optional[str] = None
-
-    for stage in _KO_STAGES:
-        if stage == "third":
-            feed = feed_ko.get("third") or []
-            if not feed:
-                continue
-            rounds[stage] = [_resolve_tie(dict(f), by_code) for f in feed]
-            continue
-
-        feed = feed_ko.get(stage) or []
-        if stage == "r32" and not feed:
-            feed = _synth_r32_ties(teams, fixtures)
-        elif not feed and prev_stage and prev_stage in rounds:
-            feed = _synth_next_round(rounds[prev_stage], stage)
-            if not feed and stage == "final" and len(rounds[prev_stage]) == 1:
-                lone = dict(rounds[prev_stage][0])
-                lone["id"] = "proj-final-0"
-                lone["stage"] = "final"
-                lone["status"] = "upcoming"
-                feed = [lone]
-
-        if not feed:
-            prev_stage = stage
-            continue
-
-        resolved = [_resolve_tie(dict(f), by_code) for f in feed]
-        rounds[stage] = resolved
-        prev_stage = stage
+    if feed:
+        rounds["r32"] = [_resolve_tie(dict(f), by_code) for f in feed]
 
     return {
         "rounds": rounds,

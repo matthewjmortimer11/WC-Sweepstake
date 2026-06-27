@@ -517,7 +517,7 @@ function GroupRivalCard(props) {
         Next swing: {t.name} v {opp.name} · {next.dateLabel} {next.time}. This is where the table can move.
       </div>}
       {groupsDone && !inKnockouts && projOpp && <div style={{ marginTop: 10, fontSize: 12.2, fontWeight: 750, color: 'rgba(255,255,255,.72)', lineHeight: 1.35 }}>
-        Groups done — projected R32: {t.name} v {projOpp.name} if standings hold.
+        Groups done — predicted R32 tie: {t.name} v {projOpp.name} if standings hold.
       </div>}
     </Cd>
   );
@@ -696,7 +696,7 @@ function MeScreen(props) {
       <SHd>Your team</SHd>
       <TeamCard me={me} onGames={props.goGames} onPredictions={props.goPredictions} />
       {window.ProjectedKnockoutBracket && <>
-        <SHd aside="updates after every result">Projected bracket</SHd>
+        <SHd aside="updates after every result">Predicted Round of 32</SHd>
         <window.ProjectedKnockoutBracket onOpen={props.goGames} />
       </>}
       {knockoutsVisible() && window.KnockoutBracket && <>
