@@ -31,6 +31,10 @@ function kbTreeValid(rounds) {
   return true;
 }
 
+function kbHasFullTree(rounds) {
+  return (rounds.r32 || []).length >= 16 && kbTreeValid(rounds);
+}
+
 function kbLayoutTree(rounds) {
   var active = KB_ROUND_ORDER.filter(function (k) { return (rounds[k] || []).length; });
   if (!active.length) return null;
@@ -83,14 +87,14 @@ function BracketCell(props) {
   var tie = props.tie;
   var compact = props.compact;
   var fromStandings = props.fromStandings;
-  var pairingOnly = fromStandings && !!tie.projectedPairing && !tie.done && tie.a !== 'TBD' && tie.b !== 'TBD';
+  var pairingOnly = fromStandings && !!tie.projectedPairing && !tie.done && !tie.bracketPad && tie.a !== 'TBD' && tie.b !== 'TBD';
   var A = tie.teamA || { code: tie.a, flag: '🏳️', name: tie.a === 'TBD' ? 'TBD' : tie.a };
   var B = tie.teamB || { code: tie.b, flag: '🏳️', name: tie.b === 'TBD' ? 'TBD' : tie.b };
   var aw = tie.done && tie.winner === tie.a;
   var bw = tie.done && tie.winner === tie.b;
   var border = tie.you ? '2.5px solid var(--ink)' : (tie.entrant ? '2px solid var(--red)' : '2px solid var(--line)');
   if (pairingOnly) border = '2px dashed var(--ink2)';
-  var bg = tie.you ? 'var(--yellow)' : '#fff';
+  var bg = tie.you ? 'var(--yellow)' : (tie.bracketPad ? 'rgba(0,0,0,.02)' : '#fff');
   function Row(p) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', gap: compact ? 4 : 6, opacity: p.lose ? .45 : 1, minHeight: compact ? 18 : 22 }}>
@@ -182,7 +186,7 @@ function BracketPanel(props) {
   var hasTree = KB_ROUND_ORDER.some(function (k) { return (rounds[k] || []).length; });
   var hasThird = (rounds.third || []).length > 0;
   var layout = hasTree && kbTreeValid(rounds) ? kbLayoutTree(rounds) : null;
-  var [view, setView] = kbState(prefs.view || (layout ? 'tree' : 'list'));
+  var [view, setView] = kbState(prefs.view || (kbHasFullTree(rounds) ? 'tree' : (layout ? 'tree' : 'list')));
   var effectiveView = (view === 'tree' && layout) ? 'tree' : 'list';
   var [round, setRound] = kbState(function () {
     if (prefs.round && rounds[prefs.round] && rounds[prefs.round].length) return prefs.round;
@@ -231,7 +235,7 @@ function BracketPanel(props) {
         </div>
       )}
       {props.embedded && (layout || props.onOpen) && (
-        <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
           {layout && <div className="ko-bracket-view-toggle" role="tablist" aria-label="Bracket view">
             <button type="button" role="tab" aria-selected={effectiveView === 'tree'} className={'ko-bracket-view-btn' + (effectiveView === 'tree' ? ' is-active' : '')} onClick={function () { setViewPref('tree'); }}>Tree</button>
             <button type="button" role="tab" aria-selected={effectiveView === 'list'} className={'ko-bracket-view-btn' + (effectiveView === 'list' ? ' is-active' : '')} onClick={function () { setViewPref('list'); }}>By round</button>
@@ -296,7 +300,9 @@ function KnockoutBracket(props) {
     <BracketPanel
       rounds={rounds}
       title="Knockout bracket"
-      subtitle={fromStandings ? 'Round of 32 pairings from live group standings; later rounds from the feed as they publish. No winner picks — results only.' : null}
+      subtitle={fromStandings
+        ? 'Full bracket — R32 from standings (dashed), R16 onward from the feed as ties publish. TBD slots fill in as results land.'
+        : 'Full knockout bracket from the feed.'}
       fromStandings={fromStandings}
       embedded={props.embedded}
       onOpen={props.onOpen}
