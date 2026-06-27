@@ -43,6 +43,7 @@ from sqlalchemy import delete, func, select, text
 from sqlalchemy.exc import IntegrityError
 
 import standings
+from bracket_projection import build_projected_bracket
 import sync
 from db import AsyncSessionLocal, engine
 from models import (
@@ -771,6 +772,14 @@ def _league_state(league: League, league_people: List[Dict[str, Any]], admin: Di
     data["meta"] = meta
     data["pot"] = len(people) * fee
     data["charitySplit"] = meta["charitySplit"]
+    group_started = any(
+        f.get("stage") == "group" and _status_is_done(f.get("status"))
+        for f in fixtures or []
+    )
+    if group_started or meta.get("knockoutsInFeed"):
+        data["projectedBracket"] = build_projected_bracket(teams, fixtures)
+    else:
+        data["projectedBracket"] = {"rounds": {}, "qualifierCount": 0, "source": "standings"}
     return data
 
 

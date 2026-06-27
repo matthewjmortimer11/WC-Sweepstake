@@ -688,6 +688,10 @@ function MeScreen(props) {
       </Saysd>
       <SHd>Your team</SHd>
       <TeamCard me={me} onGames={props.goGames} onPredictions={props.goPredictions} />
+      {window.ProjectedKnockoutBracket && <>
+        <SHd aside="updates after every result">Projected bracket</SHd>
+        <window.ProjectedKnockoutBracket onOpen={props.goGames} />
+      </>}
       {knockoutsVisible() && window.KnockoutBracket && <>
         <SHd aside="from the feed">Knockouts</SHd>
         <window.KnockoutBracket onOpen={props.goGames} />

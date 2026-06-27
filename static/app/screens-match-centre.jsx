@@ -447,6 +447,11 @@ function MatchCentreScreen() {
         </div>
       </div>
 
+      {window.ProjectedKnockoutBracket &&
+        <div style={{ marginBottom: 12 }}>
+          <window.ProjectedKnockoutBracket />
+        </div>}
+
       {mcKnockoutsVisible() && window.KnockoutBracket &&
         <div style={{ marginBottom: 12 }}>
           <window.KnockoutBracket />

@@ -1333,6 +1333,14 @@
       var fx = window.WheeshtFixtures;
       return fx && fx.buildKnockoutBracket ? fx.buildKnockoutBracket() : {};
     },
+    buildProjectedKnockoutBracket: function () {
+      var fx = window.WheeshtFixtures;
+      return fx && fx.buildProjectedKnockoutBracket ? fx.buildProjectedKnockoutBracket() : {};
+    },
+    projectedBracketVisible: function () {
+      var fx = window.WheeshtFixtures;
+      return fx && fx.projectedBracketVisible ? fx.projectedBracketVisible() : false;
+    },
     stageNameForTeam: function (t) {
       var fx = window.WheeshtFixtures;
       return fx && fx.stageNameForTeam ? fx.stageNameForTeam(t) : (t && t.stage) || '';

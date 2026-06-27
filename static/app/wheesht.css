@@ -126,6 +126,6 @@
   background: var(--yellow);
   color: var(--ink);
 }
-.ko-bracket-view-btn + .ko-bracket-view-btn {
-  border-left: 2px solid var(--line);
+.ko-bracket-cell--projected {
+  opacity: 0.96;
 }

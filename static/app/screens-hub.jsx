@@ -236,6 +236,10 @@ function DashboardScreen(props){
       ]}/>
       <SectionHead>The Bracket</SectionHead>
       <BracketSnapshot onOpen={props.goTracker}/>
+      {window.ProjectedKnockoutBracket && <>
+        <SectionHead aside="updates after every result">Projected bracket</SectionHead>
+        <window.ProjectedKnockoutBracket onOpen={props.goTracker}/>
+      </>}
       <SectionHead>Matchday</SectionHead>
       <MatchdayCard/>
       <SectionHead>The Standings</SectionHead>
@@ -533,6 +537,10 @@ function TrackerScreen(){
       </div>
       {pre ? <FieldCard/> : <StageFunnel/>}
       {!pre && window.GroupsDoneBanner && <window.GroupsDoneBanner />}
+      {!pre && window.ProjectedKnockoutBracket && <>
+        <SectionHead aside="updates after every result">Projected bracket</SectionHead>
+        <window.ProjectedKnockoutBracket />
+      </>}
       <div style={{height:12}}/>
       {pre
         ? (function(){

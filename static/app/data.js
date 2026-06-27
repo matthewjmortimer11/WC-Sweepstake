@@ -74,6 +74,7 @@
     WC.PREDICTIONS = d.predictions || [];
     WC.meta = d.meta;
     WC.league = d.league || null;
+    WC.projectedBracket = d.projectedBracket || { rounds: {}, qualifierCount: 0, source: 'standings' };
 
     // Fixture helpers — single source for next-tie, bracket, status (all read WC.FIXTURES).
     var DONE = ['done', 'ft', 'fulltime', 'full_time', 'full-time', 'finished'];
@@ -214,6 +215,53 @@
       return rounds;
     }
 
+    function buildProjectedKnockoutBracket() {
+      var raw = WC.projectedBracket;
+      if (!raw || !raw.rounds) return {};
+      var active = (window.Store && window.Store.active) ? window.Store.active() : null;
+      var me = active || YOU;
+      var myCode = me && me.team;
+      var rounds = {};
+      Object.keys(raw.rounds).forEach(function (st) {
+        rounds[st] = (raw.rounds[st] || []).map(function (t) {
+          var ownersA = ownersOf(t.a);
+          var ownersB = ownersOf(t.b);
+          var you = !!(myCode && (t.a === myCode || t.b === myCode));
+          var winner = t.winner || null;
+          return {
+            id: t.id || ('proj-' + st + '-' + t.a + '-' + t.b),
+            a: t.a,
+            b: t.b,
+            teamA: TEAMS[t.a],
+            teamB: TEAMS[t.b],
+            score: t.score,
+            done: !!t.done,
+            winner: winner,
+            stageLabel: stageLabelForFixture(t),
+            afterExtraTime: !!t.afterExtraTime,
+            pens: !!t.pens,
+            you: you,
+            entrant: ownersA.length + ownersB.length > 0,
+            ownersA: ownersA.length,
+            ownersB: ownersB.length,
+            projectedWinner: !!t.projectedWinner,
+            projectedPairing: !!t.projectedPairing,
+            dateLabel: t.dateLabel,
+            time: t.time,
+            kickoff: kickoffMs(t),
+          };
+        });
+        rounds[st].sort(function (a, b) { return (a.kickoff || 0) - (b.kickoff || 0); });
+      });
+      return rounds;
+    }
+
+    function projectedBracketVisible() {
+      var raw = WC.projectedBracket;
+      if (!raw || !raw.rounds) return false;
+      return Object.keys(raw.rounds).some(function (k) { return (raw.rounds[k] || []).length > 0; });
+    }
+
     function localTodayISO() {
       var d = new Date();
       var m = d.getMonth() + 1;
@@ -254,6 +302,8 @@
       stageNameForTeam: stageNameForTeam,
       nextForTeam: nextFixtureForTeam,
       buildKnockoutBracket: buildKnockoutBracket,
+      buildProjectedKnockoutBracket: buildProjectedKnockoutBracket,
+      projectedBracketVisible: projectedBracketVisible,
       todaysEntrantFixtures: todaysEntrantFixtures,
       winnerSide: fixtureWinnerSide,
       teamProgressMax: teamProgressMax,
