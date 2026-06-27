@@ -1,15 +1,13 @@
 """
-Projected knockout bracket from live group standings.
+Knockout bracket from live group standings + feed fixtures.
 
-Uses qualification.engine for group tables and best-third ranking, then simulates
-knockout rounds: finished ties use actual results; upcoming ties advance the
-pre-tournament odds favourite. When the feed publishes real KO pairings, those
-pairings are used for structure.
+R32 pairings are derived from group tables (FIFA slot rules) and merged with
+partial feed data as ties publish. Later rounds come from the feed only — no
+synthetic advancement and no predicted winners.
 """
 
 from __future__ import annotations
 
-import re
 from typing import Any, Dict, List, Optional, Tuple
 
 import standings
@@ -22,6 +20,7 @@ from qualification.engine import (
     rank_third_placed_teams,
 )
 
+_KO_STAGES = ("r32", "r16", "qf", "sf", "final", "third")
 _DONE = frozenset({"done", "ft", "fulltime", "full_time", "full-time", "finished"})
 _LIVE = frozenset({"live", "halftime", "half_time", "half-time", "ht", "paused", "1h", "2h"})
 
@@ -63,21 +62,6 @@ def _to_qual_fixture(f: Dict[str, Any]) -> Fixture:
     )
 
 
-def _odds_rank(t: Dict[str, Any]) -> int:
-    raw = str(t.get("odds") or "")
-    m = re.search(r"\d+", raw)
-    return int(m.group()) if m else 999_999
-
-
-def _pick_favourite(a: str, b: str, by_code: Dict[str, Dict[str, Any]]) -> str:
-    ta, tb = by_code.get(a), by_code.get(b)
-    if not ta:
-        return b
-    if not tb:
-        return a
-    return a if _odds_rank(ta) <= _odds_rank(tb) else b
-
-
 def _fixture_winner(f: Dict[str, Any]) -> Optional[str]:
     side = standings._winner_of(f)
     if side == "HOME":
@@ -91,6 +75,10 @@ def _kickoff_key(f: Dict[str, Any]) -> Tuple[str, str]:
     return (str(f.get("dateISO") or ""), str(f.get("time") or ""))
 
 
+def _pair_key(f: Dict[str, Any]) -> Tuple[str, str]:
+    return tuple(sorted([str(f.get("a") or ""), str(f.get("b") or "")]))  # type: ignore[return-value]
+
+
 def _projected_qualifiers(
     teams: List[Dict[str, Any]],
     fixtures: List[Dict[str, Any]],
@@ -100,7 +88,6 @@ def _projected_qualifiers(
     qual_fixtures = [_to_qual_fixture(f) for f in fixtures if f.get("stage") == "group"]
     tables = build_group_tables(qual_teams, qual_fixtures, include_live=True)
     thirds = rank_third_placed_teams(get_third_placed_teams(tables), cutoff=8)
-    qualifying_thirds = {t.team_id for t in thirds if t.qualifies}
 
     ordered: List[str] = []
     for group in sorted(tables.keys()):
@@ -141,7 +128,6 @@ def _synth_r32_ties(
     )
     if ties:
         return ties
-    # Fallback if group tables aren't ready yet.
     qualifiers = _projected_qualifiers(teams, fixtures)
     legacy: List[Dict[str, Any]] = []
     for i in range(0, min(len(qualifiers), 32), 2):
@@ -160,24 +146,47 @@ def _synth_r32_ties(
     return legacy
 
 
-def _resolve_tie(
-    f: Dict[str, Any],
-    by_code: Dict[str, Dict[str, Any]],
-) -> Dict[str, Any]:
-    """Return tie dict with winner filled (actual or projected)."""
-    a, b = f.get("a"), f.get("b")
+def _merge_r32_feed(
+    synth: List[Dict[str, Any]],
+    feed: List[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    """Fill all 16 R32 slots from standings; overlay feed fixtures when published."""
+    if not synth:
+        return sorted(feed, key=_kickoff_key)
+    by_pair: Dict[Tuple[str, str], Dict[str, Any]] = {}
+    for t in synth:
+        by_pair[_pair_key(t)] = dict(t)
+    for f in feed:
+        by_pair[_pair_key(f)] = dict(f)
+    merged: List[Dict[str, Any]] = []
+    seen: set[Tuple[str, str]] = set()
+    for t in synth:
+        key = _pair_key(t)
+        if key in seen:
+            continue
+        seen.add(key)
+        merged.append(by_pair[key])
+    for f in feed:
+        key = _pair_key(f)
+        if key in seen:
+            continue
+        seen.add(key)
+        merged.append(dict(f))
+    return sorted(merged, key=_kickoff_key)
+
+
+def _resolve_tie(f: Dict[str, Any]) -> Dict[str, Any]:
+    """Return tie dict with winner only when the fixture is finished."""
     done = _norm_status(f.get("status")) == "done"
     score = f.get("score")
     winner = _fixture_winner(f) if done else None
-    projected_win = False
-    if not winner and a and b:
-        winner = _pick_favourite(a, b, by_code)
-        projected_win = True
     out = dict(f)
     out["done"] = done
     out["winner"] = winner
-    out["projectedWinner"] = projected_win and not done
+    out["projectedWinner"] = False
     out["pens"] = bool(done and score and score[0] == score[1] and f.get("winner"))
+    if out.get("projectedPairing") is None and str(out.get("id", "")).startswith("proj-"):
+        out["projectedPairing"] = True
     return out
 
 
@@ -186,25 +195,26 @@ def build_projected_bracket(
     fixtures: List[Dict[str, Any]],
 ) -> Dict[str, Any]:
     """
-    Predict Round of 32 pairings and winners from current group standings.
+    Build knockout bracket from R32 standings pairings + feed fixtures.
 
-    Pairings use FIFA slot rules (or feed R32 fixtures when published).
-    Unfinished ties get a predicted winner (pre-tournament odds favourite).
-    Later knockout rounds are intentionally omitted — this is a prediction,
-    not a projected path to the final.
-
-    Returns {"rounds": {"r32": [tie, ...]}, "qualifierCount": int}.
+    R32 uses FIFA slot rules merged with partial feed data. R16 onward are
+    feed-only. No predicted winners — only actual results fill in winners.
     """
-    by_code = {t["code"]: t for t in teams}
     qualifiers = _projected_qualifiers(teams, fixtures)
-    feed_r32 = sorted(
-        [f for f in fixtures if f.get("stage") == "r32"],
-        key=_kickoff_key,
-    )
-    feed = feed_r32 if feed_r32 else _synth_r32_ties(teams, fixtures)
+    synth_r32 = _synth_r32_ties(teams, fixtures)
+    feed_r32 = [f for f in fixtures if f.get("stage") == "r32"]
+    r32_merged = _merge_r32_feed(synth_r32, feed_r32)
+
     rounds: Dict[str, List[Dict[str, Any]]] = {}
-    if feed:
-        rounds["r32"] = [_resolve_tie(dict(f), by_code) for f in feed]
+    if r32_merged:
+        rounds["r32"] = [_resolve_tie(dict(f)) for f in r32_merged]
+
+    for stage in _KO_STAGES:
+        if stage == "r32":
+            continue
+        feed = sorted([f for f in fixtures if f.get("stage") == stage], key=_kickoff_key)
+        if feed:
+            rounds[stage] = [_resolve_tie(dict(f)) for f in feed]
 
     return {
         "rounds": rounds,
@@ -219,7 +229,7 @@ def projected_r32_opponent(
     fixtures: List[Dict[str, Any]],
 ) -> Optional[str]:
     """Projected Round of 32 opponent from current group standings."""
-    for tie in _synth_r32_ties(teams, fixtures):
+    for tie in build_projected_bracket(teams, fixtures).get("rounds", {}).get("r32", []):
         if tie.get("a") == team_code:
             return tie.get("b")
         if tie.get("b") == team_code:

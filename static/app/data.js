@@ -259,7 +259,13 @@
     function projectedBracketVisible() {
       var raw = WC.projectedBracket;
       if (!raw || !raw.rounds) return false;
-      return (raw.rounds.r32 || []).length > 0;
+      var meta = WC.meta || {};
+      if (meta.groupsComplete && meta.r32Published) return false;
+      var ko = ['r32', 'r16', 'qf', 'sf', 'final', 'third'];
+      for (var i = 0; i < ko.length; i++) {
+        if ((raw.rounds[ko[i]] || []).length > 0) return true;
+      }
+      return false;
     }
 
     function projectedR32Opponent(teamCode) {

@@ -66,17 +66,14 @@ function kbLayoutTree(rounds) {
 function BracketCell(props) {
   var tie = props.tie;
   var compact = props.compact;
-  var predicted = props.predicted;
-  var projected = !predicted && (props.projected || tie.projectedWinner || tie.projectedPairing);
+  var fromStandings = props.fromStandings;
+  var pairingOnly = fromStandings && !!tie.projectedPairing && !tie.done;
   var A = tie.teamA || { code: tie.a, flag: '🏳️', name: tie.a };
   var B = tie.teamB || { code: tie.b, flag: '🏳️', name: tie.b };
-  var predWin = predicted && !tie.done && tie.projectedWinner && tie.winner;
-  var predName = predWin ? ((tie.winner === tie.a ? A : B).name || tie.winner) : null;
-  var aw = tie.done ? tie.winner === tie.a : ((predicted || projected) && tie.winner === tie.a);
-  var bw = tie.done ? tie.winner === tie.b : ((predicted || projected) && tie.winner === tie.b);
-  var dashStyle = (predicted || projected) && !tie.done;
+  var aw = tie.done && tie.winner === tie.a;
+  var bw = tie.done && tie.winner === tie.b;
   var border = tie.you ? '2.5px solid var(--ink)' : (tie.entrant ? '2px solid var(--red)' : '2px solid var(--line)');
-  if (dashStyle) border = '2px dashed var(--ink2)';
+  if (pairingOnly) border = '2px dashed var(--ink2)';
   var bg = tie.you ? 'var(--yellow)' : '#fff';
   function Row(p) {
     return (
@@ -86,20 +83,19 @@ function BracketCell(props) {
           fontSize: compact ? 10 : 11.5, fontWeight: p.win ? 800 : 700, flex: 1,
           whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
           textDecoration: p.lose ? 'line-through' : 'none',
-          fontStyle: p.win && dashStyle ? 'italic' : 'normal',
+          fontStyle: p.win && tie.done ? 'normal' : 'normal',
         }}>{compact ? p.team.code : p.team.name}</span>
         {p.score != null && <span className="dh" style={{ fontSize: compact ? 12 : 14 }}>{p.score}</span>}
       </div>
     );
   }
   return (
-    <div className={'ko-bracket-cell' + (dashStyle ? ' ko-bracket-cell--projected' : '')} style={{ border: border, borderRadius: compact ? 10 : 12, padding: compact ? '5px 7px' : '7px 9px', background: bg, height: '100%', boxSizing: 'border-box' }}>
+    <div className={'ko-bracket-cell' + (pairingOnly ? ' ko-bracket-cell--projected' : '')} style={{ border: border, borderRadius: compact ? 10 : 12, padding: compact ? '5px 7px' : '7px 9px', background: bg, height: '100%', boxSizing: 'border-box' }}>
       <Row team={A} score={tie.done && tie.score ? tie.score[0] : null} lose={bw} win={aw} />
       <div style={{ height: compact ? 2 : 4 }} />
       <Row team={B} score={tie.done && tie.score ? tie.score[1] : null} lose={aw} win={bw} />
       {tie.pens && <div style={{ fontSize: 9, fontWeight: 800, color: 'var(--ink2)', marginTop: 2 }}>Pens</div>}
-      {predWin && <div style={{ fontSize: 9, fontWeight: 800, color: 'var(--ink2)', marginTop: 2 }}>Predicted winner · {predName}</div>}
-      {projected && !tie.done && tie.winner && !predicted && <div style={{ fontSize: 9, fontWeight: 800, color: 'var(--ink2)', marginTop: 2 }}>Proj. {tie.winner}</div>}
+      {pairingOnly && <div style={{ fontSize: 9, fontWeight: 800, color: 'var(--ink2)', marginTop: 2 }}>Pairing from standings</div>}
       {tie.entrant && !tie.you && <div className="ko-bracket-entrant-dot" title="Sweepstake entrant in this tie" />}
     </div>
   );
@@ -108,7 +104,7 @@ function BracketCell(props) {
 function BracketTreeView(props) {
   var layout = props.layout;
   var labels = props.labels;
-  var projected = props.projected;
+  var fromStandings = props.fromStandings;
   var scrollRef = kbRef(null);
   kbEffect(function () {
     if (!scrollRef.current || !props.focusStage) return;
@@ -132,7 +128,7 @@ function BracketTreeView(props) {
               {col.slots.map(function (slot) {
                 return (
                   <div key={slot.tie.id} className="ko-bracket-slot" style={{ top: slot.top, height: KB_CELL_H }}>
-                    <BracketCell tie={slot.tie} compact projected={props.projected} />
+                    <BracketCell tie={slot.tie} compact fromStandings={props.fromStandings} />
                   </div>
                 );
               })}
@@ -162,18 +158,16 @@ function kbSavePrefs(scope, partial) {
 }
 
 function BracketPanel(props) {
-  var r32Only = props.r32Only;
-  var allRounds = props.rounds || {};
-  var rounds = r32Only ? { r32: allRounds.r32 || [] } : allRounds;
+  var fromStandings = props.fromStandings;
+  var rounds = props.rounds || {};
   var labels = props.labels || (WCkb.meta && WCkb.meta.stageLabels) || {};
-  var prefScope = props.predicted ? 'predicted-r32' : (props.projected ? 'projected' : 'feed');
+  var prefScope = fromStandings ? 'standings-bracket' : 'feed';
   var prefs = kbLoadPrefs(prefScope);
-  var hasTree = !r32Only && KB_ROUND_ORDER.some(function (k) { return (rounds[k] || []).length; });
-  var hasThird = !r32Only && (rounds.third || []).length > 0;
+  var hasTree = KB_ROUND_ORDER.some(function (k) { return (rounds[k] || []).length; });
+  var hasThird = (rounds.third || []).length > 0;
   var layout = hasTree ? kbLayoutTree(rounds) : null;
-  var [view, setView] = kbState(r32Only ? 'list' : (prefs.view || (layout ? 'tree' : 'list')));
+  var [view, setView] = kbState(prefs.view || (layout ? 'tree' : 'list'));
   var [round, setRound] = kbState(function () {
-    if (r32Only) return 'r32';
     if (prefs.round && rounds[prefs.round] && rounds[prefs.round].length) return prefs.round;
     var kr = WCkb.meta.knockoutRound;
     return kr && rounds[kr] && rounds[kr].length ? kr : (KB_ROUND_ORDER.find(function (k) { return (rounds[k] || []).length; }) || 'r32');
@@ -195,8 +189,8 @@ function BracketPanel(props) {
     setRound(r);
     kbSavePrefs(prefScope, { round: r });
   }
-  if (!hasTree && !hasThird && !(r32Only && (rounds.r32 || []).length)) return null;
-  var focusStage = r32Only ? 'r32' : (WCkb.meta.knockoutRound || round);
+  if (!hasTree && !hasThird) return null;
+  var focusStage = WCkb.meta.knockoutRound || round;
   return (
     <Ckb>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10, gap: 8, flexWrap: 'wrap' }}>
@@ -205,7 +199,7 @@ function BracketPanel(props) {
           {props.subtitle && <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink2)', marginTop: 4, maxWidth: 420 }}>{props.subtitle}</div>}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          {layout && !r32Only && <div className="ko-bracket-view-toggle" role="tablist" aria-label="Bracket view">
+          {layout && <div className="ko-bracket-view-toggle" role="tablist" aria-label="Bracket view">
             <button type="button" role="tab" aria-selected={view === 'tree'} className={'ko-bracket-view-btn' + (view === 'tree' ? ' is-active' : '')} onClick={function () { setViewPref('tree'); }}>Tree</button>
             <button type="button" role="tab" aria-selected={view === 'list'} className={'ko-bracket-view-btn' + (view === 'list' ? ' is-active' : '')} onClick={function () { setViewPref('list'); }}>By round</button>
           </div>}
@@ -215,18 +209,17 @@ function BracketPanel(props) {
       <div style={{ display: 'flex', gap: 12, fontSize: 10.5, fontWeight: 700, color: 'var(--ink2)', marginBottom: 8, flexWrap: 'wrap' }}>
         <span><span style={{ display: 'inline-block', width: 10, height: 10, background: 'var(--yellow)', border: '2px solid var(--ink)', borderRadius: 2, verticalAlign: 'middle', marginRight: 4 }} /> Your team</span>
         <span><span style={{ display: 'inline-block', width: 10, height: 10, border: '2px solid var(--red)', borderRadius: 2, verticalAlign: 'middle', marginRight: 4 }} /> Entrant in tie</span>
-        {props.predicted && <span><span style={{ display: 'inline-block', width: 10, height: 10, border: '2px dashed var(--ink2)', borderRadius: 2, verticalAlign: 'middle', marginRight: 4 }} /> Predicted winner</span>}
-        {props.projected && !props.predicted && <span><span style={{ display: 'inline-block', width: 10, height: 10, border: '2px dashed var(--ink2)', borderRadius: 2, verticalAlign: 'middle', marginRight: 4 }} /> Projected path</span>}
+        {fromStandings && <span><span style={{ display: 'inline-block', width: 10, height: 10, border: '2px dashed var(--ink2)', borderRadius: 2, verticalAlign: 'middle', marginRight: 4 }} /> Pairing from standings</span>}
       </div>
-      {view === 'tree' && layout && !r32Only
+      {view === 'tree' && layout
         ? <React.Fragment>
-            <BracketTreeView layout={layout} labels={labels} focusStage={focusStage} projected={props.projected} />
+            <BracketTreeView layout={layout} labels={labels} focusStage={focusStage} fromStandings={fromStandings} />
             {hasThird && <div style={{ marginTop: 12, maxWidth: 280 }}>
               <div className="ko-bracket-col-label dh" style={{ marginBottom: 6 }}>{labels.third || 'Third place'}</div>
-              {(rounds.third || []).map(function (tie) { return <BracketCell key={tie.id} tie={tie} projected={props.projected} />; })}
+              {(rounds.third || []).map(function (tie) { return <BracketCell key={tie.id} tie={tie} fromStandings={fromStandings} />; })}
             </div>}
           </React.Fragment>
-        : <BracketListView rounds={rounds} order={r32Only ? ['r32'] : KB_LIST_ORDER} labels={labels} round={round} setRound={setRoundPref} projected={props.projected} predicted={props.predicted} hideRoundTabs={r32Only} />}
+        : <BracketListView rounds={rounds} order={KB_LIST_ORDER} labels={labels} round={round} setRound={setRoundPref} fromStandings={fromStandings} />}
     </Ckb>
   );
 }
@@ -238,6 +231,7 @@ function BracketListView(props) {
   var round = props.round;
   var setRound = props.setRound;
   var hideRoundTabs = props.hideRoundTabs;
+  var fromStandings = props.fromStandings;
   var ties = rounds[round] || [];
   return (
     <React.Fragment>
@@ -253,7 +247,7 @@ function BracketListView(props) {
         })}
       </div>}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-        {ties.map(function (tie) { return <BracketCell key={tie.id} tie={tie} projected={props.projected} predicted={props.predicted} />; })}
+        {ties.map(function (tie) { return <BracketCell key={tie.id} tie={tie} fromStandings={fromStandings} />; })}
       </div>
     </React.Fragment>
   );
@@ -270,17 +264,15 @@ function KnockoutBracket(props) {
 
 function ProjectedKnockoutBracket(props) {
   if (!(Skb && Skb.projectedBracketVisible && Skb.projectedBracketVisible())) return null;
-  var allRounds = Skb.buildProjectedKnockoutBracket ? Skb.buildProjectedKnockoutBracket() : {};
-  var r32 = allRounds.r32 || [];
-  if (!r32.length) return null;
-  var qc = (WCkb.projectedBracket && WCkb.projectedBracket.qualifierCount) || 0;
+  var rounds = Skb.buildProjectedKnockoutBracket ? Skb.buildProjectedKnockoutBracket() : {};
+  var hasKo = KB_ROUND_ORDER.concat(['third']).some(function (k) { return (rounds[k] || []).length; });
+  if (!hasKo) return null;
   return (
     <BracketPanel
-      rounds={{ r32: r32 }}
-      title="Predicted Round of 32"
-      subtitle={'Who qualifies from the group tables, who meets whom, and which odds favourite Wheesht picks to win each tie. Not a forecast beyond the Round of 32 — updates after every group result.' + (qc ? ' (' + qc + ' teams projected in.)' : '')}
-      predicted={true}
-      r32Only={true}
+      rounds={rounds}
+      title="Knockout bracket"
+      subtitle="Round of 32 pairings from live group standings; later rounds from the feed as they publish. No winner picks — results only."
+      fromStandings={true}
       onOpen={props.onOpen}
     />
   );

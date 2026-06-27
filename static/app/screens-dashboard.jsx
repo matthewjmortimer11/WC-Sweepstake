@@ -477,10 +477,10 @@ function GroupRivalCard(props) {
   if (!meRow) return null;
   const above = G.ranked.find(r => r.pos === meRow.pos - 1);
   const below = G.ranked.find(r => r.pos === meRow.pos + 1);
-  const groupsDone = G.total > 0 && G.played >= G.total;
+  const allGroupsDone = !!(WCd.meta && WCd.meta.groupsComplete);
   const inKnockouts = (t.rounds || 0) >= 1;
-  const throughKnockouts = inKnockouts || groupsDone;
-  const projOppCode = groupsDone && !inKnockouts && Sd.projectedR32Opponent ? Sd.projectedR32Opponent(t.code) : null;
+  const throughKnockouts = inKnockouts || allGroupsDone;
+  const projOppCode = allGroupsDone && !inKnockouts && Sd.projectedR32Opponent ? Sd.projectedR32Opponent(t.code) : null;
   const projOpp = projOppCode ? WCd.TEAMS[projOppCode] : null;
   const koTie = throughKnockouts && Sd.nextFixtureForTeam ? Sd.nextFixtureForTeam(t.code) : null;
   const next = throughKnockouts ? null : G.fixtures.filter(f => (f.a === t.code || f.b === t.code) && comp.compFixturePlayable(f)).sort(comp.compFixtureSort)[0];
@@ -516,8 +516,8 @@ function GroupRivalCard(props) {
       {!throughKnockouts && next && opp && <div style={{ marginTop: 10, fontSize: 12.2, fontWeight: 750, color: 'rgba(255,255,255,.72)', lineHeight: 1.35 }}>
         Next swing: {t.name} v {opp.name} · {next.dateLabel} {next.time}. This is where the table can move.
       </div>}
-      {groupsDone && !inKnockouts && projOpp && <div style={{ marginTop: 10, fontSize: 12.2, fontWeight: 750, color: 'rgba(255,255,255,.72)', lineHeight: 1.35 }}>
-        Groups done — predicted R32 tie: {t.name} v {projOpp.name} if standings hold.
+      {allGroupsDone && !inKnockouts && projOpp && <div style={{ marginTop: 10, fontSize: 12.2, fontWeight: 750, color: 'rgba(255,255,255,.72)', lineHeight: 1.35 }}>
+        All groups done — R32 pairing from standings: {t.name} v {projOpp.name} if the table holds.
       </div>}
     </Cd>
   );
@@ -695,8 +695,8 @@ function MeScreen(props) {
       </Saysd>
       <SHd>Your team</SHd>
       <TeamCard me={me} onGames={props.goGames} onPredictions={props.goPredictions} />
-      {window.ProjectedKnockoutBracket && <>
-        <SHd aside="updates after every result">Predicted Round of 32</SHd>
+      {window.ProjectedKnockoutBracket && Sd.projectedBracketVisible && Sd.projectedBracketVisible() && <>
+        <SHd aside="from group standings">Knockout bracket</SHd>
         <window.ProjectedKnockoutBracket onOpen={props.goGames} />
       </>}
       {knockoutsVisible() && window.KnockoutBracket && <>

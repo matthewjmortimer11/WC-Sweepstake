@@ -236,8 +236,8 @@ function DashboardScreen(props){
       ]}/>
       <SectionHead>The Bracket</SectionHead>
       <BracketSnapshot onOpen={props.goTracker}/>
-      {window.ProjectedKnockoutBracket && <>
-        <SectionHead aside="updates after every result">Predicted Round of 32</SectionHead>
+      {window.ProjectedKnockoutBracket && window.Store && window.Store.projectedBracketVisible && window.Store.projectedBracketVisible() && <>
+        <SectionHead aside="from group standings">Knockout bracket</SectionHead>
         <window.ProjectedKnockoutBracket onOpen={props.goTracker}/>
       </>}
       <SectionHead>Matchday</SectionHead>
@@ -537,8 +537,8 @@ function TrackerScreen(){
       </div>
       {pre ? <FieldCard/> : <StageFunnel/>}
       {!pre && window.GroupsDoneBanner && <window.GroupsDoneBanner />}
-      {!pre && window.ProjectedKnockoutBracket && <>
-        <SectionHead aside="updates after every result">Predicted Round of 32</SectionHead>
+      {!pre && window.ProjectedKnockoutBracket && window.Store && window.Store.projectedBracketVisible && window.Store.projectedBracketVisible() && <>
+        <SectionHead aside="from group standings">Knockout bracket</SectionHead>
         <window.ProjectedKnockoutBracket />
       </>}
       <div style={{height:12}}/>
