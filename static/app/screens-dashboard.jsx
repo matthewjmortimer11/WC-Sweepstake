@@ -697,11 +697,11 @@ function MeScreen(props) {
       <TeamCard me={me} onGames={props.goGames} onPredictions={props.goPredictions} />
       {window.ProjectedKnockoutBracket && Sd.projectedBracketVisible && Sd.projectedBracketVisible() && <>
         <SHd aside="from group standings">Knockout bracket</SHd>
-        <window.ProjectedKnockoutBracket onOpen={props.goGames} />
+        <window.ProjectedKnockoutBracket embedded onOpen={props.goGames} />
       </>}
       {knockoutsVisible() && window.KnockoutBracket && <>
         <SHd aside="from the feed">Knockouts</SHd>
-        <window.KnockoutBracket onOpen={props.goGames} />
+        <window.KnockoutBracket embedded onOpen={props.goGames} />
       </>}
       <SHd aside="who to beat">Your group</SHd>
       <GroupRivalCard me={me} onOpen={props.goGroup} onGames={props.goGames} />

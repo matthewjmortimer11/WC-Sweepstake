@@ -175,6 +175,26 @@
       return null;
     }
 
+    function tieFinished(t) {
+      return !!(t && (t.done || fixtureDone(t)));
+    }
+
+    function tieWinner(t) {
+      if (!tieFinished(t)) return null;
+      if (fixtureDone(t)) {
+        var fromStatus = fixtureWinnerSide(t);
+        if (fromStatus) return fromStatus;
+      }
+      if (t.winner === 'HOME') return t.a;
+      if (t.winner === 'AWAY') return t.b;
+      if (t.winner && t.winner !== 'DRAW') return t.winner;
+      if (t.score && t.score[0] != null && t.score[1] != null) {
+        if (t.score[0] > t.score[1]) return t.a;
+        if (t.score[1] > t.score[0]) return t.b;
+      }
+      return null;
+    }
+
     function buildKnockoutBracket() {
       var active = (window.Store && window.Store.active) ? window.Store.active() : null;
       var me = active || YOU;
@@ -195,11 +215,11 @@
           teamA: TEAMS[f.a],
           teamB: TEAMS[f.b],
           score: f.score,
-          done: fixtureDone(f),
-          winner: fixtureWinnerSide(f),
+          done: tieFinished(f),
+          winner: tieWinner(f),
           stageLabel: stageLabelForFixture(f),
           afterExtraTime: !!f.afterExtraTime,
-          pens: fixtureDone(f) && f.winner && f.score && f.score[0] === f.score[1],
+          pens: tieFinished(f) && f.winner && f.score && f.score[0] === f.score[1],
           you: you,
           entrant: entrant,
           ownersA: ownersA.length,
@@ -227,8 +247,8 @@
           var ownersA = ownersOf(t.a);
           var ownersB = ownersOf(t.b);
           var you = !!(myCode && (t.a === myCode || t.b === myCode));
-          var done = !!t.done || fixtureDone(t);
-          var winner = done ? (fixtureWinnerSide(t) || (t.winner === 'HOME' ? t.a : t.winner === 'AWAY' ? t.b : (t.winner && t.winner !== 'DRAW' ? t.winner : null))) : null;
+          var done = tieFinished(t);
+          var winner = tieWinner(t);
           return {
             id: t.id || ('proj-' + st + '-' + t.a + '-' + t.b),
             a: t.a,
@@ -260,8 +280,7 @@
     function projectedBracketVisible() {
       var raw = WC.projectedBracket;
       if (!raw || !raw.rounds) return false;
-      var meta = WC.meta || {};
-      if (meta.groupsComplete && (meta.r32Published || meta.knockoutsInFeed)) return false;
+      if ((WC.meta || {}).knockoutsInFeed) return false;
       var ko = ['r32', 'r16', 'qf', 'sf', 'final', 'third'];
       for (var i = 0; i < ko.length; i++) {
         if ((raw.rounds[ko[i]] || []).length > 0) return true;

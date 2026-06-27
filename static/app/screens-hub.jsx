@@ -167,8 +167,8 @@ function MatchdayCard(){
 }
 
 function BracketSnapshot(props){
-  if (window.KnockoutBracket && window.WheeshtFixtures && window.WheeshtFixtures.knockoutsVisible && window.WheeshtFixtures.knockoutsVisible(WC.meta)) {
-    return <window.KnockoutBracket onOpen={props.onOpen} />;
+  if (hubFeedBracketVisible()) {
+    return <window.KnockoutBracket embedded onOpen={props.onOpen} />;
   }
   return null;
 }
@@ -244,7 +244,7 @@ function DashboardScreen(props){
       </>}
       {window.ProjectedKnockoutBracket && window.Store && window.Store.projectedBracketVisible && window.Store.projectedBracketVisible() && <>
         <SectionHead aside="from group standings">Knockout bracket</SectionHead>
-        <window.ProjectedKnockoutBracket onOpen={props.goTracker}/>
+        <window.ProjectedKnockoutBracket embedded onOpen={props.goTracker}/>
       </>}
       <SectionHead>Matchday</SectionHead>
       <MatchdayCard/>
@@ -545,7 +545,7 @@ function TrackerScreen(){
       {!pre && window.GroupsDoneBanner && <window.GroupsDoneBanner />}
       {!pre && window.ProjectedKnockoutBracket && window.Store && window.Store.projectedBracketVisible && window.Store.projectedBracketVisible() && <>
         <SectionHead aside="from group standings">Knockout bracket</SectionHead>
-        <window.ProjectedKnockoutBracket />
+        <window.ProjectedKnockoutBracket embedded />
       </>}
       <div style={{height:12}}/>
       {pre

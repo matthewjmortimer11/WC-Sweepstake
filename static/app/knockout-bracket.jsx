@@ -189,6 +189,12 @@ function BracketPanel(props) {
     return kbFirstRound(rounds);
   });
   var roundAuto = kbRef(WCkb.meta.knockoutRound || null);
+  var listRound = (rounds[round] || []).length ? round : kbFirstRound(rounds);
+  kbEffect(function () {
+    if ((rounds[round] || []).length) return;
+    var first = kbFirstRound(rounds);
+    if (first !== round) setRound(first);
+  }, [round, hasTree, hasThird]);
   kbEffect(function () {
     var kr = WCkb.meta.knockoutRound;
     if (kr && kr !== roundAuto.current && rounds[kr] && rounds[kr].length) {
@@ -209,19 +215,30 @@ function BracketPanel(props) {
   var focusStage = WCkb.meta.knockoutRound || round;
   return (
     <Ckb>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10, gap: 8, flexWrap: 'wrap' }}>
-        <div>
-          <div className="dh" style={{ fontSize: 17 }}>{props.title || 'The bracket'}</div>
-          {props.subtitle && <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink2)', marginTop: 4, maxWidth: 420 }}>{props.subtitle}</div>}
+      {!props.embedded && (
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10, gap: 8, flexWrap: 'wrap' }}>
+          <div>
+            <div className="dh" style={{ fontSize: 17 }}>{props.title || 'The bracket'}</div>
+            {props.subtitle && <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink2)', marginTop: 4, maxWidth: 420 }}>{props.subtitle}</div>}
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            {layout && <div className="ko-bracket-view-toggle" role="tablist" aria-label="Bracket view">
+              <button type="button" role="tab" aria-selected={effectiveView === 'tree'} className={'ko-bracket-view-btn' + (effectiveView === 'tree' ? ' is-active' : '')} onClick={function () { setViewPref('tree'); }}>Tree</button>
+              <button type="button" role="tab" aria-selected={effectiveView === 'list'} className={'ko-bracket-view-btn' + (effectiveView === 'list' ? ' is-active' : '')} onClick={function () { setViewPref('list'); }}>By round</button>
+            </div>}
+            {props.onOpen && <button onClick={props.onOpen} style={{ background: 'none', border: 'none', color: 'var(--red)', fontWeight: 800, fontSize: 13, cursor: 'pointer', whiteSpace: 'nowrap' }}>All fixtures →</button>}
+          </div>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+      )}
+      {props.embedded && (layout || props.onOpen) && (
+        <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
           {layout && <div className="ko-bracket-view-toggle" role="tablist" aria-label="Bracket view">
             <button type="button" role="tab" aria-selected={effectiveView === 'tree'} className={'ko-bracket-view-btn' + (effectiveView === 'tree' ? ' is-active' : '')} onClick={function () { setViewPref('tree'); }}>Tree</button>
             <button type="button" role="tab" aria-selected={effectiveView === 'list'} className={'ko-bracket-view-btn' + (effectiveView === 'list' ? ' is-active' : '')} onClick={function () { setViewPref('list'); }}>By round</button>
           </div>}
           {props.onOpen && <button onClick={props.onOpen} style={{ background: 'none', border: 'none', color: 'var(--red)', fontWeight: 800, fontSize: 13, cursor: 'pointer', whiteSpace: 'nowrap' }}>All fixtures →</button>}
         </div>
-      </div>
+      )}
       <div style={{ display: 'flex', gap: 12, fontSize: 10.5, fontWeight: 700, color: 'var(--ink2)', marginBottom: 8, flexWrap: 'wrap' }}>
         <span><span style={{ display: 'inline-block', width: 10, height: 10, background: 'var(--yellow)', border: '2px solid var(--ink)', borderRadius: 2, verticalAlign: 'middle', marginRight: 4 }} /> Your team</span>
         <span><span style={{ display: 'inline-block', width: 10, height: 10, border: '2px solid var(--red)', borderRadius: 2, verticalAlign: 'middle', marginRight: 4 }} /> Entrant in tie</span>
@@ -235,7 +252,7 @@ function BracketPanel(props) {
               {(rounds.third || []).map(function (tie) { return <BracketCell key={tie.id} tie={tie} fromStandings={fromStandings} />; })}
             </div>}
           </React.Fragment>
-        : <BracketListView rounds={rounds} order={KB_LIST_ORDER} labels={labels} round={round} setRound={setRoundPref} fromStandings={fromStandings} />}
+        : <BracketListView rounds={rounds} order={KB_LIST_ORDER} labels={labels} round={listRound} setRound={setRoundPref} fromStandings={fromStandings} />}
     </Ckb>
   );
 }
@@ -274,7 +291,7 @@ function KnockoutBracket(props) {
   var rounds = (Skb && Skb.buildKnockoutBracket) ? Skb.buildKnockoutBracket() : {};
   var hasKo = KB_ROUND_ORDER.concat(['third']).some(function (k) { return (rounds[k] || []).length; });
   if (!hasKo) return null;
-  return <BracketPanel rounds={rounds} title="The bracket" onOpen={props.onOpen} />;
+  return <BracketPanel rounds={rounds} title="The bracket" embedded={props.embedded} onOpen={props.onOpen} />;
 }
 
 function ProjectedKnockoutBracket(props) {
@@ -288,6 +305,7 @@ function ProjectedKnockoutBracket(props) {
       title="Knockout bracket"
       subtitle="Round of 32 pairings from live group standings; later rounds from the feed as they publish. No winner picks — results only."
       fromStandings={true}
+      embedded={props.embedded}
       onOpen={props.onOpen}
     />
   );

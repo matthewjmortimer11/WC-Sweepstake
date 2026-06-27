@@ -84,6 +84,21 @@ def test_partial_r32_feed_merged_with_standings():
     assert feed_tie["winner"] is None
 
 
+def test_done_flag_without_status_sets_winner():
+    teams = [_team("AAA", "A", "+100"), _team("BBB", "B", "+500")]
+    fixtures = [
+        {
+            "id": "ko1", "a": "AAA", "b": "BBB", "stage": "r32",
+            "done": True, "score": [2, 1], "winner": "HOME",
+            "dateISO": "2026-07-01", "time": "20:00",
+        },
+    ]
+    proj = build_projected_bracket(teams, fixtures)
+    tie = proj["rounds"]["r32"][0]
+    assert tie["done"] is True
+    assert tie["winner"] == "AAA"
+
+
 def test_live_r32_has_no_projected_winner():
     teams = [_team("AAA", "A", "+100"), _team("BBB", "B", "+500")]
     fixtures = [

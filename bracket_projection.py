@@ -177,7 +177,7 @@ def _merge_r32_feed(
 
 def _resolve_tie(f: Dict[str, Any]) -> Dict[str, Any]:
     """Return tie dict with winner only when the fixture is finished."""
-    done = _norm_status(f.get("status")) == "done"
+    done = _norm_status(f.get("status")) == "done" or bool(f.get("done"))
     score = f.get("score")
     winner = _fixture_winner(f) if done else None
     out = dict(f)
