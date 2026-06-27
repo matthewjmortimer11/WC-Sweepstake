@@ -971,6 +971,8 @@ function AdminHealth() {
    const counts = health.fixtureCounts || {};
    const r32n = Number(counts.r32 || 0);
    const groupsDone = !!health.groupsComplete;
+   const syncAdapter = health.syncAdapter || 'unknown';
+   const syncErr = health.syncLastError;
    function age(ts) {
      if (!ts) return 'Not yet';
      const t = typeof ts === 'number' ? ts : new Date(ts).getTime();
@@ -1011,6 +1013,9 @@ function AdminHealth() {
            {[
              ['Last app sync', age(lastRefresh)],
              ['Fixture feed', health.updatedAt ? age(health.updatedAt) : 'Static fallback'],
+             ['Data adapter', syncAdapter],
+             ['Provider sync', health.syncLastAt ? age(health.syncLastAt) : 'Not yet'],
+             ['Poll interval', health.syncSleepSeconds ? Math.round(health.syncSleepSeconds / 60) + ' min' : '—'],
              ['Live / HT', String(live)],
              ['Need result', String(needs)],
              ['Finished', finished + '/' + total],
@@ -1026,6 +1031,12 @@ function AdminHealth() {
          </div>
          {needs > 0 && <div style={{ marginTop: 10, fontSize: 12, fontWeight: 800, color: 'var(--red)', lineHeight: 1.35 }}>
            {needs} fixture{needs === 1 ? '' : 's'} look past the match window without a final score. Check Results and enter/verify them.
+         </div>}
+         {syncErr && <div style={{ marginTop: 10, fontSize: 12, fontWeight: 800, color: 'var(--red)', lineHeight: 1.35 }}>
+           Last provider sync error: {syncErr}
+         </div>}
+         {syncAdapter === 'mock' && <div style={{ marginTop: 10, fontSize: 12, fontWeight: 800, color: 'var(--ink2)', lineHeight: 1.35 }}>
+           Mock adapter — set FOOTBALL_DATA_API_KEY on Railway for live scores.
          </div>}
          {groupsDone && r32n > 0 && r32n < 16 && <div style={{ marginTop: 10, fontSize: 12, fontWeight: 800, color: 'var(--red)', lineHeight: 1.35 }}>
            R32 bracket incomplete in the feed ({r32n}/16 ties). Eliminations may lag until all 16 publish.

@@ -478,6 +478,9 @@ function GroupRivalCard(props) {
   const above = G.ranked.find(r => r.pos === meRow.pos - 1);
   const below = G.ranked.find(r => r.pos === meRow.pos + 1);
   const throughKnockouts = (t.rounds >= 1) || (G.total > 0 && G.played >= G.total);
+  const groupsDone = G.total > 0 && G.played >= G.total;
+  const projOppCode = groupsDone && !throughKnockouts && Sd.projectedR32Opponent ? Sd.projectedR32Opponent(t.code) : null;
+  const projOpp = projOppCode ? WCd.TEAMS[projOppCode] : null;
   const koTie = throughKnockouts && Sd.nextFixtureForTeam ? Sd.nextFixtureForTeam(t.code) : null;
   const next = throughKnockouts ? null : G.fixtures.filter(f => (f.a === t.code || f.b === t.code) && comp.compFixturePlayable(f)).sort(comp.compFixtureSort)[0];
   const opp = next ? WCd.TEAMS[next.a === t.code ? next.b : next.a] : null;
@@ -511,6 +514,9 @@ function GroupRivalCard(props) {
       )}
       {!throughKnockouts && next && opp && <div style={{ marginTop: 10, fontSize: 12.2, fontWeight: 750, color: 'rgba(255,255,255,.72)', lineHeight: 1.35 }}>
         Next swing: {t.name} v {opp.name} · {next.dateLabel} {next.time}. This is where the table can move.
+      </div>}
+      {groupsDone && !throughKnockouts && projOpp && <div style={{ marginTop: 10, fontSize: 12.2, fontWeight: 750, color: 'rgba(255,255,255,.72)', lineHeight: 1.35 }}>
+        Groups done — projected R32: {t.name} v {projOpp.name} if standings hold.
       </div>}
     </Cd>
   );

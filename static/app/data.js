@@ -262,6 +262,17 @@
       return Object.keys(raw.rounds).some(function (k) { return (raw.rounds[k] || []).length > 0; });
     }
 
+    function projectedR32Opponent(teamCode) {
+      var rounds = (WC.projectedBracket && WC.projectedBracket.rounds) || {};
+      var ties = rounds.r32 || [];
+      for (var i = 0; i < ties.length; i++) {
+        var t = ties[i];
+        if (t.a === teamCode) return t.b;
+        if (t.b === teamCode) return t.a;
+      }
+      return null;
+    }
+
     function localTodayISO() {
       var d = new Date();
       var m = d.getMonth() + 1;
@@ -304,6 +315,7 @@
       buildKnockoutBracket: buildKnockoutBracket,
       buildProjectedKnockoutBracket: buildProjectedKnockoutBracket,
       projectedBracketVisible: projectedBracketVisible,
+      projectedR32Opponent: projectedR32Opponent,
       todaysEntrantFixtures: todaysEntrantFixtures,
       winnerSide: fixtureWinnerSide,
       teamProgressMax: teamProgressMax,

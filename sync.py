@@ -31,6 +31,20 @@ fixture_cache: list[dict] = []
 # can invalidate their own derived caches without hashing fixture rows.
 fixture_cache_revision: int = 0
 
+# Read by main.py for organiser/admin health UI.
+sync_status: dict[str, Any] = {
+    "adapter": "mock",
+    "lastSyncAt": None,
+    "lastError": None,
+    "fixtureCount": 0,
+    "sleepSeconds": 3600,
+    "cacheRevision": 0,
+}
+
+
+def set_sync_adapter(name: str) -> None:
+    sync_status["adapter"] = name
+
 # ── Date/time helpers ─────────────────────────────────────────────────────────
 _BST = timedelta(hours=1)
 _DOW = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
@@ -101,6 +115,8 @@ def _rebuild_cache(fixtures: list[CanonicalFixture]) -> None:
     frontend.sort(key=lambda d: (d["dateISO"], d["time"]))
     fixture_cache = frontend
     fixture_cache_revision += 1
+    sync_status["fixtureCount"] = len(frontend)
+    sync_status["cacheRevision"] = fixture_cache_revision
 
 
 async def _upsert(fixtures: list[CanonicalFixture], session) -> None:
@@ -213,6 +229,9 @@ async def start_sync(adapter, tournament_id: str, comp_code: str) -> None:
                 await _upsert(fixtures, session)
 
             sleep_seconds = _next_sleep(fixtures)
+            sync_status["lastSyncAt"] = datetime.now(tz=timezone.utc).isoformat()
+            sync_status["lastError"] = None
+            sync_status["sleepSeconds"] = sleep_seconds
             log.info(
                 "Cache updated (%d fixtures). Next sync in %ds.",
                 len(fixtures), sleep_seconds,
@@ -222,6 +241,7 @@ async def start_sync(adapter, tournament_id: str, comp_code: str) -> None:
             log.info("Sync worker cancelled — shutting down.")
             raise
         except Exception as exc:
+            sync_status["lastError"] = str(exc)
             log.error("Sync error: %s — retrying in %ds", exc, sleep_seconds)
 
         try:

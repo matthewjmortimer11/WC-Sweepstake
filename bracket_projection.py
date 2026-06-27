@@ -13,6 +13,7 @@ import re
 from typing import Any, Dict, List, Optional, Tuple
 
 import standings
+from bracket_slots import build_r32_ties_from_standings
 from qualification.engine import (
     Fixture,
     Team,
@@ -130,12 +131,24 @@ def _projected_qualifiers(
     return out[:32]
 
 
-def _synth_r32_ties(qualifiers: List[str]) -> List[Dict[str, Any]]:
-    ties: List[Dict[str, Any]] = []
+def _synth_r32_ties(
+    teams: List[Dict[str, Any]],
+    fixtures: List[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    ties = build_r32_ties_from_standings(
+        teams, fixtures,
+        to_qual_team=_to_qual_team,
+        to_qual_fixture=_to_qual_fixture,
+    )
+    if ties:
+        return ties
+    # Fallback if group tables aren't ready yet.
+    qualifiers = _projected_qualifiers(teams, fixtures)
+    legacy: List[Dict[str, Any]] = []
     for i in range(0, min(len(qualifiers), 32), 2):
         if i + 1 >= len(qualifiers):
             break
-        ties.append({
+        legacy.append({
             "id": f"proj-r32-{i // 2}",
             "a": qualifiers[i],
             "b": qualifiers[i + 1],
@@ -145,7 +158,7 @@ def _synth_r32_ties(qualifiers: List[str]) -> List[Dict[str, Any]]:
             "winner": None,
             "projectedPairing": True,
         })
-    return ties
+    return legacy
 
 
 def _synth_next_round(prev: List[Dict[str, Any]], stage: str) -> List[Dict[str, Any]]:
@@ -217,7 +230,7 @@ def build_projected_bracket(
 
         feed = feed_ko.get(stage) or []
         if stage == "r32" and not feed:
-            feed = _synth_r32_ties(qualifiers)
+            feed = _synth_r32_ties(teams, fixtures)
         elif not feed and prev_stage and prev_stage in rounds:
             feed = _synth_next_round(rounds[prev_stage], stage)
             if not feed and stage == "final" and len(rounds[prev_stage]) == 1:
@@ -240,3 +253,17 @@ def build_projected_bracket(
         "qualifierCount": len(qualifiers),
         "source": "standings",
     }
+
+
+def projected_r32_opponent(
+    team_code: str,
+    teams: List[Dict[str, Any]],
+    fixtures: List[Dict[str, Any]],
+) -> Optional[str]:
+    """Projected Round of 32 opponent from current group standings."""
+    for tie in _synth_r32_ties(teams, fixtures):
+        if tie.get("a") == team_code:
+            return tie.get("b")
+        if tie.get("b") == team_code:
+            return tie.get("a")
+    return None

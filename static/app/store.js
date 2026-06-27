@@ -1323,7 +1323,16 @@
         groupsComplete: !!meta.groupsComplete,
         r32Published: !!meta.r32Published,
         knockoutsInFeed: !!meta.knockoutsInFeed,
+        syncAdapter: meta.syncAdapter || null,
+        syncLastAt: meta.syncLastAt || null,
+        syncLastError: meta.syncLastError || null,
+        syncSleepSeconds: Number(meta.syncSleepSeconds || 0),
+        syncFixtureCount: Number(meta.syncFixtureCount || 0),
       };
+    },
+    projectedR32Opponent: function (code) {
+      var fx = window.WheeshtFixtures;
+      return fx && fx.projectedR32Opponent ? fx.projectedR32Opponent(code) : null;
     },
     nextFixtureForTeam: function (code) {
       var fx = window.WheeshtFixtures;

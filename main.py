@@ -769,6 +769,7 @@ def _league_state(league: League, league_people: List[Dict[str, Any]], admin: Di
     meta["hiddenPredictions"] = list(admin_meta.get("hiddenPredictions") or [])
     meta.update(_pro_meta(league))
     meta.update(_fixture_health(fixtures))
+    meta.update(_sync_meta())
     data["meta"] = meta
     data["pot"] = len(people) * fee
     data["charitySplit"] = meta["charitySplit"]
@@ -793,6 +794,17 @@ def _status_is_live(status: Any) -> bool:
     return str(status or "").strip().lower() in {
         "live", "halftime", "half_time", "half-time", "inplay", "in_play",
         "in-progress", "inprogress", "paused", "ht", "1h", "2h",
+    }
+
+
+def _sync_meta() -> Dict[str, Any]:
+    st = sync.sync_status
+    return {
+        "syncAdapter": st.get("adapter"),
+        "syncLastAt": st.get("lastSyncAt"),
+        "syncLastError": st.get("lastError"),
+        "syncSleepSeconds": st.get("sleepSeconds"),
+        "syncFixtureCount": st.get("fixtureCount"),
     }
 
 
@@ -915,6 +927,7 @@ def _base_state() -> Dict[str, Any]:
     meta["out"] = 0
     meta["currency"] = "£"
     meta.update(_fixture_health(data.get("fixtures") or []))
+    meta.update(_sync_meta())
     stage_labels = dict(_wc_data["meta"].get("stageLabels") or {})
     phase = meta.get("phase") or "pre"
     meta.update(_tournament_fixture_meta(
@@ -1084,10 +1097,12 @@ async def lifespan(app: FastAPI):
     if api_key:
         from adapters.football_data_org import FootballDataOrgAdapter
         adapter = FootballDataOrgAdapter(api_key)
+        sync.set_sync_adapter("football-data.org")
         log.info("Using FootballDataOrgAdapter")
     else:
         from adapters.mock import MockAdapter
         adapter = MockAdapter()
+        sync.set_sync_adapter("mock")
         log.warning("FOOTBALL_DATA_API_KEY not set — using MockAdapter (no live data)")
 
     task = asyncio.create_task(

@@ -9,6 +9,7 @@ const { useState: kbState, useEffect: kbEffect, useRef: kbRef } = React;
 
 var KB_ROUND_ORDER = ['r32', 'r16', 'qf', 'sf', 'final'];
 var KB_LIST_ORDER = ['r32', 'r16', 'qf', 'sf', 'final', 'third'];
+var KB_PREFS_KEY = 'wc-ko-bracket-prefs';
 var KB_CELL_H = 46;
 var KB_COL_W = 128;
 var KB_GAP_W = 32;
@@ -138,14 +139,34 @@ function BracketTreeView(props) {
   );
 }
 
+function kbLoadPrefs(scope) {
+  try {
+    var raw = localStorage.getItem(KB_PREFS_KEY);
+    var all = raw ? JSON.parse(raw) : {};
+    return all[scope] || {};
+  } catch (e) { return {}; }
+}
+
+function kbSavePrefs(scope, partial) {
+  try {
+    var raw = localStorage.getItem(KB_PREFS_KEY);
+    var all = raw ? JSON.parse(raw) : {};
+    all[scope] = Object.assign({}, all[scope] || {}, partial);
+    localStorage.setItem(KB_PREFS_KEY, JSON.stringify(all));
+  } catch (e) { /* ignore */ }
+}
+
 function BracketPanel(props) {
   var rounds = props.rounds || {};
   var labels = props.labels || (WCkb.meta && WCkb.meta.stageLabels) || {};
+  var prefScope = props.projected ? 'projected' : 'feed';
+  var prefs = kbLoadPrefs(prefScope);
   var hasTree = KB_ROUND_ORDER.some(function (k) { return (rounds[k] || []).length; });
   var hasThird = (rounds.third || []).length > 0;
   var layout = hasTree ? kbLayoutTree(rounds) : null;
-  var [view, setView] = kbState(layout ? 'tree' : 'list');
+  var [view, setView] = kbState(prefs.view || (layout ? 'tree' : 'list'));
   var [round, setRound] = kbState(function () {
+    if (prefs.round && rounds[prefs.round] && rounds[prefs.round].length) return prefs.round;
     var kr = WCkb.meta.knockoutRound;
     return kr && rounds[kr] && rounds[kr].length ? kr : (KB_ROUND_ORDER.find(function (k) { return (rounds[k] || []).length; }) || 'r32');
   });
@@ -155,8 +176,17 @@ function BracketPanel(props) {
     if (kr && kr !== roundAuto.current && rounds[kr] && rounds[kr].length) {
       setRound(kr);
       roundAuto.current = kr;
+      kbSavePrefs(prefScope, { round: kr });
     }
   }, [WCkb.meta.knockoutRound]);
+  function setViewPref(v) {
+    setView(v);
+    kbSavePrefs(prefScope, { view: v });
+  }
+  function setRoundPref(r) {
+    setRound(r);
+    kbSavePrefs(prefScope, { round: r });
+  }
   if (!hasTree && !hasThird) return null;
   var focusStage = WCkb.meta.knockoutRound || round;
   return (
@@ -168,8 +198,8 @@ function BracketPanel(props) {
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           {layout && <div className="ko-bracket-view-toggle" role="tablist" aria-label="Bracket view">
-            <button type="button" role="tab" aria-selected={view === 'tree'} className={'ko-bracket-view-btn' + (view === 'tree' ? ' is-active' : '')} onClick={function () { setView('tree'); }}>Tree</button>
-            <button type="button" role="tab" aria-selected={view === 'list'} className={'ko-bracket-view-btn' + (view === 'list' ? ' is-active' : '')} onClick={function () { setView('list'); }}>By round</button>
+            <button type="button" role="tab" aria-selected={view === 'tree'} className={'ko-bracket-view-btn' + (view === 'tree' ? ' is-active' : '')} onClick={function () { setViewPref('tree'); }}>Tree</button>
+            <button type="button" role="tab" aria-selected={view === 'list'} className={'ko-bracket-view-btn' + (view === 'list' ? ' is-active' : '')} onClick={function () { setViewPref('list'); }}>By round</button>
           </div>}
           {props.onOpen && <button onClick={props.onOpen} style={{ background: 'none', border: 'none', color: 'var(--red)', fontWeight: 800, fontSize: 13, cursor: 'pointer', whiteSpace: 'nowrap' }}>All fixtures →</button>}
         </div>
@@ -187,7 +217,7 @@ function BracketPanel(props) {
               {(rounds.third || []).map(function (tie) { return <BracketCell key={tie.id} tie={tie} projected={props.projected} />; })}
             </div>}
           </React.Fragment>
-        : <BracketListView rounds={rounds} order={KB_LIST_ORDER} labels={labels} round={round} setRound={setRound} projected={props.projected} />}
+        : <BracketListView rounds={rounds} order={KB_LIST_ORDER} labels={labels} round={round} setRound={setRoundPref} projected={props.projected} />}
     </Ckb>
   );
 }

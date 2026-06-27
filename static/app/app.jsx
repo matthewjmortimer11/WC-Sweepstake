@@ -878,6 +878,30 @@ function App(){
     return unsub;
   },[flow,me&&me.id]); // eslint-disable-line
 
+  /* ---- Toast when user's team advances to a new knockout stage ---- */
+  aEffect(function(){
+    if(flow!=='app'||!me||!me.team) return;
+    var code = me.team;
+    var t0 = A_WC.TEAMS[code] || {};
+    var prevStage = t0.stage || 'group';
+    var ready = false;
+    var unsub = A_S.subscribe(function(){
+      var t = A_WC.TEAMS[code];
+      if(!t) return;
+      if(!ready){ prevStage = t.stage || 'group'; ready = true; return; }
+      var st = t.stage || 'group';
+      if(st !== prevStage && st !== 'group' && st !== 'out-group' && st !== 'out' && t.alive !== false){
+        var labels = { r32: 'Round of 32', r16: 'Round of 16', qf: 'Quarter-finals', sf: 'Semi-finals', final: 'the Final', winner: 'champions' };
+        var lbl = labels[st] || st;
+        var tn = t.name || code;
+        window.wcToast && window.wcToast(tn + (st === 'winner' ? ' are ' : ' are into ') + lbl + '.', st === 'winner' ? 'celebrating' : 'confident');
+        if(st === 'winner' || st === 'final') window.wcConfetti && window.wcConfetti({ y: .35, count: 90 });
+      }
+      prevStage = st;
+    });
+    return unsub;
+  },[flow,me&&me.id]); // eslint-disable-line
+
   /* ---- Toast when sweepstake elimination flips ---- */
   aEffect(function(){
     if(flow!=='app'||!me||!me.team) return;
