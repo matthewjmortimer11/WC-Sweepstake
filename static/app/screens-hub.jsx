@@ -524,6 +524,7 @@ function TrackerScreen(){
         </div>
       </div>
       {pre ? <FieldCard/> : <StageFunnel/>}
+      {!pre && window.GroupsDoneBanner && <window.GroupsDoneBanner />}
       <div style={{height:12}}/>
       {pre
         ? (function(){

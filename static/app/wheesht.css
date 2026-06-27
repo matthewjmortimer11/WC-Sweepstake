@@ -55,3 +55,77 @@
   cursor: pointer;
   box-shadow: var(--wc-shadow-sm);
 }
+
+/* Knockout bracket tree */
+.ko-bracket-scroll {
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  margin: 0 -4px;
+  padding: 4px 4px 8px;
+}
+.ko-bracket-canvas {
+  min-width: 100%;
+}
+.ko-bracket-svg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  z-index: 0;
+}
+.ko-bracket-col {
+  position: absolute;
+  top: 0;
+  z-index: 1;
+}
+.ko-bracket-col-label {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--ink2);
+  margin-bottom: 6px;
+  white-space: nowrap;
+}
+.ko-bracket-slot {
+  position: absolute;
+  left: 0;
+  width: 100%;
+}
+.ko-bracket-cell {
+  position: relative;
+}
+.ko-bracket-entrant-dot {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--red);
+}
+.ko-bracket-view-toggle {
+  display: inline-flex;
+  border: 2px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+  background: #fff;
+}
+.ko-bracket-view-btn {
+  border: none;
+  background: transparent;
+  font-family: var(--body);
+  font-size: 11px;
+  font-weight: 800;
+  padding: 6px 10px;
+  cursor: pointer;
+  color: var(--ink2);
+}
+.ko-bracket-view-btn.is-active {
+  background: var(--yellow);
+  color: var(--ink);
+}
+.ko-bracket-view-btn + .ko-bracket-view-btn {
+  border-left: 2px solid var(--line);
+}

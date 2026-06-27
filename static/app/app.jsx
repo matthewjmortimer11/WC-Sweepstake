@@ -842,11 +842,17 @@ function App(){
         const oCode=f.a===myCode?f.b:f.a, oTeam=A_WC.TEAMS[oCode];
         const oname=oTeam?oTeam.name:oCode;
         if(won){
-          const lines=[
+          var isGroup = !f.stage || f.stage === 'group';
+          const lines = isGroup ? [
             [tflag+' '+tname+' win! Get in. Wheesht is noting your quiet celebration.','celebrating'],
             [tname+' take three points. Your day just got better. Wheesht acknowledges this.','confident'],
             [tname+' beat '+oname+'. The pot gets a little closer. Wheesht is watching.','confident'],
             ['Three points for '+tname+'! Wheesht approves. Quietly. Very quietly.','happy'],
+          ] : [
+            [tflag+' '+tname+' win! Through to the next round. Wheesht is noting your quiet celebration.','celebrating'],
+            [tname+' beat '+oname+' in the knockouts. The pot gets a little closer.','confident'],
+            [tname+' are through. One step closer. Wheesht is watching.','confident'],
+            [tname+' into the next round. Wheesht approves. Quietly.','happy'],
           ];
           const pick=lines[(Math.random()*lines.length)|0];
           window.wcToast&&window.wcToast(pick[0],pick[1]);

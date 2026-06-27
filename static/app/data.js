@@ -214,8 +214,15 @@
       return rounds;
     }
 
+    function localTodayISO() {
+      var d = new Date();
+      var m = d.getMonth() + 1;
+      var day = d.getDate();
+      return d.getFullYear() + '-' + (m < 10 ? '0' : '') + m + '-' + (day < 10 ? '0' : '') + day;
+    }
+
     function todaysEntrantFixtures() {
-      var today = new Date().toISOString().slice(0, 10);
+      var today = localTodayISO();
       return (WC.FIXTURES || []).filter(function (f) {
         if (f.dateISO !== today) return false;
         if (fixtureDone(f)) return false;

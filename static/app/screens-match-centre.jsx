@@ -356,7 +356,9 @@ function NextHero(props) {
 /* ---- screen ------------------------------------------------------------- */
 function MatchCentreScreen() {
   const me = Smc ? Smc.active() : null;
-  const [filter, setFilter] = mcState('all');
+  const [filter, setFilter] = mcState(function () {
+    return (WCmc.meta && WCmc.meta.r32Published) ? 'knockouts' : 'all';
+  });
   const [wiFixture, setWiFixture] = mcState(null);
   const owned = mcOwned();
   const all = (WCmc.FIXTURES || []).slice();
@@ -394,11 +396,19 @@ function MatchCentreScreen() {
   else if (filter === 'knockouts') list = list.filter(f => f.stage && f.stage !== 'group');
 
   const byDate = []; const seen = {};
+  const inKnockouts = !!(WCmc.meta && (WCmc.meta.r32Published || WCmc.meta.knockoutRound));
   if (filter === 'knockouts') {
     list.sort(function (a, b) {
       var ra = mcStageRank(a.stage || 'group');
       var rb = mcStageRank(b.stage || 'group');
       if (ra !== rb) return rb - ra;
+      return (mcKickoffMs(a) || 0) - (mcKickoffMs(b) || 0);
+    });
+  } else if (filter === 'all' && inKnockouts) {
+    list.sort(function (a, b) {
+      var ka = (a.stage && a.stage !== 'group') ? 1 : 0;
+      var kb = (b.stage && b.stage !== 'group') ? 1 : 0;
+      if (ka !== kb) return kb - ka;
       return (mcKickoffMs(a) || 0) - (mcKickoffMs(b) || 0);
     });
   }

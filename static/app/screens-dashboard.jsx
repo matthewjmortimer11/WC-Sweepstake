@@ -651,65 +651,6 @@ function GroupsDoneBanner() {
   );
 }
 
-function BracketRow(props) {
-  const tie = props.tie;
-  const A = tie.teamA || { code: tie.a, flag: '🏳️', name: tie.a };
-  const B = tie.teamB || { code: tie.b, flag: '🏳️', name: tie.b };
-  const aw = tie.done && tie.winner === tie.a;
-  const bw = tie.done && tie.winner === tie.b;
-  function Row(p) {
-    return (
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, opacity: p.lose ? .45 : 1 }}>
-        <Fd team={p.team} size={18} />
-        <span style={{ fontSize: 11.5, fontWeight: 700, flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textDecoration: p.lose ? 'line-through' : 'none' }}>{p.team.code}</span>
-        {p.score != null && <span className="dh" style={{ fontSize: 14 }}>{p.score}</span>}
-      </div>
-    );
-  }
-  return (
-    <div style={{ border: tie.you ? '2.5px solid var(--ink)' : '2px solid var(--line)', borderRadius: 12, padding: '7px 9px', background: tie.you ? 'var(--yellow)' : '#fff' }}>
-      <Row team={A} score={tie.done && tie.score ? tie.score[0] : null} lose={bw} />
-      <div style={{ height: 4 }} />
-      <Row team={B} score={tie.done && tie.score ? tie.score[1] : null} lose={aw} />
-      {tie.pens && <div style={{ fontSize: 9.5, fontWeight: 800, color: 'var(--ink2)', marginTop: 4 }}>Decided on pens</div>}
-    </div>
-  );
-}
-
-function KnockoutBracket(props) {
-  const rounds = (Sd && Sd.buildKnockoutBracket) ? Sd.buildKnockoutBracket() : {};
-  const order = ['r32', 'r16', 'qf', 'sf', 'final'];
-  const labels = (WCd.meta && WCd.meta.stageLabels) || {};
-  const [round, setRound] = dState(function () {
-    var kr = WCd.meta.knockoutRound;
-    return kr && rounds[kr] && rounds[kr].length ? kr : (order.find(function (k) { return (rounds[k] || []).length; }) || 'r32');
-  });
-  const ties = rounds[round] || [];
-  if (!WCd.meta.r32Published || !ties.length) return null;
-  return (
-    <Cd>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-        <div className="dh" style={{ fontSize: 17 }}>The bracket</div>
-        {props.onOpen && <button onClick={props.onOpen} style={{ background: 'none', border: 'none', color: 'var(--red)', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>All fixtures →</button>}
-      </div>
-      <div style={{ display: 'flex', gap: 6, overflowX: 'auto', marginBottom: 10 }}>
-        {order.map(function (k) {
-          if (!(rounds[k] || []).length) return null;
-          return (
-            <button key={k} onClick={function () { setRound(k); }} className="wc-btn wc-btn--sm"
-              style={{ flex: '0 0 auto', background: round === k ? 'var(--yellow)' : '#fff', boxShadow: round === k ? '0 3px 0 var(--ink)' : '0 3px 0 var(--shadow)' }}>
-              {labels[k] || k.toUpperCase()}
-            </button>
-          );
-        })}
-      </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-        {ties.map(function (tie) { return <BracketRow key={tie.id} tie={tie} />; })}
-      </div>
-    </Cd>
-  );
-}
-
 function MeScreen(props) {
   const me = Sd.active();
   const [edit, setEdit] = dState(false);
@@ -727,9 +668,9 @@ function MeScreen(props) {
       </Saysd>
       <SHd>Your team</SHd>
       <TeamCard me={me} onGames={props.goGames} onPredictions={props.goPredictions} />
-      {WCd.meta.r32Published && <>
+      {WCd.meta.r32Published && window.KnockoutBracket && <>
         <SHd aside="from the feed">Knockouts</SHd>
-        <KnockoutBracket onOpen={props.goGames} />
+        <window.KnockoutBracket onOpen={props.goGames} />
       </>}
       <SHd aside="who to beat">Your group</SHd>
       <GroupRivalCard me={me} onOpen={props.goGroup} />
@@ -745,4 +686,4 @@ function MeScreen(props) {
 }
 
 window.MeScreen = MeScreen;
-window.KnockoutBracket = KnockoutBracket;
+window.GroupsDoneBanner = GroupsDoneBanner;
