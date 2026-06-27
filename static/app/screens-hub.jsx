@@ -167,7 +167,7 @@ function MatchdayCard(){
 }
 
 function BracketSnapshot(props){
-  if (window.KnockoutBracket && WC.meta && WC.meta.r32Published) {
+  if (window.KnockoutBracket && window.WheeshtFixtures && window.WheeshtFixtures.knockoutsVisible && window.WheeshtFixtures.knockoutsVisible(WC.meta)) {
     return <window.KnockoutBracket onOpen={props.onOpen} />;
   }
   return null;

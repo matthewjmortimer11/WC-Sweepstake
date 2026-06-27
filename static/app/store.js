@@ -177,6 +177,7 @@
       fixtureCounts: WC.meta.fixtureCounts || {},
       groupsComplete: WC.meta.groupsComplete,
       r32Published: WC.meta.r32Published,
+      knockoutsInFeed: WC.meta.knockoutsInFeed,
       knockoutRound: WC.meta.knockoutRound || null,
     },
   };
@@ -209,6 +210,7 @@
     if (BASE.meta.fixtureCounts) WC.meta.fixtureCounts = BASE.meta.fixtureCounts;
     if (BASE.meta.groupsComplete != null) WC.meta.groupsComplete = BASE.meta.groupsComplete;
     if (BASE.meta.r32Published != null) WC.meta.r32Published = BASE.meta.r32Published;
+    if (BASE.meta.knockoutsInFeed != null) WC.meta.knockoutsInFeed = BASE.meta.knockoutsInFeed;
     if (BASE.meta.knockoutRound) WC.meta.knockoutRound = BASE.meta.knockoutRound;
     WC.meta.teamsLeft = WC.TEAM_LIST.filter(function (t) { return t.alive; }).length;
     WC.meta.includeDepartment = !admin.meta || admin.meta.includeDepartment !== false;
@@ -1076,6 +1078,7 @@
           BASE.meta.fixtureCounts = WC.meta.fixtureCounts;
           BASE.meta.groupsComplete = WC.meta.groupsComplete;
           BASE.meta.r32Published = WC.meta.r32Published;
+          BASE.meta.knockoutsInFeed = WC.meta.knockoutsInFeed;
           BASE.meta.knockoutRound = WC.meta.knockoutRound;
           lastRefreshAt = Date.now();
           if (LIVE) applyAdmin();
@@ -1319,6 +1322,7 @@
         fixtureCounts: meta.fixtureCounts || {},
         groupsComplete: !!meta.groupsComplete,
         r32Published: !!meta.r32Published,
+        knockoutsInFeed: !!meta.knockoutsInFeed,
       };
     },
     nextFixtureForTeam: function (code) {

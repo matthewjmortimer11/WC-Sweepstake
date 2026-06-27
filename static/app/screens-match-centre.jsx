@@ -17,6 +17,12 @@ const Smc = window.Store;
 const { Card: Cmc, Btn: Bmc, Flag: Fmc, Chip: Chmc, WheeshtSays: Saysmc, SectionHead: SHmc } = window;
 const { useState: mcState, useEffect: mcEffect, useRef: mcRef } = React;
 
+function mcKnockoutsVisible() {
+  return window.WheeshtFixtures && window.WheeshtFixtures.knockoutsVisible
+    ? window.WheeshtFixtures.knockoutsVisible(WCmc.meta)
+    : !!(WCmc.meta && WCmc.meta.r32Published);
+}
+
 function mcTeam(code) { return WCmc.TEAMS[code] || { code: code || 'TBD', name: code || 'To be decided', flag: '🏳️', group: '?' }; }
 function mcName(code) { return mcTeam(code).name; }
 function mcHasScore(f) { return !!(f && f.score && f.score[0] != null && f.score[1] != null); }
@@ -357,7 +363,7 @@ function NextHero(props) {
 function MatchCentreScreen() {
   const me = Smc ? Smc.active() : null;
   const [filter, setFilter] = mcState(function () {
-    return (WCmc.meta && WCmc.meta.r32Published) ? 'knockouts' : 'all';
+    return mcKnockoutsVisible() ? 'knockouts' : 'all';
   });
   const [wiFixture, setWiFixture] = mcState(null);
   const owned = mcOwned();
@@ -401,7 +407,7 @@ function MatchCentreScreen() {
   else if (filter === 'knockouts') list = list.filter(f => f.stage && f.stage !== 'group');
 
   const byDate = []; const seen = {};
-  const inKnockouts = !!(WCmc.meta && (WCmc.meta.r32Published || WCmc.meta.knockoutRound));
+  const inKnockouts = mcKnockoutsVisible() || !!(WCmc.meta && WCmc.meta.knockoutRound);
   if (filter === 'knockouts') {
     list.sort(function (a, b) {
       var ra = mcStageRank(a.stage || 'group');
@@ -424,8 +430,8 @@ function MatchCentreScreen() {
 
   const doneCount = all.filter(f => mcStatus(f) === 'done').length;
   const filters = [['all', 'All'], ['mine', 'My team'], ['owned', 'In the draw'], ['upcoming', 'Upcoming'], ['done', 'Finished']];
-  if (WCmc.meta && WCmc.meta.r32Published) filters.splice(1, 0, ['knockouts', 'Knockouts']);
-  if (needsResultList.length) filters.splice(WCmc.meta && WCmc.meta.r32Published ? 4 : 3, 0, ['needsResult', 'Needs result']);
+  if (mcKnockoutsVisible()) filters.splice(1, 0, ['knockouts', 'Knockouts']);
+  if (needsResultList.length) filters.splice(mcKnockoutsVisible() ? 4 : 3, 0, ['needsResult', 'Needs result']);
 
   return (
     <React.Fragment>
@@ -441,7 +447,7 @@ function MatchCentreScreen() {
         </div>
       </div>
 
-      {WCmc.meta && WCmc.meta.r32Published && window.KnockoutBracket &&
+      {mcKnockoutsVisible() && window.KnockoutBracket &&
         <div style={{ marginBottom: 12 }}>
           <window.KnockoutBracket />
         </div>}

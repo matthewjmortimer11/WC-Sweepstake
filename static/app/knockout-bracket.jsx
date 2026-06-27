@@ -179,7 +179,7 @@ function KnockoutBracket(props) {
       roundAuto.current = kr;
     }
   }, [WCkb.meta.knockoutRound]);
-  if (!WCkb.meta.r32Published || (!hasTree && !hasThird) || (!layout && !hasThird)) return null;
+  if (!(window.WheeshtFixtures && window.WheeshtFixtures.knockoutsVisible && window.WheeshtFixtures.knockoutsVisible(WCkb.meta)) || (!hasTree && !hasThird) || (!layout && !hasThird)) return null;
   var focusStage = WCkb.meta.knockoutRound || round;
   return (
     <Ckb>

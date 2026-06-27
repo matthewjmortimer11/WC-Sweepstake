@@ -477,7 +477,9 @@ function GroupRivalCard(props) {
   if (!meRow) return null;
   const above = G.ranked.find(r => r.pos === meRow.pos - 1);
   const below = G.ranked.find(r => r.pos === meRow.pos + 1);
-  const next = G.fixtures.filter(f => (f.a === t.code || f.b === t.code) && comp.compFixturePlayable(f)).sort(comp.compFixtureSort)[0];
+  const throughKnockouts = (t.rounds >= 1) || (G.total > 0 && G.played >= G.total);
+  const koTie = throughKnockouts && Sd.nextFixtureForTeam ? Sd.nextFixtureForTeam(t.code) : null;
+  const next = throughKnockouts ? null : G.fixtures.filter(f => (f.a === t.code || f.b === t.code) && comp.compFixturePlayable(f)).sort(comp.compFixtureSort)[0];
   const opp = next ? WCd.TEAMS[next.a === t.code ? next.b : next.a] : null;
   const gapAbove = above ? Math.max(0, above.Pts - meRow.Pts) : 0;
   const gapBelow = below ? Math.max(0, meRow.Pts - below.Pts) : 0;
@@ -485,12 +487,14 @@ function GroupRivalCard(props) {
     <Cd bordered style={{ background: 'var(--ink)', color: '#fff' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
         <div>
-          <div style={{ fontSize: 10.5, fontWeight: 900, letterSpacing: '.07em', color: 'var(--yellow)', textTransform: 'uppercase' }}>Group {t.group} pressure</div>
+          <div style={{ fontSize: 10.5, fontWeight: 900, letterSpacing: '.07em', color: 'var(--yellow)', textTransform: 'uppercase' }}>
+            {throughKnockouts ? 'Knockout pressure' : ('Group ' + t.group + ' pressure')}
+          </div>
           <div className="dh" style={{ fontSize: 24, color: '#fff', lineHeight: 1, marginTop: 3 }}>#{meRow.pos}<span style={{ fontSize: 13, color: 'rgba(255,255,255,.55)' }}>/{G.ranked.length}</span> · {G.hasResults ? meRow.Pts + ' pts' : 'awaiting kick-off'}</div>
         </div>
-        <button onClick={props.onOpen} className="wc-btn wc-btn--sm" style={{ flex: '0 0 auto', background: 'var(--yellow)', boxShadow: '0 3px 0 #000' }}>Open group</button>
+        <button onClick={throughKnockouts ? props.onGames : props.onOpen} className="wc-btn wc-btn--sm" style={{ flex: '0 0 auto', background: 'var(--yellow)', boxShadow: '0 3px 0 #000' }}>{throughKnockouts ? 'Match centre' : 'Open group'}</button>
       </div>
-      {(above || below) && <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 12 }}>
+      {!throughKnockouts && (above || below) && <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 12 }}>
         <div style={{ background: 'rgba(255,255,255,.1)', borderRadius: 12, padding: '9px 10px' }}>
           <div style={{ fontSize: 9.5, fontWeight: 900, letterSpacing: '.05em', color: '#ffb3b4' }}>TO CATCH</div>
           <div style={{ fontSize: 13, fontWeight: 850, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{above ? above.team.name + ' +' + gapAbove : 'Nobody'}</div>
@@ -500,7 +504,12 @@ function GroupRivalCard(props) {
           <div style={{ fontSize: 13, fontWeight: 850, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{below ? below.team.name + (gapBelow ? ' -' + gapBelow : ' level') : 'Nobody'}</div>
         </div>
       </div>}
-      {next && opp && <div style={{ marginTop: 10, fontSize: 12.2, fontWeight: 750, color: 'rgba(255,255,255,.72)', lineHeight: 1.35 }}>
+      {throughKnockouts && koTie && koTie.fixture && koTie.opponent && t.alive && (
+        <div style={{ marginTop: 10, fontSize: 12.2, fontWeight: 750, color: 'rgba(255,255,255,.72)', lineHeight: 1.35 }}>
+          {koTie.isLive ? '● LIVE · ' : 'Next tie: '}{koTie.stageLabel} — {t.name} v {koTie.opponent.name} · {koTie.fixture.dateLabel} {koTie.fixture.time}.
+        </div>
+      )}
+      {!throughKnockouts && next && opp && <div style={{ marginTop: 10, fontSize: 12.2, fontWeight: 750, color: 'rgba(255,255,255,.72)', lineHeight: 1.35 }}>
         Next swing: {t.name} v {opp.name} · {next.dateLabel} {next.time}. This is where the table can move.
       </div>}
     </Cd>
@@ -633,20 +642,31 @@ function ActivityFeed(props) {
   );
 }
 
+function knockoutsVisible() {
+  if (window.WheeshtFixtures && window.WheeshtFixtures.knockoutsVisible) {
+    return window.WheeshtFixtures.knockoutsVisible(WCd.meta);
+  }
+  return !!(WCd.meta && WCd.meta.r32Published);
+}
+
 function GroupsDoneBanner() {
   if (!WCd.meta.groupsComplete || PRE()) return null;
-  if (!WCd.meta.r32Published) {
+  if (knockoutsVisible()) {
     return (
-      <Cd bordered style={{ background: 'var(--yellow)', marginBottom: 12 }}>
-        <div className="dh" style={{ fontSize: 17 }}>Groups done</div>
-        <div style={{ fontSize: 13, fontWeight: 600, marginTop: 4 }}>Waiting on the Round of 32 draw in the feed — bracket appears when all 16 ties land.</div>
+      <Cd bordered style={{ background: 'var(--ink)', color: '#fff', marginBottom: 12 }}>
+        <div className="dh" style={{ fontSize: 17, color: 'var(--yellow)' }}>Knockout stage</div>
+        <div style={{ fontSize: 13, fontWeight: 600, marginTop: 4, color: 'rgba(255,255,255,.85)' }}>
+          {WCd.meta.r32Published
+            ? 'Groups complete — 32 through to the knockouts. No second chances from here.'
+            : 'Knockout fixtures are in the feed — bracket updates as more ties publish.'}
+        </div>
       </Cd>
     );
   }
   return (
-    <Cd bordered style={{ background: 'var(--ink)', color: '#fff', marginBottom: 12 }}>
-      <div className="dh" style={{ fontSize: 17, color: 'var(--yellow)' }}>Knockout stage</div>
-      <div style={{ fontSize: 13, fontWeight: 600, marginTop: 4, color: 'rgba(255,255,255,.85)' }}>Groups complete — 32 through to the knockouts. No second chances from here.</div>
+    <Cd bordered style={{ background: 'var(--yellow)', marginBottom: 12 }}>
+      <div className="dh" style={{ fontSize: 17 }}>Groups done</div>
+      <div style={{ fontSize: 13, fontWeight: 600, marginTop: 4 }}>Waiting on the Round of 32 draw in the feed — bracket appears when knockout ties land.</div>
     </Cd>
   );
 }
@@ -668,12 +688,12 @@ function MeScreen(props) {
       </Saysd>
       <SHd>Your team</SHd>
       <TeamCard me={me} onGames={props.goGames} onPredictions={props.goPredictions} />
-      {WCd.meta.r32Published && window.KnockoutBracket && <>
+      {knockoutsVisible() && window.KnockoutBracket && <>
         <SHd aside="from the feed">Knockouts</SHd>
         <window.KnockoutBracket onOpen={props.goGames} />
       </>}
       <SHd aside="who to beat">Your group</SHd>
-      <GroupRivalCard me={me} onOpen={props.goGroup} />
+      <GroupRivalCard me={me} onOpen={props.goGroup} onGames={props.goGames} />
       <SHd aside={(Sd.predictionsLocked && Sd.predictionsLocked()) ? 'locked' : 'open'}>Predictions</SHd>
       <PredCard me={me} onOpen={props.goPredictions} />
       <SHd>{pre ? 'Potential winnings' : 'Results & winnings'}</SHd>

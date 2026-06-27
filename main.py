@@ -886,6 +886,7 @@ def _tournament_fixture_meta(
         "fixtureCounts": counts,
         "groupsComplete": group_done,
         "r32Published": r32_published,
+        "knockoutsInFeed": sum(counts.get(st, 0) for st in (*ko_order, "third")) > 0,
         "knockoutRound": knockout_round,
         "stageLabel": stage_label,
     }

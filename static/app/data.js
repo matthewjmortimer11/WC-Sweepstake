@@ -235,6 +235,17 @@
       return Math.max(1, ladder.length - 1);
     }
 
+    function knockoutsVisible(meta) {
+      meta = meta || WC.meta || {};
+      if (meta.r32Published || meta.knockoutsInFeed) return true;
+      var fc = meta.fixtureCounts || {};
+      var ko = ['r32', 'r16', 'qf', 'sf', 'final', 'third'];
+      for (var i = 0; i < ko.length; i++) {
+        if ((fc[ko[i]] || 0) > 0) return true;
+      }
+      return false;
+    }
+
     WC.fixtures = {
       kickoffMs: kickoffMs,
       status: fixtureStatus,
@@ -246,6 +257,7 @@
       todaysEntrantFixtures: todaysEntrantFixtures,
       winnerSide: fixtureWinnerSide,
       teamProgressMax: teamProgressMax,
+      knockoutsVisible: knockoutsVisible,
     };
     window.WheeshtFixtures = WC.fixtures;
 
