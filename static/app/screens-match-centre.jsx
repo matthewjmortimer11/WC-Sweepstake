@@ -391,8 +391,17 @@ function MatchCentreScreen() {
   else if (filter === 'done') list = list.filter(f => mcStatus(f) === 'done');
   else if (filter === 'upcoming') list = list.filter(f => mcStatus(f) === 'upcoming');
   else if (filter === 'needsResult') list = list.filter(f => mcStatus(f) === 'needsResult');
+  else if (filter === 'knockouts') list = list.filter(f => f.stage && f.stage !== 'group');
 
   const byDate = []; const seen = {};
+  if (filter === 'knockouts') {
+    list.sort(function (a, b) {
+      var ra = mcStageRank(a.stage || 'group');
+      var rb = mcStageRank(b.stage || 'group');
+      if (ra !== rb) return rb - ra;
+      return (mcKickoffMs(a) || 0) - (mcKickoffMs(b) || 0);
+    });
+  }
   list.forEach(f => {
     if (!seen[f.dateISO]) { seen[f.dateISO] = { label: f.dateLabel, items: [] }; byDate.push(seen[f.dateISO]); }
     seen[f.dateISO].items.push(f);
@@ -400,7 +409,8 @@ function MatchCentreScreen() {
 
   const doneCount = all.filter(f => mcStatus(f) === 'done').length;
   const filters = [['all', 'All'], ['mine', 'My team'], ['owned', 'In the draw'], ['upcoming', 'Upcoming'], ['done', 'Finished']];
-  if (needsResultList.length) filters.splice(3, 0, ['needsResult', 'Needs result']);
+  if (WCmc.meta && WCmc.meta.r32Published) filters.splice(1, 0, ['knockouts', 'Knockouts']);
+  if (needsResultList.length) filters.splice(WCmc.meta && WCmc.meta.r32Published ? 4 : 3, 0, ['needsResult', 'Needs result']);
 
   return (
     <React.Fragment>
@@ -415,6 +425,11 @@ function MatchCentreScreen() {
           </div>
         </div>
       </div>
+
+      {WCmc.meta && WCmc.meta.r32Published && window.KnockoutBracket &&
+        <div style={{ marginBottom: 12 }}>
+          <window.KnockoutBracket />
+        </div>}
 
       {/* LIVE NOW — top priority */}
       {liveList.length > 0 && <>

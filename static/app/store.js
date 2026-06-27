@@ -174,6 +174,10 @@
       customFields: WC.meta.customFields || [],
       predDeadline: WC.meta.predDeadline || null,
       hiddenPredictions: WC.meta.hiddenPredictions || [],
+      fixtureCounts: WC.meta.fixtureCounts || {},
+      groupsComplete: WC.meta.groupsComplete,
+      r32Published: WC.meta.r32Published,
+      knockoutRound: WC.meta.knockoutRound || null,
     },
   };
   WC.TEAM_LIST.forEach(function (t) { BASE.teams[t.code] = { alive: t.alive, stage: t.stage, rounds: t.rounds }; });
@@ -200,8 +204,12 @@
       if (admin.predictions && admin.predictions.hasOwnProperty(m.key)) m.answer = admin.predictions[m.key];
     });
     WC.meta.phase = (admin.meta && admin.meta.phase) || BASE.meta.phase;
-    WC.meta.stageLabel = WC.meta.phase === 'pre' ? 'Group Stage'
-      : WC.meta.phase === 'done' ? 'Tournament over' : 'In play';
+    WC.meta.stageLabel = BASE.meta.stageLabel || WC.meta.stageLabel
+      || (WC.meta.phase === 'pre' ? 'Group stage' : WC.meta.phase === 'done' ? 'Tournament over' : 'In play');
+    if (BASE.meta.fixtureCounts) WC.meta.fixtureCounts = BASE.meta.fixtureCounts;
+    if (BASE.meta.groupsComplete != null) WC.meta.groupsComplete = BASE.meta.groupsComplete;
+    if (BASE.meta.r32Published != null) WC.meta.r32Published = BASE.meta.r32Published;
+    if (BASE.meta.knockoutRound) WC.meta.knockoutRound = BASE.meta.knockoutRound;
     WC.meta.teamsLeft = WC.TEAM_LIST.filter(function (t) { return t.alive; }).length;
     WC.meta.includeDepartment = !admin.meta || admin.meta.includeDepartment !== false;
     WC.meta.includeLocation = !admin.meta || admin.meta.includeLocation !== false;
@@ -1057,7 +1065,20 @@
             }
           }
           if (window.__rebuildWC) window.__rebuildWC();
+          BASE.teams = {};
+          WC.TEAM_LIST.forEach(function (t) {
+            BASE.teams[t.code] = { alive: t.alive, stage: t.stage, rounds: t.rounds };
+          });
+          BASE.preds = {};
+          (WC.PREDICTIONS || []).forEach(function (m) { BASE.preds[m.key] = m.answer; });
+          BASE.meta.phase = WC.meta.phase;
+          BASE.meta.stageLabel = WC.meta.stageLabel;
+          BASE.meta.fixtureCounts = WC.meta.fixtureCounts;
+          BASE.meta.groupsComplete = WC.meta.groupsComplete;
+          BASE.meta.r32Published = WC.meta.r32Published;
+          BASE.meta.knockoutRound = WC.meta.knockoutRound;
           lastRefreshAt = Date.now();
+          if (LIVE) applyAdmin();
           rebuild(); emit();
         }
         return d;
@@ -1295,7 +1316,22 @@
         liveFixtures: Number(meta.liveFixtures || 0),
         finishedFixtures: Number(meta.finishedFixtures || 0),
         needsResult: Number(meta.needsResult || 0),
+        fixtureCounts: meta.fixtureCounts || {},
+        groupsComplete: !!meta.groupsComplete,
+        r32Published: !!meta.r32Published,
       };
+    },
+    nextFixtureForTeam: function (code) {
+      var fx = window.WheeshtFixtures;
+      return fx && fx.nextForTeam ? fx.nextForTeam(code) : null;
+    },
+    buildKnockoutBracket: function () {
+      var fx = window.WheeshtFixtures;
+      return fx && fx.buildKnockoutBracket ? fx.buildKnockoutBracket() : {};
+    },
+    stageNameForTeam: function (t) {
+      var fx = window.WheeshtFixtures;
+      return fx && fx.stageNameForTeam ? fx.stageNameForTeam(t) : (t && t.stage) || '';
     },
     teamsAlive: function () { return WC.TEAM_LIST.filter(function (t) { return t.alive; }).length; },
     phase: function () { return WC.meta.phase; },
@@ -1416,14 +1452,29 @@
     },
     setTeamOut: function (code, out) {
       admin.teams = admin.teams || {};
-      if (out) admin.teams[code] = { alive: false, stage: 'out-group', rounds: 1 };
-      else admin.teams[code] = { alive: true, stage: (WC.meta.phase === 'pre' ? 'group' : 'r16'), rounds: (WC.meta.phase === 'pre' ? 0 : 3) };
+      var t = WC.TEAMS[code];
+      if (out) {
+        var st = (t && t.stage && t.stage !== 'group') ? ('out-' + t.stage.replace(/^out-/, '')) : 'out-group';
+        admin.teams[code] = { alive: false, stage: st, rounds: (t && t.rounds) || 1 };
+      } else {
+        delete admin.teams[code];
+      }
       if (out && WC.meta.phase === 'pre') { admin.meta = admin.meta || {}; admin.meta.phase = 'live'; }
       commitAdmin();
     },
-    setFixtureResult: function (id, a, b) {
+    setFixtureResult: function (id, a, b, winner) {
       admin.fixtures = admin.fixtures || {};
-      admin.fixtures[id] = { score: [a, b], status: 'done' };
+      var row = { score: [a, b], status: 'done' };
+      if (winner) {
+        row.winner = winner;
+      } else if (a > b) {
+        row.winner = 'HOME';
+      } else if (b > a) {
+        row.winner = 'AWAY';
+      } else {
+        row.winner = 'DRAW';
+      }
+      admin.fixtures[id] = row;
       if (WC.meta.phase === 'pre') { admin.meta = admin.meta || {}; admin.meta.phase = 'live'; }
       commitAdmin();
     },

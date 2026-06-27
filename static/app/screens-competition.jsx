@@ -189,6 +189,10 @@ function MyGroupDashboard(props) {
   const nextOpp = nextFix ? WCc.TEAMS[nextFix.a === t.code ? nextFix.b : nextFix.a] : null;
   const staleFix = myFix.find(f => compStatus(f) === 'needsResult');
   const staleOpp = staleFix ? WCc.TEAMS[staleFix.a === t.code ? staleFix.b : staleFix.a] : null;
+  const throughKnockouts = (t.rounds >= 1) || (G.total > 0 && G.played >= G.total);
+  const koTie = (throughKnockouts && Sc && Sc.nextFixtureForTeam) ? Sc.nextFixtureForTeam(t.code) : null;
+  const showGroupNext = !throughKnockouts && nextFix && nextOpp;
+  const showKoNext = throughKnockouts && koTie && koTie.fixture && koTie.opponent;
 
   // movers within the group (only meaningful once a 2nd matchday exists)
   let biggestMover = null, biggestFaller = null;
@@ -210,7 +214,7 @@ function MyGroupDashboard(props) {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
           <div style={{ minWidth: 0 }}>
             <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.08em', color: 'var(--yellow)' }}>
-              GROUP {t.group} · {G.hasResults ? 'MATCHDAY ' + G.latestMd + ' OF 3' : 'NOT STARTED'}
+              {throughKnockouts ? 'THROUGH TO THE KNOCKOUTS' : ('GROUP ' + t.group + ' · ' + (G.hasResults ? 'MATCHDAY ' + G.latestMd + ' OF 3' : 'NOT STARTED'))}
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 8 }}>
               <Fc team={t} size={42} />
@@ -257,7 +261,7 @@ function MyGroupDashboard(props) {
       </Cc>
 
       {/* ===== MUST-WIN / NEXT GAME ===== */}
-      {nextFix && nextOpp && t.alive && (
+      {showGroupNext && t.alive && (
         <Cc bordered style={{ marginTop: 12, background: status.mustWin ? 'var(--red)' : 'var(--yellow)', color: status.mustWin ? '#fff' : 'var(--ink)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
             <span className={status.mustWin ? 'flame' : ''} style={{ fontSize: 30 }}>{status.mustWin ? '🔥' : '⚽'}</span>
@@ -270,8 +274,21 @@ function MyGroupDashboard(props) {
           </div>
         </Cc>
       )}
+      {showKoNext && t.alive && (
+        <Cc bordered style={{ marginTop: 12, background: 'var(--ink)', color: '#fff' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
+            <span className="flame" style={{ fontSize: 30 }}>🔥</span>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '.06em', color: 'var(--yellow)' }}>
+                {(koTie.isLive ? '● LIVE · ' : 'NEXT KNOCKOUT · ') + koTie.stageLabel + ' · ' + koTie.fixture.dateLabel + ' · ' + koTie.fixture.time}
+              </div>
+              <div className="dh" style={{ fontSize: 19, marginTop: 2, lineHeight: 1, color: '#fff' }}>{t.name} <span style={{ opacity: .55 }}>vs</span> {koTie.opponent.name} {koTie.opponent.flag}</div>
+            </div>
+          </div>
+        </Cc>
+      )}
 
-      {!nextFix && staleFix && staleOpp && t.alive && (
+      {!throughKnockouts && !nextFix && staleFix && staleOpp && t.alive && (
         <Cc bordered style={{ marginTop: 12, background: 'var(--yellow)', color: 'var(--ink)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
             <span style={{ fontSize: 30 }}>⏱</span>

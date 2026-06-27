@@ -114,8 +114,20 @@ function TeamToggle(props) {
 
 function ScoreStepper(props) {
    const [a, setA] = aState2(props.a); const [b, setB] = aState2(props.b);
+   const [penWinner, setPenWinner] = aState2(null);
    const ta = adminTeam(props.f.a), tb = adminTeam(props.f.b);
+   const isKo = props.f.stage && props.f.stage !== 'group';
+   const level = a === b;
    function step(box, setter, val, d) { var n = Math.max(0, val + d); setter(n); }
+   function save() {
+     if (isKo && level && !penWinner) return;
+     var w = null;
+     if (isKo && level) w = penWinner;
+     else if (a > b) w = 'HOME';
+     else if (b > a) w = 'AWAY';
+     else w = 'DRAW';
+     props.onSave(a, b, w);
+   }
    const num = { width: 34, textAlign: 'center', fontFamily: 'var(--disp)', fontWeight: 800, fontSize: 22 };
    const sbtn = { width: 28, height: 28, borderRadius: 8, border: '2px solid var(--ink)', background: '#fff', fontWeight: 900, fontSize: 16, cursor: 'pointer', lineHeight: 1 };
    return (
@@ -129,8 +141,17 @@ function ScoreStepper(props) {
            <button style={sbtn} onClick={() => step(i, set, v, 1)}>+</button>
          </div>
        ))}
+       {isKo && level && (
+         <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1.5px solid var(--line)' }}>
+           <div style={{ fontSize: 12, fontWeight: 800, marginBottom: 8 }}>Level after 90 — who went through?</div>
+           <div style={{ display: 'flex', gap: 8 }}>
+             <button type="button" onClick={() => setPenWinner('HOME')} className="wc-btn wc-btn--sm" style={{ flex: 1, background: penWinner === 'HOME' ? 'var(--yellow)' : '#fff' }}>{ta.name}</button>
+             <button type="button" onClick={() => setPenWinner('AWAY')} className="wc-btn wc-btn--sm" style={{ flex: 1, background: penWinner === 'AWAY' ? 'var(--yellow)' : '#fff' }}>{tb.name}</button>
+           </div>
+         </div>
+       )}
        <div style={{ display: 'flex', gap: 8, marginTop: 11 }}>
-         <Ba variant="ink" sm block onClick={() => props.onSave(a, b)}>Save full-time</Ba>
+         <Ba variant="ink" sm block onClick={save} disabled={isKo && level && !penWinner}>Save full-time</Ba>
          <button onClick={props.onCancel} className="wc-btn wc-btn--sm" style={{ boxShadow: '0 4px 0 var(--shadow)', padding: '0 14px' }}>Cancel</button>
        </div>
      </div>
@@ -162,14 +183,16 @@ function FixtureAdminRow(props) {
              : <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--ink2)' }}>{f.time}</span>}
        </div>
        <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginTop: 8 }}>
-         <span style={{ fontSize: 10.5, fontWeight: 700, color: 'var(--ink2)', flex: 1 }}>Gp {f.group} · {f.dateLabel}</span>
+         <span style={{ fontSize: 10.5, fontWeight: 700, color: 'var(--ink2)', flex: 1 }}>
+           {f.stage === 'group' ? ('Gp ' + f.group) : ((WCa.meta.stageLabels && WCa.meta.stageLabels[f.stage]) || f.stage.toUpperCase())} · {f.dateLabel}
+         </span>
          {st !== 'done' && <button onClick={() => Sa.setFixtureLive(f.id, st !== 'live' && st !== 'halfTime')} className="wc-btn wc-btn--sm" style={{ padding: '5px 10px', boxShadow: '0 3px 0 var(--shadow)' }}>{st === 'upcoming' ? 'Go live' : 'Go back'}</button>}
          <button onClick={() => setOpen(!open)} className="wc-btn wc-btn--sm" style={{ padding: '5px 10px', boxShadow: '0 3px 0 var(--shadow)' }}>{st === 'done' ? 'Edit score' : 'Enter score'}</button>
          {st === 'done' && <button onClick={() => Sa.clearFixture(f.id)} className="wc-btn wc-btn--sm" style={{ padding: '5px 10px', boxShadow: '0 3px 0 var(--shadow)' }}>Undo</button>}
        </div>
        {open && <ScoreStepper f={f} a={f.score ? f.score[0] : 0} b={f.score ? f.score[1] : 0}
-         onSave={(a, b) => {
-           Sa.setFixtureResult(f.id, a, b);
+         onSave={(a, b, winner) => {
+           Sa.setFixtureResult(f.id, a, b, winner);
            setOpen(false);
            const bn = matchBanter(f, a, b);
            if (window.wcToast) window.wcToast(bn.text, bn.mood);
@@ -945,6 +968,9 @@ function AdminHealth() {
    const live = Number(health.liveFixtures || 0);
    const finished = Number(health.finishedFixtures || 0);
    const needs = Number(health.needsResult || 0);
+   const counts = health.fixtureCounts || {};
+   const r32n = Number(counts.r32 || 0);
+   const groupsDone = !!health.groupsComplete;
    function age(ts) {
      if (!ts) return 'Not yet';
      const t = typeof ts === 'number' ? ts : new Date(ts).getTime();
@@ -989,6 +1015,8 @@ function AdminHealth() {
              ['Need result', String(needs)],
              ['Finished', finished + '/' + total],
              ['Upcoming', String(Math.max(0, total - finished - live))],
+             ['R32 ties', String(r32n) + '/16'],
+             ['Groups done', groupsDone ? 'Yes' : 'No'],
            ].map(function(row) {
              return <div key={row[0]} style={{ background: '#fff', border: '2px solid var(--line)', borderRadius: 12, padding: '9px 10px' }}>
                <div style={{ fontSize: 9.5, fontWeight: 900, letterSpacing: '.05em', textTransform: 'uppercase', color: 'var(--ink2)' }}>{row[0]}</div>
@@ -998,6 +1026,9 @@ function AdminHealth() {
          </div>
          {needs > 0 && <div style={{ marginTop: 10, fontSize: 12, fontWeight: 800, color: 'var(--red)', lineHeight: 1.35 }}>
            {needs} fixture{needs === 1 ? '' : 's'} look past the match window without a final score. Check Results and enter/verify them.
+         </div>}
+         {groupsDone && r32n > 0 && r32n < 16 && <div style={{ marginTop: 10, fontSize: 12, fontWeight: 800, color: 'var(--red)', lineHeight: 1.35 }}>
+           R32 bracket incomplete in the feed ({r32n}/16 ties). Eliminations may lag until all 16 publish.
          </div>}
        </Ca>
        <Ca flat style={{ marginBottom: 12 }}>

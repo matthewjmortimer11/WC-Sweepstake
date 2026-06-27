@@ -16,12 +16,11 @@ function money_d(n) {
 }
 const PRE = () => (WCd.meta.phase === 'pre');
 function stageName(t) {
-  if (t.stage === 'group') return 'Group stage';
-  if (t.stage === 'qf') return 'Quarter-final';
-  if (t.stage === 'r16') return 'Round of 16';
-  if (t.stage === 'out-r16') return 'Out · Round of 16';
-  if (t.stage === 'out-r32') return 'Out · Round of 32';
-  return 'Out · Group stage';
+  if (Sd && Sd.stageNameForTeam) return Sd.stageNameForTeam(t);
+  return (t && t.stage) || '';
+}
+function nextTieFor(me) {
+  return (Sd && Sd.nextFixtureForTeam) ? Sd.nextFixtureForTeam(me.team) : null;
 }
 
 // Read a chosen image file, square-crop (cover) and shrink it to a small JPEG
@@ -412,11 +411,10 @@ function EditProfile(props) {
 
 function TeamCard(props) {
   const me = props.me; const t = dashTeam(me.team);
-  const nextTie = (WCd.R16 || []).find(x => (x.a === me.team || x.b === me.team) && !x.done);
-  const opp = nextTie ? WCd.TEAMS[nextTie.a === me.team ? nextTie.b : nextTie.a] : null;
+  const tie = nextTieFor(me);
   const pre = PRE();
-  const nextFix = (WCd.FIXTURES || []).find(f => (f.a === me.team || f.b === me.team) && !dashFixtureFinished(f));
-  const fixOpp = nextFix ? WCd.TEAMS[nextFix.a === me.team ? nextFix.b : nextFix.a] : null;
+  const nextFix = tie && tie.fixture;
+  const fixOpp = tie && tie.opponent;
   return (
     <Cd bordered className="pop" style={t.alive ? null : { background: 'var(--ink)', color: '#fff' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
@@ -447,14 +445,24 @@ function TeamCard(props) {
           </div>
           <span style={{ fontSize: 22 }}>⚽</span>
         </div>}
-      {t.alive && !pre && nextTie && opp &&
-        <div style={{ marginTop: 14, display: 'flex', alignItems: 'center', gap: 10, background: 'var(--ink)', borderRadius: 14, padding: '11px 14px', color: '#fff' }}>
+      {t.alive && !pre && nextFix && fixOpp &&
+        <button onClick={props.onGames} style={{ width: '100%', marginTop: 14, display: 'flex', alignItems: 'center', gap: 10, background: 'var(--ink)', border: 'none', borderRadius: 14, padding: '11px 14px', color: '#fff', cursor: 'pointer', textAlign: 'left' }}>
           <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.06em', color: 'var(--yellow)' }}>YOUR NEXT TIE · {nextTie.note}</div>
-            <div className="dh" style={{ fontSize: 18, marginTop: 2 }}>{t.name} <span style={{ opacity: .5 }}>vs</span> {opp.name} {opp.flag}</div>
+            <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.06em', color: 'var(--yellow)' }}>
+              {tie.isLive ? '● LIVE · ' : 'YOUR NEXT TIE · '}{tie.stageLabel} · {nextFix.dateLabel} · {nextFix.time}
+            </div>
+            <div className="dh" style={{ fontSize: 18, marginTop: 2 }}>{t.name} <span style={{ opacity: .5 }}>vs</span> {fixOpp.name} {fixOpp.flag}</div>
           </div>
           <span className="flame" style={{ fontSize: 24 }}>🔥</span>
-        </div>}
+        </button>}
+      {!t.alive && !pre &&
+        <button onClick={props.onPredictions} style={{ width: '100%', marginTop: 14, display: 'flex', alignItems: 'center', gap: 10, background: 'var(--yellow)', border: 'none', borderRadius: 14, padding: '11px 14px', color: 'var(--ink)', cursor: 'pointer', textAlign: 'left' }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.06em' }}>OUT OF THE SWEEPSTAKE</div>
+            <div className="dh" style={{ fontSize: 16, marginTop: 2 }}>Predictions league still live — keep picking</div>
+          </div>
+          <span className="dh" style={{ fontSize: 18 }}>→</span>
+        </button>}
     </Cd>
   );
 }
@@ -625,6 +633,83 @@ function ActivityFeed(props) {
   );
 }
 
+function GroupsDoneBanner() {
+  if (!WCd.meta.groupsComplete || PRE()) return null;
+  if (!WCd.meta.r32Published) {
+    return (
+      <Cd bordered style={{ background: 'var(--yellow)', marginBottom: 12 }}>
+        <div className="dh" style={{ fontSize: 17 }}>Groups done</div>
+        <div style={{ fontSize: 13, fontWeight: 600, marginTop: 4 }}>Waiting on the Round of 32 draw in the feed — bracket appears when all 16 ties land.</div>
+      </Cd>
+    );
+  }
+  return (
+    <Cd bordered style={{ background: 'var(--ink)', color: '#fff', marginBottom: 12 }}>
+      <div className="dh" style={{ fontSize: 17, color: 'var(--yellow)' }}>Knockout stage</div>
+      <div style={{ fontSize: 13, fontWeight: 600, marginTop: 4, color: 'rgba(255,255,255,.85)' }}>Groups complete — 32 through to the knockouts. No second chances from here.</div>
+    </Cd>
+  );
+}
+
+function BracketRow(props) {
+  const tie = props.tie;
+  const A = tie.teamA || { code: tie.a, flag: '🏳️', name: tie.a };
+  const B = tie.teamB || { code: tie.b, flag: '🏳️', name: tie.b };
+  const aw = tie.done && tie.winner === tie.a;
+  const bw = tie.done && tie.winner === tie.b;
+  function Row(p) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, opacity: p.lose ? .45 : 1 }}>
+        <Fd team={p.team} size={18} />
+        <span style={{ fontSize: 11.5, fontWeight: 700, flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textDecoration: p.lose ? 'line-through' : 'none' }}>{p.team.code}</span>
+        {p.score != null && <span className="dh" style={{ fontSize: 14 }}>{p.score}</span>}
+      </div>
+    );
+  }
+  return (
+    <div style={{ border: tie.you ? '2.5px solid var(--ink)' : '2px solid var(--line)', borderRadius: 12, padding: '7px 9px', background: tie.you ? 'var(--yellow)' : '#fff' }}>
+      <Row team={A} score={tie.done && tie.score ? tie.score[0] : null} lose={bw} />
+      <div style={{ height: 4 }} />
+      <Row team={B} score={tie.done && tie.score ? tie.score[1] : null} lose={aw} />
+      {tie.pens && <div style={{ fontSize: 9.5, fontWeight: 800, color: 'var(--ink2)', marginTop: 4 }}>Decided on pens</div>}
+    </div>
+  );
+}
+
+function KnockoutBracket(props) {
+  const rounds = (Sd && Sd.buildKnockoutBracket) ? Sd.buildKnockoutBracket() : {};
+  const order = ['r32', 'r16', 'qf', 'sf', 'final'];
+  const labels = (WCd.meta && WCd.meta.stageLabels) || {};
+  const [round, setRound] = dState(function () {
+    var kr = WCd.meta.knockoutRound;
+    return kr && rounds[kr] && rounds[kr].length ? kr : (order.find(function (k) { return (rounds[k] || []).length; }) || 'r32');
+  });
+  const ties = rounds[round] || [];
+  if (!WCd.meta.r32Published || !ties.length) return null;
+  return (
+    <Cd>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+        <div className="dh" style={{ fontSize: 17 }}>The bracket</div>
+        {props.onOpen && <button onClick={props.onOpen} style={{ background: 'none', border: 'none', color: 'var(--red)', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>All fixtures →</button>}
+      </div>
+      <div style={{ display: 'flex', gap: 6, overflowX: 'auto', marginBottom: 10 }}>
+        {order.map(function (k) {
+          if (!(rounds[k] || []).length) return null;
+          return (
+            <button key={k} onClick={function () { setRound(k); }} className="wc-btn wc-btn--sm"
+              style={{ flex: '0 0 auto', background: round === k ? 'var(--yellow)' : '#fff', boxShadow: round === k ? '0 3px 0 var(--ink)' : '0 3px 0 var(--shadow)' }}>
+              {labels[k] || k.toUpperCase()}
+            </button>
+          );
+        })}
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+        {ties.map(function (tie) { return <BracketRow key={tie.id} tie={tie} />; })}
+      </div>
+    </Cd>
+  );
+}
+
 function MeScreen(props) {
   const me = Sd.active();
   const [edit, setEdit] = dState(false);
@@ -636,11 +721,16 @@ function MeScreen(props) {
     <div className="pad">
       <ProfileHeader me={me} onEdit={() => setEdit(true)} />
       <div style={{ height: 12 }} />
+      <GroupsDoneBanner />
       <Saysd mood={greetMood} label={'hey ' + (Sd.shownName ? Sd.shownName(me) : me.name).split(' ')[0]} animate>
         {pre ? <>You've drawn {t.name}. No games yet — get your predictions in while the slate's clean.</> : (t.alive ? <>{t.name} are still standing. Keep your predictions sharp — the pot's in play.</> : <>Your team is out, but the predictions league is still live. Wheesht isn't done with you yet.</>)}
       </Saysd>
       <SHd>Your team</SHd>
-      <TeamCard me={me} onGames={props.goGames} />
+      <TeamCard me={me} onGames={props.goGames} onPredictions={props.goPredictions} />
+      {WCd.meta.r32Published && <>
+        <SHd aside="from the feed">Knockouts</SHd>
+        <KnockoutBracket onOpen={props.goGames} />
+      </>}
       <SHd aside="who to beat">Your group</SHd>
       <GroupRivalCard me={me} onOpen={props.goGroup} />
       <SHd aside={(Sd.predictionsLocked && Sd.predictionsLocked()) ? 'locked' : 'open'}>Predictions</SHd>
@@ -655,3 +745,4 @@ function MeScreen(props) {
 }
 
 window.MeScreen = MeScreen;
+window.KnockoutBracket = KnockoutBracket;

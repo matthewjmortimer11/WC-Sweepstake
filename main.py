@@ -688,10 +688,14 @@ def _resolve(league_people: List[Dict[str, Any]], admin: Dict[str, Any]):
                       "options": [f["a"], f["b"], "draw"], "answer": None,
                       "fixture_id": fixture_id, "fixture_status": fix_status}
             sc = f.get("score")
-            if _status_is_done(fix_status) and isinstance(sc, (list, tuple)) and len(sc) == 2 and None not in sc:
-                if sc[0] > sc[1]:   market["answer"] = f["a"]
-                elif sc[1] > sc[0]: market["answer"] = f["b"]
-                else:               market["answer"] = "draw"
+            if _status_is_done(fix_status):
+                win = standings._winner_of(f)
+                if win == "HOME":
+                    market["answer"] = f["a"]
+                elif win == "AWAY":
+                    market["answer"] = f["b"]
+                elif win == "DRAW" and f.get("stage") == "group":
+                    market["answer"] = "draw"
         else:
             market = {"key": market_id, "q": fa + " " + na + " vs " + fb + " " + nb + " — exact score?",
                       "kind": "scoreline", "points": dm_points,
@@ -740,9 +744,8 @@ def _league_state(league: League, league_people: List[Dict[str, Any]], admin: Di
     meta = dict(_wc_data["meta"])
     meta.pop("adminPin", None)
     meta["phase"] = phase
-    meta["stageLabel"] = (
-        "Group stage" if phase == "pre" else "Tournament over" if phase == "done" else "In play"
-    )
+    stage_labels = dict(_wc_data["meta"].get("stageLabels") or {})
+    meta.update(_tournament_fixture_meta(fixtures, teams, phase, stage_labels))
     meta["groupSize"] = len(people)
     meta["stillIn"] = sum(1 for p in people if p.get("alive"))
     meta["out"] = sum(1 for p in people if not p.get("alive"))
@@ -813,6 +816,81 @@ def _fixture_health(fixtures: List[Dict[str, Any]]) -> Dict[str, Any]:
     }
 
 
+def _tournament_fixture_meta(
+    fixtures: List[Dict[str, Any]],
+    teams: List[Dict[str, Any]],
+    phase: str,
+    stage_labels: Dict[str, str],
+) -> Dict[str, Any]:
+    """Fixture inventory + group/knockout phase signals for client and admin."""
+    codes = {t["code"] for t in teams}
+    counts: Dict[str, int] = {}
+    for f in fixtures or []:
+        st = str(f.get("stage") or "group")
+        counts[st] = counts.get(st, 0) + 1
+
+    groups: Dict[str, List[str]] = {}
+    for t in teams:
+        g = t.get("group")
+        if g:
+            groups.setdefault(g, []).append(t["code"])
+
+    group_done = True
+    for g, members in groups.items():
+        k = len(members)
+        expected = k * (k - 1) // 2 if k > 1 else 0
+        done_n = sum(
+            1 for f in fixtures or []
+            if f.get("stage") == "group" and f.get("group") == g and _status_is_done(f.get("status"))
+        )
+        if expected > 0 and done_n < expected:
+            group_done = False
+            break
+    if not groups:
+        group_done = False
+
+    r32_paired = sum(
+        1 for f in fixtures or []
+        if f.get("stage") == "r32" and f.get("a") in codes and f.get("b") in codes
+    )
+    r32_published = r32_paired >= 16
+
+    ko_order = ["r32", "r16", "qf", "sf", "final"]
+    knockout_round: Optional[str] = None
+    for st in ko_order:
+        if counts.get(st, 0) <= 0:
+            continue
+        if any(
+            f.get("stage") == st and not _status_is_done(f.get("status"))
+            for f in fixtures or []
+        ):
+            knockout_round = st
+            break
+        knockout_round = st
+
+    champion = any(t.get("stage") == "winner" for t in teams)
+    if phase == "done" or champion:
+        stage_label = "Tournament over"
+    elif phase == "pre":
+        stage_label = "Group stage"
+    elif knockout_round:
+        stage_label = stage_labels.get(knockout_round, knockout_round.replace("_", " ").title())
+    elif group_done and counts.get("r32", 0) == 0:
+        stage_label = "Group stage complete"
+    elif not group_done:
+        stage_label = "Group stage"
+    else:
+        stage_label = "In play"
+
+    return {
+        "fixtureCounts": counts,
+        "groupsComplete": group_done,
+        "r32Published": r32_published,
+        "knockoutRound": knockout_round,
+        "stageLabel": stage_label,
+    }
+
+
 def _base_state() -> Dict[str, Any]:
     """League-agnostic payload injected at first paint / used before a league is
     chosen. No participants, no pot — just the shared tournament scaffolding."""
@@ -827,6 +905,14 @@ def _base_state() -> Dict[str, Any]:
     meta["out"] = 0
     meta["currency"] = "£"
     meta.update(_fixture_health(data.get("fixtures") or []))
+    stage_labels = dict(_wc_data["meta"].get("stageLabels") or {})
+    phase = meta.get("phase") or "pre"
+    meta.update(_tournament_fixture_meta(
+        data.get("fixtures") or [],
+        _wc_data.get("teams") or [],
+        phase,
+        stage_labels,
+    ))
     data["meta"] = meta
     data["pot"] = 0
     return data

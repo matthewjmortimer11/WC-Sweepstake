@@ -69,6 +69,7 @@ def _to_frontend(f: CanonicalFixture) -> dict[str, Any]:
         # winner (HOME/AWAY/DRAW) preserved so the rules engine can resolve
         # knockout ties decided on penalties, where full-time score is level.
         "winner": f.winner,
+        "afterExtraTime": f.after_extra_time,
         "updatedAt": f.last_updated.isoformat() if f.last_updated else None,
     }
 

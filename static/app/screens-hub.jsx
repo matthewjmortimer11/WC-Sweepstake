@@ -20,15 +20,25 @@ function ownerName(code) {
   return o.length ? o[0].name : 'nobody';
 }
 function nextFixtureForTeam(teamCode) {
+  if (window.Store && window.Store.nextFixtureForTeam) {
+    var tie = window.Store.nextFixtureForTeam(teamCode);
+    return tie && tie.fixture ? tie.fixture : null;
+  }
   return (WC.FIXTURES || []).find(function (f) {
     return (f.a === teamCode || f.b === teamCode) && !fixtureDone(f);
   });
 }
 function stageLabel(t){
+  if (window.Store && window.Store.stageNameForTeam) return window.Store.stageNameForTeam(t);
   if (t.stage === 'qf') return 'Quarter-final';
+  if (t.stage === 'r32') return 'Round of 32';
   if (t.stage === 'r16') return 'Round of 16';
+  if (t.stage === 'sf') return 'Semi-final';
+  if (t.stage === 'final') return 'Final';
+  if (t.stage === 'winner') return 'Winners';
   if (t.stage === 'out-r16') return 'Out · Round of 16';
   if (t.stage === 'out-r32') return 'Out · Round of 32';
+  if (t.stage === 'group') return 'Group stage';
   return 'Out · Group stage';
 }
 function teamProgressRing(t) {
@@ -115,27 +125,31 @@ function DashTeam(){
 }
 
 function MatchdayCard(){
-  const ties = WC.R16.filter(t=>!t.done).slice(0,3);
+  const ties = (window.WheeshtFixtures && window.WheeshtFixtures.todaysEntrantFixtures)
+    ? window.WheeshtFixtures.todaysEntrantFixtures().slice(0, 3)
+    : [];
+  if (!ties.length) return null;
   return (
     <Card>
       <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:4}}>
         <W mood="broadcast" size={40}/>
         <div>
-          <div className="dh" style={{fontSize:17}}>Today’s matchday</div>
-          <div style={{fontSize:12,fontWeight:600,color:'var(--ink2)'}}>Wheesht has thoughts. Wheesht is keeping them professional.</div>
+          <div className="dh" style={{fontSize:17}}>Today's matchday</div>
+          <div style={{fontSize:12,fontWeight:600,color:'var(--ink2)'}}>Fixtures with someone from your draw.</div>
         </div>
       </div>
       <div style={{display:'flex',flexDirection:'column',gap:9,marginTop:8}}>
-        {ties.map(tie=>{
-          const A=WC.TEAMS[tie.a],B=WC.TEAMS[tie.b];
+        {ties.map(function(f){
+          const A=WC.TEAMS[f.a],B=WC.TEAMS[f.b];
+          const you = WC.YOU && (f.a === WC.YOU.team || f.b === WC.YOU.team);
           return (
-            <div key={tie.id} style={{display:'flex',alignItems:'center',gap:8,padding:'9px 11px',border:'2px solid var(--line)',borderRadius:13,background:tie.you?'rgba(245,200,0,.16)':'#fff'}}>
+            <div key={f.id} style={{display:'flex',alignItems:'center',gap:8,padding:'9px 11px',border:'2px solid var(--line)',borderRadius:13,background:you?'rgba(245,200,0,.16)':'#fff'}}>
               <Flag team={A} size={26}/>
               <div style={{flex:1,fontSize:13,fontWeight:700,lineHeight:1.15}}>
-                {ownerName(tie.a)}’s {A.name} <span style={{color:'var(--ink2)',fontWeight:600}}>vs</span> {ownerName(tie.b)}’s {B.name}
+                {ownerName(f.a)}'s {A.name} <span style={{color:'var(--ink2)',fontWeight:600}}>vs</span> {ownerName(f.b)}'s {B.name}
               </div>
               <Flag team={B} size={26}/>
-              {tie.you && <Chip tone="yellow" style={{marginLeft:2}}>You</Chip>}
+              {you && <Chip tone="yellow" style={{marginLeft:2}}>You</Chip>}
             </div>
           );
         })}
@@ -145,35 +159,10 @@ function MatchdayCard(){
 }
 
 function BracketSnapshot(props){
-  return (
-    <Card>
-      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
-        <div className="dh" style={{fontSize:17}}>The bracket · Round of 16</div>
-        <button onClick={props.onOpen} style={{background:'none',border:'none',color:'var(--red)',fontWeight:800,fontSize:13,cursor:'pointer'}}>Full tracker →</button>
-      </div>
-      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
-        {WC.R16.map(tie=>{
-          const A=WC.TEAMS[tie.a],B=WC.TEAMS[tie.b];
-          const aw = tie.done && tie.score && tie.score[0]>tie.score[1];
-          const bw = tie.done && tie.score && tie.score[1]>tie.score[0];
-          return (
-            <div key={tie.id} style={{border:tie.you?'2.5px solid var(--ink)':'2px solid var(--line)',borderRadius:12,padding:'7px 9px',background:tie.you?'var(--yellow)':'#fff'}}>
-              <Row team={A} score={tie.done?tie.score[0]:null} lose={bw}/>
-              <div style={{height:4}}/>
-              <Row team={B} score={tie.done?tie.score[1]:null} lose={aw}/>
-            </div>
-          );
-        })}
-      </div>
-    </Card>
-  );
-  function Row(p){
-    return <div style={{display:'flex',alignItems:'center',gap:6,opacity:p.lose?.45:1}}>
-      <Flag team={p.team} size={18}/>
-      <span style={{fontSize:11.5,fontWeight:700,flex:1,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',textDecoration:p.lose?'line-through':'none'}}>{p.team.code}</span>
-      {p.score!=null && <span className="dh" style={{fontSize:14}}>{p.score}</span>}
-    </div>;
+  if (window.KnockoutBracket && WC.meta && WC.meta.r32Published) {
+    return <window.KnockoutBracket onOpen={props.onOpen} />;
   }
+  return null;
 }
 
 function SegmentPanel(){

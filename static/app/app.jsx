@@ -832,9 +832,11 @@ function App(){
       });
       newDone.forEach(function(f){
         seen.add(f.id);
-        const aWin=f.score[0]>f.score[1], draw=f.score[0]===f.score[1];
-        const won=(f.a===myCode&&aWin)||(f.b===myCode&&!aWin&&!draw);
-        const drew=draw;
+        var winSide = window.WheeshtFixtures && window.WheeshtFixtures.winnerSide
+          ? window.WheeshtFixtures.winnerSide(f) : null;
+        var aWin=f.score[0]>f.score[1], draw=f.score[0]===f.score[1];
+        var won = winSide ? (winSide === myCode) : ((f.a===myCode&&aWin)||(f.b===myCode&&!aWin&&!draw));
+        var drew = !winSide && draw;
         const t2=A_WC.TEAMS[myCode];
         const tflag=t2?t2.flag:'', tname=t2?t2.name:myCode;
         const oCode=f.a===myCode?f.b:f.a, oTeam=A_WC.TEAMS[oCode];
@@ -866,6 +868,25 @@ function App(){
           window.wcToast&&window.wcToast(pick[0],pick[1]);
         }
       });
+    });
+    return unsub;
+  },[flow,me&&me.id]); // eslint-disable-line
+
+  /* ---- Toast when sweepstake elimination flips ---- */
+  aEffect(function(){
+    if(flow!=='app'||!me||!me.team) return;
+    var prevAlive = me.alive !== false;
+    var unsub = A_S.subscribe(function(){
+      var cur = A_S.active();
+      if(!cur || cur.id !== me.id) return;
+      if(prevAlive && cur.alive === false){
+        var tn = (A_WC.TEAMS[cur.team] && A_WC.TEAMS[cur.team].name) || 'Your team';
+        window.wcToast && window.wcToast(
+          tn + ' is out of the sweepstake. The predictions league is still live — keep picking.',
+          'crying'
+        );
+      }
+      prevAlive = cur.alive !== false;
     });
     return unsub;
   },[flow,me&&me.id]); // eslint-disable-line

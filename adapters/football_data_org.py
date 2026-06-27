@@ -27,7 +27,7 @@ _STAGE_MAP: dict[str, str] = {
     "QUARTER_FINALS": "qf",
     "SEMI_FINALS": "sf",
     "FINAL": "final",
-    "THIRD_PLACE": "final",         # treat 3rd-place play-off as a final-stage match
+    "THIRD_PLACE": "third",
 }
 
 # ── Status mapping ────────────────────────────────────────────────────────────
@@ -51,10 +51,15 @@ _STATUS_MAP: dict[str, str] = {
 TLA_OVERRIDES: dict[str, str] = {
     "SAU": "KSA",   # Saudi Arabia
     "CVE": "CPV",   # Cape Verde
-    "KOR": "KOR",   # South Korea (same, explicit for clarity)
-    "IRN": "IRN",   # Iran (same)
-    "CRC": "CRC",   # Costa Rica (same)
-    # Add further overrides as mismatches are discovered.
+    "RSA": "RSA",   # South Africa (explicit)
+    "KOR": "KOR",
+    "IRN": "IRN",
+    "CRC": "CRC",
+    "CUW": "CUW",   # Curaçao
+    "CIV": "CIV",   # Côte d'Ivoire
+    "BIH": "BIH",
+    "COD": "COD",   # DR Congo
+    "CPV": "CPV",
 }
 
 
@@ -92,7 +97,10 @@ def _match_to_canonical(
     raw_stage = match.get("stage", "")
     stage = _STAGE_MAP.get(raw_stage)
     if not stage:
-        log.debug("Unknown stage %r — skipping match %s", raw_stage, match.get("id"))
+        log.warning(
+            "Unknown football-data.org stage %r — skipping match %s",
+            raw_stage, match.get("id"),
+        )
         return None
 
     raw_status = match.get("status", "SCHEDULED")
@@ -104,6 +112,13 @@ def _match_to_canonical(
     away_tla = _normalise_tla(
         (match.get("awayTeam") or {}).get("tla")
     )
+    if home_tla == "UNK" or away_tla == "UNK":
+        log.warning(
+            "Missing team TLA on match %s (home=%r away=%r) — fixture may not resolve",
+            match.get("id"),
+            (match.get("homeTeam") or {}).get("tla"),
+            (match.get("awayTeam") or {}).get("tla"),
+        )
 
     score = match.get("score") or {}
     ft = score.get("fullTime") or {}

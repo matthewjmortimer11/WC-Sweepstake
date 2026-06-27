@@ -122,3 +122,59 @@ def test_apply_to_people_mirrors_team_status():
     out = standings.apply_to_people(people, teams)
     assert out[0]["alive"] is False
     assert out[0]["stage"] == "out-r16"
+
+
+def test_penalty_knockout_eliminates_loser():
+    teams = [_team("AAA"), _team("BBB")]
+    fixtures = [
+        _fx("AAA", "BBB", stage="r16", status="done", score=[1, 1], winner="AWAY"),
+    ]
+    out = standings.compute_team_status(teams, fixtures, LADDER)
+    by = {t["code"]: t for t in out}
+    assert by["BBB"]["alive"] is True
+    assert by["AAA"]["alive"] is False
+
+
+def test_champion_gets_winner_stage():
+    teams = [_team("AAA"), _team("BBB")]
+    fixtures = [
+        _fx("AAA", "BBB", stage="final", status="done", score=[2, 1], winner="HOME"),
+    ]
+    out = standings.compute_team_status(teams, fixtures, LADDER)
+    by = {t["code"]: t for t in out}
+    assert by["AAA"]["stage"] == "winner"
+    assert by["AAA"]["alive"] is True
+    assert by["BBB"]["alive"] is False
+
+
+def test_partial_r32_keeps_third_alive():
+    teams = [_team("A1", "A"), _team("A2", "A"), _team("A3", "A"), _team("A4", "A")]
+    fixtures = [
+        _fx("A1", "A2", score=[1, 0]),
+        _fx("A1", "A3", score=[1, 0]),
+        _fx("A1", "A4", score=[1, 0]),
+        _fx("A2", "A3", score=[1, 1]),
+        _fx("A2", "A4", score=[1, 0]),
+        _fx("A3", "A4", score=[1, 0]),
+        _fx("A1", "A2", stage="r32", score=[1, 0]),
+        _fx("A3", "A4", stage="r32", score=[1, 0]),
+    ]
+    out = standings.compute_team_status(teams, fixtures, LADDER)
+    by = {t["code"]: t for t in out}
+    assert by["A3"]["alive"] is True
+
+
+def test_final_market_ignores_third_place_fixture():
+    teams = [
+        {**_team("AAA"), "stage": "final", "rounds": 5},
+        {**_team("BBB"), "stage": "final", "rounds": 5},
+        _team("CCC"),
+        _team("DDD"),
+    ]
+    fixtures = [
+        _fx("CCC", "DDD", stage="third", score=[2, 1], winner="HOME"),
+        _fx("AAA", "BBB", stage="final", score=[3, 2], winner="HOME"),
+    ]
+    preds = [{"key": "final", "kind": "team2", "options": ["AAA", "BBB", "CCC", "DDD"], "answer": None, "points": 10}]
+    graded = standings.grade_predictions(preds, teams, fixtures, LADDER)
+    assert sorted(graded[0]["answer"]) == ["AAA", "BBB"]
