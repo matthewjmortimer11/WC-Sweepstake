@@ -47,7 +47,7 @@ function gameScreen() {
   return winBanner()
     + trackers()
     + '<div class="grid grid-main">'
-    + '<div>' + boardPanel() + actionsPanel() + manualGlobal() + '</div>'
+    + '<div>' + boardPanel() + actionsPanel() + parleyPanel() + manualGlobal() + pactsPanel() + '</div>'
     + '<div>' + playersPanel() + logPanel() + '</div>'
     + '</div>';
 }
@@ -211,6 +211,41 @@ function pstat(label, value, kind, pid, key) {
     + '<button class="step" data-act="adj" data-id="' + pid + '" data-key="' + key + '" data-d="1">+</button></div></div>';
 }
 
+/* ---- Phase 3: social helper launchers ---- */
+function parleyPanel() {
+  var off = CT.state.winner ? " disabled" : "";
+  function b(act, label, cls) { return '<button class="btn ' + (cls || "btn-secondary") + '" data-act="' + act + '"' + off + '>' + label + '</button>'; }
+  return '<div class="panel"><div class="panel-head"><h2>Parley &amp; Conflict</h2>'
+    + '<span class="faint" style="font-size:12px">Helpers — they guide &amp; log</span></div><hr class="rule">'
+    + '<div class="act-grid" style="grid-template-columns:1fr 1fr 1fr">'
+    + b("h-open-challenge", "Challenge")
+    + b("h-open-vote", "Formal Vote")
+    + b("h-open-duel", "Duel")
+    + b("h-open-callout", "Call Out", "btn-danger")
+    + b("h-open-trade", "Trade")
+    + b("h-open-contract", "Blood Contract")
+    + '</div></div>';
+}
+
+function pactsPanel() {
+  var active = CT.state.contracts.filter(function (c) { return c.status === "active"; });
+  if (!CT.state.contracts.length) return "";
+  var rows = CT.state.contracts.map(function (c) {
+    var a = CT.playerById(c.aId), b = CT.playerById(c.bId);
+    var names = (a ? a.name : "?") + " ↔ " + (b ? b.name : "?");
+    var statusTag = c.status === "active" ? '' : '<span class="tag ' + (c.status === "broken" ? "wax" : "moss") + '">' + c.status + '</span>';
+    var controls = c.status === "active"
+      ? '<div class="btn-row"><button class="btn btn-ghost btn-sm" data-act="h-ct-fulfill" data-id="' + c.id + '">Fulfilled</button>'
+        + '<button class="btn btn-danger btn-sm" data-act="h-ct-break" data-id="' + c.id + '" data-breaker="' + c.aId + '">' + CT.esc(a ? a.name : "A") + ' broke it</button>'
+        + '<button class="btn btn-danger btn-sm" data-act="h-ct-break" data-id="' + c.id + '" data-breaker="' + c.bId + '">' + CT.esc(b ? b.name : "B") + ' broke it</button></div>'
+      : '';
+    return '<div class="pcard" style="padding:12px"><div class="row" style="justify-content:space-between"><strong>' + CT.esc(names) + '</strong>' + statusTag + '</div>'
+      + '<div class="prole" style="margin:4px 0 8px">' + CT.esc(c.promise) + '</div>' + controls + '</div>';
+  }).join("");
+  return '<div class="panel"><div class="panel-head"><h2>Pacts</h2><span class="faint" style="font-size:12px">' + active.length + ' active</span></div>'
+    + '<hr class="rule"><div class="stack">' + rows + '</div></div>';
+}
+
 /* ---- global manual controls (§32) ---- */
 function manualGlobal() {
   var s = CT.state;
@@ -251,6 +286,7 @@ function overlays() {
   if (CT.ui.roleDiscardFor) return roleDiscardView();
   if (CT.ui.handFixFor) return handFixView();
   if (CT.ui.keepOne) return keepOneView();
+  if (CT.helpers && CT.helpers.ui.open) return CT.helpers.view();
   if (CT.ui.showImport) return importView();
   return "";
 }
@@ -372,6 +408,7 @@ function bind() { /* listeners attached once in init via document */ }
 
 CT.handleAction = function (act, el, ev) {
   if (CT.setup.active && CT.setup.handle && setupActs[act]) { CT.setup.handle(act, el); return; }
+  if (act.indexOf("h-") === 0) { CT.helpers.handle(act, el); return; }
   switch (act) {
     case "start-setup": CT.setup.begin(); break;
     case "new-game":
@@ -429,7 +466,9 @@ CT.handleAction = function (act, el, ev) {
     case "reveal-lose-role": CT.ui.roleDiscardRevealed = true; CT.render(); break;
     case "confirm-lose-role":
       CT.applyRoleDiscard(CT.ui.roleDiscardFor, el.dataset.slot, el.dataset.role);
-      CT.ui.roleDiscardFor = null; CT.ui.roleDiscardRevealed = false; CT.render(); break;
+      CT.ui.roleDiscardFor = null; CT.ui.roleDiscardRevealed = false;
+      if (CT.ui.afterDiscard) { var fn = CT.ui.afterDiscard; CT.ui.afterDiscard = null; fn(); } // vote/duel follow-up effects
+      CT.render(); break;
     case "close-lose-role": CT.ui.roleDiscardFor = null; CT.ui.roleDiscardRevealed = false; CT.render(); break;
     case "view-private": CT.ui.privateFor = el.dataset.id; CT.ui.privateRevealed = false; CT.render(); break;
     case "reveal-private-view": CT.ui.privateRevealed = true; CT.render(); break;
@@ -448,10 +487,12 @@ CT.handleAction = function (act, el, ev) {
 
 CT.handleChange = function (act, el) {
   if (CT.setup.active && setupChangeActs[act]) { CT.setup.handle(act, el); return; }
+  if (act.indexOf("h-") === 0) { CT.helpers.handle(act, el); return; } // helper selects & checkboxes
   if (act === "move-player") { CT.movePlayer(el.dataset.id, el.value, true); CT.render(); }
 };
 CT.handleInput = function (act, el) {
-  if (CT.setup.active && act === "name") { CT.setup.handle(act, el); }
+  if (CT.setup.active && act === "name") { CT.setup.handle(act, el); return; }
+  if (act.indexOf("h-") === 0) { CT.helpers.handle(act, el); } // silent text/number updates
 };
 
 var setupActs = { "count":1,"to-names":1,"seat-type":1,"back-count":1,"to-private":1,"reveal-private":1,"choose-public":1,"confirm-private":1,"back-private":1,"first-mode":1,"begin-game":1 };
@@ -478,11 +519,12 @@ document.addEventListener("click", function (ev) {
 document.addEventListener("change", function (ev) {
   var el = ev.target.closest("[data-act]");
   if (!el) return;
-  if (el.tagName === "SELECT") CT.handleChange(el.dataset.act, el);
+  if (el.tagName === "SELECT" || (el.tagName === "INPUT" && el.type === "checkbox")) CT.handleChange(el.dataset.act, el);
 });
 document.addEventListener("input", function (ev) {
   var el = ev.target.closest("[data-act]");
   if (!el) return;
+  if (el.type === "checkbox") return; // checkboxes handled on change
   if (el.tagName === "INPUT" || el.tagName === "TEXTAREA") CT.handleInput(el.dataset.act, el);
 });
 

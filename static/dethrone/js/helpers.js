@@ -1,0 +1,349 @@
+/* The Cursed Throne — Phase 3 social helpers (challenge, vote, duel, Call Out,
+ * trade, Blood Contract). They guide + track + log; consequences route through
+ * the existing role-discard flow. Social judgement stays at the table. */
+window.CT = window.CT || {};
+CT.helpers = { ui: {} };
+
+/* ---------- small builders ---------- */
+function actives() { return CT.state.players.filter(function (p) { return p.status === "active"; }); }
+function opt(list, sel, ph) {
+  var o = ph != null ? '<option value="">' + ph + '</option>' : "";
+  return o + list.map(function (p) { return '<option value="' + p.id + '"' + (p.id === sel ? " selected" : "") + '>' + CT.esc(p.name) + "</option>"; }).join("");
+}
+function roleOpts(sel) {
+  return '<option value="">— choose a role —</option>' + CT.ROLES.map(function (r) {
+    return '<option value="' + r.id + '"' + (r.id === sel ? " selected" : "") + '>' + CT.esc(r.name) + "</option>";
+  }).join("");
+}
+function field(label, inner) { return '<label class="field"><span class="lbl">' + label + "</span>" + inner + "</label>"; }
+function wrap(inner, maxw) {
+  return '<div class="scrim"><div class="modal" style="max-width:' + (maxw || 560) + 'px">'
+    + '<div class="btn-row" style="justify-content:flex-end;margin-bottom:-8px"><button class="btn btn-ghost btn-sm" data-act="h-close">✕ Close</button></div>'
+    + inner + "</div></div>";
+}
+function roleBonus(p, key) { var r = p && p.publicRoleId ? CT.roleById(p.publicRoleId) : null; return (r && r[key]) || 0; }
+
+CT.helpers.view = function () {
+  var u = CT.helpers.ui;
+  switch (u.open) {
+    case "challenge": return CT.helpers.vChallenge();
+    case "vote":      return CT.helpers.vVote();
+    case "duel":      return CT.helpers.vDuel();
+    case "callout":   return CT.helpers.vCallout();
+    case "trade":     return CT.helpers.vTrade();
+    case "contract":  return CT.helpers.vContract();
+  }
+  return "";
+};
+
+/* ===================== Challenge (§19) ===================== */
+CT.helpers.openChallenge = function () { CT.helpers.ui = { open: "challenge", claimant: "", challenger: "", power: "" }; CT.render(); };
+CT.helpers.vChallenge = function () {
+  var u = CT.helpers.ui, ps = actives();
+  var ready = u.claimant && u.challenger && u.claimant !== u.challenger;
+  return wrap('<div class="eyebrow">Helper</div><h2 style="margin:4px 0 2px">Challenge a power</h2>'
+    + '<p class="muted" style="font-size:14px;margin:0 0 12px">The claimant proves the power privately to the challenger (physically). Record the outcome — only a discarded card is revealed.</p>'
+    + field("Claimant (announced a power)", '<select data-act="h-cl-claimant">' + opt(ps, u.claimant, "— who —") + "</select>")
+    + field("Claimed power (optional, for the log)", '<input type="text" data-act="h-cl-power" value="' + CT.esc(u.power || "") + '" placeholder="e.g. Stride">')
+    + field("Challenger", '<select data-act="h-cl-challenger">' + opt(ps, u.challenger, "— who —") + "</select>")
+    + '<hr class="rule">'
+    + '<div class="btn-row"><button class="btn btn-secondary" data-act="h-ch-valid"' + (ready ? "" : " disabled") + '>Proof valid → challenger loses a role</button>'
+    + '<button class="btn btn-danger" data-act="h-ch-bluff"' + (ready ? "" : " disabled") + '>Failed bluff → claimant loses a role</button></div>');
+};
+
+/* ===================== Formal vote (§21) ===================== */
+CT.helpers.openVote = function () {
+  CT.helpers.ui = { open: "vote", vtype: "accuse", proposer: "", target: "", seconder: false, decree: false, phase: "setup", votes: {}, bonusYes: 0, bonusNo: 0 };
+  CT.render();
+};
+CT.helpers.vVote = function () {
+  var u = CT.helpers.ui, ps = actives();
+  if (u.phase === "setup") {
+    var targets = u.vtype === "banish" ? ps.filter(function (p) { return p.rep <= 2; }) : ps;
+    var prop = CT.playerById(u.proposer);
+    var note = u.vtype === "accuse"
+      ? "Accuser needs Reputation 2+, plus a seconder (unless a Decree bypasses it)."
+      : "Banish targets only low-Rep players (≤2). Rep 0 needs no seconder; Rep 1–2 needs one (unless a Decree bypasses it).";
+    var ready = u.proposer && u.target && u.proposer !== u.target;
+    return wrap('<div class="eyebrow">Helper</div><h2 style="margin:4px 0 2px">Formal vote</h2>'
+      + '<div class="seg" style="margin:8px 0 14px">'
+      + '<button aria-pressed="' + (u.vtype === "accuse") + '" data-act="h-v-type" data-t="accuse">Accuse Cursed</button>'
+      + '<button aria-pressed="' + (u.vtype === "banish") + '" data-act="h-v-type" data-t="banish">Banish Threat</button></div>'
+      + '<p class="muted" style="font-size:13px;margin:0 0 12px">' + note + '</p>'
+      + field("Proposer", '<select data-act="h-v-proposer">' + opt(ps, u.proposer, "— who —") + "</select>")
+      + (u.vtype === "accuse" && prop && prop.rep < 2 ? '<div class="tag wax" style="margin-bottom:12px">Proposer has Rep ' + prop.rep + ' (below 2)</div>' : "")
+      + field("Target", '<select data-act="h-v-target">' + opt(targets, u.target, "— who —") + "</select>")
+      + '<div class="row" style="gap:18px;margin-bottom:8px">'
+      + '<label class="row" style="gap:6px;cursor:pointer"><input type="checkbox" data-act="h-v-seconder" style="width:auto" ' + (u.seconder ? "checked" : "") + '> Has a seconder</label>'
+      + '<label class="row" style="gap:6px;cursor:pointer"><input type="checkbox" data-act="h-v-decree" style="width:auto" ' + (u.decree ? "checked" : "") + '> Decree (no seconder needed)</label></div>'
+      + '<hr class="rule"><div class="btn-row"><div class="spacer"></div><button class="btn btn-primary" data-act="h-v-start"' + (ready ? "" : " disabled") + '>Collect votes →</button></div>');
+  }
+  // tally phase
+  var rows = ps.map(function (p) {
+    var v = u.votes[p.id] || null, w = p.rep >= 5 ? 2 : 1;
+    function b(val, lbl, cls) { return '<button class="btn btn-sm ' + (v === val ? cls : "btn-secondary") + '" data-act="h-v-cast" data-pid="' + p.id + '" data-v="' + val + '">' + lbl + "</button>"; }
+    return '<div class="vote-row"><span>' + CT.esc(p.name) + (w > 1 ? ' <span class="tag gold">×2</span>' : "") + "</span>"
+      + '<div class="btn-row">' + b("yes", "Yes", "btn-primary") + b("no", "No", "btn-danger") + b("", "—", "btn-ghost") + "</div></div>";
+  }).join("");
+  var yes = 0, no = 0;
+  ps.forEach(function (p) { var w = p.rep >= 5 ? 2 : 1; if (u.votes[p.id] === "yes") yes += w; else if (u.votes[p.id] === "no") no += w; });
+  yes += u.bonusYes; no += u.bonusNo;
+  var pass = yes > no; // ties fail (§21)
+  return wrap('<div class="eyebrow">' + (u.vtype === "accuse" ? "Accuse Cursed" : "Banish Threat") + ' · target: ' + CT.esc((CT.playerById(u.target) || {}).name || "?") + '</div>'
+    + '<h2 style="margin:4px 0 10px">Cast votes</h2><div class="stack" style="gap:6px">' + rows + "</div>"
+    + '<div class="row" style="gap:18px;margin-top:12px"><span class="muted" style="font-size:13px">Extra weight (Whisper Vote / Hidden Witness):</span>'
+    + '<span>Yes <button class="step" data-act="h-v-bonus" data-side="yes" data-d="-1">−</button> ' + u.bonusYes + ' <button class="step" data-act="h-v-bonus" data-side="yes" data-d="1">+</button></span>'
+    + '<span>No <button class="step" data-act="h-v-bonus" data-side="no" data-d="-1">−</button> ' + u.bonusNo + ' <button class="step" data-act="h-v-bonus" data-side="no" data-d="1">+</button></span></div>'
+    + '<hr class="rule"><div class="row" style="justify-content:space-between"><strong style="font-family:var(--serif);font-size:20px">' + yes + " – " + no
+    + '  <span class="tag ' + (pass ? "moss" : "wax") + '">' + (pass ? "PASSES" : "FAILS") + "</span></strong>"
+    + '<div class="btn-row"><button class="btn btn-ghost" data-act="h-v-back">← Back</button>'
+    + '<button class="btn btn-primary" data-act="h-v-apply">Apply result</button></div></div>');
+};
+
+/* ===================== Duel (§22) ===================== */
+CT.helpers.openDuel = function () { CT.helpers.ui = { open: "duel", att: "", def: "", serious: false, override: false, attBonus: 0, defBonus: 0, phase: "setup" }; CT.render(); };
+CT.helpers.vDuel = function () {
+  var u = CT.helpers.ui, ps = actives();
+  var att = CT.playerById(u.att), def = CT.playerById(u.def);
+  if (u.phase === "setup") {
+    var defList = (att && !u.override) ? ps.filter(function (p) { return p.location === att.location && p.id !== att.id; }) : ps.filter(function (p) { return !att || p.id !== att.id; });
+    var seriousOk = att && def && (u.override || (att.location === "barracks" && def.location === "barracks"));
+    return wrap('<div class="eyebrow">Helper</div><h2 style="margin:4px 0 2px">Duel</h2>'
+      + '<p class="muted" style="font-size:13px;margin:0 0 12px">Same location (or override). Public-role bonuses are added automatically; add card / claimed-power bonuses by hand.</p>'
+      + field("Attacker", '<select data-act="h-d-att">' + opt(ps, u.att, "— who —") + "</select>")
+      + field("Defender", '<select data-act="h-d-def">' + opt(defList, u.def, "— who —") + "</select>")
+      + '<div class="row" style="gap:18px;margin-bottom:8px">'
+      + '<label class="row" style="gap:6px;cursor:pointer"><input type="checkbox" data-act="h-d-override" style="width:auto" ' + (u.override ? "checked" : "") + '> Override location</label>'
+      + '<label class="row" style="gap:6px;cursor:pointer' + (att && att.seriousDuelUsed ? ";opacity:.5" : "") + '"><input type="checkbox" data-act="h-d-serious" style="width:auto" ' + (u.serious ? "checked" : "") + (seriousOk && !(att && att.seriousDuelUsed) ? "" : " disabled") + '> Serious Duel (Barracks)</label></div>'
+      + (att && att.seriousDuelUsed ? '<div class="tag wax" style="margin-bottom:10px">' + CT.esc(att.name) + ' has already used their Serious Duel</div>' : "")
+      + '<div class="row" style="gap:12px">'
+      + field("Attacker bonus (cards/powers)", '<input type="number" data-act="h-d-attbonus" value="' + u.attBonus + '">')
+      + field("Defender bonus (cards/powers)", '<input type="number" data-act="h-d-defbonus" value="' + u.defBonus + '">') + "</div>"
+      + (att ? '<p class="faint" style="font-size:12px">Auto: attacker +' + roleBonus(att, "duelBonusAttack") + ' atk · defender +' + (def ? roleBonus(def, "duelBonusDefence") : 0) + ' def (public roles)</p>' : "")
+      + '<hr class="rule"><div class="btn-row"><button class="btn btn-secondary" data-act="h-d-flee"' + (def ? "" : " disabled") + '>Defender plays Flee</button>'
+      + '<div class="spacer"></div><button class="btn btn-primary" data-act="h-d-fight"' + (att && def ? "" : " disabled") + '>Fight →</button></div>');
+  }
+  // resolve
+  var aT = roleBonus(att, "duelBonusAttack") + (+u.attBonus || 0);
+  var dT = roleBonus(def, "duelBonusDefence") + (+u.defBonus || 0);
+  var attackerWins = aT > dT; // tie -> defender (§22)
+  var winner = attackerWins ? att : def, loser = attackerWins ? def : att;
+  var conseqs = u.serious
+    ? '<button class="btn btn-danger" data-act="h-d-conseq" data-c="serious">' + CT.esc(loser.name) + ' loses a role card</button>'
+    : ["Disarm|disarm", "Shame|shame", "Drive Out|drive", "Wound|wound", "Search (manual)|search"].map(function (s) {
+        var x = s.split("|"); return '<button class="btn btn-secondary btn-sm" data-act="h-d-conseq" data-c="' + x[1] + '">' + x[0] + "</button>";
+      }).join("");
+  return wrap('<div class="eyebrow">Duel result' + (u.serious ? " · Serious" : "") + '</div>'
+    + '<h2 style="margin:4px 0 8px">' + CT.esc(att.name) + " " + aT + " vs " + dT + " " + CT.esc(def.name) + "</h2>"
+    + '<p style="margin:0 0 4px"><strong style="color:var(--gold)">' + CT.esc(winner.name) + " wins.</strong> "
+    + (attackerWins ? "" : "(Defender wins ties.) ") + CT.esc(winner.name) + " chooses a consequence for " + CT.esc(loser.name) + ".</p>"
+    + '<hr class="rule"><div class="btn-row">' + conseqs + "</div>"
+    + '<div class="btn-row" style="margin-top:12px"><button class="btn btn-ghost" data-act="h-d-back">← Back</button></div>');
+};
+
+/* ===================== Call Out (§28) ===================== */
+CT.helpers.openCallout = function () { CT.helpers.ui = { open: "callout", caller: "", target: "", role: "" }; CT.render(); };
+CT.helpers.vCallout = function () {
+  var u = CT.helpers.ui, ps = actives();
+  var ready = u.caller && u.target && u.role && u.caller !== u.target;
+  return wrap('<div class="eyebrow">Helper</div><h2 style="margin:4px 0 2px">Call Out</h2>'
+    + '<p class="muted" style="font-size:14px;margin:0 0 12px">Naming a hidden role. Corruption rises by 2 immediately. If correct, that role is revealed (Cursed One → Loyal win) and the caller gains a shown role. If wrong, the caller loses 1 Reputation. The app checks privately — wrong guesses reveal nothing.</p>'
+    + field("Caller", '<select data-act="h-co-caller">' + opt(ps, u.caller, "— who —") + "</select>")
+    + field("Target", '<select data-act="h-co-target">' + opt(ps, u.target, "— who —") + "</select>")
+    + field("Names this hidden role", '<select data-act="h-co-role">' + roleOpts(u.role) + "</select>")
+    + '<hr class="rule"><div class="btn-row"><div class="spacer"></div><button class="btn btn-danger" data-act="h-co-go"' + (ready ? "" : " disabled") + '>Call out (corruption +2)</button></div>');
+};
+
+/* ===================== Trade — Market immediate (§25) ===================== */
+CT.helpers.openTrade = function () { CT.helpers.ui = { open: "trade", a: "", b: "", goldAB: 0, goldBA: 0, cardAB: "", cardBA: "" }; CT.render(); };
+function handOpts(p, sel) {
+  if (!p) return '<option value="">—</option>';
+  return '<option value="">— no card —</option>' + p.actionCardIds.map(function (id, i) {
+    var c = CT.cardById(id); return '<option value="' + i + '"' + (String(i) === String(sel) ? " selected" : "") + '>' + CT.esc(c.name) + "</option>";
+  }).join("");
+}
+CT.helpers.vTrade = function () {
+  var u = CT.helpers.ui, ps = actives();
+  var a = CT.playerById(u.a), b = CT.playerById(u.b);
+  var ready = u.a && u.b && u.a !== u.b;
+  return wrap('<div class="eyebrow">Helper</div><h2 style="margin:4px 0 2px">Trade (immediate)</h2>'
+    + '<p class="muted" style="font-size:13px;margin:0 0 12px">Immediate exchange of gold and/or one action card each way. Use for Market trades (both at Market).</p>'
+    + '<div class="row" style="gap:12px">' + field("Player A", '<select data-act="h-t-a">' + opt(ps, u.a, "— who —") + "</select>")
+    + field("Player B", '<select data-act="h-t-b">' + opt(ps, u.b, "— who —") + "</select>") + "</div>"
+    + '<div class="row" style="gap:12px">' + field("Gold A → B", '<input type="number" min="0" data-act="h-t-goldab" value="' + u.goldAB + '">')
+    + field("Gold B → A", '<input type="number" min="0" data-act="h-t-goldba" value="' + u.goldBA + '">') + "</div>"
+    + '<div class="row" style="gap:12px">' + field("Card A → B", '<select data-act="h-t-cardab">' + handOpts(a, u.cardAB) + "</select>")
+    + field("Card B → A", '<select data-act="h-t-cardba">' + handOpts(b, u.cardBA) + "</select>") + "</div>"
+    + '<hr class="rule"><div class="btn-row"><div class="spacer"></div><button class="btn btn-primary" data-act="h-t-go"' + (ready ? "" : " disabled") + '>Execute trade</button></div>');
+};
+
+/* ===================== Blood Contract (§25) ===================== */
+CT.helpers.openContract = function () { CT.helpers.ui = { open: "contract", a: "", b: "", promise: "" }; CT.render(); };
+CT.helpers.vContract = function () {
+  var u = CT.helpers.ui, ps = actives();
+  var ready = u.a && u.b && u.a !== u.b && (u.promise || "").trim();
+  return wrap('<div class="eyebrow">Helper</div><h2 style="margin:4px 0 2px">Blood Contract</h2>'
+    + '<p class="muted" style="font-size:13px;margin:0 0 12px">A binding promise. If broken, the breaker loses 1 Reputation and corruption rises by 1. Manage existing contracts from the Pacts panel.</p>'
+    + '<div class="row" style="gap:12px">' + field("Party A", '<select data-act="h-c-a">' + opt(ps, u.a, "— who —") + "</select>")
+    + field("Party B", '<select data-act="h-c-b">' + opt(ps, u.b, "— who —") + "</select>") + "</div>"
+    + field("The promise", '<textarea data-act="h-c-promise" placeholder="e.g. Paul will vote with Shannon next round">' + CT.esc(u.promise || "") + "</textarea>")
+    + '<hr class="rule"><div class="btn-row"><div class="spacer"></div><button class="btn btn-primary" data-act="h-c-swear"' + (ready ? "" : " disabled") + '>Swear contract</button></div>');
+};
+
+/* ===================== handler ===================== */
+CT.helpers.handle = function (act, el) {
+  var u = CT.helpers.ui;
+  switch (act) {
+    // open / close
+    case "h-open-challenge": return CT.helpers.openChallenge();
+    case "h-open-vote": return CT.helpers.openVote();
+    case "h-open-duel": return CT.helpers.openDuel();
+    case "h-open-callout": return CT.helpers.openCallout();
+    case "h-open-trade": return CT.helpers.openTrade();
+    case "h-open-contract": return CT.helpers.openContract();
+    case "h-close": u.open = null; return CT.render();
+
+    // challenge (selects re-render; power input silent)
+    case "h-cl-claimant": u.claimant = el.value; return CT.render();
+    case "h-cl-challenger": u.challenger = el.value; return CT.render();
+    case "h-cl-power": u.power = el.value; return; // silent
+    case "h-ch-valid":
+      CT.log(CT.playerById(u.claimant).name + " proved \"" + (u.power || "their power") + "\". " + CT.playerById(u.challenger).name + " challenged wrongly and must lose a role.");
+      CT.ui.roleDiscardFor = u.challenger; CT.ui.roleDiscardRevealed = false; u.open = null; return CT.render();
+    case "h-ch-bluff":
+      CT.log(CT.playerById(u.claimant).name + "'s \"" + (u.power || "claim") + "\" was a failed bluff and they must lose a role.");
+      CT.ui.roleDiscardFor = u.claimant; CT.ui.roleDiscardRevealed = false; u.open = null; return CT.render();
+
+    // vote
+    case "h-v-type": u.vtype = el.dataset.t; u.target = ""; return CT.render();
+    case "h-v-proposer": u.proposer = el.value; return CT.render();
+    case "h-v-target": u.target = el.value; return CT.render();
+    case "h-v-seconder": u.seconder = el.checked; return CT.render();
+    case "h-v-decree": u.decree = el.checked; return CT.render();
+    case "h-v-start": u.phase = "tally"; return CT.render();
+    case "h-v-back": u.phase = "setup"; return CT.render();
+    case "h-v-cast": u.votes[el.dataset.pid] = el.dataset.v; return CT.render();
+    case "h-v-bonus":
+      var k = el.dataset.side === "yes" ? "bonusYes" : "bonusNo";
+      u[k] = Math.max(0, u[k] + (+el.dataset.d)); return CT.render();
+    case "h-v-apply": return CT.helpers.applyVote();
+
+    // duel
+    case "h-d-att": u.att = el.value; u.def = ""; return CT.render();
+    case "h-d-def": u.def = el.value; return CT.render();
+    case "h-d-override": u.override = el.checked; return CT.render();
+    case "h-d-serious": u.serious = el.checked; return CT.render();
+    case "h-d-attbonus": u.attBonus = +el.value || 0; return; // silent
+    case "h-d-defbonus": u.defBonus = +el.value || 0; return; // silent
+    case "h-d-fight": u.phase = "resolve"; return CT.render();
+    case "h-d-back": u.phase = "setup"; return CT.render();
+    case "h-d-flee": return CT.helpers.applyFlee();
+    case "h-d-conseq": return CT.helpers.applyDuelConseq(el.dataset.c);
+
+    // call out
+    case "h-co-caller": u.caller = el.value; return CT.render();
+    case "h-co-target": u.target = el.value; return CT.render();
+    case "h-co-role": u.role = el.value; return CT.render();
+    case "h-co-go": return CT.helpers.applyCallout();
+
+    // trade
+    case "h-t-a": u.a = el.value; u.cardAB = ""; return CT.render();
+    case "h-t-b": u.b = el.value; u.cardBA = ""; return CT.render();
+    case "h-t-goldab": u.goldAB = Math.max(0, +el.value || 0); return; // silent
+    case "h-t-goldba": u.goldBA = Math.max(0, +el.value || 0); return; // silent
+    case "h-t-cardab": u.cardAB = el.value; return CT.render();
+    case "h-t-cardba": u.cardBA = el.value; return CT.render();
+    case "h-t-go": return CT.helpers.applyTrade();
+
+    // contract
+    case "h-c-a": u.a = el.value; return CT.render();
+    case "h-c-b": u.b = el.value; return CT.render();
+    case "h-c-promise": u.promise = el.value; return; // silent
+    case "h-c-swear": CT.addContract(u.a, u.b, u.promise.trim()); u.open = null; return CT.render();
+    case "h-ct-fulfill": CT.resolveContract(el.dataset.id, "fulfilled"); return CT.render();
+    case "h-ct-break": CT.resolveContract(el.dataset.id, "broken", el.dataset.breaker); return CT.render();
+  }
+};
+
+/* ---------- apply functions ---------- */
+CT.helpers.applyVote = function () {
+  var u = CT.helpers.ui, ps = actives();
+  var yes = 0, no = 0;
+  ps.forEach(function (p) { var w = p.rep >= 5 ? 2 : 1; if (u.votes[p.id] === "yes") yes += w; else if (u.votes[p.id] === "no") no += w; });
+  yes += u.bonusYes; no += u.bonusNo;
+  var pass = yes > no;
+  var target = CT.playerById(u.target);
+  if (u.vtype === "accuse") {
+    CT.log("Accusation vote against " + target.name + ": " + (pass ? "PASSES" : "fails") + " (" + yes + "–" + no + ").");
+    if (pass) {
+      CT.ui.roleDiscardFor = u.target; CT.ui.roleDiscardRevealed = false;
+      CT.ui.afterDiscard = function () { if (!CT.state.winner) CT.adjustCorruption(2, "Cursed not revealed by accusation"); };
+    }
+  } else {
+    var innocent = target.hiddenRoleIds.indexOf("cursedone") === -1; // public can't be Cursed
+    CT.log("Banishment vote against " + target.name + ": " + (pass ? "PASSES" : "fails") + " (" + yes + "–" + no + ").");
+    if (pass) {
+      CT.ui.roleDiscardFor = u.target; CT.ui.roleDiscardRevealed = false;
+      CT.ui.afterDiscard = function () { if (!CT.state.winner && innocent) CT.adjustCorruption(1, "innocent banished"); };
+    }
+  }
+  u.open = null; CT.render();
+};
+
+CT.helpers.applyFlee = function () {
+  var u = CT.helpers.ui, def = CT.playerById(u.def);
+  CT.log(def.name + " plays Flee — the duel is cancelled. Move up to 2 spaces (manual).", "event");
+  CT.adjustRep(u.def, -1, "Flee");
+  u.open = null; CT.render();
+};
+
+CT.helpers.applyDuelConseq = function (c) {
+  var u = CT.helpers.ui;
+  var att = CT.playerById(u.att), def = CT.playerById(u.def);
+  var aT = roleBonus(att, "duelBonusAttack") + (+u.attBonus || 0);
+  var dT = roleBonus(def, "duelBonusDefence") + (+u.defBonus || 0);
+  var attackerWins = aT > dT;
+  var winner = attackerWins ? att : def, loser = attackerWins ? def : att;
+  CT.log("Duel: " + winner.name + " beat " + loser.name + " (" + aT + "–" + dT + ").");
+  if (u.serious) att.seriousDuelUsed = true;
+  switch (c) {
+    case "serious": CT.ui.roleDiscardFor = loser.id; CT.ui.roleDiscardRevealed = false; break;
+    case "disarm": CT.disarmRandom(loser.id, 2); break;
+    case "shame": CT.adjustRep(loser.id, -1, "Shame"); break;
+    case "wound": loser.wounded = true; CT.log(loser.name + " is Wounded — no hidden powers next turn."); break;
+    case "drive": {
+      var dest = (CT.legalMoves(loser)[0]) || loser.location;
+      CT.movePlayer(loser.id, dest, false); CT.log(loser.name + " was Driven Out.", "event"); break;
+    }
+    case "search": CT.log(winner.name + " searches " + loser.name + " — resolve privately (show a justifying role or lose 1 Rep).", "note"); break;
+  }
+  CT.save(); u.open = null; CT.render();
+};
+
+CT.helpers.applyCallout = function () {
+  var u = CT.helpers.ui;
+  var caller = CT.playerById(u.caller), target = CT.playerById(u.target), role = CT.roleById(u.role);
+  CT.log(caller.name + " calls out " + target.name + " as " + role.name + "!");
+  CT.adjustCorruption(2, "Call Out");
+  var correct = target.hiddenRoleIds.indexOf(u.role) > -1;
+  if (correct) {
+    CT.log("Correct — " + role.name + " is revealed.");
+    CT.applyRoleDiscard(target.id, "hidden", u.role); // reveals; Cursed -> loyal win; handles elimination
+    if (!CT.state.winner) CT.grantExtraShownRole(caller.id, "Call Out");
+  } else {
+    CT.log("Wrong — " + target.name + " reveals nothing. " + caller.name + " loses 1 Reputation.");
+    CT.adjustRep(caller.id, -1, "wrong Call Out");
+  }
+  CT.helpers.ui.open = null; CT.render();
+};
+
+CT.helpers.applyTrade = function () {
+  var u = CT.helpers.ui, a = CT.playerById(u.a), b = CT.playerById(u.b);
+  var gAB = Math.min(+u.goldAB || 0, a.gold), gBA = Math.min(+u.goldBA || 0, b.gold);
+  if (gAB) { a.gold -= gAB; b.gold += gAB; }
+  if (gBA) { b.gold -= gBA; a.gold += gBA; }
+  if (u.cardAB !== "" && a.actionCardIds[+u.cardAB] != null) { b.actionCardIds.push(a.actionCardIds.splice(+u.cardAB, 1)[0]); }
+  if (u.cardBA !== "" && b.actionCardIds[+u.cardBA] != null) { a.actionCardIds.push(b.actionCardIds.splice(+u.cardBA, 1)[0]); }
+  CT.log(a.name + " and " + b.name + " traded" + (gAB || gBA ? " gold" : "") + ".");
+  CT.save(); u.open = null; CT.render();
+};

@@ -21,6 +21,15 @@ refresh resumes the same game.
 
 ## What is implemented (Phases 1–2)
 
+### Phase 3 — Social mechanics
+A **Parley & Conflict** panel launches helpers that guide + log; social judgement stays at the table.
+- **Challenge (§19)**: pick claimant + challenger; record "proof valid" (challenger loses a role) or "failed bluff" (claimant loses a role) — routed through the role-discard helper.
+- **Formal vote (§21)**: Accuse Cursed / Banish Threat, with Rep-weighted tally (Rep 5 = ×2), seconder/Decree flags, and extra-weight steppers (Whisper Vote / Hidden Witness). Ties fail. On a pass the target loses a role; Accuse adds **corruption +2** if the Cursed One isn't revealed, Banish adds **+1** if the target was innocent.
+- **Duel (§22)**: attacker/defender (same location or override), auto public-role bonuses + manual card/power bonuses, ties to the defender. Winner picks a consequence — Disarm / Shame / Drive Out / Wound / Search — or, for a **Serious Duel** (Barracks, once per game, tracked), the loser discards a role. **Flee** cancels the duel (−1 Rep).
+- **Call Out (§28)**: corruption +2, then the app checks privately — correct reveals that role (Cursed One → Loyal win) and the caller gains an extra shown role; wrong costs the caller 1 Rep and reveals nothing.
+- **Trade (§25)**: immediate gold + one-card-each-way exchange.
+- **Blood Contract (§25)**: sworn pacts tracked in a **Pacts** panel; marking one broken docks the breaker 1 Rep and adds corruption +1.
+
 ### Solo testing — bots
 - At setup, mark any seat **Bot** (default: seat 1 is you, the rest are bots) so one person can exercise the systems. Bots skip pass-and-play (they auto-pick a public role).
 - On a bot's turn you get **▶ Play turn** (one bot turn) and **⏩ Auto-play bots** (runs every bot until it's a human's turn or the game ends). Bots are a simple rules engine — move → one affordable location action → end turn; the Cursed bot heads to the Graveyard, buys corruption, and performs the Final Rite when corruption ≥ 8. Not a real opponent (the game is social) — just a flow-testing aid.
@@ -57,7 +66,6 @@ brief — guide and track, don't over-automate.
 
 ## Known limitations / not yet built
 
-- **Phase 3**: challenge / vote / Call-Out / duel / trade helpers, Serious Duel tracking enforcement, Blood Contract notes.
 - **Phase 4**: Throne claim helper, royal removal, succession tracking.
 - **Phase 5**: richer board art, exportable playtest report, full 76 action cards, balance toggles.
 - Action cards are the §27 starter set (~30); the data model already scales to 76.

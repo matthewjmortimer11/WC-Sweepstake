@@ -77,6 +77,7 @@ CT.newGame = function (playersInput, undealtRoleIds, startingActionByPlayer, fir
     }),
     decks: {},     // deckName -> [cardId] draw pile (shuffled)
     discards: {},  // deckName -> [cardId]
+    contracts: [], // Blood Contracts (§25): {id, aId, bId, promise, status}
     log: [],
   };
   CT.DECK_NAMES.forEach(function (name) {
@@ -197,6 +198,7 @@ CT.load = function () {
     if (!raw) return null;
     var data = JSON.parse(raw);
     if (!data || data.version !== CT.SAVE_VERSION) return null;
+    if (!data.contracts) data.contracts = []; // backfill saves from before Phase 3
     CT.state = data;
     return CT.state;
   } catch (e) { return null; }
@@ -356,6 +358,53 @@ CT.applyRoleDiscard = function (playerId, slot, roleId) {
     CT.log(p.name + " has no role cards left and is eliminated.", "event");
     // a Cursed elimination would already have triggered loyal win above, so this is an innocent
     if (!CT.state.winner) CT.setInnocentElims(CT.state.innocentElims + 1, p.name + " eliminated");
+  }
+  CT.save();
+};
+
+/* ===================== Phase 3: social-mechanic engine bits ===================== */
+
+/* Call Out success grants the caller one extra shown role (§28), drawn face-up
+ * from the undealt role deck. Limit one extra shown role at a time. */
+CT.grantExtraShownRole = function (callerId, reason) {
+  var p = CT.playerById(callerId); if (!p) return;
+  if (p.extraShownRoleIds.length > 0) { CT.log(p.name + " already has an extra shown role; none granted.", "note"); return; }
+  if (!CT.state.undealtRoleIds.length) { CT.log("No undealt roles remain to grant.", "note"); return; }
+  var id = CT.state.undealtRoleIds.shift();
+  p.extraShownRoleIds.push(id);
+  CT.log(p.name + " gains an extra shown role: " + CT.roleById(id).name + (reason ? " (" + reason + ")" : "") + ".");
+  CT.save();
+};
+
+/* Duel "Disarm": loser discards up to n random action cards (§22). */
+CT.disarmRandom = function (playerId, n) {
+  var p = CT.playerById(playerId); if (!p) return 0;
+  var count = Math.min(n, p.actionCardIds.length), done = 0;
+  for (var i = 0; i < count; i++) {
+    var idx = Math.floor(Math.random() * p.actionCardIds.length);
+    CT.discardCard(p.id, p.actionCardIds[idx], "Disarm"); done++;
+  }
+  return done;
+};
+
+/* Blood Contract (§25) — manual note with a break penalty. */
+CT.addContract = function (aId, bId, promise) {
+  CT.state.contracts.push({ id: CT.util.uid("ct"), aId: aId, bId: bId, promise: promise, status: "active" });
+  var a = CT.playerById(aId), b = CT.playerById(bId);
+  CT.log("Blood Contract sworn between " + (a ? a.name : "?") + " and " + (b ? b.name : "?") + ".", "note");
+  CT.save();
+};
+CT.resolveContract = function (id, status, breakerId) {
+  var c = CT.state.contracts.find(function (x) { return x.id === id; });
+  if (!c) return;
+  c.status = status;
+  if (status === "broken") {
+    var who = CT.playerById(breakerId);
+    CT.log("Blood Contract broken by " + (who ? who.name : "?") + ".", "note");
+    if (who) CT.adjustRep(breakerId, -1, "broke a Blood Contract");
+    CT.adjustCorruption(1, "broken Blood Contract");
+  } else {
+    CT.log("Blood Contract fulfilled.", "note");
   }
   CT.save();
 };

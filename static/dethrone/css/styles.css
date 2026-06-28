@@ -220,6 +220,10 @@ textarea { min-height: 64px; resize: vertical; }
 .reminder { margin-top: var(--s4); background: var(--wax-soft); border: 1px solid #d49a8f; color: #6e201a;
   border-radius: var(--r-tag); padding: 10px 12px; font-size: 13px; display: flex; align-items: center; gap: var(--s3); justify-content: space-between; }
 
+/* vote tally rows */
+.vote-row { display: flex; align-items: center; justify-content: space-between; gap: var(--s3); padding: 6px 10px; background: var(--p-1); border: 1px solid var(--line); border-radius: var(--r-tag); }
+.vote-row .btn-row { gap: 6px; flex-wrap: nowrap; }
+
 /* player token */
 .token { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 700;
   background: var(--p-2); border: 1px solid var(--p-4); border-radius: var(--r-pill); padding: 1px 8px 1px 4px; }
