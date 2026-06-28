@@ -83,10 +83,33 @@ function kbLayoutTree(rounds) {
   return { cols: cols, links: links, totalH: totalH, totalW: totalW, active: active };
 }
 
+function kbPathHighlight(rounds) {
+  var me = (Skb && Skb.active) ? Skb.active() : WCkb.YOU;
+  if (!me || !me.team || me.alive === false) return {};
+  if (!(Skb && Skb.knockoutPathForTeam)) return {};
+  var path = Skb.knockoutPathForTeam(me.team);
+  if (!path || path.waitingDraw) return {};
+  var currentId = path.current && (path.current.tieId || (path.current.fixture && path.current.fixture.id));
+  var nextId = path.next && path.next.tieId;
+  return {
+    currentId: currentId || null,
+    nextId: nextId || null,
+    currentStage: path.current && path.current.stage,
+  };
+}
+
+function kbPathRole(tie, highlight) {
+  if (!tie || !highlight) return null;
+  if (highlight.currentId && tie.id === highlight.currentId) return 'current';
+  if (highlight.nextId && tie.id === highlight.nextId) return 'next';
+  return null;
+}
+
 function BracketCell(props) {
   var tie = props.tie;
   var compact = props.compact;
   var fromStandings = props.fromStandings;
+  var pathRole = props.pathRole;
   var pairingOnly = fromStandings && !!tie.projectedPairing && !tie.done && !tie.bracketPad && tie.a !== 'TBD' && tie.b !== 'TBD';
   var A = tie.teamA || { code: tie.a, flag: '🏳️', name: tie.a === 'TBD' ? 'TBD' : tie.a };
   var B = tie.teamB || { code: tie.b, flag: '🏳️', name: tie.b === 'TBD' ? 'TBD' : tie.b };
@@ -94,7 +117,14 @@ function BracketCell(props) {
   var bw = tie.done && tie.winner === tie.b;
   var border = tie.you ? '2.5px solid var(--ink)' : (tie.entrant ? '2px solid var(--red)' : '2px solid var(--line)');
   if (pairingOnly) border = '2px dashed var(--ink2)';
-  var bg = tie.you ? 'var(--yellow)' : (tie.bracketPad ? 'rgba(0,0,0,.02)' : '#fff');
+  if (pathRole === 'current') border = '3px solid var(--ink)';
+  else if (pathRole === 'next') border = '2.5px dashed var(--green)';
+  var bg = tie.you ? 'var(--yellow)' : (tie.bracketPad ? 'rgba(0,0,0,.04)' : '#fff');
+  if (pathRole === 'next') bg = 'rgba(26,122,68,.08)';
+  var cellClass = 'ko-bracket-cell'
+    + (pairingOnly ? ' ko-bracket-cell--projected' : '')
+    + (pathRole === 'current' ? ' ko-bracket-cell--path-current' : '')
+    + (pathRole === 'next' ? ' ko-bracket-cell--path-next' : '');
   function Row(p) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', gap: compact ? 4 : 6, opacity: p.lose ? .45 : 1, minHeight: compact ? 18 : 22 }}>
@@ -110,7 +140,9 @@ function BracketCell(props) {
     );
   }
   return (
-    <div className={'ko-bracket-cell' + (pairingOnly ? ' ko-bracket-cell--projected' : '')} style={{ border: border, borderRadius: compact ? 10 : 12, padding: compact ? '5px 7px' : '7px 9px', background: bg, height: '100%', boxSizing: 'border-box' }}>
+    <div className={cellClass} style={{ border: border, borderRadius: compact ? 10 : 12, padding: compact ? '5px 7px' : '7px 9px', background: bg, height: '100%', boxSizing: 'border-box' }}>
+      {pathRole === 'current' && <span className="ko-bracket-path-tag ko-bracket-path-tag--current">Your tie</span>}
+      {pathRole === 'next' && <span className="ko-bracket-path-tag ko-bracket-path-tag--next">If you win</span>}
       <Row team={A} score={tie.done && tie.score ? tie.score[0] : null} lose={bw} win={aw} />
       <div style={{ height: compact ? 2 : 4 }} />
       <Row team={B} score={tie.done && tie.score ? tie.score[1] : null} lose={aw} win={bw} />
@@ -125,14 +157,14 @@ function BracketTreeView(props) {
   var layout = props.layout;
   var labels = props.labels;
   var fromStandings = props.fromStandings;
+  var highlight = props.highlight || {};
   var scrollRef = kbRef(null);
   kbEffect(function () {
     if (!scrollRef.current || !props.focusStage) return;
     var col = layout.cols.find(function (c) { return c.stage === props.focusStage; });
     if (!col) return;
-    var target = Math.max(0, col.left - 24);
-    scrollRef.current.scrollLeft = target;
-  }, [props.focusStage, layout.cols.length]);
+    scrollRef.current.scrollLeft = Math.max(0, col.left - 24);
+  }, [props.focusStage, layout.cols.length, highlight.currentId]);
   return (
     <div className="ko-bracket-scroll" ref={scrollRef}>
       <div className="ko-bracket-canvas" style={{ width: layout.totalW, height: layout.totalH, position: 'relative' }}>
@@ -148,7 +180,7 @@ function BracketTreeView(props) {
               {col.slots.map(function (slot) {
                 return (
                   <div key={slot.tie.id} className="ko-bracket-slot" style={{ top: slot.top, height: KB_CELL_H }}>
-                    <BracketCell tie={slot.tie} compact fromStandings={props.fromStandings} />
+                    <BracketCell tie={slot.tie} compact fromStandings={fromStandings} pathRole={kbPathRole(slot.tie, highlight)} />
                   </div>
                 );
               })}
@@ -181,6 +213,7 @@ function BracketPanel(props) {
   var fromStandings = props.fromStandings;
   var rounds = props.rounds || {};
   var labels = props.labels || (WCkb.meta && WCkb.meta.stageLabels) || {};
+  var highlight = kbPathHighlight(rounds);
   var prefScope = fromStandings ? 'standings-bracket' : 'feed';
   var prefs = kbLoadPrefs(prefScope);
   var hasTree = KB_ROUND_ORDER.some(function (k) { return (rounds[k] || []).length; });
@@ -207,6 +240,12 @@ function BracketPanel(props) {
       kbSavePrefs(prefScope, { round: kr });
     }
   }, [WCkb.meta.knockoutRound]);
+  kbEffect(function () {
+    if (!highlight.currentStage || !(rounds[highlight.currentStage] || []).length) return;
+    if (round === highlight.currentStage) return;
+    setRound(highlight.currentStage);
+    kbSavePrefs(prefScope, { round: highlight.currentStage });
+  }, [highlight.currentStage, highlight.currentId]);
   function setViewPref(v) {
     setView(v);
     kbSavePrefs(prefScope, { view: v });
@@ -216,7 +255,8 @@ function BracketPanel(props) {
     kbSavePrefs(prefScope, { round: r });
   }
   if (!hasTree && !hasThird) return null;
-  var focusStage = WCkb.meta.knockoutRound || round;
+  var focusStage = highlight.currentStage || WCkb.meta.knockoutRound || round;
+  var showPathLegend = !!(highlight.currentId || highlight.nextId);
   return (
     <Ckb>
       {!props.embedded && (
@@ -248,16 +288,18 @@ function BracketPanel(props) {
         <span><span style={{ display: 'inline-block', width: 10, height: 10, border: '2px solid var(--red)', borderRadius: 2, verticalAlign: 'middle', marginRight: 4 }} /> Entrant in tie</span>
         {fromStandings && <span><span style={{ display: 'inline-block', width: 10, height: 10, border: '2px dashed var(--ink2)', borderRadius: 2, verticalAlign: 'middle', marginRight: 4 }} /> Pairing from standings</span>}
         <span><span style={{ display: 'inline-block', width: 10, height: 10, background: 'rgba(0,0,0,.04)', border: '2px solid var(--line)', borderRadius: 2, verticalAlign: 'middle', marginRight: 4 }} /> TBD</span>
+        {showPathLegend && <span><span style={{ display: 'inline-block', width: 10, height: 10, background: 'var(--yellow)', border: '3px solid var(--ink)', borderRadius: 2, verticalAlign: 'middle', marginRight: 4 }} /> Your tie</span>}
+        {showPathLegend && highlight.nextId && <span><span style={{ display: 'inline-block', width: 10, height: 10, background: 'rgba(26,122,68,.12)', border: '2px dashed var(--green)', borderRadius: 2, verticalAlign: 'middle', marginRight: 4 }} /> If you win</span>}
       </div>
       {effectiveView === 'tree'
         ? <React.Fragment>
-            <BracketTreeView layout={layout} labels={labels} focusStage={focusStage} fromStandings={fromStandings} />
+            <BracketTreeView layout={layout} labels={labels} focusStage={focusStage} fromStandings={fromStandings} highlight={highlight} />
             {hasThird && <div style={{ marginTop: 12, maxWidth: 280 }}>
               <div className="ko-bracket-col-label dh" style={{ marginBottom: 6 }}>{labels.third || 'Third place'}</div>
-              {(rounds.third || []).map(function (tie) { return <BracketCell key={tie.id} tie={tie} fromStandings={fromStandings} />; })}
+              {(rounds.third || []).map(function (tie) { return <BracketCell key={tie.id} tie={tie} fromStandings={fromStandings} pathRole={kbPathRole(tie, highlight)} />; })}
             </div>}
           </React.Fragment>
-        : <BracketListView rounds={rounds} order={KB_LIST_ORDER} labels={labels} round={listRound} setRound={setRoundPref} fromStandings={fromStandings} />}
+        : <BracketListView rounds={rounds} order={KB_LIST_ORDER} labels={labels} round={listRound} setRound={setRoundPref} fromStandings={fromStandings} highlight={highlight} />}
     </Ckb>
   );
 }
@@ -270,6 +312,7 @@ function BracketListView(props) {
   var setRound = props.setRound;
   var hideRoundTabs = props.hideRoundTabs;
   var fromStandings = props.fromStandings;
+  var highlight = props.highlight || {};
   var ties = rounds[round] || [];
   return (
     <React.Fragment>
@@ -285,7 +328,7 @@ function BracketListView(props) {
         })}
       </div>}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-        {ties.map(function (tie) { return <BracketCell key={tie.id} tie={tie} fromStandings={fromStandings} />; })}
+        {ties.map(function (tie) { return <BracketCell key={tie.id} tie={tie} fromStandings={fromStandings} pathRole={kbPathRole(tie, highlight)} />; })}
       </div>
     </React.Fragment>
   );

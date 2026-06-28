@@ -187,6 +187,7 @@
         isLive: st === 'live' || st === 'halfTime',
         status: st,
         projected: false,
+        tieId: f.id,
       };
     }
 
@@ -236,6 +237,7 @@
         return {
           stage: stage || tie.stage,
           stageLabel: label,
+          tieId: tie.id,
           slotA: 'TBD',
           slotB: 'TBD',
           description: label + ' berth',
@@ -245,6 +247,7 @@
       return {
         stage: stage || tie.stage,
         stageLabel: label,
+        tieId: tie.id,
         slotA: tie.a,
         slotB: tie.b,
         teamA: a,
@@ -276,6 +279,7 @@
         isLive: st === 'live' || st === 'halfTime',
         status: st,
         projected: !!tie.projectedPairing,
+        tieId: tie.id,
       };
     }
 

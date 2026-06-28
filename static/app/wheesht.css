@@ -129,3 +129,30 @@
 .ko-bracket-cell--projected {
   opacity: 0.96;
 }
+.ko-bracket-cell--path-current {
+  box-shadow: 0 0 0 2px var(--ink), 0 4px 0 var(--shadow);
+}
+.ko-bracket-cell--path-next {
+  box-shadow: 0 0 0 2px rgba(26, 122, 68, .35);
+}
+.ko-bracket-path-tag {
+  position: absolute;
+  top: -7px;
+  left: 8px;
+  font-size: 8px;
+  font-weight: 900;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  padding: 1px 5px;
+  border-radius: 4px;
+  line-height: 1.3;
+  z-index: 2;
+}
+.ko-bracket-path-tag--current {
+  background: var(--ink);
+  color: var(--yellow);
+}
+.ko-bracket-path-tag--next {
+  background: var(--green);
+  color: #fff;
+}
