@@ -344,7 +344,10 @@ def grade_predictions(
             t = by_code.get(special_stage_keys[key])
             # Only settle once they can't progress further.
             if t and (not t.get("alive") or t.get("stage") == "winner"):
-                idx = ladder_index.get(t.get("stage"))
+                stage = t.get("stage")
+                if stage and str(stage).startswith("out-"):
+                    stage = str(stage)[4:]
+                idx = ladder_index.get(stage)
                 opts = m.get("options") or []
                 # The stage-market options are positionally aligned with the
                 # stage ladder (group → winner).

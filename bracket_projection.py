@@ -162,11 +162,13 @@ def _feed_fills_r32_slot(slot: Dict[str, Any], feed: Dict[str, Any]) -> bool:
     ta, tb = slot.get("a"), slot.get("b")
     if {fa, fb} == {ta, tb}:
         return True
-    feed_teams = [c for c in (fa, fb) if c and c != "TBD"]
-    if not feed_teams:
+    known = [c for c in (ta, tb) if c and c != "TBD"]
+    if len(known) != 1:
         return False
-    slot_teams = [ta, tb]
-    return any(t in slot_teams for t in feed_teams)
+    feed_teams = [c for c in (fa, fb) if c and c != "TBD"]
+    if len(feed_teams) != 1:
+        return False
+    return feed_teams[0] == known[0]
 
 
 def _merge_r32_feed(
@@ -187,9 +189,16 @@ def _merge_r32_feed(
                 placed = True
                 break
         if not placed:
-            out = dict(f)
-            out["projectedPairing"] = False
-            merged.append(out)
+            feed_teams = [c for c in (f.get("a"), f.get("b")) if c and c != "TBD"]
+            dup = any(
+                c in (m.get("a"), m.get("b"))
+                for m in merged
+                for c in feed_teams
+            )
+            if not dup:
+                out = dict(f)
+                out["projectedPairing"] = False
+                merged.append(out)
     return sorted(merged, key=_r32_sort_key)
 
 

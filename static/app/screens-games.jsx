@@ -121,6 +121,13 @@ function NextUp(props) {
   );
 }
 
+function groupFixtureSort(a, b) {
+  var comp = window.WheeshtCompetition;
+  if (comp && comp.compFixtureSort) return comp.compFixtureSort(a, b);
+  var km = (window.WheeshtFixtures && window.WheeshtFixtures.kickoffMs) || function () { return 0; };
+  return (km(a) || 0) - (km(b) || 0);
+}
+
 function GamesScreen() {
   const me = Sg ? Sg.active() : null;
   const mineTeam = me ? me.team : null;
@@ -139,7 +146,7 @@ function GamesScreen() {
   const koFixtures = (Sg && Sg.buildKnockoutFixtureList)
     ? Sg.buildKnockoutFixtureList()
     : all.filter(isKnockoutFixture);
-  const groupFixtures = all.filter(function (f) { return !isKnockoutFixture(f); });
+  const groupFixtures = all.filter(function (f) { return !isKnockoutFixture(f); }).sort(groupFixtureSort);
   const fxApi = window.WheeshtFixtures || {};
   const koOrderKey = fxApi.knockoutFixtureOrderKey || function (f) { return String(f.id || (f.stage + '|' + f.a + '|' + f.b)); };
   const koOrder = {};
@@ -158,11 +165,12 @@ function GamesScreen() {
       if (ib == null) return -1;
       return ia - ib;
     });
-  } else if (fxApi.sortKnockoutFixtures && list.some(isKnockoutFixture)) {
-    list = fxApi.sortKnockoutFixtures(list);
+  } else {
+    list.sort(groupFixtureSort);
   }
 
-  const upcoming = (koPhase && !showGroup ? koFixtures : all).filter(function (f) { return statusOf(f) !== 'done'; });
+  const upcomingSource = koPhase && !showGroup ? koFixtures : groupFixtures;
+  const upcoming = upcomingSource.filter(function (f) { return statusOf(f) !== 'done'; });
   const path = (mineTeam && Sg && Sg.knockoutPathForTeam) ? Sg.knockoutPathForTeam(mineTeam) : null;
   const pathCur = path && path.current;
   const nextMineFromPath = pathCur && pathCur.fixture ? pathCur.fixture : null;

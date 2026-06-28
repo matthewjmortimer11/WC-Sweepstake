@@ -167,8 +167,9 @@ function SweepstakeTieOwners(props) {
 /* ---- qualification read (honest, non-speculative) ----------------------- */
 function qualStatus(t, G, mePos, gamesLeft) {
   if (!t.alive) return { label: 'Eliminated', tone: 'red', mood: 'crying', mustWin: false, detail: 'Out of the tournament. The predictions league is still live, mind.' };
-  if (t.rounds >= 1) return { label: 'Through to the knockouts', tone: 'green', mood: 'celebrating', mustWin: false, detail: 'Group survived. Now it gets serious.' };
   var groupsComplete = !!(WCc.meta && WCc.meta.groupsComplete);
+  var teamPhase = Sc.teamSweepstakePhase ? Sc.teamSweepstakePhase(t.code) : 'in_group';
+  if (t.rounds >= 1 && teamPhase !== 'in_group') return { label: 'Through to the knockouts', tone: 'green', mood: 'celebrating', mustWin: false, detail: 'Group survived. Now it gets serious.' };
   if (groupsComplete && gamesLeft === 0 && t.alive) return { label: 'Through to knockouts', tone: 'green', mood: 'celebrating', mustWin: false, detail: 'Groups finished — you are in the Round of 32.' };
   if (!G.hasResults) return { label: 'Not started', tone: 'ghost', mood: 'confident', mustWin: false, detail: 'No ball kicked yet. Everything to play for.' };
   if (mePos <= 2) return { label: 'In a qualifying spot', tone: 'green', mood: 'confident', mustWin: false, detail: 'Top two go through. Hold your nerve.' };

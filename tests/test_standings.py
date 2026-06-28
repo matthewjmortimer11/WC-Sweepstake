@@ -125,6 +125,15 @@ def test_apply_to_people_mirrors_team_status():
     assert out[0]["stage"] == "out-r16"
 
 
+def test_scotland_stage_market_grades_on_knockout_exit():
+    teams = [{**_team("SCO"), "alive": False, "stage": "out-r16", "rounds": 2}]
+    fixtures = []
+    opts = ["Group stage", "Round of 32", "Round of 16", "Quarter-finals", "Semi-finals", "Final", "Winners"]
+    preds = [{"key": "scotland", "kind": "team", "options": opts, "answer": None, "points": 5}]
+    graded = standings.grade_predictions(preds, teams, fixtures, LADDER)
+    assert graded[0]["answer"] == "Round of 16"
+
+
 def test_penalty_knockout_eliminates_loser():
     teams = [_team("AAA"), _team("BBB")]
     fixtures = [

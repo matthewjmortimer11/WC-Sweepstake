@@ -207,6 +207,23 @@
       return null;
     }
 
+    function findLastFinishedBracketSlot(teamCode, merged) {
+      var last = null;
+      var i, st, ties, ti, tie;
+      for (i = 0; i < BRACKET_TREE_STAGES.length; i++) {
+        st = BRACKET_TREE_STAGES[i];
+        ties = merged[st] || [];
+        for (ti = 0; ti < ties.length; ti++) {
+          tie = ties[ti];
+          if (tie.bracketPad) continue;
+          if (tie.a !== teamCode && tie.b !== teamCode) continue;
+          if (!tieFinished(tie)) continue;
+          last = { stage: st, index: ti, tie: tie };
+        }
+      }
+      return last;
+    }
+
     function nextKnockoutStageAfter(stage) {
       var si = BRACKET_TREE_STAGES.indexOf(stage);
       if (si < 0 || si >= BRACKET_TREE_STAGES.length - 1) return null;
@@ -326,6 +343,13 @@
         if (idx >= 0) {
           var nxt2 = nextBracketSlot(current.stage, idx, merged);
           if (nxt2 && nxt2.tie) next = describeBracketSlot(nxt2.tie, nxt2.stage);
+        }
+      }
+      if (!next) {
+        var finishedSlot = findLastFinishedBracketSlot(teamCode, merged);
+        if (finishedSlot) {
+          var nxt3 = nextBracketSlot(finishedSlot.stage, finishedSlot.index, merged);
+          if (nxt3 && nxt3.tie) next = describeBracketSlot(nxt3.tie, nxt3.stage);
         }
       }
       if (!current && tsp === 'in_knockout' && t.stage && t.stage !== 'group' && t.stage !== 'winner') {
@@ -556,9 +580,11 @@
 
     function feedFillsR32Slot(slot, feed) {
       if (sameBracketPair(slot.a, slot.b, feed.a, feed.b)) return true;
+      var slotKnown = [slot.a, slot.b].filter(function (c) { return c && c !== 'TBD'; });
+      if (slotKnown.length !== 1) return false;
       var feedTeams = [feed.a, feed.b].filter(function (c) { return c && c !== 'TBD'; });
-      if (!feedTeams.length) return false;
-      return feedTeams.some(function (c) { return c === slot.a || c === slot.b; });
+      if (feedTeams.length !== 1) return false;
+      return feedTeams[0] === slotKnown[0];
     }
 
     function mergeR32Rounds(proj, feed) {
@@ -821,20 +847,25 @@
 
       var entered = people.length;
       var stillIn = people.filter(function (p) { return p.alive; }).length;
-      var out = meta.out != null ? Number(meta.out) : (entered - stillIn);
+      var out = entered - stillIn;
       var groupsN = people.filter(throughGroups).length;
       var r32N = people.filter(pastR32).length;
       var qfN = people.filter(intoQFs).length;
       var tp = meta.tournamentPhase || (meta.groupsComplete ? 'group_complete' : 'group');
+      var inGroupStage = tp === 'group' && !meta.groupsComplete;
 
       var subtitle;
-      if (tp === 'group' && !meta.groupsComplete) {
-        subtitle = entered + ' in the draw · updates after each group result';
+      if (inGroupStage) {
+        subtitle = out + ' out · ' + stillIn + ' still in · updates after each result';
       } else if (tp === 'group_complete') {
         subtitle = out + ' out after groups · ' + stillIn + ' still standing';
       } else {
         subtitle = out + ' knocked out · ' + stillIn + ' still in the hunt';
       }
+
+      var stage2Label = meta.groupsComplete ? 'In knockouts' : 'Still in groups';
+      var stage2N = meta.groupsComplete ? groupsN : stillIn;
+      var stage2Sub = meta.groupsComplete ? 'Top two + best thirds' : 'alive in the draw';
 
       return {
         entered: entered,
@@ -846,13 +877,9 @@
         subtitle: subtitle,
         stages: [
           { label: 'Entered', n: entered, sub: 'the draw' },
-          {
-            label: meta.groupsComplete ? 'In knockouts' : 'Through groups',
-            n: groupsN,
-            sub: meta.groupsComplete ? 'Top two + best thirds' : 'Qualifiers only',
-          },
-          { label: 'Past R32', n: r32N, sub: 'Last 16' },
-          { label: 'Into QFs', n: qfN, sub: 'Last 8' },
+          { label: stage2Label, n: stage2N, sub: stage2Sub },
+          { label: 'Past R32', n: inGroupStage ? 0 : r32N, sub: inGroupStage ? 'after knockouts begin' : 'Last 16' },
+          { label: 'Into QFs', n: inGroupStage ? 0 : qfN, sub: inGroupStage ? 'after knockouts begin' : 'Last 8' },
           { label: 'Still in', n: stillIn, sub: 'right now' },
         ],
       };
