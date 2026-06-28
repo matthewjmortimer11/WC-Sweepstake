@@ -637,6 +637,89 @@
       return false;
     }
 
+    var KO_LIST_STAGES = ['r32', 'r16', 'qf', 'sf', 'final', 'third'];
+    var KO_STAGE_SORT = { r32: 1, r16: 2, qf: 3, sf: 4, final: 5, third: 6 };
+
+    function knockoutFixtureKey(f) {
+      return String(f.stage || '') + '|' + bracketPairKey(f.a, f.b);
+    }
+
+    function bracketTieToFixture(tie, stage) {
+      if (!tie || tie.bracketPad) return null;
+      if (tie.a === 'TBD' && tie.b === 'TBD') return null;
+      var st = fixtureStatus(tie);
+      return {
+        id: tie.id || ('bracket-' + stage + '-' + tie.a + '-' + tie.b),
+        a: tie.a,
+        b: tie.b,
+        stage: stage,
+        group: null,
+        matchday: null,
+        status: tie.done ? 'done' : (st === 'upcoming' ? 'upcoming' : st),
+        score: tie.score,
+        winner: tie.winner,
+        dateISO: tie.dateISO || null,
+        dateLabel: tie.dateLabel || (tie.projectedPairing ? 'Pairing TBC' : 'Date TBC'),
+        time: tie.time || null,
+        venue: tie.venue || null,
+        projectedPairing: !!tie.projectedPairing,
+        fromBracket: true,
+      };
+    }
+
+    function findFeedKnockoutMatch(fx, stage) {
+      var feed = WC.FIXTURES || [];
+      for (var i = 0; i < feed.length; i++) {
+        var f = feed[i];
+        if (f.stage !== stage) continue;
+        if (fx.id && f.id === fx.id) return f;
+        if (sameBracketPair(f.a, f.b, fx.a, fx.b)) return f;
+      }
+      return null;
+    }
+
+    function buildKnockoutFixtureList() {
+      var merged = buildMergedKnockoutBracket();
+      var out = [];
+      var seen = {};
+      KO_LIST_STAGES.forEach(function (st) {
+        (merged[st] || []).forEach(function (tie) {
+          var fx = bracketTieToFixture(tie, st);
+          if (!fx) return;
+          var feedMatch = findFeedKnockoutMatch(fx, st);
+          if (feedMatch) {
+            fx = Object.assign({}, fx, feedMatch, { projectedPairing: false, fromBracket: false });
+          }
+          var key = knockoutFixtureKey(fx);
+          if (seen[key]) return;
+          seen[key] = true;
+          out.push(fx);
+        });
+      });
+      (WC.FIXTURES || []).forEach(function (f) {
+        if (!f.stage || f.stage === 'group') return;
+        var key = knockoutFixtureKey(f);
+        if (seen[key]) return;
+        seen[key] = true;
+        out.push(f);
+      });
+      out.sort(function (a, b) {
+        var ra = statusRank(fixtureStatus(a));
+        var rb = statusRank(fixtureStatus(b));
+        if (ra !== rb) return ra - rb;
+        var sa = KO_STAGE_SORT[a.stage] || 99;
+        var sb = KO_STAGE_SORT[b.stage] || 99;
+        if (sa !== sb) return sa - sb;
+        var ka = kickoffMs(a);
+        var kb = kickoffMs(b);
+        if (ka && kb && ka !== kb) return ka - kb;
+        if (ka && !kb) return -1;
+        if (!ka && kb) return 1;
+        return r32SlotNum({ id: a.id }) - r32SlotNum({ id: b.id });
+      });
+      return out;
+    }
+
     WC.fixtures = {
       kickoffMs: kickoffMs,
       status: fixtureStatus,
@@ -650,6 +733,7 @@
       buildKnockoutBracket: buildKnockoutBracket,
       buildProjectedKnockoutBracket: buildProjectedKnockoutBracket,
       buildMergedKnockoutBracket: buildMergedKnockoutBracket,
+      buildKnockoutFixtureList: buildKnockoutFixtureList,
       knockoutBracketVisible: knockoutBracketVisible,
       projectedBracketVisible: projectedBracketVisible,
       projectedR32Opponent: projectedR32Opponent,

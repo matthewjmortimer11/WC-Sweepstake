@@ -1357,6 +1357,10 @@
       var fx = window.WheeshtFixtures;
       return fx && fx.buildMergedKnockoutBracket ? fx.buildMergedKnockoutBracket() : {};
     },
+    buildKnockoutFixtureList: function () {
+      var fx = window.WheeshtFixtures;
+      return fx && fx.buildKnockoutFixtureList ? fx.buildKnockoutFixtureList() : [];
+    },
     knockoutBracketVisible: function () {
       var fx = window.WheeshtFixtures;
       return fx && fx.knockoutBracketVisible ? fx.knockoutBracketVisible() : false;

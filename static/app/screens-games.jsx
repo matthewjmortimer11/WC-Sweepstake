@@ -63,6 +63,7 @@ function FixtureRow(props) {
           <Chg tone="ghost">{ko ? koStageLabel(f) : ('Group ' + f.group)}</Chg>
           {!ko && <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--ink2)' }}>MD{f.matchday}</span>}
           {mine && <Chg tone="yellow">Your team</Chg>}
+          {f.projectedPairing && <Chg tone="ghost">From standings</Chg>}
         </div>
         {st === 'done' && f.score
           ? <Chg tone="ink">FT {f.score[0]}–{f.score[1]}</Chg>
@@ -125,10 +126,12 @@ function GamesScreen() {
   const [showGroup, setShowGroup] = gState(false);
   const owned = ownedSet();
   const all = (WCg.FIXTURES || []).slice();
-  const koFixtures = all.filter(isKnockoutFixture);
+  const koFixtures = (Sg && Sg.buildKnockoutFixtureList)
+    ? Sg.buildKnockoutFixtureList()
+    : all.filter(isKnockoutFixture);
   const groupFixtures = all.filter(function (f) { return !isKnockoutFixture(f); });
 
-  let list = koPhase && !showGroup ? koFixtures : groupFixtures;
+  let list = koPhase && !showGroup ? koFixtures.slice() : groupFixtures.slice();
   if (filter === 'mine' && mineTeam) list = list.filter(function (f) { return f.a === mineTeam || f.b === mineTeam; });
   else if (filter === 'owned') list = list.filter(function (f) { return owned[f.a] || owned[f.b]; });
 
@@ -142,10 +145,14 @@ function GamesScreen() {
   const byDate = [];
   const seen = {};
   list.forEach(function (f) {
-    var key = f.dateISO || f.dateLabel || 'TBC';
-    if (!seen[key]) { seen[key] = { label: f.dateLabel || 'Date TBC', items: [] }; byDate.push(seen[key]); }
+    var key = f.dateISO || ('tbc-' + (f.stage || 'ko'));
+    if (!seen[key]) {
+      seen[key] = { label: f.dateLabel || (f.dateISO ? f.dateLabel : (koStageLabel(f) + ' · date TBC')), items: [], sortKey: f.dateISO || ('0000-' + (f.stage || 'z')) };
+      byDate.push(seen[key]);
+    }
     seen[key].items.push(f);
   });
+  byDate.sort(function (a, b) { return String(a.sortKey).localeCompare(String(b.sortKey)); });
 
   const filters = koPhase && !showGroup
     ? [['all', 'All knockouts'], ['owned', 'In the draw'], ['mine', 'My team']]
@@ -154,7 +161,9 @@ function GamesScreen() {
   const stageLbl = (WCg.meta && WCg.meta.stageLabel) || 'Knockout stage';
   const title = koPhase && !showGroup ? 'Knockout fixtures' : 'Upcoming games';
   const subtitle = koPhase && !showGroup
-    ? (koFixtures.length ? stageLbl + ' · ' + koFixtures.length + ' ties' : 'R32 pairings coming — check the bracket on Me')
+    ? (koFixtures.length
+      ? stageLbl + ' · ' + koFixtures.length + ' ties' + (koFixtures.some(function (f) { return f.projectedPairing; }) ? ' (includes standings pairings)' : '')
+      : 'R32 pairings coming — check the bracket on Me')
     : (groupFixtures.length + ' group-stage fixtures · kick-off ' + (WCg.meta.kickoff || 'soon'));
 
   return (
