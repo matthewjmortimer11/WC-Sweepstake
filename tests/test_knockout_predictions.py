@@ -120,3 +120,28 @@ def test_scoreline_type():
     )
     assert out[0]["kind"] == "scoreline"
     assert out[0]["answer"] == "1-0"
+
+
+def test_fixture_status_done_when_done_flag_only():
+    fixtures = [_fx("AAA", "BBB", stage="r16", status="upcoming", score=[2, 1], winner="HOME")]
+    fixtures[0]["done"] = True
+    teams = {"AAA": _team("AAA"), "BBB": _team("BBB")}
+    out = kp.knockout_prediction_markets(
+        fixtures, teams,
+        {"enabled": True, "fromStage": "r16", "toStage": "final"},
+        status_is_done=standings._fixture_finished,
+        winner_of=standings._winner_of,
+    )
+    assert out[0]["fixture_status"] == "done"
+    assert out[0]["answer"] == "AAA"
+    assert out[0]["dateISO"] == "2026-07-05"
+
+
+def test_ko_scores_when_answer_set_despite_stale_status():
+    preds = [{
+        "key": "ko_fix1", "kind": "team", "points": 5, "answer": "AAA",
+        "fixture_status": "upcoming", "fixture_id": "fix1",
+    }]
+    people = [{"id": "p1", "picks": {"ko_fix1": "AAA"}, "predScore": 0}]
+    out = standings.apply_pred_scores(people, preds)
+    assert out[0]["predScore"] == 5

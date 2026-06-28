@@ -684,13 +684,21 @@ def _resolve(league_people: List[Dict[str, Any]], admin: Dict[str, Any]):
         except (TypeError, ValueError):
             dm_points = 5
         fix_status = f.get("status", "upcoming")
+        if standings._fixture_finished(f):
+            fix_status = "done"
+        fix_meta = {
+            "fixture_id": fixture_id,
+            "fixture_status": fix_status,
+            "dateISO": f.get("dateISO"),
+            "time": f.get("time"),
+        }
         if dm_type == "winner":
             market = {"key": market_id, "q": fa + " " + na + " vs " + fb + " " + nb + " — who wins?",
                       "kind": "team", "points": dm_points,
                       "options": [f["a"], f["b"], "draw"], "answer": None,
-                      "fixture_id": fixture_id, "fixture_status": fix_status}
+                      **fix_meta}
             sc = f.get("score")
-            if _status_is_done(fix_status):
+            if standings._fixture_finished(f):
                 win = standings._winner_of(f)
                 if win == "HOME":
                     market["answer"] = f["a"]
@@ -702,9 +710,9 @@ def _resolve(league_people: List[Dict[str, Any]], admin: Dict[str, Any]):
             market = {"key": market_id, "q": fa + " " + na + " vs " + fb + " " + nb + " — exact score?",
                       "kind": "scoreline", "points": dm_points,
                       "options": [f["a"], f["b"]], "answer": None,
-                      "fixture_id": fixture_id, "fixture_status": fix_status}
+                      **fix_meta}
             sc = f.get("score")
-            if _status_is_done(fix_status) and isinstance(sc, (list, tuple)) and len(sc) == 2 and None not in sc:
+            if standings._fixture_finished(f) and isinstance(sc, (list, tuple)) and len(sc) == 2 and None not in sc:
                 market["answer"] = str(sc[0]) + "-" + str(sc[1])
         predictions.append(market)
 
@@ -729,6 +737,8 @@ def _resolve(league_people: List[Dict[str, Any]], admin: Dict[str, Any]):
 
     for m in predictions:
         if m["key"] in admin_preds:
+            if str(m["key"]).startswith("ko_"):
+                continue
             ans = admin_preds[m["key"]]
             if m.get("kind") == "team2":
                 # Only apply if both teams are known non-null strings (guards stale [null,null] data)
@@ -818,6 +828,28 @@ def _status_is_live(status: Any) -> bool:
         "live", "halftime", "half_time", "half-time", "inplay", "in_play",
         "in-progress", "inprogress", "paused", "ht", "1h", "2h",
     }
+
+
+def _fixture_pick_open(f: Optional[Dict[str, Any]]) -> bool:
+    """Per-fixture prediction markets lock at kick-off or when live/finished."""
+    if not f:
+        return False
+    if standings._fixture_finished(f):
+        return False
+    if _status_is_live(f.get("status")):
+        return False
+    date_iso = f.get("dateISO")
+    if not date_iso:
+        return True
+    try:
+        tm = str(f.get("time") or "00:00")[:5]
+        kick = datetime.fromisoformat(str(date_iso) + "T" + tm + ":00")
+        kick_utc = kick.replace(tzinfo=_UK_TZ).astimezone(timezone.utc)
+        if time.time() >= kick_utc.timestamp():
+            return False
+    except Exception:
+        pass
+    return True
 
 
 def _sync_meta() -> Dict[str, Any]:
@@ -1129,7 +1161,7 @@ async def lifespan(app: FastAPI):
     api_key = os.environ.get("FOOTBALL_DATA_API_KEY", "")
     if api_key:
         from adapters.football_data_org import FootballDataOrgAdapter
-        adapter = FootballDataOrgAdapter(api_key)
+        adapter = FootballDataOrgAdapter(api_key, known_teams=_wc_data.get("teams") or [])
         sync.set_sync_adapter("football-data.org")
         log.info("Using FootballDataOrgAdapter")
     else:
@@ -2508,6 +2540,17 @@ async def set_pick(
             raise HTTPException(status_code=404, detail="league not found")
         _require_pro(league)
         await _guard_account_write(session, league, participant_id, x_wheesht_account_token, x_wheesht_admin_token)
+        key = str(payload.key or "")
+        if key.startswith("ko_") or key.startswith("dm_"):
+            admin = await _get_admin_data(session, league)
+            _, fixtures, _, predictions, _ = _resolve([], admin)
+            market = next((m for m in predictions if isinstance(m, dict) and m.get("key") == key), None)
+            if market is None:
+                raise HTTPException(status_code=400, detail="Unknown prediction market")
+            fid = str(market.get("fixture_id") or "")
+            fix = next((f for f in fixtures if str(f.get("id") or "") == fid), None)
+            if not _fixture_pick_open(fix):
+                raise HTTPException(status_code=400, detail="This pick is locked — kick-off has passed")
         row = await session.get(Participant, participant_id)
         if row is None or row.league_id != league.id:
             # Seeded base entry making its first pick → materialise a DB row.

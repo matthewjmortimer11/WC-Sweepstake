@@ -387,9 +387,12 @@ def grade_predictions(
 def _market_resolved(m: Dict[str, Any]) -> bool:
     if not m:
         return False
-    if str(m.get("key") or "").startswith("dm_"):
+    key = str(m.get("key") or "")
+    if key.startswith(("dm_", "ko_")):
+        if m.get("kind") != "team2" and m.get("answer") is not None:
+            return True
         st = str(m.get("fixture_status") or m.get("fixtureStatus") or m.get("status") or "").lower()
-        if st not in ("done", "ft", "fulltime", "full_time", "full-time", "finished"):
+        if st not in _DONE:
             return False
     if m.get("kind") == "team2":
         ans = m.get("answer")

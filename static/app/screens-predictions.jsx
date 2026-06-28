@@ -18,7 +18,10 @@ function isKnockoutBracketMarket(m) {
 }
 
 function isResolved(m) {
-  if (isPerFixtureMarket(m) && !fixtureFinished(m)) return false;
+  if (isPerFixtureMarket(m)) {
+    if (m.answer != null && (m.kind !== 'team2' || (Array.isArray(m.answer) && m.answer.length > 0))) return true;
+    if (!fixtureFinished(m)) return false;
+  }
   if (m.kind === 'team2') return Array.isArray(m.answer) && m.answer.length > 0 && m.answer.every(function (x) { return x != null; });
   return m.answer != null;
 }
@@ -35,14 +38,22 @@ function pickComplete(m, picks) {
 function fixtureStatus(m) {
   return String((m && (m.fixture_status || m.fixtureStatus || m.status)) || '').toLowerCase();
 }
+function fixtureKickoffMs(m) {
+  if (!m || !m.dateISO) return null;
+  var tm = String(m.time || '00:00').slice(0, 5);
+  try { var t = new Date(String(m.dateISO) + 'T' + tm + ':00').getTime(); return isFinite(t) ? t : null; } catch (e) { return null; }
+}
 function fixtureKickedOff(m) {
-  return fixtureActive(m) || fixtureFinished(m);
+  if (fixtureActive(m) || fixtureFinished(m)) return true;
+  var ko = fixtureKickoffMs(m);
+  return ko != null && ko <= Date.now();
 }
 function fixtureActive(m) {
   const st = fixtureStatus(m);
   return ['live', 'halftime', 'half_time', 'half-time', 'ht', 'inplay', 'in_play', 'in-progress', 'inprogress', 'paused', '1h', '2h'].indexOf(st) >= 0;
 }
 function fixtureFinished(m) {
+  if (m && m.done) return true;
   const st = fixtureStatus(m);
   return ['done', 'ft', 'fulltime', 'full_time', 'full-time', 'finished'].indexOf(st) >= 0;
 }

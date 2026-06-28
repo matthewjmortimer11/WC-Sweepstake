@@ -1241,7 +1241,10 @@ function AdminPanel(props) {
              <button onClick={() => downloadCsv('predictions')} className="wc-btn wc-btn--sm wc-btn--ink" style={{ flex: 1 }}>Download predictions CSV</button>
            </div>
            <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--ink2)', marginBottom: 10 }}>Set the answer once it's known — every entrant's score and the league re-grade instantly.</div>
-           {(WCa.predictions || Sa.PREDICTIONS).map(m => <PredAdmin key={m.key} m={m} />)}
+           {(WCa.predictions || Sa.PREDICTIONS).filter(function (m) {
+             var k = String((m && m.key) || '');
+             return k.indexOf('ko_') !== 0 && k.indexOf('dm_') !== 0;
+           }).map(m => <PredAdmin key={m.key} m={m} />)}
            <KnockoutBracketPredAdmin />
            <MatchPredAdmin />
          </ProLockedAdmin>}

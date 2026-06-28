@@ -1,6 +1,10 @@
 """Contract tests for the Football-Data.org adapter (recorded payloads, no live API)."""
 
-from adapters.football_data_org import _match_to_canonical, _normalise_tla
+from adapters.football_data_org import (
+    _match_to_canonical,
+    _normalise_tla,
+    resolve_team_code,
+)
 
 
 def _sample_match(**overrides):
@@ -12,8 +16,8 @@ def _sample_match(**overrides):
         "matchday": 1,
         "utcDate": "2026-06-15T19:00:00Z",
         "venue": "Test Stadium",
-        "homeTeam": {"tla": "SCO"},
-        "awayTeam": {"tla": "BRA"},
+        "homeTeam": {"id": 1, "tla": "SCO", "name": "Scotland"},
+        "awayTeam": {"id": 2, "tla": "BRA", "name": "Brazil"},
         "score": {
             "winner": "AWAY_TEAM",
             "duration": "REGULAR",
@@ -24,8 +28,18 @@ def _sample_match(**overrides):
     return base
 
 
+def _ctx(**overrides):
+    base = {
+        "team_id_map": {1: "SCO", 2: "BRA"},
+        "name_to_code": {"scotland": "SCO", "brazil": "BRA", "sco": "SCO", "bra": "BRA"},
+        "known_codes": {"SCO", "BRA", "MEX"},
+    }
+    base.update(overrides)
+    return base
+
+
 def test_group_stage_mapping():
-    cf = _match_to_canonical(_sample_match(), "world-cup-2026")
+    cf = _match_to_canonical(_sample_match(), "world-cup-2026", **_ctx())
     assert cf is not None
     assert cf.stage == "group"
     assert cf.group_name == "C"
@@ -37,24 +51,44 @@ def test_group_stage_mapping():
     assert cf.away_goals == 2
 
 
-def test_r32_mapping():
+def test_last_32_mapping():
     cf = _match_to_canonical(
-        _sample_match(stage="ROUND_OF_32", group=None, matchday=None),
+        _sample_match(stage="LAST_32", group=None, matchday=None),
         "world-cup-2026",
+        **_ctx(),
     )
+    assert cf is not None
     assert cf.stage == "r32"
     assert cf.group_name is None
 
 
+def test_round_of_32_alias():
+    cf = _match_to_canonical(
+        _sample_match(stage="ROUND_OF_32", group=None, matchday=None),
+        "world-cup-2026",
+        **_ctx(),
+    )
+    assert cf.stage == "r32"
+
+
+def test_last_16_mapping():
+    cf = _match_to_canonical(
+        _sample_match(stage="LAST_16", group=None, matchday=None),
+        "world-cup-2026",
+        **_ctx(),
+    )
+    assert cf.stage == "r16"
+
+
 def test_third_place_not_final():
-    cf = _match_to_canonical(_sample_match(stage="THIRD_PLACE", group=None), "world-cup-2026")
+    cf = _match_to_canonical(_sample_match(stage="THIRD_PLACE", group=None), "world-cup-2026", **_ctx())
     assert cf.stage == "third"
 
 
 def test_penalty_shootout_winner():
     cf = _match_to_canonical(
         _sample_match(
-            stage="ROUND_OF_16",
+            stage="LAST_16",
             group=None,
             score={
                 "winner": "HOME_TEAM",
@@ -63,6 +97,7 @@ def test_penalty_shootout_winner():
             },
         ),
         "world-cup-2026",
+        **_ctx(),
     )
     assert cf.stage == "r16"
     assert cf.winner == "HOME"
@@ -74,5 +109,35 @@ def test_tla_override_saudi():
     assert _normalise_tla("SAU") == "KSA"
 
 
+def test_team_id_fallback_when_tla_missing():
+    code = resolve_team_code(
+        {"id": 99, "name": "Mexico", "tla": None},
+        team_id_map={99: "MEX"},
+        name_to_code={"mexico": "MEX"},
+        known_codes={"MEX"},
+    )
+    assert code == "MEX"
+
+
+def test_team_code_field_fallback():
+    code = resolve_team_code(
+        {"id": 100, "code": "FRA", "name": "France"},
+        team_id_map={},
+        name_to_code={"france": "FRA"},
+        known_codes={"FRA"},
+    )
+    assert code == "FRA"
+
+
+def test_name_fallback_when_no_tla():
+    code = resolve_team_code(
+        {"id": 101, "shortName": "Scotland", "name": "Scotland"},
+        team_id_map={},
+        name_to_code={"scotland": "SCO"},
+        known_codes={"SCO"},
+    )
+    assert code == "SCO"
+
+
 def test_unknown_stage_skipped():
-    assert _match_to_canonical(_sample_match(stage="MYSTERY_ROUND"), "world-cup-2026") is None
+    assert _match_to_canonical(_sample_match(stage="MYSTERY_ROUND"), "world-cup-2026", **_ctx()) is None

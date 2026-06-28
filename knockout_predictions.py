@@ -119,7 +119,18 @@ def knockout_prediction_markets(
         na = ta.get("name", f["a"])
         nb = tb.get("name", f["b"])
         fix_status = f.get("status", "upcoming")
+        if status_is_done(f):
+            fix_status = "done"
         market_id = _safe_market_key(fid)
+
+        common = {
+            "fixture_id": fid,
+            "fixture_status": fix_status,
+            "stage": f.get("stage"),
+            "knockoutBracket": True,
+            "dateISO": f.get("dateISO"),
+            "time": f.get("time"),
+        }
 
         if pred_type == "scoreline":
             market: Dict[str, Any] = {
@@ -129,10 +140,7 @@ def knockout_prediction_markets(
                 "points": points,
                 "options": [f["a"], f["b"]],
                 "answer": None,
-                "fixture_id": fid,
-                "fixture_status": fix_status,
-                "stage": f.get("stage"),
-                "knockoutBracket": True,
+                **common,
             }
             sc = f.get("score")
             if status_is_done(f) and isinstance(sc, (list, tuple)) and len(sc) == 2 and None not in sc:
@@ -145,10 +153,7 @@ def knockout_prediction_markets(
                 "points": points,
                 "options": [f["a"], f["b"]],
                 "answer": None,
-                "fixture_id": fid,
-                "fixture_status": fix_status,
-                "stage": f.get("stage"),
-                "knockoutBracket": True,
+                **common,
             }
             if status_is_done(f):
                 win = winner_of(f)

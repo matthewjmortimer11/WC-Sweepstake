@@ -150,6 +150,11 @@ async def _upsert(fixtures: list[CanonicalFixture], session) -> None:
     stmt = stmt.on_conflict_do_update(
         index_elements=["id"],
         set_={
+            "stage": stmt.excluded.stage,
+            "group_name": stmt.excluded.group_name,
+            "matchday": stmt.excluded.matchday,
+            "home_team": stmt.excluded.home_team,
+            "away_team": stmt.excluded.away_team,
             "status": stmt.excluded.status,
             "home_goals": stmt.excluded.home_goals,
             "away_goals": stmt.excluded.away_goals,
@@ -162,7 +167,6 @@ async def _upsert(fixtures: list[CanonicalFixture], session) -> None:
     )
     await session.execute(stmt)
     await session.commit()
-    _rebuild_cache(fixtures)
 
 
 async def _load_from_db(tournament_id: str) -> None:
@@ -228,6 +232,8 @@ async def start_sync(adapter, tournament_id: str, comp_code: str) -> None:
 
             async with AsyncSessionLocal() as session:
                 await _upsert(fixtures, session)
+
+            await _load_from_db(tournament_id)
 
             sleep_seconds = _next_sleep(fixtures)
             sync_status["lastSyncAt"] = datetime.now(tz=timezone.utc).isoformat()

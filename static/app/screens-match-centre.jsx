@@ -57,9 +57,14 @@ function mcOwned() {
 }
 
 /* ---- predictions: which of the user's picks ride on this match? ---------- */
+function mcPerFixtureKey(key) {
+  var k = String(key || '');
+  return k.indexOf('dm_') === 0 || k.indexOf('ko_') === 0;
+}
 function mcResolved(m) {
   if (!m) return false;
-  if (String(m.key || '').indexOf('dm_') === 0) {
+  if (mcPerFixtureKey(m.key)) {
+    if (m.answer != null && m.kind !== 'team2') return true;
     const st = String(m.fixture_status || m.fixtureStatus || m.status || '').toLowerCase();
     if (['done', 'ft', 'fulltime', 'full_time', 'full-time', 'finished'].indexOf(st) < 0) return false;
   }
@@ -89,7 +94,12 @@ function mcStake(me, f) {
   const picks = me.picks; const items = [];
   mcMarkets().forEach(m => {
     const pick = picks[m.key]; const resolved = mcResolved(m); let who = null;
-    if (m.kind === 'team') { if (pick && (pick === f.a || pick === f.b)) who = mcName(pick); }
+    if (mcPerFixtureKey(m.key)) {
+      if (String(m.fixture_id || '') !== String(f.id || '')) return;
+      if (m.kind === 'team' && pick && (pick === f.a || pick === f.b)) who = mcName(pick);
+      else if (m.kind === 'scoreline' && pick) who = 'Score: ' + pick;
+    }
+    else if (m.kind === 'team') { if (pick && (pick === f.a || pick === f.b)) who = mcName(pick); }
     else if (m.kind === 'team2') { if (Array.isArray(pick)) { const c = pick.find(x => x === f.a || x === f.b); if (c) who = mcName(c); } }
     else if (m.kind === 'player') {
       if (pick) { const o = (m.options || []).find(x => x && x.id === pick); if (o && (o.team === f.a || o.team === f.b)) who = o.name; }
