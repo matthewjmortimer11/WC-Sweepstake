@@ -14,7 +14,12 @@ function gameTeam(code) {
 
 function ownedSet() {
   var set = {};
-  (Sg ? Sg.allSync() : WCg.PEOPLE).forEach(function (p) { set[p.team] = (set[p.team] || 0) + 1; });
+  (Sg ? Sg.allSync() : WCg.PEOPLE).forEach(function (p) {
+    if (p.alive === false) return;
+    var t = WCg.TEAMS[p.team];
+    if (t && t.alive === false) return;
+    set[p.team] = (set[p.team] || 0) + 1;
+  });
   return set;
 }
 function statusOf(f) {
@@ -119,9 +124,11 @@ function NextUp(props) {
 function GamesScreen() {
   const me = Sg ? Sg.active() : null;
   const mineTeam = me ? me.team : null;
+  const myTeamObj = mineTeam ? WCg.TEAMS[mineTeam] : null;
+  const stillIn = me && me.alive !== false && myTeamObj && myTeamObj.alive !== false;
   const phase = tournamentPhase();
   const koPhase = phase === 'knockout' || phase === 'group_complete';
-  const defaultFilter = koPhase && mineTeam ? 'mine' : 'all';
+  const defaultFilter = koPhase && mineTeam && stillIn ? 'mine' : 'all';
   const [filter, setFilter] = gState(defaultFilter);
   const [showGroup, setShowGroup] = gState(false);
   const owned = ownedSet();
@@ -130,10 +137,27 @@ function GamesScreen() {
     ? Sg.buildKnockoutFixtureList()
     : all.filter(isKnockoutFixture);
   const groupFixtures = all.filter(function (f) { return !isKnockoutFixture(f); });
+  const fxApi = window.WheeshtFixtures || {};
+  const koOrderKey = fxApi.knockoutFixtureOrderKey || function (f) { return String(f.id || (f.stage + '|' + f.a + '|' + f.b)); };
+  const koOrder = {};
+  koFixtures.forEach(function (f, i) { koOrder[koOrderKey(f)] = i; });
 
   let list = koPhase && !showGroup ? koFixtures.slice() : groupFixtures.slice();
   if (filter === 'mine' && mineTeam) list = list.filter(function (f) { return f.a === mineTeam || f.b === mineTeam; });
   else if (filter === 'owned') list = list.filter(function (f) { return owned[f.a] || owned[f.b]; });
+
+  if (koPhase && !showGroup) {
+    list.sort(function (a, b) {
+      var ia = koOrder[koOrderKey(a)];
+      var ib = koOrder[koOrderKey(b)];
+      if (ia == null && ib == null) return 0;
+      if (ia == null) return 1;
+      if (ib == null) return -1;
+      return ia - ib;
+    });
+  } else if (fxApi.sortKnockoutFixtures && list.some(isKnockoutFixture)) {
+    list = fxApi.sortKnockoutFixtures(list);
+  }
 
   const upcoming = (koPhase && !showGroup ? koFixtures : all).filter(function (f) { return statusOf(f) !== 'done'; });
   const path = (mineTeam && Sg && Sg.knockoutPathForTeam) ? Sg.knockoutPathForTeam(mineTeam) : null;
@@ -145,14 +169,39 @@ function GamesScreen() {
   const byDate = [];
   const seen = {};
   list.forEach(function (f) {
-    var key = f.dateISO || ('tbc-' + (f.stage || 'ko'));
+    var key = koPhase && !showGroup
+      ? (f.dateISO || ('tbc|' + (f.stage || 'ko')))
+      : (f.dateISO || ('tbc-' + (f.stage || 'ko')));
     if (!seen[key]) {
-      seen[key] = { label: f.dateLabel || (f.dateISO ? f.dateLabel : (koStageLabel(f) + ' · date TBC')), items: [], sortKey: f.dateISO || ('0000-' + (f.stage || 'z')) };
+      seen[key] = {
+        label: f.dateLabel || (f.dateISO ? f.dateLabel : (koStageLabel(f) + ' · date TBC')),
+        items: [],
+        sortKey: f.dateISO || ('z-' + String({ r32: 1, r16: 2, qf: 3, sf: 4, final: 5, third: 6 }[f.stage] || 9).padStart(2, '0')),
+      };
       byDate.push(seen[key]);
     }
     seen[key].items.push(f);
   });
-  byDate.sort(function (a, b) { return String(a.sortKey).localeCompare(String(b.sortKey)); });
+  function minKoOrder(items) {
+    var min = 99999;
+    items.forEach(function (f) {
+      var o = koOrder[koOrderKey(f)];
+      if (o != null && o < min) min = o;
+    });
+    return min;
+  }
+  byDate.sort(function (a, b) {
+    if (koPhase && !showGroup) return minKoOrder(a.items) - minKoOrder(b.items);
+    return String(a.sortKey).localeCompare(String(b.sortKey));
+  });
+  byDate.forEach(function (day) {
+    day.items.sort(function (a, b) {
+      var ia = koOrder[koOrderKey(a)];
+      var ib = koOrder[koOrderKey(b)];
+      if (ia == null || ib == null) return 0;
+      return ia - ib;
+    });
+  });
 
   const filters = koPhase && !showGroup
     ? [['all', 'All knockouts'], ['owned', 'In the draw'], ['mine', 'My team']]

@@ -7,9 +7,11 @@ FIFA's bracket draw or the full group tiebreaker ladder. Instead:
   * Advancement is read from the fixtures the provider publishes. A team that
     appears in a knockout fixture has qualified to that round; a team that
     loses a finished knockout match is out.
-  * Group-stage elimination only removes teams that are unambiguously gone
-    (bottom of a fully-played group). Third-placed teams stay alive until the
-    knockout fixtures reveal which "best thirds" advanced — so we never guess.
+  * Group-stage elimination removes teams unambiguously gone (bottom of a
+    fully-played group). Once every group is complete, non-qualifiers are cut
+    using the same top-two + best-thirds projection as the R32 bracket — still
+    no predicted knockout winners. If the full opening knockout round is later
+    published in the feed, that remains authoritative.
 
 The output is the same shape the frontend already consumes: each team gets
 `alive`, `stage`, and `rounds` (index in the stage ladder). Participants then
@@ -19,6 +21,14 @@ mirror the status of the team they hold.
 from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
+
+from qualification.engine import (
+    Fixture,
+    Team,
+    build_group_tables,
+    get_third_placed_teams,
+    rank_third_placed_teams,
+)
 
 
 def _first_knockout_round(stage_ladder: List[str]) -> Optional[str]:
@@ -56,6 +66,72 @@ def _opening_knockout_draw_complete(
             teams.add(a)
             teams.add(b)
     return paired >= 16 and len(teams) >= 32
+
+
+def _to_qual_team(t: Dict[str, Any]) -> Team:
+    return Team(id=t["code"], name=t.get("name") or t["code"], group=t.get("group") or "?")
+
+
+def _to_qual_fixture(f: Dict[str, Any]) -> Fixture:
+    st = str(f.get("status") or "upcoming").strip().lower()
+    if st in ("done", "ft", "fulltime", "full_time", "full-time", "finished"):
+        qst = "done"
+    elif st in ("live", "halftime", "half_time", "half-time", "ht", "paused", "1h", "2h"):
+        qst = "live"
+    else:
+        qst = "upcoming"
+    score = f.get("score")
+    hg = ag = None
+    if isinstance(score, (list, tuple)) and len(score) == 2:
+        hg, ag = score[0], score[1]
+    return Fixture(
+        id=str(f.get("id") or ""),
+        home=f["a"],
+        away=f["b"],
+        status=qst,  # type: ignore[arg-type]
+        group=f.get("group"),
+        home_goals=hg,
+        away_goals=ag,
+        stage=str(f.get("stage") or "group"),
+    )
+
+
+def _projected_qualifier_codes(
+    teams: List[Dict[str, Any]],
+    fixtures: List[Dict[str, Any]],
+) -> List[str]:
+    """32 team codes projected to advance (top two per group + eight best thirds)."""
+    qual_teams = [_to_qual_team(t) for t in teams]
+    qual_fixtures = [_to_qual_fixture(f) for f in fixtures if f.get("stage") == "group"]
+    tables = build_group_tables(qual_teams, qual_fixtures, include_live=True)
+    thirds = rank_third_placed_teams(get_third_placed_teams(tables), cutoff=8)
+
+    ordered: List[str] = []
+    for group in sorted(tables.keys()):
+        rows = tables[group]
+        first = next((r for r in rows if r.rank == 1), None)
+        second = next((r for r in rows if r.rank == 2), None)
+        if first:
+            ordered.append(first.team_id)
+        if second:
+            ordered.append(second.team_id)
+    for t in thirds:
+        if t.qualifies:
+            ordered.append(t.team_id)
+
+    seen = set()
+    out: List[str] = []
+    for code in ordered:
+        if code not in seen:
+            seen.add(code)
+            out.append(code)
+    for t in teams:
+        if len(out) >= 32:
+            break
+        if t["code"] not in seen:
+            seen.add(t["code"])
+            out.append(t["code"])
+    return out[:32]
 
 
 def _winner_of(fx: Dict[str, Any]) -> Optional[str]:
@@ -174,14 +250,23 @@ def compute_team_status(
                     eliminated[c] = True
         else:
             # Bracket incomplete or not drawn yet: only the bottom team is
-            # certainly gone. Top two and third may still advance.
+            # certainly gone while groups are still playing.
             for c in ranked[3:]:
+                eliminated[c] = True
+
+    all_groups_complete = bool(groups) and all(group_done.get(g) for g in groups if g)
+    if all_groups_complete and not knockout_draw_complete and len(codes) >= 32:
+        qualifiers = set(_projected_qualifier_codes(teams, fixtures))
+        for c in codes:
+            if reached[c] == "group" and c not in qualifiers:
                 eliminated[c] = True
 
     out: List[Dict[str, Any]] = []
     for t in teams:
         c = t["code"]
         stage = "winner" if champion == c else reached[c]
+        if eliminated[c] and reached[c] == "group":
+            stage = "out-group"
         nt = dict(t)
         nt["stage"] = stage
         nt["alive"] = not eliminated[c]

@@ -147,6 +147,38 @@ def test_champion_gets_winner_stage():
     assert by["BBB"]["alive"] is False
 
 
+def test_groups_complete_eliminates_non_qualifiers_from_projection(monkeypatch):
+    """When every group is finished, non-qualifying thirds are cut even before
+    the full R32 draw is in the feed."""
+    teams = []
+    fixtures = []
+    for g in "ABCDEFGH":
+        codes = [f"{g}1", f"{g}2", f"{g}3", f"{g}4"]
+        for c in codes:
+            teams.append(_team(c, g))
+        a, b, c3, d = codes
+        fixtures.extend([
+            _fx(a, b, group=g, score=[3, 0]),
+            _fx(a, c3, group=g, score=[3, 0]),
+            _fx(a, d, group=g, score=[3, 0]),
+            _fx(b, c3, group=g, score=[2, 1]),
+            _fx(b, d, group=g, score=[2, 0]),
+            _fx(c3, d, group=g, score=[1, 0]),
+        ])
+
+    def fake_qualifiers(teams, fixtures):
+        return [t["code"] for t in teams if t["code"] != "H3"]
+
+    monkeypatch.setattr(standings, "_projected_qualifier_codes", fake_qualifiers)
+    out = standings.compute_team_status(teams, fixtures, LADDER)
+    by = {t["code"]: t for t in out}
+    assert by["H4"]["alive"] is False
+    assert by["H3"]["alive"] is False
+    assert by["H3"]["stage"] == "out-group"
+    assert by["H1"]["alive"] is True
+    assert by["H2"]["alive"] is True
+
+
 def test_partial_r32_keeps_third_alive():
     teams = [_team("A1", "A"), _team("A2", "A"), _team("A3", "A"), _team("A4", "A")]
     fixtures = [

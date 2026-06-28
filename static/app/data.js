@@ -720,6 +720,29 @@
       return out;
     }
 
+    function compareKnockoutFixtures(a, b) {
+      var ra = statusRank(fixtureStatus(a));
+      var rb = statusRank(fixtureStatus(b));
+      if (ra !== rb) return ra - rb;
+      var sa = KO_STAGE_SORT[a.stage] || 99;
+      var sb = KO_STAGE_SORT[b.stage] || 99;
+      if (sa !== sb) return sa - sb;
+      var ka = kickoffMs(a);
+      var kb = kickoffMs(b);
+      if (ka && kb && ka !== kb) return ka - kb;
+      if (ka && !kb) return -1;
+      if (!ka && kb) return 1;
+      return r32SlotNum({ id: a.id }) - r32SlotNum({ id: b.id });
+    }
+
+    function sortKnockoutFixtures(list) {
+      return (list || []).slice().sort(compareKnockoutFixtures);
+    }
+
+    function knockoutFixtureOrderKey(f) {
+      return String(f.id || (f.stage + '|' + f.a + '|' + f.b));
+    }
+
     WC.fixtures = {
       kickoffMs: kickoffMs,
       status: fixtureStatus,
@@ -734,6 +757,9 @@
       buildProjectedKnockoutBracket: buildProjectedKnockoutBracket,
       buildMergedKnockoutBracket: buildMergedKnockoutBracket,
       buildKnockoutFixtureList: buildKnockoutFixtureList,
+      sortKnockoutFixtures: sortKnockoutFixtures,
+      compareKnockoutFixtures: compareKnockoutFixtures,
+      knockoutFixtureOrderKey: knockoutFixtureOrderKey,
       knockoutBracketVisible: knockoutBracketVisible,
       projectedBracketVisible: projectedBracketVisible,
       projectedR32Opponent: projectedR32Opponent,

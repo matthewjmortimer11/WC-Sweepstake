@@ -137,19 +137,21 @@ function SweepstakeTieOwners(props) {
     var list = ownersList(owners, code, meId);
     var label = formatOwnerNames(list);
     var isMe = code === meTeam;
+    var knockedOut = team.alive === false;
     var ink = dark ? '#fff' : 'var(--ink)';
     var sub = dark ? 'rgba(255,255,255,.72)' : 'var(--ink2)';
     var ownerInk = list.length ? (list.some(function (o) { return o.mine; }) ? 'var(--yellow)' : 'var(--red)') : sub;
     return (
       <div style={{ flex: 1, minWidth: 0, textAlign: 'center' }}>
         <Fc team={team} size={compact ? 30 : 38} />
-        <div className="dh" style={{ fontSize: compact ? 15 : 17, color: ink, marginTop: 4, lineHeight: 1.1 }}>{team.name}</div>
+        <div className="dh" style={{ fontSize: compact ? 15 : 17, color: ink, marginTop: 4, lineHeight: 1.1, opacity: knockedOut ? .55 : 1, textDecoration: knockedOut ? 'line-through' : 'none' }}>{team.name}</div>
+        {knockedOut && <Chc tone="red" style={{ marginTop: 4, fontSize: 9, padding: '2px 6px' }}>Out</Chc>}
         {list.length && list[0].person && onSelectPerson
           ? <button type="button" onClick={function () { onSelectPerson(list[0].person); }} style={{ border: 'none', background: 'none', padding: 0, margin: '5px 0 0', cursor: 'pointer', font: 'inherit', fontSize: compact ? 12 : 13, fontWeight: 800, color: ownerInk, textDecoration: 'underline', textDecorationThickness: 1, textUnderlineOffset: 2 }}>
               {isMe ? 'You' : label}{isMe && list.length > 1 ? ' +' + (list.length - 1) : ''}
             </button>
           : <div style={{ fontSize: compact ? 12 : 13, fontWeight: 800, color: ownerInk, marginTop: 5, lineHeight: 1.3 }}>{isMe && list.length ? 'You' + (list.length > 1 ? ' +' + (list.length - 1) : '') : label}</div>}
-        <div style={{ fontSize: 10, fontWeight: 700, color: sub, marginTop: 2 }}>{isMe ? 'your team' : (list.length ? 'in the draw' : 'nobody picked')}</div>
+        <div style={{ fontSize: 10, fontWeight: 700, color: sub, marginTop: 2 }}>{isMe ? 'your team' : (knockedOut ? 'knocked out' : (list.length ? 'in the draw' : 'nobody picked'))}</div>
       </div>
     );
   }
@@ -164,8 +166,9 @@ function SweepstakeTieOwners(props) {
 
 /* ---- qualification read (honest, non-speculative) ----------------------- */
 function qualStatus(t, G, mePos, gamesLeft) {
-  if (!t.alive) return { label: 'Eliminated', tone: 'red', mood: 'crying', mustWin: false, detail: 'Out of the group. The predictions league is still live, mind.' };
+  if (!t.alive) return { label: 'Eliminated', tone: 'red', mood: 'crying', mustWin: false, detail: 'Out of the tournament. The predictions league is still live, mind.' };
   if (t.rounds >= 1) return { label: 'Through to the knockouts', tone: 'green', mood: 'celebrating', mustWin: false, detail: 'Group survived. Now it gets serious.' };
+  if (G.hasResults && gamesLeft === 0 && t.alive) return { label: 'Through to knockouts', tone: 'green', mood: 'celebrating', mustWin: false, detail: 'Groups finished — you are in the Round of 32.' };
   if (!G.hasResults) return { label: 'Not started', tone: 'ghost', mood: 'confident', mustWin: false, detail: 'No ball kicked yet. Everything to play for.' };
   if (mePos <= 2) return { label: 'In a qualifying spot', tone: 'green', mood: 'confident', mustWin: false, detail: 'Top two go through. Hold your nerve.' };
   if (mePos === 3) return { label: 'On the bubble', tone: 'yellow', mood: 'nervous', mustWin: gamesLeft > 0, detail: gamesLeft > 0 ? 'Outside the top two — a win pulls you back in.' : '3rd place. Sweating on a best-third spot.' };
@@ -248,10 +251,12 @@ function MyGroupDashboard(props) {
   const path = (Sc.knockoutPathForTeam && t.alive) ? Sc.knockoutPathForTeam(t.code) : null;
   const koTie = path && path.current ? path.current : null;
   const status = qualStatus(t, G, mePos, gamesLeft);
-  const displayStatus = koMode
+  const displayStatus = !t.alive
+    ? status
+    : koMode
     ? { label: 'In the knockouts', tone: 'green', mood: 'confident', mustWin: false, detail: 'Group stage done — knockout path is live.' }
     : waitingDraw
-      ? { label: 'Waiting on R32 draw', tone: 'yellow', mood: 'nervous', mustWin: false, detail: 'Still alive — best-third spots being finalised.' }
+      ? { label: 'Through to knockouts', tone: 'green', mood: 'celebrating', mustWin: false, detail: 'Groups finished — waiting on the full R32 draw.' }
       : status;
   const nextFix = futureFix[0];
   const nextStatus = nextFix ? compStatus(nextFix) : '';
@@ -403,17 +408,19 @@ function MyGroupDashboard(props) {
         {G.ranked.map((r, i) => {
           const o = ownerLabel(owners, r.code, me.id);
           const isMe = r.code === t.code;
-          const qualifies = r.pos <= 2;
+          const out = !r.team.alive;
+          const qualifies = !out && r.pos <= 2;
           const gd = r.GF - r.GA;
+          const groupOver = koMode || waitingDraw || !!(WCc.meta && WCc.meta.groupsComplete);
           return (
             <React.Fragment key={r.code + '-' + r.pos}>
-              <div className={showMove && r.move > 0 ? 'lb-up' : showMove && r.move < 0 ? 'lb-dn' : ''} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 2px', borderRadius: 9, margin: '2px 0', background: isMe ? 'rgba(245,200,0,.22)' : 'transparent', opacity: r.team.alive ? 1 : .5 }}>
-                <span className="dh" style={{ width: 18, textAlign: 'center', fontSize: 15, color: qualifies && G.hasResults ? 'var(--green)' : 'var(--ink2)' }}>{r.pos}</span>
+              <div className={showMove && r.move > 0 ? 'lb-up' : showMove && r.move < 0 ? 'lb-dn' : ''} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 2px', borderRadius: 9, margin: '2px 0', background: isMe ? 'rgba(245,200,0,.22)' : 'transparent', opacity: out ? .45 : 1 }}>
+                <span className="dh" style={{ width: 18, textAlign: 'center', fontSize: 15, color: out ? 'var(--red)' : (qualifies && G.hasResults ? 'var(--green)' : 'var(--ink2)') }}>{r.pos}</span>
                 <MoveTag move={r.move} show={showMove} />
                 <Fc team={r.team} size={22} />
                 <div style={{ flex: 1, minWidth: 0, marginLeft: 2 }}>
-                  <div style={{ fontWeight: 800, fontSize: 13.5, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    {r.team.name}{r.pos === 1 && G.hasResults ? ' 👑' : ''}{isMe ? <span style={{ color: 'var(--red)' }}> · YOU</span> : ''}
+                  <div style={{ fontWeight: 800, fontSize: 13.5, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textDecoration: out ? 'line-through' : 'none' }}>
+                    {r.team.name}{r.pos === 1 && G.hasResults && !out ? ' 👑' : ''}{isMe ? <span style={{ color: 'var(--red)' }}> · YOU</span> : ''}
                   </div>
                   <div style={{ fontSize: 10.5, fontWeight: 700, color: 'var(--ink2)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                     {o.person
@@ -423,12 +430,13 @@ function MyGroupDashboard(props) {
                       : o.name}
                   </div>
                 </div>
+                {out && <Chc tone="red" style={{ flex: '0 0 auto', fontSize: 9, padding: '2px 6px' }}>OUT</Chc>}
                 <span style={{ width: 22, textAlign: 'center', fontSize: 12.5, fontWeight: 700, color: 'var(--ink2)' }}>{G.hasResults ? r.P : '–'}</span>
 	                <span style={{ width: 28, textAlign: 'center', fontSize: 12.5, fontWeight: 700, color: 'var(--ink2)' }}>{G.hasResults ? (gd > 0 ? '+' + gd : gd) : '–'}</span>
 	                <span className="dh" style={{ width: 28, textAlign: 'center', fontSize: 16, color: isMe ? 'var(--red)' : 'var(--ink)' }}>{G.hasResults ? r.Pts : '–'}</span>
 	              </div>
               {selectedPerson && o.person && selectedPerson.id === o.person.id && window.PersonSnapshot && <window.PersonSnapshot inline person={(Sc.getSync && Sc.getSync(o.person.id)) || o.person} onClose={() => keepCompetitionScroll(function(){ setSelectedPerson(null); })} />}
-	              {i === 1 && <div style={{ display: 'flex', alignItems: 'center', gap: 7, margin: '3px 0', padding: '0 2px' }}>
+	              {i === 1 && !groupOver && G.hasResults && <div style={{ display: 'flex', alignItems: 'center', gap: 7, margin: '3px 0', padding: '0 2px' }}>
 	                <div style={{ flex: 1, borderTop: '2px dashed var(--green)' }} />
 	                <span style={{ fontSize: 9, fontWeight: 800, letterSpacing: '.06em', color: 'var(--green)' }}>QUALIFY ↑</span>
 	              </div>}
@@ -436,8 +444,11 @@ function MyGroupDashboard(props) {
           );
         })}
       </Cc>
-      {!koMode && <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--ink2)', marginTop: 7, lineHeight: 1.35 }}>
+      {!koMode && !waitingDraw && !(WCc.meta && WCc.meta.groupsComplete) && <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--ink2)', marginTop: 7, lineHeight: 1.35 }}>
         Top two qualify automatically. Third can still sneak through as one of the best third-placed teams.
+      </div>}
+      {(koMode || waitingDraw || (WCc.meta && WCc.meta.groupsComplete)) && <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--ink2)', marginTop: 7, lineHeight: 1.35 }}>
+        Group stage finished. Teams marked OUT did not reach the knockouts.
       </div>}
 
       {/* ===== MY RIVALS — group stage only ===== */}
