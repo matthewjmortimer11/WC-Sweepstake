@@ -677,7 +677,8 @@ function App(){
     function pollMs(){
       try {
         var m = window.WC && window.WC.meta;
-        if (m && Number(m.liveFixtures || 0) > 0) return 15000;
+        if (m && Number(m.liveFixtures || 0) > 0) return 10000;
+        if (m && (m.tournamentPhase === 'knockout' || m.groupsComplete)) return 20000;
       } catch (e) {}
       return 45000;
     }

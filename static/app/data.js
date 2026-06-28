@@ -772,6 +772,92 @@
       return String(f.id || (f.stage + '|' + f.a + '|' + f.b));
     }
 
+    function teamWonKnockoutRound(teamCode, stage) {
+      if (!teamCode || !stage) return false;
+      var list = WC.FIXTURES || [];
+      for (var i = 0; i < list.length; i++) {
+        var f = list[i];
+        if (f.stage !== stage || !fixtureDone(f)) continue;
+        if (fixtureWinnerSide(f) === teamCode) return true;
+      }
+      return false;
+    }
+
+    /** Sweepstake funnel counts for Hub “The cull, so far” — uses alive + furthest stage. */
+    function cullFunnelCounts(people) {
+      people = people || PEOPLE || [];
+      var meta = WC.meta || {};
+      function teamOf(p) { return TEAMS[p.team] || {}; }
+
+      function throughGroups(p) {
+        var t = teamOf(p);
+        if (t.stage === 'out-group') return false;
+        if ((t.rounds || 0) >= 1) return true;
+        if (p.alive && meta.groupsComplete) return true;
+        var st = String(t.stage || '');
+        if (st.indexOf('out-') === 0 && st !== 'out-group') return true;
+        return false;
+      }
+
+      function pastR32(p) {
+        var t = teamOf(p);
+        var st = String(t.stage || '');
+        if ((t.rounds || 0) >= 2) return true;
+        if (/^(r16|qf|sf|final|winner)$/.test(st)) return true;
+        if (/^out-(r16|qf|sf|final)/.test(st)) return true;
+        if (p.alive && teamWonKnockoutRound(p.team, 'r32')) return true;
+        return false;
+      }
+
+      function intoQFs(p) {
+        var t = teamOf(p);
+        var st = String(t.stage || '');
+        if ((t.rounds || 0) >= 3) return true;
+        if (/^(qf|sf|final|winner)$/.test(st)) return true;
+        if (/^out-(qf|sf|final)/.test(st)) return true;
+        if (p.alive && teamWonKnockoutRound(p.team, 'r16')) return true;
+        return false;
+      }
+
+      var entered = people.length;
+      var stillIn = people.filter(function (p) { return p.alive; }).length;
+      var out = meta.out != null ? Number(meta.out) : (entered - stillIn);
+      var groupsN = people.filter(throughGroups).length;
+      var r32N = people.filter(pastR32).length;
+      var qfN = people.filter(intoQFs).length;
+      var tp = meta.tournamentPhase || (meta.groupsComplete ? 'group_complete' : 'group');
+
+      var subtitle;
+      if (tp === 'group' && !meta.groupsComplete) {
+        subtitle = entered + ' in the draw · updates after each group result';
+      } else if (tp === 'group_complete') {
+        subtitle = out + ' out after groups · ' + stillIn + ' still standing';
+      } else {
+        subtitle = out + ' knocked out · ' + stillIn + ' still in the hunt';
+      }
+
+      return {
+        entered: entered,
+        throughGroups: groupsN,
+        pastR32: r32N,
+        intoQFs: qfN,
+        stillIn: stillIn,
+        out: out,
+        subtitle: subtitle,
+        stages: [
+          { label: 'Entered', n: entered, sub: 'the draw' },
+          {
+            label: meta.groupsComplete ? 'In knockouts' : 'Through groups',
+            n: groupsN,
+            sub: meta.groupsComplete ? 'Top two + best thirds' : 'Qualifiers only',
+          },
+          { label: 'Past R32', n: r32N, sub: 'Last 16' },
+          { label: 'Into QFs', n: qfN, sub: 'Last 8' },
+          { label: 'Still in', n: stillIn, sub: 'right now' },
+        ],
+      };
+    }
+
     WC.fixtures = {
       kickoffMs: kickoffMs,
       status: fixtureStatus,
@@ -789,6 +875,7 @@
       sortKnockoutFixtures: sortKnockoutFixtures,
       compareKnockoutFixtures: compareKnockoutFixtures,
       knockoutFixtureOrderKey: knockoutFixtureOrderKey,
+      cullFunnelCounts: cullFunnelCounts,
       knockoutBracketVisible: knockoutBracketVisible,
       projectedBracketVisible: projectedBracketVisible,
       projectedR32Opponent: projectedR32Opponent,

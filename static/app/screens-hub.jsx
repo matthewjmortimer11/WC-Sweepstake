@@ -301,22 +301,31 @@ function FieldCard(){
 }
 function StageFunnel(){
   const P = window.Store ? window.Store.allSync() : WC.PEOPLE;
-  const stages = [
+  const funnel = (window.WheeshtFixtures && window.WheeshtFixtures.cullFunnelCounts)
+    ? window.WheeshtFixtures.cullFunnelCounts(P)
+    : null;
+  const stages = funnel ? funnel.stages : [
     {label:'Entered', n:P.length, sub:'the draw'},
-    {label:'Past groups', n:P.filter(p=>(WC.TEAMS[p.team]||{rounds:0}).rounds>=2).length, sub:'Top 2 + best 3rds'},
-    {label:'Past R32', n:P.filter(p=>(WC.TEAMS[p.team]||{rounds:0}).rounds>=3).length, sub:'Last 16'},
-    {label:'Into QFs', n:P.filter(p=>(WC.TEAMS[p.team]||{rounds:0}).rounds>=4).length, sub:'Last 8'},
+    {label:'Through groups', n:0, sub:'—'},
+    {label:'Past R32', n:0, sub:'Last 16'},
+    {label:'Into QFs', n:0, sub:'Last 8'},
+    {label:'Still in', n:P.filter(function(p){ return p.alive; }).length, sub:'right now'},
   ];
-  const max=P.length;
+  const max = Math.max(P.length, 1);
+  const subtitle = funnel ? funnel.subtitle : (P.filter(function(p){ return p.alive; }).length + ' still standing');
   return (
     <Card bordered>
-      <div className="dh" style={{fontSize:17,marginBottom:10}}>The cull, so far</div>
+      <div className="dh" style={{fontSize:17,marginBottom:2}}>The cull, so far</div>
+      <div style={{fontSize:12,fontWeight:600,color:'var(--ink2)',marginBottom:10}}>{subtitle}</div>
       <div style={{display:'flex',flexDirection:'column',gap:9}}>
         {stages.map((s,i)=>(
-          <div key={i} style={{display:'flex',alignItems:'center',gap:10}}>
-            <div style={{width:78,fontSize:12,fontWeight:800,textAlign:'right'}}>{s.label}</div>
+          <div key={s.label} style={{display:'flex',alignItems:'center',gap:10}}>
+            <div style={{width:78,fontSize:12,fontWeight:800,textAlign:'right',lineHeight:1.2}}>
+              {s.label}
+              <div style={{fontSize:9,fontWeight:700,color:'var(--ink2)'}}>{s.sub}</div>
+            </div>
             <div style={{flex:1,height:26,background:'var(--bg)',borderRadius:8,border:'2px solid var(--ink)',overflow:'hidden',position:'relative'}}>
-              <div style={{position:'absolute',inset:0,width:(100*s.n/max)+'%',background:i===0?'var(--ink)':(i>=3?'var(--green)':'var(--yellow)'),transition:'width .8s cubic-bezier(.2,.8,.2,1)'}}/>
+              <div style={{position:'absolute',inset:0,width:(100*s.n/max)+'%',background:i===0?'var(--ink)':(i>=stages.length-1?'var(--green)':'var(--yellow)'),transition:'width .8s cubic-bezier(.2,.8,.2,1)'}}/>
               <div style={{position:'absolute',left:8,top:0,bottom:0,display:'flex',alignItems:'center',fontWeight:800,fontFamily:'var(--disp)',fontSize:14,color:i===0?'#fff':'var(--ink)'}}>{s.n}</div>
             </div>
           </div>

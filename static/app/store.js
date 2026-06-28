@@ -433,6 +433,10 @@
       if (seen[p.id] || removed.indexOf(p.id) >= 0) return;
       seen[p.id] = 1; cache.push(overlayProfile(liveStatus(p)));
     });
+    if (WC.meta) {
+      WC.meta.stillIn = cache.filter(function (p) { return p.alive; }).length;
+      WC.meta.out = cache.length - WC.meta.stillIn;
+    }
   }
   rebuild();
 
@@ -1083,6 +1087,12 @@
           BASE.meta.r32Published = WC.meta.r32Published;
           BASE.meta.knockoutsInFeed = WC.meta.knockoutsInFeed;
           BASE.meta.knockoutRound = WC.meta.knockoutRound;
+          if (d.meta) {
+            if (d.meta.stillIn != null) { WC.meta.stillIn = d.meta.stillIn; BASE.meta.stillIn = d.meta.stillIn; }
+            if (d.meta.out != null) { WC.meta.out = d.meta.out; BASE.meta.out = d.meta.out; }
+            if (d.meta.teamsLeft != null) { WC.meta.teamsLeft = d.meta.teamsLeft; BASE.meta.teamsLeft = d.meta.teamsLeft; }
+            if (d.meta.liveFixtures != null) { WC.meta.liveFixtures = d.meta.liveFixtures; BASE.meta.liveFixtures = d.meta.liveFixtures; }
+          }
           lastRefreshAt = Date.now();
           if (LIVE) applyAdmin();
           rebuild(); emit();
