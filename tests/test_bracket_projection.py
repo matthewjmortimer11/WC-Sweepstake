@@ -102,6 +102,33 @@ def test_done_flag_without_status_sets_winner():
     assert tie["winner"] == "AAA"
 
 
+def test_r32_feed_home_away_swap_merges():
+    teams, fixtures = _four_group("A", ["A1", "A2", "A3", "A4"])
+    teams_b, fixtures_b = _four_group("B", ["B1", "B2", "B3", "B4"])
+    teams = teams + teams_b
+    fixtures = fixtures + fixtures_b
+    fixtures.append({
+        "id": "feed-r32-0", "a": "B2", "b": "A2", "stage": "r32",
+        "status": "upcoming", "score": None,
+        "dateISO": "2026-06-28", "time": "16:00",
+    })
+    proj = build_projected_bracket(teams, fixtures)
+    feed_tie = next(
+        t for t in proj["rounds"]["r32"]
+        if {t["a"], t["b"]} == {"A2", "B2"}
+    )
+    assert feed_tie["id"] == "feed-r32-0"
+    assert feed_tie.get("projectedPairing") is not True
+
+
+def test_projected_r32_opponent_skips_tbd():
+    from bracket_projection import projected_r32_opponent
+
+    teams, fixtures = _four_group("A", ["A1", "A2", "A3", "A4"])
+    opp = projected_r32_opponent("A2", teams, fixtures)
+    assert opp != "TBD"
+
+
 def test_live_r32_has_no_projected_winner():
     teams = [_team("AAA", "A", "+100"), _team("BBB", "B", "+500")]
     fixtures = [

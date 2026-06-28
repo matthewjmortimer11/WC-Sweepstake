@@ -116,7 +116,7 @@ function BracketCell(props) {
       <Row team={B} score={tie.done && tie.score ? tie.score[1] : null} lose={aw} win={bw} />
       {tie.pens && <div style={{ fontSize: 9, fontWeight: 800, color: 'var(--ink2)', marginTop: 2 }}>Pens</div>}
       {pairingOnly && <div style={{ fontSize: 9, fontWeight: 800, color: 'var(--ink2)', marginTop: 2 }}>Pairing from standings</div>}
-      {tie.entrant && !tie.you && <div className="ko-bracket-entrant-dot" title="Sweepstake entrant in this tie" />}
+      {tie.entrant && !tie.you && !tie.bracketPad && <div className="ko-bracket-entrant-dot" title="Sweepstake entrant in this tie" />}
     </div>
   );
 }
@@ -247,6 +247,7 @@ function BracketPanel(props) {
         <span><span style={{ display: 'inline-block', width: 10, height: 10, background: 'var(--yellow)', border: '2px solid var(--ink)', borderRadius: 2, verticalAlign: 'middle', marginRight: 4 }} /> Your team</span>
         <span><span style={{ display: 'inline-block', width: 10, height: 10, border: '2px solid var(--red)', borderRadius: 2, verticalAlign: 'middle', marginRight: 4 }} /> Entrant in tie</span>
         {fromStandings && <span><span style={{ display: 'inline-block', width: 10, height: 10, border: '2px dashed var(--ink2)', borderRadius: 2, verticalAlign: 'middle', marginRight: 4 }} /> Pairing from standings</span>}
+        <span><span style={{ display: 'inline-block', width: 10, height: 10, background: 'rgba(0,0,0,.04)', border: '2px solid var(--line)', borderRadius: 2, verticalAlign: 'middle', marginRight: 4 }} /> TBD</span>
       </div>
       {effectiveView === 'tree'
         ? <React.Fragment>

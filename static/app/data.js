@@ -212,8 +212,8 @@
           id: f.id,
           a: f.a,
           b: f.b,
-          teamA: TEAMS[f.a],
-          teamB: TEAMS[f.b],
+          teamA: TEAMS[f.a] || (f.a === 'TBD' ? { code: 'TBD', flag: '🏳️', name: 'TBD' } : undefined),
+          teamB: TEAMS[f.b] || (f.b === 'TBD' ? { code: 'TBD', flag: '🏳️', name: 'TBD' } : undefined),
           score: f.score,
           done: tieFinished(f),
           winner: tieWinner(f),
@@ -224,6 +224,8 @@
           entrant: entrant,
           ownersA: ownersA.length,
           ownersB: ownersB.length,
+          projectedPairing: false,
+          bracketPad: false,
           dateLabel: f.dateLabel,
           time: f.time,
           kickoff: kickoffMs(f),
@@ -289,7 +291,9 @@
 
     function padKnockoutBracket(rounds) {
       rounds = rounds || {};
-      var hasKo = BRACKET_TREE_STAGES.some(function (k) { return (rounds[k] || []).length > 0; });
+      var hasKo = BRACKET_TREE_STAGES.some(function (k) {
+        return (rounds[k] || []).some(function (t) { return !t.bracketPad && (t.a !== 'TBD' || t.b !== 'TBD'); });
+      });
       if (!hasKo) return rounds;
       var out = Object.assign({}, rounds);
       BRACKET_TREE_STAGES.forEach(function (st) {
@@ -342,22 +346,42 @@
       return rounds;
     }
 
+    function bracketPairKey(a, b) {
+      return [String(a || ''), String(b || '')].sort().join('|');
+    }
+
+    function sameBracketPair(a1, b1, a2, b2) {
+      return bracketPairKey(a1, b1) === bracketPairKey(a2, b2);
+    }
+
+    function feedOverlayR32(base, feed) {
+      var out = Object.assign({}, base || {}, feed);
+      out.projectedPairing = false;
+      out.bracketPad = false;
+      out.teamA = TEAMS[out.a] || (out.a === 'TBD' ? { code: 'TBD', flag: '🏳️', name: 'TBD' } : undefined);
+      out.teamB = TEAMS[out.b] || (out.b === 'TBD' ? { code: 'TBD', flag: '🏳️', name: 'TBD' } : undefined);
+      return out;
+    }
+
+    function feedFillsR32Slot(slot, feed) {
+      if (sameBracketPair(slot.a, slot.b, feed.a, feed.b)) return true;
+      var known = [slot.a, slot.b].filter(function (c) { return c && c !== 'TBD'; });
+      if (known.length !== 1) return false;
+      return feed.a === known[0] || feed.b === known[0];
+    }
+
     function mergeR32Rounds(proj, feed) {
       var merged = (proj || []).map(function (t) { return Object.assign({}, t); });
       (feed || []).forEach(function (f) {
-        var fa = f.a;
-        var fb = f.b;
         var placed = false;
         for (var i = 0; i < merged.length; i++) {
-          var ta = merged[i].a;
-          var tb = merged[i].b;
-          if (fa === ta && fb === tb) {
-            merged[i] = Object.assign({}, merged[i], f);
+          if (sameBracketPair(merged[i].a, merged[i].b, f.a, f.b) || feedFillsR32Slot(merged[i], f)) {
+            merged[i] = feedOverlayR32(merged[i], f);
             placed = true;
             break;
           }
         }
-        if (!placed) merged.push(f);
+        if (!placed) merged.push(feedOverlayR32(null, f));
       });
       return sortBracketRound(merged, 'r32');
     }
@@ -397,7 +421,14 @@
     }
 
     function projectedR32Opponent(teamCode) {
-      var ties = buildMergedKnockoutBracket().r32 || [];
+      var meta = WC.meta || {};
+      var feed = buildKnockoutBracket();
+      var ties;
+      if (meta.r32Published) {
+        ties = feed.r32 || [];
+      } else {
+        ties = mergeR32Rounds(buildProjectedKnockoutBracket().r32, feed.r32);
+      }
       for (var i = 0; i < ties.length; i++) {
         var t = ties[i];
         if (t.a === teamCode && t.b && t.b !== 'TBD') return t.b;

@@ -157,6 +157,17 @@ def _r32_sort_key(f: Dict[str, Any]) -> Tuple[int, Tuple[str, str]]:
     return slot, _kickoff_key(f)
 
 
+def _feed_fills_r32_slot(slot: Dict[str, Any], feed: Dict[str, Any]) -> bool:
+    fa, fb = feed.get("a"), feed.get("b")
+    ta, tb = slot.get("a"), slot.get("b")
+    if {fa, fb} == {ta, tb}:
+        return True
+    known = [c for c in (ta, tb) if c and c != "TBD"]
+    if len(known) != 1:
+        return False
+    return fa == known[0] or fb == known[0]
+
+
 def _merge_r32_feed(
     synth: List[Dict[str, Any]],
     feed: List[Dict[str, Any]],
@@ -166,16 +177,18 @@ def _merge_r32_feed(
         return sorted(feed, key=_r32_sort_key)
     merged: List[Dict[str, Any]] = [dict(t) for t in synth]
     for f in feed:
-        fa, fb = f.get("a"), f.get("b")
         placed = False
         for i, t in enumerate(merged):
-            ta, tb = t.get("a"), t.get("b")
-            if {fa, fb} == {ta, tb}:
-                merged[i] = dict(f)
+            if _feed_fills_r32_slot(t, f):
+                out = dict(f)
+                out["projectedPairing"] = False
+                merged[i] = out
                 placed = True
                 break
         if not placed:
-            merged.append(dict(f))
+            out = dict(f)
+            out["projectedPairing"] = False
+            merged.append(out)
     return sorted(merged, key=_r32_sort_key)
 
 
@@ -235,7 +248,11 @@ def projected_r32_opponent(
     """Projected Round of 32 opponent from current group standings."""
     for tie in build_projected_bracket(teams, fixtures).get("rounds", {}).get("r32", []):
         if tie.get("a") == team_code:
-            return tie.get("b")
-        if tie.get("b") == team_code:
-            return tie.get("a")
+            opp = tie.get("b")
+        elif tie.get("b") == team_code:
+            opp = tie.get("a")
+        else:
+            continue
+        if opp and opp != "TBD":
+            return opp
     return None
