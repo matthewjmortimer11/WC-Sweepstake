@@ -163,6 +163,12 @@ textarea { min-height: 64px; resize: vertical; }
 .seg { display: inline-flex; border: 1px solid var(--p-4); border-radius: var(--r-pill); overflow: hidden; background: var(--p-1); }
 .seg button { border: 0; background: transparent; padding: 9px 18px; font-weight: 700; cursor: pointer; color: var(--ink-soft); font-family: var(--serif); font-size: 17px; }
 .seg button[aria-pressed="true"] { background: var(--ink); color: var(--p-0); }
+.seg-sm button { padding: 6px 14px; font-size: 14px; }
+
+/* seat rows (Human/Bot) on the setup names step */
+.seat-row { display: flex; gap: var(--s3); align-items: center; margin-bottom: var(--s3); }
+.seat-row input { flex: 1; }
+.bot-controls { padding: var(--s2) 0; }
 
 /* ---------- tags / chips ---------- */
 .tag { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 700;
@@ -248,8 +254,8 @@ textarea { min-height: 64px; resize: vertical; }
 .log .entry.note .what { color: var(--ink-soft); font-style: italic; }
 
 /* ---------- modal / cover screens (pass-and-play) ---------- */
-.scrim { position: fixed; inset: 0; background: rgba(20,14,6,.55); display: grid; place-items: center; padding: var(--s5); z-index: 50; }
-.modal { background: var(--raised); border: 1px solid var(--p-4); border-radius: var(--r-panel); box-shadow: var(--e3); max-width: 560px; width: 100%; padding: var(--s6); }
+.scrim { position: fixed; inset: 0; background: rgba(20,14,6,.55); display: flex; overflow-y: auto; padding: var(--s5); z-index: 50; }
+.modal { margin: auto; background: var(--raised); border: 1px solid var(--p-4); border-radius: var(--r-panel); box-shadow: var(--e3); max-width: 560px; width: 100%; padding: var(--s6); }
 .cover { text-align: center; }
 .cover .seal-big { width: 84px; height: 84px; margin: 0 auto var(--s4); border-radius: var(--r-pill);
   background: radial-gradient(circle at 35% 30%, var(--wax-bright), var(--wax)); display: grid; place-items: center;

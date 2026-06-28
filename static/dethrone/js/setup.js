@@ -6,6 +6,7 @@ CT.setup = {
   step: "count",      // count | names | private | first
   count: 5,
   names: [],
+  bots: [],           // [bool, ...] — true = computer-controlled (testing)
   dealt: [],          // [[roleId x3], ...]
   publicChoice: [],   // [roleId | null, ...]
   hidden: [],         // [[roleId x2], ...]
@@ -20,7 +21,15 @@ CT.setup.begin = function () {
   CT.setup.active = true;
   CT.setup.step = "count";
   CT.setup.names = ["", "", "", "", "", ""];
+  // default to a solo test: seat 1 is you, the rest are bots
+  CT.setup.bots = [false, true, true, true, true, true];
   CT.render();
+};
+
+/* first human seat at or after `from` (-1 if none) */
+CT.setup.firstHumanFrom = function (from) {
+  for (var i = from; i < CT.setup.count; i++) if (!CT.setup.bots[i]) return i;
+  return -1;
 };
 
 /* deal exactly 3 to each, always one Cursed One (§8) */
@@ -34,7 +43,13 @@ CT.setup.deal = function () {
   CT.setup.publicChoice = new Array(n).fill(null);
   CT.setup.hidden = new Array(n).fill(null);
   CT.setup.undealt = CT.ROLES.map(function (r) { return r.id; }).filter(function (id) { return pool.indexOf(id) === -1; });
-  CT.setup.privateIndex = 0;
+  // bots auto-pick their public role (first card that can be public) — no pass-and-play for them
+  for (var b = 0; b < n; b++) {
+    if (CT.setup.bots[b]) {
+      CT.setup.publicChoice[b] = CT.setup.dealt[b].filter(function (id) { return CT.roleById(id).canBePublic; })[0];
+    }
+  }
+  CT.setup.privateIndex = CT.setup.firstHumanFrom(0);
   CT.setup.privateRevealed = false;
 };
 
@@ -50,7 +65,7 @@ CT.setup.finish = function () {
   for (var j = 0; j < n; j++) {
     var pub = CT.setup.publicChoice[j];
     var hid = CT.setup.dealt[j].filter(function (id) { return id !== pub; });
-    playersInput.push({ name: CT.setup.names[j].trim() || ("Player " + (j + 1)), dealtRoleIds: CT.setup.dealt[j], publicRoleId: pub, hiddenRoleIds: hid });
+    playersInput.push({ name: CT.setup.names[j].trim() || ("Player " + (j + 1)), isBot: !!CT.setup.bots[j], dealtRoleIds: CT.setup.dealt[j], publicRoleId: pub, hiddenRoleIds: hid });
   }
   var first = CT.setup.firstMode === "random" ? Math.floor(Math.random() * n) : CT.setup.firstPlayerIndex;
   CT.newGame(playersInput, CT.setup.undealt, startingByPlayer, first);
@@ -86,13 +101,20 @@ CT.setup.viewCount = function () {
 CT.setup.viewNames = function () {
   var s = CT.setup, fields = "";
   for (var i = 0; i < s.count; i++) {
-    fields += '<label class="field"><span class="lbl">Seat ' + (i + 1) + '</span>'
-      + '<input type="text" data-act="name" data-i="' + i + '" value="' + (s.names[i] || "").replace(/"/g, "&quot;") + '" placeholder="Name" autocomplete="off"></label>';
+    var bot = s.bots[i];
+    fields += '<div class="seat-row">'
+      + '<input type="text" data-act="name" data-i="' + i + '" value="' + (s.names[i] || "").replace(/"/g, "&quot;") + '" placeholder="Seat ' + (i + 1) + ' name" autocomplete="off">'
+      + '<div class="seg seg-sm">'
+      + '<button aria-pressed="' + (!bot) + '" data-act="seat-type" data-i="' + i + '" data-bot="0">You</button>'
+      + '<button aria-pressed="' + (!!bot) + '" data-act="seat-type" data-i="' + i + '" data-bot="1">Bot</button>'
+      + '</div></div>';
   }
   return '<div class="panel" style="max-width:560px;margin:0 auto">'
     + '<div class="eyebrow">New game · Step 2 of 3</div>'
     + '<h1 style="margin-top:6px">Who is playing?</h1>'
-    + '<hr class="rule">' + fields
+    + '<hr class="rule">'
+    + '<p class="muted" style="font-size:14px;margin-top:0">Mark a seat <strong>Bot</strong> to have the computer play it — handy for testing the game solo. Bots skip private role selection.</p>'
+    + fields
     + '<div class="btn-row"><button class="btn btn-ghost" data-act="back-count">← Back</button>'
     + '<div class="spacer"></div><button class="btn btn-primary" data-act="to-private">Deal roles →</button></div>'
     + '</div>';
@@ -100,7 +122,10 @@ CT.setup.viewNames = function () {
 
 CT.setup.viewPrivate = function () {
   var s = CT.setup, name = s.names[s.privateIndex].trim() || ("Player " + (s.privateIndex + 1));
-  var progress = "Player " + (s.privateIndex + 1) + " of " + s.count;
+  // count humans for a sensible "x of y" that ignores bot seats
+  var humans = [], pos = 0;
+  for (var hi = 0; hi < s.count; hi++) if (!s.bots[hi]) { humans.push(hi); if (hi === s.privateIndex) pos = humans.length; }
+  var progress = "Player " + pos + " of " + humans.length;
 
   if (!s.privateRevealed) {
     // cover screen (§8)
@@ -139,7 +164,7 @@ CT.setup.viewPrivate = function () {
     + '<div class="players" style="grid-template-columns:1fr;gap:12px">' + cards + '</div>'
     + '<div class="btn-row" style="margin-top:16px"><div class="spacer"></div>'
     + '<button class="btn btn-primary" data-act="confirm-private"' + (chosen ? "" : " disabled") + '>'
-    + (s.privateIndex + 1 < s.count ? "Confirm & pass device →" : "Confirm — last player") + '</button></div>'
+    + (s.firstHumanFrom(s.privateIndex + 1) > -1 ? "Confirm & pass device →" : "Confirm — last player") + '</button></div>'
     + '</div></div>';
 };
 
@@ -170,16 +195,25 @@ CT.setup.handle = function (act, el) {
       while (s.names.length < s.count) s.names.push("");
       s.step = "names"; CT.render(); break;
     case "name": s.names[+el.dataset.i] = el.value; break; // no re-render (keep focus)
+    case "seat-type": s.bots[+el.dataset.i] = el.dataset.bot === "1"; CT.render(); break;
     case "back-count": s.step = "count"; CT.render(); break;
-    case "to-private": s.deal(); s.step = "private"; CT.render(); break;
+    case "to-private":
+      s.deal();
+      // if every seat is a bot, there's nothing to pass-and-play — go straight to first player
+      s.step = (s.privateIndex === -1) ? "first" : "private";
+      CT.render(); break;
     case "reveal-private": s.privateRevealed = true; CT.render(); break;
     case "choose-public": s.publicChoice[s.privateIndex] = el.dataset.id; CT.render(); break;
     case "confirm-private":
       if (!s.publicChoice[s.privateIndex]) return;
-      if (s.privateIndex + 1 < s.count) { s.privateIndex++; s.privateRevealed = false; CT.render(); }
+      var next = s.firstHumanFrom(s.privateIndex + 1);
+      if (next > -1) { s.privateIndex = next; s.privateRevealed = false; CT.render(); }
       else { s.step = "first"; CT.render(); }
       break;
-    case "back-private": s.step = "private"; s.privateIndex = 0; s.privateRevealed = false; CT.render(); break;
+    case "back-private":
+      s.privateIndex = s.firstHumanFrom(0);
+      s.step = (s.privateIndex === -1) ? "first" : "private"; // all-bots: nothing to revisit
+      s.privateRevealed = false; CT.render(); break;
     case "first-mode": s.firstMode = el.dataset.m; CT.render(); break;
     case "first-pick": s.firstPlayerIndex = +el.value; break;
     case "begin-game": s.finish(); break;

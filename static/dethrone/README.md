@@ -21,6 +21,10 @@ refresh resumes the same game.
 
 ## What is implemented (Phases 1–2)
 
+### Solo testing — bots
+- At setup, mark any seat **Bot** (default: seat 1 is you, the rest are bots) so one person can exercise the systems. Bots skip pass-and-play (they auto-pick a public role).
+- On a bot's turn you get **▶ Play turn** (one bot turn) and **⏩ Auto-play bots** (runs every bot until it's a human's turn or the game ends). Bots are a simple rules engine — move → one affordable location action → end turn; the Cursed bot heads to the Graveyard, buys corruption, and performs the Final Rite when corruption ≥ 8. Not a real opponent (the game is social) — just a flow-testing aid.
+
 ### Phase 2 — Core play
 - **Legal movement**: the active player's connected locations are highlighted on the board; click one to move there. The per-player "Move to" dropdown remains as a manual override.
 - **Location actions (§13)**: each location shows its basic + strong action as buttons for the active player, with gold costs enforced and effects applied automatically — Petition (+1 Rep, cap 4), Buy / Backroom / Study / Research / Arm (pay → draw the right deck), Haggle (draw 2, **keep-one** helper), Work the Room (+2g), Scavenge (+3g, −1 Rep), Buy Graveyard Card (pay 4, **corruption +1**, draw), Recover (clear Wound or regain Rep). Royal Command / Deep Research / Serious Duel are log-only "manual" buttons for now.

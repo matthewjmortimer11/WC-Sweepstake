@@ -138,10 +138,21 @@ function actionsPanel() {
       + '<div class="act-hint">' + CT.esc(a.hint) + (a.manual ? ' · manual' : '') + '</div>';
   }).join("");
 
-  return '<div class="panel"><div class="panel-head"><h2>' + CT.esc(p.name) + '’s turn</h2>'
+  var body;
+  if (disabled) {
+    body = '<p class="muted">' + (CT.state.winner ? "The game is over." : "This player is eliminated.") + '</p>';
+  } else if (p.isBot) {
+    body = '<div class="bot-controls"><p class="muted" style="margin:0 0 10px;font-size:14px">'
+      + CT.esc(p.name) + ' is a bot. Play their turn, or auto-play through every bot until it’s a human’s turn.</p>'
+      + '<div class="btn-row"><button class="btn btn-primary" data-act="bot-turn">▶ Play ' + CT.esc(p.name) + '’s turn</button>'
+      + '<button class="btn btn-gold" data-act="bot-auto">⏩ Auto-play bots</button></div></div>';
+  } else {
+    body = '<div class="act-grid">' + buttons + '</div>';
+  }
+  return '<div class="panel"><div class="panel-head"><h2>' + CT.esc(p.name) + '’s turn'
+    + (p.isBot ? ' <span class="tag">BOT</span>' : '') + '</h2>'
     + '<span class="tag gold">📍 ' + loc.name + '</span></div><hr class="rule">'
-    + (disabled ? '<p class="muted">' + (CT.state.winner ? "The game is over." : "This player is eliminated.") + '</p>'
-        : '<div class="act-grid">' + buttons + '</div>')
+    + body
     + (over ? '<div class="reminder">Hand is over the limit of ' + CT.CONST.HAND_LIMIT + ' (' + p.actionCardIds.length + ' cards). '
         + '<button class="btn btn-secondary btn-sm" data-act="fix-hand" data-id="' + p.id + '">Discard down</button></div>' : "")
     + '<div class="btn-row" style="margin-top:14px"><span class="faint" style="font-size:12px;align-self:center">Movement & actions can also be overridden below.</span>'
@@ -176,7 +187,7 @@ function playerCard(p) {
   return '<div class="pcard' + (active ? " active" : "") + (p.status === "eliminated" ? " elim" : "") + '">'
     + '<div class="ptop"><div><div class="pname">'
     + '<span class="dot" style="background:' + tokenColor(i) + ';width:18px;height:18px;border-radius:999px;display:inline-grid;place-items:center;color:#fff;font-size:10px;font-weight:800">' + initials(p.name) + '</span>'
-    + CT.esc(p.name) + '</div>'
+    + CT.esc(p.name) + (p.isBot ? ' <span class="tag">BOT</span>' : '') + '</div>'
     + '<div class="prole">' + (role ? CT.esc(role.name) : "—") + '</div></div>'
     + '<button class="btn btn-ghost btn-sm" data-act="view-private" data-id="' + p.id + '">View private</button></div>'
     + '<div class="pstats">'
@@ -367,6 +378,8 @@ CT.handleAction = function (act, el, ev) {
       if (confirm("Start a new game? The current game is saved in your export but will be cleared.")) { CT.resetGame(); CT.setup.begin(); }
       break;
     case "end-turn": CT.endTurn(); CT.render(); break;
+    case "bot-turn": { var bp = CT.activePlayer(); if (bp) CT.bot.takeTurn(bp.id); CT.render(); break; }
+    case "bot-auto": CT.bot.autoRun(); CT.render(); break;
     case "adj": {
       var d = +el.dataset.d;
       if (el.dataset.key === "gold") CT.adjustGold(el.dataset.id, d, "manual");
@@ -441,7 +454,7 @@ CT.handleInput = function (act, el) {
   if (CT.setup.active && act === "name") { CT.setup.handle(act, el); }
 };
 
-var setupActs = { "count":1,"to-names":1,"back-count":1,"to-private":1,"reveal-private":1,"choose-public":1,"confirm-private":1,"back-private":1,"first-mode":1,"begin-game":1 };
+var setupActs = { "count":1,"to-names":1,"seat-type":1,"back-count":1,"to-private":1,"reveal-private":1,"choose-public":1,"confirm-private":1,"back-private":1,"first-mode":1,"begin-game":1 };
 var setupChangeActs = { "first-pick":1 };
 
 function doExport() {

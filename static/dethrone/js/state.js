@@ -62,6 +62,7 @@ CT.newGame = function (playersInput, undealtRoleIds, startingActionByPlayer, fir
       return {
         id: CT.util.uid("p"),
         name: p.name,
+        isBot: !!p.isBot,
         location: C.START_LOCATION,
         gold: C.START_GOLD,
         rep: C.START_REP,
