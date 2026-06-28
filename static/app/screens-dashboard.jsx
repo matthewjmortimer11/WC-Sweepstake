@@ -484,7 +484,8 @@ function GroupRivalCard(props) {
   const path = (Sd.knockoutPathForTeam && t.alive) ? Sd.knockoutPathForTeam(t.code) : null;
   const owners = comp.ownersByCode ? comp.ownersByCode() : {};
   const TieOwners = comp.SweepstakeTieOwners;
-  const next = !koMode ? G.fixtures.filter(f => (f.a === t.code || f.b === t.code) && comp.compFixturePlayable(f)).sort(comp.compFixtureSort)[0] : null;
+  const betweenRounds = !!(path && path.betweenRounds);
+  const next = !koMode && !waitingDraw && !betweenRounds ? G.fixtures.filter(f => (f.a === t.code || f.b === t.code) && comp.compFixturePlayable(f)).sort(comp.compFixtureSort)[0] : null;
   const opp = next ? WCd.TEAMS[next.a === t.code ? next.b : next.a] : null;
   const gapAbove = above ? Math.max(0, above.Pts - meRow.Pts) : 0;
   const gapBelow = below ? Math.max(0, meRow.Pts - below.Pts) : 0;
@@ -494,15 +495,17 @@ function GroupRivalCard(props) {
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
         <div>
           <div style={{ fontSize: 10.5, fontWeight: 900, letterSpacing: '.07em', color: 'var(--yellow)', textTransform: 'uppercase' }}>
-            {koMode ? ('Knockout path · ' + stageLbl) : waitingDraw ? 'Waiting on R32 draw' : ('Group ' + t.group + ' pressure')}
+            {waitingDraw ? 'Waiting on R32 draw' : betweenRounds ? ('Through · ' + (path.waitingNextRound || 'next round')) : koMode ? ('Knockout path · ' + stageLbl) : ('Group ' + t.group + ' pressure')}
           </div>
           <div className="dh" style={{ fontSize: 24, color: '#fff', lineHeight: 1, marginTop: 3 }}>
             {koMode && path && path.current
               ? (path.current.stageLabel || 'Knockout')
+              : betweenRounds
+                ? (path.waitingNextRound || 'Next round')
               : <>#{meRow.pos}<span style={{ fontSize: 13, color: 'rgba(255,255,255,.55)' }}>/{G.ranked.length}</span> · {G.hasResults ? meRow.Pts + ' pts' : 'awaiting kick-off'}</>}
           </div>
         </div>
-        <button onClick={koMode || waitingDraw ? props.onGames : props.onOpen} className="wc-btn wc-btn--sm" style={{ flex: '0 0 auto', background: 'var(--yellow)', boxShadow: '0 3px 0 #000' }}>{koMode || waitingDraw ? 'Match centre' : 'Open group'}</button>
+        <button onClick={koMode || waitingDraw || betweenRounds ? props.onGames : props.onOpen} className="wc-btn wc-btn--sm" style={{ flex: '0 0 auto', background: 'var(--yellow)', boxShadow: '0 3px 0 #000' }}>{koMode || waitingDraw || betweenRounds ? 'Match centre' : 'Open group'}</button>
       </div>
       {!koMode && !waitingDraw && (above || below) && <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 12 }}>
         <div style={{ background: 'rgba(255,255,255,.1)', borderRadius: 12, padding: '9px 10px' }}>
@@ -514,7 +517,7 @@ function GroupRivalCard(props) {
           <div style={{ fontSize: 13, fontWeight: 850, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{below ? below.team.name + (gapBelow ? ' -' + gapBelow : ' level') : 'Nobody'}</div>
         </div>
       </div>}
-      {(koMode || waitingDraw) && t.alive && window.KnockoutPathCard && <window.KnockoutPathCard teamCode={t.code} path={path} compact />}
+      {(koMode || waitingDraw || betweenRounds) && t.alive && window.KnockoutPathCard && <window.KnockoutPathCard teamCode={t.code} path={path} compact />}
       {koMode && path && path.current && path.current.opponent && TieOwners && (
         <TieOwners codeA={t.code} codeB={path.current.opponent.code} owners={owners} meId={me.id} meTeam={t.code} dark compact />
       )}

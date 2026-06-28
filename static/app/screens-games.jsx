@@ -6,7 +6,7 @@ const WCg = window.WC;
 const Wg = window.Wheesht;
 const Sg = window.Store;
 const { Card: Cg, Btn: Bg, Flag: Fg, Chip: Chg, WheeshtSays: Saysg, SectionHead: SHg } = window;
-const { useState: gState } = React;
+const { useState: gState, useEffect: gEffect } = React;
 
 function gameTeam(code) {
   return WCg.TEAMS[code] || { code: code || 'TBD', name: code || 'To be decided', flag: '🏳️' };
@@ -131,6 +131,9 @@ function GamesScreen() {
   const defaultFilter = koPhase && mineTeam && stillIn ? 'mine' : 'all';
   const [filter, setFilter] = gState(defaultFilter);
   const [showGroup, setShowGroup] = gState(false);
+  gEffect(function () {
+    if (!stillIn) setFilter(function (f) { return f === 'mine' ? 'all' : f; });
+  }, [stillIn]);
   const owned = ownedSet();
   const all = (WCg.FIXTURES || []).slice();
   const koFixtures = (Sg && Sg.buildKnockoutFixtureList)
@@ -272,9 +275,15 @@ function GamesScreen() {
       {list.length === 0 &&
         <Cg flat style={{ textAlign: 'center', padding: '26px 16px' }}>
           <Wg mood="neutral" size={64} animate />
-          <div className="dh" style={{ fontSize: 17, marginTop: 6 }}>{koPhase && !showGroup ? 'Knockout ties not in the feed yet.' : 'Nothing to show here.'}</div>
+          <div className="dh" style={{ fontSize: 17, marginTop: 6 }}>
+            {filter === 'mine' && !stillIn
+              ? 'Your team is out — switch to All knockouts or In the draw.'
+              : (koPhase && !showGroup ? 'Knockout ties not in the feed yet.' : 'Nothing to show here.')}
+          </div>
           <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink2)', marginTop: 3 }}>
-            {koPhase && !showGroup ? 'Check the bracket on Me for projected R32 pairings.' : 'No fixtures match that filter yet.'}
+            {filter === 'mine' && !stillIn
+              ? 'The predictions league is still live even when your nation is gone.'
+              : (koPhase && !showGroup ? 'Check the bracket on Me for projected R32 pairings.' : 'No fixtures match that filter yet.')}
           </div>
         </Cg>}
 

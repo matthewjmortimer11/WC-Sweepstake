@@ -126,6 +126,16 @@ function DashTeam(){
           <div style={{fontSize:11,fontWeight:800,letterSpacing:'.06em',color:'var(--ink2)'}}>ELIMINATED</div>
           <div className="dh" style={{fontSize:17,marginTop:2}}>{stageLabel(t)}</div>
         </div>
+      ) : koPath && koPath.waitingDraw ? (
+        <div style={{marginTop:14,background:'var(--yellow)',borderRadius:14,padding:'11px 14px',color:'var(--ink)'}}>
+          <div style={{fontSize:11,fontWeight:800,letterSpacing:'.06em'}}>WAITING ON R32 DRAW</div>
+          <div style={{fontSize:13,fontWeight:700,marginTop:4,lineHeight:1.35}}>Groups done — your team is through. Full knockout draw still landing.</div>
+        </div>
+      ) : koPath && koPath.betweenRounds ? (
+        <div style={{marginTop:14,background:'var(--yellow)',borderRadius:14,padding:'11px 14px',color:'var(--ink)'}}>
+          <div style={{fontSize:11,fontWeight:800,letterSpacing:'.06em'}}>THROUGH · {koPath.waitingNextRound || 'NEXT ROUND'}</div>
+          <div style={{fontSize:13,fontWeight:700,marginTop:4,lineHeight:1.35}}>Waiting on the next knockout tie in the feed.</div>
+        </div>
       ) : null}
     </Card>
   );

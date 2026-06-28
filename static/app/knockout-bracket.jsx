@@ -374,6 +374,13 @@ function KnockoutPathCard(props) {
       </div>
     );
   }
+  if (path.betweenRounds) {
+    return (
+      <div style={{ marginTop: compact ? 10 : 12, fontSize: compact ? 12.2 : 13, fontWeight: 750, color: compact ? 'rgba(255,255,255,.72)' : 'var(--ink2)', lineHeight: 1.4 }}>
+        Through — waiting on the {path.waitingNextRound || 'next round'} tie to publish in the feed.
+      </div>
+    );
+  }
   if (!cur && !nxt) return null;
   var dateLine = cur && cur.fixture && cur.fixture.dateLabel
     ? cur.fixture.dateLabel + (cur.fixture.time ? ' · ' + cur.fixture.time : '')

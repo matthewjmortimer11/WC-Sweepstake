@@ -162,10 +162,11 @@ def _feed_fills_r32_slot(slot: Dict[str, Any], feed: Dict[str, Any]) -> bool:
     ta, tb = slot.get("a"), slot.get("b")
     if {fa, fb} == {ta, tb}:
         return True
-    known = [c for c in (ta, tb) if c and c != "TBD"]
-    if len(known) != 1:
+    feed_teams = [c for c in (fa, fb) if c and c != "TBD"]
+    if not feed_teams:
         return False
-    return fa == known[0] or fb == known[0]
+    slot_teams = [ta, tb]
+    return any(t in slot_teams for t in feed_teams)
 
 
 def _merge_r32_feed(

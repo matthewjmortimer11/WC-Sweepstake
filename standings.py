@@ -265,12 +265,18 @@ def compute_team_status(
     for t in teams:
         c = t["code"]
         stage = "winner" if champion == c else reached[c]
-        if eliminated[c] and reached[c] == "group":
-            stage = "out-group"
+        if eliminated[c]:
+            if reached[c] == "group":
+                stage = "out-group"
+            elif champion != c:
+                stage = "out-" + reached[c]
         nt = dict(t)
         nt["stage"] = stage
         nt["alive"] = not eliminated[c]
-        nt["rounds"] = ladder_index.get(stage, 0)
+        furthest = reached[c] if eliminated[c] else stage
+        if str(furthest).startswith("out-"):
+            furthest = furthest[4:]
+        nt["rounds"] = ladder_index.get(furthest, ladder_index.get("group", 0))
         out.append(nt)
     return out
 

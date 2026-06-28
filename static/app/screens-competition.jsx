@@ -168,7 +168,8 @@ function SweepstakeTieOwners(props) {
 function qualStatus(t, G, mePos, gamesLeft) {
   if (!t.alive) return { label: 'Eliminated', tone: 'red', mood: 'crying', mustWin: false, detail: 'Out of the tournament. The predictions league is still live, mind.' };
   if (t.rounds >= 1) return { label: 'Through to the knockouts', tone: 'green', mood: 'celebrating', mustWin: false, detail: 'Group survived. Now it gets serious.' };
-  if (G.hasResults && gamesLeft === 0 && t.alive) return { label: 'Through to knockouts', tone: 'green', mood: 'celebrating', mustWin: false, detail: 'Groups finished — you are in the Round of 32.' };
+  var groupsComplete = !!(WCc.meta && WCc.meta.groupsComplete);
+  if (groupsComplete && gamesLeft === 0 && t.alive) return { label: 'Through to knockouts', tone: 'green', mood: 'celebrating', mustWin: false, detail: 'Groups finished — you are in the Round of 32.' };
   if (!G.hasResults) return { label: 'Not started', tone: 'ghost', mood: 'confident', mustWin: false, detail: 'No ball kicked yet. Everything to play for.' };
   if (mePos <= 2) return { label: 'In a qualifying spot', tone: 'green', mood: 'confident', mustWin: false, detail: 'Top two go through. Hold your nerve.' };
   if (mePos === 3) return { label: 'On the bubble', tone: 'yellow', mood: 'nervous', mustWin: gamesLeft > 0, detail: gamesLeft > 0 ? 'Outside the top two — a win pulls you back in.' : '3rd place. Sweating on a best-third spot.' };
@@ -251,12 +252,15 @@ function MyGroupDashboard(props) {
   const path = (Sc.knockoutPathForTeam && t.alive) ? Sc.knockoutPathForTeam(t.code) : null;
   const koTie = path && path.current ? path.current : null;
   const status = qualStatus(t, G, mePos, gamesLeft);
+  const betweenRounds = !!(path && path.betweenRounds);
   const displayStatus = !t.alive
     ? status
-    : koMode
-    ? { label: 'In the knockouts', tone: 'green', mood: 'confident', mustWin: false, detail: 'Group stage done — knockout path is live.' }
     : waitingDraw
       ? { label: 'Through to knockouts', tone: 'green', mood: 'celebrating', mustWin: false, detail: 'Groups finished — waiting on the full R32 draw.' }
+      : betweenRounds
+        ? { label: 'Waiting on ' + (path.waitingNextRound || 'next round'), tone: 'yellow', mood: 'nervous', mustWin: false, detail: 'Through — the next knockout tie is not in the feed yet.' }
+    : koMode
+    ? { label: 'In the knockouts', tone: 'green', mood: 'confident', mustWin: false, detail: 'Group stage done — knockout path is live.' }
       : status;
   const nextFix = futureFix[0];
   const nextStatus = nextFix ? compStatus(nextFix) : '';
@@ -265,7 +269,7 @@ function MyGroupDashboard(props) {
   const staleFix = myFix.find(f => compStatus(f) === 'needsResult');
   const staleOpp = staleFix ? WCc.TEAMS[staleFix.a === t.code ? staleFix.b : staleFix.a] : null;
   const showGroupNext = !koMode && !waitingDraw && nextFix && nextOpp;
-  const showKoNext = (koMode || waitingDraw) && t.alive && (koTie || waitingDraw);
+  const showKoNext = (koMode || waitingDraw || betweenRounds) && t.alive && (koTie || waitingDraw || betweenRounds);
   function selectPerson(person) {
     keepCompetitionScroll(function () {
       setSelectedPerson(selectedPerson && selectedPerson.id === person.id ? null : person);
@@ -292,7 +296,7 @@ function MyGroupDashboard(props) {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
           <div style={{ minWidth: 0 }}>
             <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.08em', color: 'var(--yellow)' }}>
-              {koMode ? ('KNOCKOUT STAGE · ' + ((WCc.meta && WCc.meta.stageLabel) || '')) : waitingDraw ? 'WAITING ON R32 DRAW' : ('GROUP ' + t.group + ' · ' + (G.hasResults ? 'MATCHDAY ' + G.latestMd + ' OF 3' : 'NOT STARTED'))}
+              {koMode ? ('KNOCKOUT STAGE · ' + ((WCc.meta && WCc.meta.stageLabel) || '')) : waitingDraw ? 'WAITING ON R32 DRAW' : betweenRounds ? ('THROUGH · ' + (path.waitingNextRound || 'NEXT ROUND').toUpperCase()) : ('GROUP ' + t.group + ' · ' + (G.hasResults ? 'MATCHDAY ' + G.latestMd + ' OF 3' : 'NOT STARTED'))}
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 8 }}>
               <Fc team={t} size={42} />
@@ -354,10 +358,14 @@ function MyGroupDashboard(props) {
         </Cc>
       )}
       {showKoNext && t.alive && (
-        <Cc bordered style={{ marginTop: 12, background: waitingDraw ? 'var(--yellow)' : 'var(--ink)', color: waitingDraw ? 'var(--ink)' : '#fff' }}>
+        <Cc bordered style={{ marginTop: 12, background: (waitingDraw || betweenRounds) ? 'var(--yellow)' : 'var(--ink)', color: (waitingDraw || betweenRounds) ? 'var(--ink)' : '#fff' }}>
           {waitingDraw ? (
             <div style={{ fontSize: 13, fontWeight: 750, lineHeight: 1.4 }}>
               All groups finished. Your team is still alive — waiting on the full R32 draw and best-third spots.
+            </div>
+          ) : betweenRounds ? (
+            <div style={{ fontSize: 13, fontWeight: 750, lineHeight: 1.4 }}>
+              Through to the {path.waitingNextRound || 'next round'}. That tie has not been published in the feed yet — check back soon or follow the bracket on Me.
             </div>
           ) : (
             <div>
@@ -408,10 +416,10 @@ function MyGroupDashboard(props) {
         {G.ranked.map((r, i) => {
           const o = ownerLabel(owners, r.code, me.id);
           const isMe = r.code === t.code;
-          const out = !r.team.alive;
-          const qualifies = !out && r.pos <= 2;
-          const gd = r.GF - r.GA;
           const groupOver = koMode || waitingDraw || !!(WCc.meta && WCc.meta.groupsComplete);
+          const out = !r.team.alive;
+          const qualifies = !out && (r.pos <= 2 || (groupOver && r.pos === 3 && r.team.alive));
+          const gd = r.GF - r.GA;
           return (
             <React.Fragment key={r.code + '-' + r.pos}>
               <div className={showMove && r.move > 0 ? 'lb-up' : showMove && r.move < 0 ? 'lb-dn' : ''} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 2px', borderRadius: 9, margin: '2px 0', background: isMe ? 'rgba(245,200,0,.22)' : 'transparent', opacity: out ? .45 : 1 }}>

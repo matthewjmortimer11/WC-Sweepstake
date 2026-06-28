@@ -207,6 +207,12 @@
       return null;
     }
 
+    function nextKnockoutStageAfter(stage) {
+      var si = BRACKET_TREE_STAGES.indexOf(stage);
+      if (si < 0 || si >= BRACKET_TREE_STAGES.length - 1) return null;
+      return BRACKET_TREE_STAGES[si + 1];
+    }
+
     function nextBracketSlot(currentStage, currentIndex, merged) {
       var si = BRACKET_TREE_STAGES.indexOf(currentStage);
       if (si < 0 || si >= BRACKET_TREE_STAGES.length - 1) return null;
@@ -320,6 +326,23 @@
         if (idx >= 0) {
           var nxt2 = nextBracketSlot(current.stage, idx, merged);
           if (nxt2 && nxt2.tie) next = describeBracketSlot(nxt2.tie, nxt2.stage);
+        }
+      }
+      if (!current && tsp === 'in_knockout' && t.stage && t.stage !== 'group' && t.stage !== 'winner') {
+        var baseStage = String(t.stage).replace(/^out-/, '');
+        var waitSt = nextKnockoutStageAfter(baseStage);
+        if (waitSt) {
+          return {
+            current: null,
+            next: next,
+            eliminatedAt: null,
+            phase: tsp,
+            tournamentPhase: phase,
+            waitingDraw: false,
+            betweenRounds: true,
+            waitingNextStage: waitSt,
+            waitingNextRound: stageLabelForRound(waitSt),
+          };
         }
       }
       return { current: current, next: next, eliminatedAt: null, phase: tsp, tournamentPhase: phase, waitingDraw: false };
@@ -533,9 +556,9 @@
 
     function feedFillsR32Slot(slot, feed) {
       if (sameBracketPair(slot.a, slot.b, feed.a, feed.b)) return true;
-      var known = [slot.a, slot.b].filter(function (c) { return c && c !== 'TBD'; });
-      if (known.length !== 1) return false;
-      return feed.a === known[0] || feed.b === known[0];
+      var feedTeams = [feed.a, feed.b].filter(function (c) { return c && c !== 'TBD'; });
+      if (!feedTeams.length) return false;
+      return feedTeams.some(function (c) { return c === slot.a || c === slot.b; });
     }
 
     function mergeR32Rounds(proj, feed) {
@@ -549,7 +572,13 @@
             break;
           }
         }
-        if (!placed) merged.push(feedOverlayR32(null, f));
+        if (!placed) {
+          var feedTeams = [f.a, f.b].filter(function (c) { return c && c !== 'TBD'; });
+          var dup = feedTeams.some(function (c) {
+            return merged.some(function (m) { return m.a === c || m.b === c; });
+          });
+          if (!dup) merged.push(feedOverlayR32(null, f));
+        }
       });
       return sortBracketRound(merged, 'r32');
     }

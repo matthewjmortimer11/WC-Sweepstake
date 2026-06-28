@@ -27,6 +27,7 @@ def test_knockout_loss_eliminates_loser():
     by = {t["code"]: t for t in out}
     assert by["AAA"]["alive"] is True
     assert by["BBB"]["alive"] is False
+    assert by["BBB"]["stage"] == "out-r16"
     assert by["AAA"]["stage"] == "r16"
 
 
