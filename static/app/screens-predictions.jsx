@@ -71,6 +71,30 @@ function timeLeftLabel(dt, now) {
   return days + 'd ' + (hrs % 24) + 'h left';
 }
 
+var KO_STAGE_SORT = { r32: 1, r16: 2, qf: 3, sf: 4, final: 5, third: 6 };
+
+function marketKickoffMs(m) {
+  if (!m) return Infinity;
+  var ms = fixtureKickoffMs(m);
+  if (ms != null) return ms;
+  var fid = m.fixture_id;
+  if (fid && WCp.FIXTURES) {
+    for (var i = 0; i < WCp.FIXTURES.length; i++) {
+      var f = WCp.FIXTURES[i];
+      if (f && String(f.id) === String(fid)) {
+        ms = fixtureKickoffMs(f);
+        if (ms != null) return ms;
+        break;
+      }
+    }
+  }
+  return ((KO_STAGE_SORT[m.stage] || 99) * 1e12);
+}
+
+function sortKoMarkets(list) {
+  return list.slice().sort(function (a, b) { return marketKickoffMs(a) - marketKickoffMs(b); });
+}
+
 function optLabel(m, opt) {
   if (opt === 'draw') return { main: 'Draw', sub: 'Honours even', flag: '🤝', id: 'draw' };
   if (m.kind === 'player') return { main: opt.name, sub: WCp.TEAMS[opt.team] ? WCp.TEAMS[opt.team].name : '', flag: WCp.TEAMS[opt.team] ? WCp.TEAMS[opt.team].flag : '', id: opt.id };
@@ -397,11 +421,16 @@ function PredictionsScreen(props) {
     </div>;
   }
   const markets = Sp.visiblePredictions ? Sp.visiblePredictions() : (WCp.predictions || Sp.PREDICTIONS).filter(m => ((WCp.meta && WCp.meta.hiddenPredictions) || []).indexOf(m.key) < 0);
-  const KO_STAGE_SORT = { r32: 1, r16: 2, qf: 3, sf: 4, final: 5, third: 6 };
+  const koCfg = (WCp.meta && WCp.meta.knockoutPredictions) || {};
+  const koEnabled = !!koCfg.enabled;
   const dmTs = k => { const p = String(k).split('_'); const n = parseInt(p[p.length - 1], 10); return isFinite(n) ? n : 0; };
   const open = markets.filter(m => !isResolved(m)).sort((a, b) => {
     const aKo = isKnockoutBracketMarket(a), bKo = isKnockoutBracketMarket(b);
-    if (aKo && bKo) return (KO_STAGE_SORT[a.stage] || 99) - (KO_STAGE_SORT[b.stage] || 99);
+    if (koEnabled) {
+      if (aKo && !bKo) return -1;
+      if (!aKo && bKo) return 1;
+    }
+    if (aKo && bKo) return marketKickoffMs(a) - marketKickoffMs(b);
     const ad = String(a.key || '').indexOf('dm_') === 0, bd = String(b.key || '').indexOf('dm_') === 0;
     if (ad && bd) return dmTs(b.key) - dmTs(a.key);
     if (ad !== bd) return ad ? -1 : 1;
@@ -411,9 +440,8 @@ function PredictionsScreen(props) {
   const graded = markets.filter(m => isResolved(m));
   const perFixKickedOff = function (m) { return isPerFixtureMarket(m) && fixtureKickedOff(m); };
   const openStatic = open.filter(function (m) { return !isPerFixtureMarket(m); });
-  const openKo = open.filter(isKnockoutBracketMarket);
+  const openKo = sortKoMarkets(open.filter(isKnockoutBracketMarket));
   const openDm = open.filter(function (m) { return String(m.key || '').indexOf('dm_') === 0; });
-  const koCfg = (WCp.meta && WCp.meta.knockoutPredictions) || {};
   // Per-fixture markets that kicked off without a pick don't count as "missing"
   const countableMarkets = markets.filter(m => !perFixKickedOff(m) || pickComplete(m, me.picks || {}));
   const made = countableMarkets.filter(m => pickComplete(m, me.picks || {})).length;
@@ -460,19 +488,19 @@ function PredictionsScreen(props) {
         <div className="dh" style={{ fontSize: 18, marginTop: 3 }}>Full card submitted.</div>
         <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--ink2)', marginTop: 3 }}>You can still change picks until they lock. Wheesht has the draft in pencil.</div>
       </Cp>}
-      <Saysp mood="mischievous" label="on the record" animate>{WCp.LINES.predOpen}</Saysp>
-      {openStatic.length > 0 && <>
-        <SHp aside={missing.filter(function (m) { return !isPerFixtureMarket(m); }).length ? missing.filter(function (m) { return !isPerFixtureMarket(m); }).length + ' left' : 'all in'}>{allOpenMade && !openKo.length && !openDm.length ? 'Review your calls' : 'Make your call'}</SHp>
-        {openStatic.map(m => <Market key={m.key} market={m} me={me} onPick={onPick} locked={locked} />)}
-      </>}
       {openKo.length > 0 && <>
         <SHp aside={openKo.filter(function (m) { return !pickComplete(m, me.picks || {}); }).length ? openKo.filter(function (m) { return !pickComplete(m, me.picks || {}); }).length + ' left' : 'all in'}>
           Knockout bracket{koCfg.enabled ? ' · ' + (koCfg.points || 5) + ' pts each' : ''}
         </SHp>
         <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--ink2)', marginBottom: 10, lineHeight: 1.35 }}>
-          Pick the winner for each tie in the feed. New ties appear as the draw publishes. Locks at kick-off.
+          Pick the winner for each tie, earliest kick-off first. New ties appear as the draw publishes. Locks at kick-off.
         </div>
         {openKo.map(m => <Market key={m.key} market={m} me={me} onPick={onPick} locked={locked} />)}
+      </>}
+      <Saysp mood="mischievous" label="on the record" animate>{WCp.LINES.predOpen}</Saysp>
+      {openStatic.length > 0 && <>
+        <SHp aside={missing.filter(function (m) { return !isPerFixtureMarket(m); }).length ? missing.filter(function (m) { return !isPerFixtureMarket(m); }).length + ' left' : 'all in'}>{allOpenMade && !openKo.length && !openDm.length ? 'Review your calls' : 'Make your call'}</SHp>
+        {openStatic.map(m => <Market key={m.key} market={m} me={me} onPick={onPick} locked={locked} />)}
       </>}
       {openDm.length > 0 && <>
         <SHp aside="match picks">One-off match predictions</SHp>
