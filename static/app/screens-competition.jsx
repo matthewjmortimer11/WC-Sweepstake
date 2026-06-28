@@ -96,11 +96,70 @@ function ownersByCode() {
 }
 function ownerLabel(owners, code, meId) {
   const list = owners[code] || [];
-  if (!list.length) return { name: 'Unclaimed', mine: false, extra: 0, person: null };
+  if (!list.length) return { name: 'Unclaimed', mine: false, extra: 0, person: null, list: [] };
   const mine = list.some(p => p.id === meId);
   const primary = mine ? list.find(p => p.id === meId) : list[0];
   const nm = (Sc && Sc.shownName) ? Sc.shownName(primary) : primary.name;
-  return { name: nm, mine: mine, extra: list.length - 1, person: primary };
+  return { name: nm, mine: mine, extra: list.length - 1, person: primary, list: list };
+}
+
+function ownersList(owners, code, meId) {
+  return (owners[code] || []).map(function (p) {
+    return {
+      person: p,
+      name: (Sc && Sc.shownName) ? Sc.shownName(p) : p.name,
+      mine: p.id === meId,
+    };
+  });
+}
+
+function formatOwnerNames(list) {
+  if (!list.length) return 'Unclaimed in this league';
+  if (list.length === 1) return list[0].mine ? 'You' : list[0].name;
+  var names = list.slice(0, 2).map(function (o) { return o.mine ? 'You' : o.name; });
+  var extra = list.length - names.length;
+  return names.join(', ') + (extra > 0 ? ' +' + extra : '');
+}
+
+function SweepstakeTieOwners(props) {
+  var codeA = props.codeA;
+  var codeB = props.codeB;
+  var owners = props.owners || {};
+  var meId = props.meId;
+  var meTeam = props.meTeam;
+  var dark = props.dark;
+  var compact = props.compact;
+  var onSelectPerson = props.onSelectPerson;
+  if (!codeA || !codeB) return null;
+  function Side(sideProps) {
+    var code = sideProps.code;
+    var team = WCc.TEAMS[code] || { code: code, name: code, flag: '🏳️' };
+    var list = ownersList(owners, code, meId);
+    var label = formatOwnerNames(list);
+    var isMe = code === meTeam;
+    var ink = dark ? '#fff' : 'var(--ink)';
+    var sub = dark ? 'rgba(255,255,255,.72)' : 'var(--ink2)';
+    var ownerInk = list.length ? (list.some(function (o) { return o.mine; }) ? 'var(--yellow)' : 'var(--red)') : sub;
+    return (
+      <div style={{ flex: 1, minWidth: 0, textAlign: 'center' }}>
+        <Fc team={team} size={compact ? 30 : 38} />
+        <div className="dh" style={{ fontSize: compact ? 15 : 17, color: ink, marginTop: 4, lineHeight: 1.1 }}>{team.name}</div>
+        {list.length && list[0].person && onSelectPerson
+          ? <button type="button" onClick={function () { onSelectPerson(list[0].person); }} style={{ border: 'none', background: 'none', padding: 0, margin: '5px 0 0', cursor: 'pointer', font: 'inherit', fontSize: compact ? 12 : 13, fontWeight: 800, color: ownerInk, textDecoration: 'underline', textDecorationThickness: 1, textUnderlineOffset: 2 }}>
+              {isMe ? 'You' : label}{isMe && list.length > 1 ? ' +' + (list.length - 1) : ''}
+            </button>
+          : <div style={{ fontSize: compact ? 12 : 13, fontWeight: 800, color: ownerInk, marginTop: 5, lineHeight: 1.3 }}>{isMe && list.length ? 'You' + (list.length > 1 ? ' +' + (list.length - 1) : '') : label}</div>}
+        <div style={{ fontSize: 10, fontWeight: 700, color: sub, marginTop: 2 }}>{isMe ? 'your team' : (list.length ? 'in the draw' : 'nobody picked')}</div>
+      </div>
+    );
+  }
+  return (
+    <div style={{ display: 'flex', alignItems: 'flex-start', gap: compact ? 8 : 12, marginTop: compact ? 8 : 12, paddingTop: compact ? 8 : 12, borderTop: dark ? '1px solid rgba(255,255,255,.16)' : '1.5px solid var(--line)' }}>
+      <Side code={codeA} />
+      <div className="dh" style={{ fontSize: compact ? 14 : 16, color: dark ? 'var(--yellow)' : 'var(--ink2)', paddingTop: compact ? 22 : 28, flex: '0 0 auto' }}>v</div>
+      <Side code={codeB} />
+    </div>
+  );
 }
 
 /* ---- qualification read (honest, non-speculative) ----------------------- */
@@ -182,6 +241,12 @@ function MyGroupDashboard(props) {
   const myFix = G.fixtures.filter(f => f.a === t.code || f.b === t.code).slice().sort(compFixtureSort);
   const futureFix = myFix.filter(compFixturePlayable);
   const gamesLeft = futureFix.length;
+  const tPhase = Sc.tournamentPhase ? Sc.tournamentPhase() : (WCc.meta.tournamentPhase || 'group');
+  const teamPhase = Sc.teamSweepstakePhase ? Sc.teamSweepstakePhase(t.code) : 'in_group';
+  const koMode = tPhase !== 'group' && teamPhase !== 'in_group' && teamPhase !== 'out';
+  const waitingDraw = teamPhase === 'waiting_draw';
+  const path = (Sc.knockoutPathForTeam && t.alive) ? Sc.knockoutPathForTeam(t.code) : null;
+  const koTie = path && path.current ? path.current : null;
   const status = qualStatus(t, G, mePos, gamesLeft);
   const displayStatus = koMode
     ? { label: 'In the knockouts', tone: 'green', mood: 'confident', mustWin: false, detail: 'Group stage done — knockout path is live.' }
@@ -194,14 +259,13 @@ function MyGroupDashboard(props) {
   const nextOpp = nextFix ? WCc.TEAMS[nextFix.a === t.code ? nextFix.b : nextFix.a] : null;
   const staleFix = myFix.find(f => compStatus(f) === 'needsResult');
   const staleOpp = staleFix ? WCc.TEAMS[staleFix.a === t.code ? staleFix.b : staleFix.a] : null;
-  const tPhase = Sc.tournamentPhase ? Sc.tournamentPhase() : (WCc.meta.tournamentPhase || 'group');
-  const teamPhase = Sc.teamSweepstakePhase ? Sc.teamSweepstakePhase(t.code) : 'in_group';
-  const koMode = tPhase !== 'group' && teamPhase !== 'in_group' && teamPhase !== 'out';
-  const waitingDraw = teamPhase === 'waiting_draw';
-  const path = (Sc.knockoutPathForTeam && t.alive) ? Sc.knockoutPathForTeam(t.code) : null;
-  const koTie = path && path.current ? path.current : null;
   const showGroupNext = !koMode && !waitingDraw && nextFix && nextOpp;
   const showKoNext = (koMode || waitingDraw) && t.alive && (koTie || waitingDraw);
+  function selectPerson(person) {
+    keepCompetitionScroll(function () {
+      setSelectedPerson(selectedPerson && selectedPerson.id === person.id ? null : person);
+    });
+  }
 
   // movers within the group (only meaningful once a 2nd matchday exists)
   let biggestMover = null, biggestFaller = null;
@@ -279,6 +343,7 @@ function MyGroupDashboard(props) {
                 {nextLabel} · {nextFix.dateLabel} · {nextFix.time}
               </div>
               <div className="dh" style={{ fontSize: 19, marginTop: 2, lineHeight: 1 }}>{t.name} <span style={{ opacity: .55 }}>v</span> {nextOpp.name} {nextOpp.flag}</div>
+              <SweepstakeTieOwners codeA={t.code} codeB={nextFix.a === t.code ? nextFix.b : nextFix.a} owners={owners} meId={me.id} meTeam={t.code} dark={status.mustWin} compact onSelectPerson={selectPerson} />
             </div>
           </div>
         </Cc>
@@ -290,19 +355,24 @@ function MyGroupDashboard(props) {
               All groups finished. Your team is still alive — waiting on the full R32 draw and best-third spots.
             </div>
           ) : (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
-              <span className="flame" style={{ fontSize: 30 }}>🔥</span>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '.06em', color: 'var(--yellow)' }}>
-                  {(koTie.isLive ? '● LIVE · ' : 'NEXT KNOCKOUT · ') + koTie.stageLabel + (koTie.fixture && koTie.fixture.dateLabel ? ' · ' + koTie.fixture.dateLabel + (koTie.fixture.time ? ' · ' + koTie.fixture.time : '') : (koTie.projected ? ' · pairing from standings' : ''))}
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
+                <span className="flame" style={{ fontSize: 30 }}>🔥</span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '.06em', color: 'var(--yellow)' }}>
+                    {(koTie.isLive ? '● LIVE · ' : 'NEXT KNOCKOUT · ') + koTie.stageLabel + (koTie.fixture && koTie.fixture.dateLabel ? ' · ' + koTie.fixture.dateLabel + (koTie.fixture.time ? ' · ' + koTie.fixture.time : '') : (koTie.projected ? ' · pairing from standings' : ''))}
+                  </div>
+                  <div className="dh" style={{ fontSize: 19, marginTop: 2, lineHeight: 1, color: '#fff' }}>{t.name} <span style={{ opacity: .55 }}>vs</span> {koTie.opponent.name} {koTie.opponent.flag}</div>
                 </div>
-                <div className="dh" style={{ fontSize: 19, marginTop: 2, lineHeight: 1, color: '#fff' }}>{t.name} <span style={{ opacity: .55 }}>vs</span> {koTie.opponent.name} {koTie.opponent.flag}</div>
-                {window.KnockoutPathCard && path && path.next && <window.KnockoutPathCard teamCode={t.code} path={path} showCurrent={false} />}
               </div>
+              <SweepstakeTieOwners codeA={t.code} codeB={koTie.opponent.code} owners={owners} meId={me.id} meTeam={t.code} dark compact onSelectPerson={selectPerson} />
+              {window.KnockoutPathCard && path && path.next && <window.KnockoutPathCard teamCode={t.code} path={path} showCurrent={false} compact />}
             </div>
           )}
         </Cc>
       )}
+
+      {selectedPerson && window.PersonSnapshot && <window.PersonSnapshot inline person={(Sc.getSync && Sc.getSync(selectedPerson.id)) || selectedPerson} onClose={function () { keepCompetitionScroll(function () { setSelectedPerson(null); }); }} />}
 
       {!koMode && !waitingDraw && !nextFix && staleFix && staleOpp && t.alive && (
         <Cc bordered style={{ marginTop: 12, background: 'var(--yellow)', color: 'var(--ink)' }}>
@@ -391,23 +461,6 @@ function MyGroupDashboard(props) {
         </div>
       </>}
 
-      {(koMode || waitingDraw) && koTie && koTie.opponent && <>
-        <SHc aside="in the draw">Sweepstake rivals in your tie</SHc>
-        <div style={{ display: 'flex', gap: 9, flexWrap: 'wrap' }}>
-          {[t.code, koTie.opponent.code].map(function (code) {
-            var o = ownerLabel(owners, code, me.id);
-            if (!o.person && o.name === 'Unclaimed') return null;
-            return (
-              <Cc key={code} flat style={{ flex: '1 1 140px', padding: '11px 12px', border: code === t.code ? '2.5px solid var(--ink)' : '2px solid var(--line)' }}>
-                <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: '.05em', color: 'var(--ink2)' }}>{code === t.code ? 'YOUR TEAM' : 'OPPONENT'}</div>
-                <div style={{ fontSize: 14, fontWeight: 800, marginTop: 4 }}>{WCc.TEAMS[code] && WCc.TEAMS[code].name}</div>
-                <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--red)', marginTop: 2 }}>{o.mine ? 'You' : o.name}{o.extra > 0 ? ' +' + o.extra : ''}</div>
-              </Cc>
-            );
-          })}
-        </div>
-      </>}
-
       {/* ===== GROUP STATS — hide in knockout mode ===== */}
       {!koMode && <>
       <SHc aside="the group at a glance">Group statistics</SHc>
@@ -462,6 +515,8 @@ window.WheeshtCompetition = {
   groupModel: groupModel,
   ownersByCode: ownersByCode,
   ownerLabel: ownerLabel,
+  ownersList: ownersList,
+  SweepstakeTieOwners: SweepstakeTieOwners,
   compStatus: compStatus,
   compFixturePlayable: compFixturePlayable,
   compFixtureSort: compFixtureSort,

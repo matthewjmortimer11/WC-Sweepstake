@@ -482,6 +482,8 @@ function GroupRivalCard(props) {
   const koMode = tPhase !== 'group' && teamPhase !== 'in_group' && teamPhase !== 'out';
   const waitingDraw = teamPhase === 'waiting_draw';
   const path = (Sd.knockoutPathForTeam && t.alive) ? Sd.knockoutPathForTeam(t.code) : null;
+  const owners = comp.ownersByCode ? comp.ownersByCode() : {};
+  const TieOwners = comp.SweepstakeTieOwners;
   const next = !koMode ? G.fixtures.filter(f => (f.a === t.code || f.b === t.code) && comp.compFixturePlayable(f)).sort(comp.compFixtureSort)[0] : null;
   const opp = next ? WCd.TEAMS[next.a === t.code ? next.b : next.a] : null;
   const gapAbove = above ? Math.max(0, above.Pts - meRow.Pts) : 0;
@@ -513,9 +515,15 @@ function GroupRivalCard(props) {
         </div>
       </div>}
       {(koMode || waitingDraw) && t.alive && window.KnockoutPathCard && <window.KnockoutPathCard teamCode={t.code} path={path} compact />}
-      {!koMode && !waitingDraw && next && opp && <div style={{ marginTop: 10, fontSize: 12.2, fontWeight: 750, color: 'rgba(255,255,255,.72)', lineHeight: 1.35 }}>
-        Next swing: {t.name} v {opp.name} · {next.dateLabel} {next.time}. This is where the table can move.
-      </div>}
+      {koMode && path && path.current && path.current.opponent && TieOwners && (
+        <TieOwners codeA={t.code} codeB={path.current.opponent.code} owners={owners} meId={me.id} meTeam={t.code} dark compact />
+      )}
+      {!koMode && !waitingDraw && next && opp && <>
+        <div style={{ marginTop: 10, fontSize: 12.2, fontWeight: 750, color: 'rgba(255,255,255,.72)', lineHeight: 1.35 }}>
+          Next swing: {t.name} v {opp.name} · {next.dateLabel} {next.time}.
+        </div>
+        <TieOwners codeA={t.code} codeB={next.a === t.code ? next.b : next.a} owners={owners} meId={me.id} meTeam={t.code} dark compact />
+      </>}
     </Cd>
   );
 }
