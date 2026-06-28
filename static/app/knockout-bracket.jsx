@@ -315,5 +315,46 @@ function ProjectedKnockoutBracket(props) {
   return <KnockoutBracket embedded={props.embedded} onOpen={props.onOpen} />;
 }
 
+function KnockoutPathCard(props) {
+  var teamCode = props.teamCode;
+  var compact = props.compact;
+  var showCurrent = props.showCurrent !== false;
+  var path = props.path || (Skb && Skb.knockoutPathForTeam ? Skb.knockoutPathForTeam(teamCode) : null);
+  var team = WCkb.TEAMS[teamCode];
+  if (!path || !team) return null;
+  var cur = path.current;
+  var nxt = path.next;
+  if (path.waitingDraw) {
+    return (
+      <div style={{ marginTop: compact ? 10 : 12, fontSize: compact ? 12.2 : 13, fontWeight: 750, color: compact ? 'rgba(255,255,255,.72)' : 'var(--ink2)', lineHeight: 1.4 }}>
+        Groups complete — waiting on the R32 draw. Best-third spots still to be confirmed.
+      </div>
+    );
+  }
+  if (!cur && !nxt) return null;
+  var dateLine = cur && cur.fixture && cur.fixture.dateLabel
+    ? cur.fixture.dateLabel + (cur.fixture.time ? ' · ' + cur.fixture.time : '')
+    : (cur && cur.projected ? 'Pairing from standings — kick-off TBC' : '');
+  return (
+    <div style={{ marginTop: compact ? 10 : 12 }}>
+      {showCurrent && cur && cur.opponent && (
+        <div style={{ fontSize: compact ? 12.2 : 13, fontWeight: 750, color: compact ? 'rgba(255,255,255,.85)' : 'var(--ink)', lineHeight: 1.4 }}>
+          {cur.isLive ? '● LIVE · ' : (cur.projected ? 'R32 pairing · ' : 'Next tie · ')}
+          {cur.stageLabel} — {team.name} v {cur.opponent.name}
+          {dateLine ? ' · ' + dateLine : ''}
+          {cur.projected ? ' (if the table holds)' : ''}
+        </div>
+      )}
+      {nxt && (
+        <div style={{ fontSize: compact ? 11.5 : 12, fontWeight: 700, color: compact ? 'rgba(255,255,255,.58)' : 'var(--ink2)', lineHeight: 1.35, marginTop: cur ? 6 : 0 }}>
+          If you win → {nxt.stageLabel}: {nxt.description}
+          {nxt.projected ? ' (bracket slot)' : ''}
+        </div>
+      )}
+    </div>
+  );
+}
+
 window.KnockoutBracket = KnockoutBracket;
 window.ProjectedKnockoutBracket = ProjectedKnockoutBracket;
+window.KnockoutPathCard = KnockoutPathCard;

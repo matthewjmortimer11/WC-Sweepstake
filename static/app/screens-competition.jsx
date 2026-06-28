@@ -183,16 +183,25 @@ function MyGroupDashboard(props) {
   const futureFix = myFix.filter(compFixturePlayable);
   const gamesLeft = futureFix.length;
   const status = qualStatus(t, G, mePos, gamesLeft);
+  const displayStatus = koMode
+    ? { label: 'In the knockouts', tone: 'green', mood: 'confident', mustWin: false, detail: 'Group stage done — knockout path is live.' }
+    : waitingDraw
+      ? { label: 'Waiting on R32 draw', tone: 'yellow', mood: 'nervous', mustWin: false, detail: 'Still alive — best-third spots being finalised.' }
+      : status;
   const nextFix = futureFix[0];
   const nextStatus = nextFix ? compStatus(nextFix) : '';
   const nextLabel = nextStatus === 'live' ? 'LIVE NOW' : nextStatus === 'halfTime' ? 'HALF-TIME' : (status.mustWin ? 'MUST-WIN GAME' : 'YOUR NEXT GROUP GAME');
   const nextOpp = nextFix ? WCc.TEAMS[nextFix.a === t.code ? nextFix.b : nextFix.a] : null;
   const staleFix = myFix.find(f => compStatus(f) === 'needsResult');
   const staleOpp = staleFix ? WCc.TEAMS[staleFix.a === t.code ? staleFix.b : staleFix.a] : null;
-  const throughKnockouts = (t.rounds >= 1) || (G.total > 0 && G.played >= G.total);
-  const koTie = (throughKnockouts && Sc && Sc.nextFixtureForTeam) ? Sc.nextFixtureForTeam(t.code) : null;
-  const showGroupNext = !throughKnockouts && nextFix && nextOpp;
-  const showKoNext = throughKnockouts && koTie && koTie.fixture && koTie.opponent;
+  const tPhase = Sc.tournamentPhase ? Sc.tournamentPhase() : (WCc.meta.tournamentPhase || 'group');
+  const teamPhase = Sc.teamSweepstakePhase ? Sc.teamSweepstakePhase(t.code) : 'in_group';
+  const koMode = tPhase !== 'group' && teamPhase !== 'in_group' && teamPhase !== 'out';
+  const waitingDraw = teamPhase === 'waiting_draw';
+  const path = (Sc.knockoutPathForTeam && t.alive) ? Sc.knockoutPathForTeam(t.code) : null;
+  const koTie = path && path.current ? path.current : null;
+  const showGroupNext = !koMode && !waitingDraw && nextFix && nextOpp;
+  const showKoNext = (koMode || waitingDraw) && t.alive && (koTie || waitingDraw);
 
   // movers within the group (only meaningful once a 2nd matchday exists)
   let biggestMover = null, biggestFaller = null;
@@ -214,7 +223,7 @@ function MyGroupDashboard(props) {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
           <div style={{ minWidth: 0 }}>
             <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.08em', color: 'var(--yellow)' }}>
-              {throughKnockouts ? 'THROUGH TO THE KNOCKOUTS' : ('GROUP ' + t.group + ' · ' + (G.hasResults ? 'MATCHDAY ' + G.latestMd + ' OF 3' : 'NOT STARTED'))}
+              {koMode ? ('KNOCKOUT STAGE · ' + ((WCc.meta && WCc.meta.stageLabel) || '')) : waitingDraw ? 'WAITING ON R32 DRAW' : ('GROUP ' + t.group + ' · ' + (G.hasResults ? 'MATCHDAY ' + G.latestMd + ' OF 3' : 'NOT STARTED'))}
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 8 }}>
               <Fc team={t} size={42} />
@@ -231,7 +240,7 @@ function MyGroupDashboard(props) {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 12 }}>
-          <Chc tone={status.tone} style={{ flex: '0 0 auto' }}>{status.label}</Chc>
+          <Chc tone={displayStatus.tone} style={{ flex: '0 0 auto' }}>{displayStatus.label}</Chc>
           <div style={{ flex: 1 }} />
           <div style={{ textAlign: 'right' }}>
             <span className="dh" style={{ fontSize: 22, color: 'var(--yellow)' }}>{G.hasResults ? meRow.Pts : '–'}</span>
@@ -239,8 +248,8 @@ function MyGroupDashboard(props) {
           </div>
         </div>
 
-        {/* who to beat / who's chasing — packed mini line */}
-        {G.hasResults && (rivalAbove || rivalBelow) && (
+        {/* who to beat / who's chasing — group stage only */}
+        {!koMode && !waitingDraw && G.hasResults && (rivalAbove || rivalBelow) && (
           <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
             {rivalAbove
               ? <div style={{ flex: 1, background: 'rgba(232,39,42,.18)', borderRadius: 11, padding: '8px 10px' }}>
@@ -275,20 +284,27 @@ function MyGroupDashboard(props) {
         </Cc>
       )}
       {showKoNext && t.alive && (
-        <Cc bordered style={{ marginTop: 12, background: 'var(--ink)', color: '#fff' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
-            <span className="flame" style={{ fontSize: 30 }}>🔥</span>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '.06em', color: 'var(--yellow)' }}>
-                {(koTie.isLive ? '● LIVE · ' : 'NEXT KNOCKOUT · ') + koTie.stageLabel + ' · ' + koTie.fixture.dateLabel + ' · ' + koTie.fixture.time}
-              </div>
-              <div className="dh" style={{ fontSize: 19, marginTop: 2, lineHeight: 1, color: '#fff' }}>{t.name} <span style={{ opacity: .55 }}>vs</span> {koTie.opponent.name} {koTie.opponent.flag}</div>
+        <Cc bordered style={{ marginTop: 12, background: waitingDraw ? 'var(--yellow)' : 'var(--ink)', color: waitingDraw ? 'var(--ink)' : '#fff' }}>
+          {waitingDraw ? (
+            <div style={{ fontSize: 13, fontWeight: 750, lineHeight: 1.4 }}>
+              All groups finished. Your team is still alive — waiting on the full R32 draw and best-third spots.
             </div>
-          </div>
+          ) : (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
+              <span className="flame" style={{ fontSize: 30 }}>🔥</span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '.06em', color: 'var(--yellow)' }}>
+                  {(koTie.isLive ? '● LIVE · ' : 'NEXT KNOCKOUT · ') + koTie.stageLabel + (koTie.fixture && koTie.fixture.dateLabel ? ' · ' + koTie.fixture.dateLabel + (koTie.fixture.time ? ' · ' + koTie.fixture.time : '') : (koTie.projected ? ' · pairing from standings' : ''))}
+                </div>
+                <div className="dh" style={{ fontSize: 19, marginTop: 2, lineHeight: 1, color: '#fff' }}>{t.name} <span style={{ opacity: .55 }}>vs</span> {koTie.opponent.name} {koTie.opponent.flag}</div>
+                {window.KnockoutPathCard && path && path.next && <window.KnockoutPathCard teamCode={t.code} path={path} showCurrent={false} />}
+              </div>
+            </div>
+          )}
         </Cc>
       )}
 
-      {!throughKnockouts && !nextFix && staleFix && staleOpp && t.alive && (
+      {!koMode && !waitingDraw && !nextFix && staleFix && staleOpp && t.alive && (
         <Cc bordered style={{ marginTop: 12, background: 'var(--yellow)', color: 'var(--ink)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
             <span style={{ fontSize: 30 }}>⏱</span>
@@ -304,7 +320,7 @@ function MyGroupDashboard(props) {
       )}
 
       {/* ===== THE GROUP TABLE ===== */}
-      <SHc aside={G.hasResults ? G.played + ' of ' + G.total + ' played' : 'predicted order'}>The group table</SHc>
+      <SHc aside={koMode ? 'final standings' : (G.hasResults ? G.played + ' of ' + G.total + ' played' : 'predicted order')}>{koMode ? 'How you got here' : 'The group table'}</SHc>
       <Cc flat style={{ padding: '8px 12px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '2px 2px 7px', borderBottom: '2px solid var(--line)', fontSize: 9.5, fontWeight: 800, letterSpacing: '.03em', color: 'var(--ink2)', textTransform: 'uppercase' }}>
           <span style={{ width: 18, textAlign: 'center' }}>#</span>
@@ -350,12 +366,12 @@ function MyGroupDashboard(props) {
           );
         })}
       </Cc>
-      <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--ink2)', marginTop: 7, lineHeight: 1.35 }}>
+      {!koMode && <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--ink2)', marginTop: 7, lineHeight: 1.35 }}>
         Top two qualify automatically. Third can still sneak through as one of the best third-placed teams.
-      </div>
+      </div>}
 
-      {/* ===== MY RIVALS ===== */}
-      {G.hasResults && (rivalAbove || rivalBelow) && <>
+      {/* ===== MY RIVALS — group stage only ===== */}
+      {!koMode && !waitingDraw && G.hasResults && (rivalAbove || rivalBelow) && <>
         <SHc aside="above & below you">My rivals</SHc>
         <div style={{ display: 'flex', gap: 9 }}>
           {rivalAbove
@@ -375,7 +391,25 @@ function MyGroupDashboard(props) {
         </div>
       </>}
 
-      {/* ===== GROUP STATS ===== */}
+      {(koMode || waitingDraw) && koTie && koTie.opponent && <>
+        <SHc aside="in the draw">Sweepstake rivals in your tie</SHc>
+        <div style={{ display: 'flex', gap: 9, flexWrap: 'wrap' }}>
+          {[t.code, koTie.opponent.code].map(function (code) {
+            var o = ownerLabel(owners, code, me.id);
+            if (!o.person && o.name === 'Unclaimed') return null;
+            return (
+              <Cc key={code} flat style={{ flex: '1 1 140px', padding: '11px 12px', border: code === t.code ? '2.5px solid var(--ink)' : '2px solid var(--line)' }}>
+                <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: '.05em', color: 'var(--ink2)' }}>{code === t.code ? 'YOUR TEAM' : 'OPPONENT'}</div>
+                <div style={{ fontSize: 14, fontWeight: 800, marginTop: 4 }}>{WCc.TEAMS[code] && WCc.TEAMS[code].name}</div>
+                <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--red)', marginTop: 2 }}>{o.mine ? 'You' : o.name}{o.extra > 0 ? ' +' + o.extra : ''}</div>
+              </Cc>
+            );
+          })}
+        </div>
+      </>}
+
+      {/* ===== GROUP STATS — hide in knockout mode ===== */}
+      {!koMode && <>
       <SHc aside="the group at a glance">Group statistics</SHc>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
         <StatPill icon="👑" label="Group leader" value={leader ? leader.team.name : '—'} />
@@ -388,6 +422,13 @@ function MyGroupDashboard(props) {
       <Saysc mood={status.mood} label="your group" animate>
         {status.detail}{rivalAbove && status.mustWin ? ' Beat ' + rivalAbove.team.name + ' and the maths changes fast.' : ''}
       </Saysc>
+      </>}
+      {koMode && <>
+        <div style={{ height: 14 }} />
+        <Saysc mood="confident" label="knockouts" animate>
+          {path && path.current ? 'Your knockout path is set — see who you face now and who could be next.' : 'Knockout stage — check the bracket for your tie.'}
+        </Saysc>
+      </>}
     </div>
   );
 }

@@ -45,6 +45,29 @@ LABELS = {
 }
 
 
+def test_tournament_phase_group_complete():
+    """All groups finished but no knockouts yet → group_complete."""
+    teams = [_team(f"A{i}", "A") for i in range(1, 5)]
+    fixtures = [
+        _fx("A1", "A2", group="A", score=[1, 0]),
+        _fx("A1", "A3", group="A", score=[1, 0]),
+        _fx("A1", "A4", group="A", score=[1, 0]),
+        _fx("A2", "A3", group="A", score=[1, 0]),
+        _fx("A2", "A4", group="A", score=[1, 0]),
+        _fx("A3", "A4", group="A", score=[1, 0]),
+    ]
+    meta = _tournament_fixture_meta(fixtures, teams, "live", LABELS)
+    assert meta["groupsComplete"] is True
+    assert meta["tournamentPhase"] == "group_complete"
+
+
+def test_tournament_phase_knockout():
+    fixtures = [_fx("AAA", "BBB", stage="r32", group=None, status="upcoming", score=None)]
+    teams = [_team("AAA"), _team("BBB")]
+    meta = _tournament_fixture_meta(fixtures, teams, "live", LABELS)
+    assert meta["tournamentPhase"] == "knockout"
+
+
 def test_knockouts_in_feed_without_full_r32():
     """Partial provider feed (e.g. QF only) should expose knockouts without r32Published."""
     fixtures = [

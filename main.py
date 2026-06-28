@@ -903,6 +903,15 @@ def _tournament_fixture_meta(
     else:
         stage_label = "In play"
 
+    if phase == "done" or champion:
+        tournament_phase = "finished"
+    elif knockout_round or r32_published or sum(counts.get(st, 0) for st in (*ko_order, "third")) > 0:
+        tournament_phase = "knockout"
+    elif group_done:
+        tournament_phase = "group_complete"
+    else:
+        tournament_phase = "group"
+
     return {
         "fixtureCounts": counts,
         "groupsComplete": group_done,
@@ -910,6 +919,7 @@ def _tournament_fixture_meta(
         "knockoutsInFeed": sum(counts.get(st, 0) for st in (*ko_order, "third")) > 0,
         "knockoutRound": knockout_round,
         "stageLabel": stage_label,
+        "tournamentPhase": tournament_phase,
     }
 
 

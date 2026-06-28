@@ -176,6 +176,7 @@
       hiddenPredictions: WC.meta.hiddenPredictions || [],
       fixtureCounts: WC.meta.fixtureCounts || {},
       groupsComplete: WC.meta.groupsComplete,
+      tournamentPhase: WC.meta.tournamentPhase,
       r32Published: WC.meta.r32Published,
       knockoutsInFeed: WC.meta.knockoutsInFeed,
       knockoutRound: WC.meta.knockoutRound || null,
@@ -209,6 +210,7 @@
       || (WC.meta.phase === 'pre' ? 'Group stage' : WC.meta.phase === 'done' ? 'Tournament over' : 'In play');
     if (BASE.meta.fixtureCounts) WC.meta.fixtureCounts = BASE.meta.fixtureCounts;
     if (BASE.meta.groupsComplete != null) WC.meta.groupsComplete = BASE.meta.groupsComplete;
+    if (BASE.meta.tournamentPhase) WC.meta.tournamentPhase = BASE.meta.tournamentPhase;
     if (BASE.meta.r32Published != null) WC.meta.r32Published = BASE.meta.r32Published;
     if (BASE.meta.knockoutsInFeed != null) WC.meta.knockoutsInFeed = BASE.meta.knockoutsInFeed;
     if (BASE.meta.knockoutRound) WC.meta.knockoutRound = BASE.meta.knockoutRound;
@@ -1077,6 +1079,7 @@
           BASE.meta.stageLabel = WC.meta.stageLabel;
           BASE.meta.fixtureCounts = WC.meta.fixtureCounts;
           BASE.meta.groupsComplete = WC.meta.groupsComplete;
+          BASE.meta.tournamentPhase = WC.meta.tournamentPhase;
           BASE.meta.r32Published = WC.meta.r32Published;
           BASE.meta.knockoutsInFeed = WC.meta.knockoutsInFeed;
           BASE.meta.knockoutRound = WC.meta.knockoutRound;
@@ -1337,6 +1340,18 @@
     nextFixtureForTeam: function (code) {
       var fx = window.WheeshtFixtures;
       return fx && fx.nextForTeam ? fx.nextForTeam(code) : null;
+    },
+    tournamentPhase: function () {
+      var fx = window.WheeshtFixtures;
+      return fx && fx.tournamentPhase ? fx.tournamentPhase() : 'group';
+    },
+    teamSweepstakePhase: function (code) {
+      var fx = window.WheeshtFixtures;
+      return fx && fx.teamSweepstakePhase ? fx.teamSweepstakePhase(code) : 'in_group';
+    },
+    knockoutPathForTeam: function (code) {
+      var fx = window.WheeshtFixtures;
+      return fx && fx.knockoutPathForTeam ? fx.knockoutPathForTeam(code) : { current: null, next: null, phase: 'in_group', tournamentPhase: 'group' };
     },
     buildMergedKnockoutBracket: function () {
       var fx = window.WheeshtFixtures;

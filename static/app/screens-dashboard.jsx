@@ -477,28 +477,32 @@ function GroupRivalCard(props) {
   if (!meRow) return null;
   const above = G.ranked.find(r => r.pos === meRow.pos - 1);
   const below = G.ranked.find(r => r.pos === meRow.pos + 1);
-  const allGroupsDone = !!(WCd.meta && WCd.meta.groupsComplete);
-  const inKnockouts = (t.rounds || 0) >= 1;
-  const throughKnockouts = inKnockouts || allGroupsDone;
-  const projOppCode = allGroupsDone && !inKnockouts && Sd.projectedBracketVisible && Sd.projectedBracketVisible() && Sd.projectedR32Opponent ? Sd.projectedR32Opponent(t.code) : null;
-  const projOpp = projOppCode ? WCd.TEAMS[projOppCode] : null;
-  const koTie = throughKnockouts && Sd.nextFixtureForTeam ? Sd.nextFixtureForTeam(t.code) : null;
-  const next = throughKnockouts ? null : G.fixtures.filter(f => (f.a === t.code || f.b === t.code) && comp.compFixturePlayable(f)).sort(comp.compFixtureSort)[0];
+  const tPhase = Sd.tournamentPhase ? Sd.tournamentPhase() : (WCd.meta.tournamentPhase || 'group');
+  const teamPhase = Sd.teamSweepstakePhase ? Sd.teamSweepstakePhase(t.code) : 'in_group';
+  const koMode = tPhase !== 'group' && teamPhase !== 'in_group' && teamPhase !== 'out';
+  const waitingDraw = teamPhase === 'waiting_draw';
+  const path = (Sd.knockoutPathForTeam && t.alive) ? Sd.knockoutPathForTeam(t.code) : null;
+  const next = !koMode ? G.fixtures.filter(f => (f.a === t.code || f.b === t.code) && comp.compFixturePlayable(f)).sort(comp.compFixtureSort)[0] : null;
   const opp = next ? WCd.TEAMS[next.a === t.code ? next.b : next.a] : null;
   const gapAbove = above ? Math.max(0, above.Pts - meRow.Pts) : 0;
   const gapBelow = below ? Math.max(0, meRow.Pts - below.Pts) : 0;
+  const stageLbl = (WCd.meta && WCd.meta.stageLabel) || 'Knockout stage';
   return (
     <Cd bordered style={{ background: 'var(--ink)', color: '#fff' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
         <div>
           <div style={{ fontSize: 10.5, fontWeight: 900, letterSpacing: '.07em', color: 'var(--yellow)', textTransform: 'uppercase' }}>
-            {throughKnockouts ? 'Knockout pressure' : ('Group ' + t.group + ' pressure')}
+            {koMode ? ('Knockout path · ' + stageLbl) : waitingDraw ? 'Waiting on R32 draw' : ('Group ' + t.group + ' pressure')}
           </div>
-          <div className="dh" style={{ fontSize: 24, color: '#fff', lineHeight: 1, marginTop: 3 }}>#{meRow.pos}<span style={{ fontSize: 13, color: 'rgba(255,255,255,.55)' }}>/{G.ranked.length}</span> · {G.hasResults ? meRow.Pts + ' pts' : 'awaiting kick-off'}</div>
+          <div className="dh" style={{ fontSize: 24, color: '#fff', lineHeight: 1, marginTop: 3 }}>
+            {koMode && path && path.current
+              ? (path.current.stageLabel || 'Knockout')
+              : <>#{meRow.pos}<span style={{ fontSize: 13, color: 'rgba(255,255,255,.55)' }}>/{G.ranked.length}</span> · {G.hasResults ? meRow.Pts + ' pts' : 'awaiting kick-off'}</>}
+          </div>
         </div>
-        <button onClick={throughKnockouts ? props.onGames : props.onOpen} className="wc-btn wc-btn--sm" style={{ flex: '0 0 auto', background: 'var(--yellow)', boxShadow: '0 3px 0 #000' }}>{throughKnockouts ? 'Match centre' : 'Open group'}</button>
+        <button onClick={koMode || waitingDraw ? props.onGames : props.onOpen} className="wc-btn wc-btn--sm" style={{ flex: '0 0 auto', background: 'var(--yellow)', boxShadow: '0 3px 0 #000' }}>{koMode || waitingDraw ? 'Match centre' : 'Open group'}</button>
       </div>
-      {!throughKnockouts && (above || below) && <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 12 }}>
+      {!koMode && !waitingDraw && (above || below) && <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 12 }}>
         <div style={{ background: 'rgba(255,255,255,.1)', borderRadius: 12, padding: '9px 10px' }}>
           <div style={{ fontSize: 9.5, fontWeight: 900, letterSpacing: '.05em', color: '#ffb3b4' }}>TO CATCH</div>
           <div style={{ fontSize: 13, fontWeight: 850, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{above ? above.team.name + ' +' + gapAbove : 'Nobody'}</div>
@@ -508,16 +512,9 @@ function GroupRivalCard(props) {
           <div style={{ fontSize: 13, fontWeight: 850, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{below ? below.team.name + (gapBelow ? ' -' + gapBelow : ' level') : 'Nobody'}</div>
         </div>
       </div>}
-      {throughKnockouts && koTie && koTie.fixture && koTie.opponent && t.alive && (
-        <div style={{ marginTop: 10, fontSize: 12.2, fontWeight: 750, color: 'rgba(255,255,255,.72)', lineHeight: 1.35 }}>
-          {koTie.isLive ? '● LIVE · ' : 'Next tie: '}{koTie.stageLabel} — {t.name} v {koTie.opponent.name} · {koTie.fixture.dateLabel} {koTie.fixture.time}.
-        </div>
-      )}
-      {!throughKnockouts && next && opp && <div style={{ marginTop: 10, fontSize: 12.2, fontWeight: 750, color: 'rgba(255,255,255,.72)', lineHeight: 1.35 }}>
+      {(koMode || waitingDraw) && t.alive && window.KnockoutPathCard && <window.KnockoutPathCard teamCode={t.code} path={path} compact />}
+      {!koMode && !waitingDraw && next && opp && <div style={{ marginTop: 10, fontSize: 12.2, fontWeight: 750, color: 'rgba(255,255,255,.72)', lineHeight: 1.35 }}>
         Next swing: {t.name} v {opp.name} · {next.dateLabel} {next.time}. This is where the table can move.
-      </div>}
-      {allGroupsDone && !inKnockouts && projOpp && <div style={{ marginTop: 10, fontSize: 12.2, fontWeight: 750, color: 'rgba(255,255,255,.72)', lineHeight: 1.35 }}>
-        All groups done — R32 pairing from standings: {t.name} v {projOpp.name} if the table holds.
       </div>}
     </Cd>
   );

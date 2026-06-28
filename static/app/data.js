@@ -136,7 +136,32 @@
       return 3;
     }
 
-    function nextFixtureForTeam(teamCode) {
+    function teamInfo(code) {
+      if (!code || code === 'TBD') return { code: 'TBD', name: 'TBD', flag: '🏳️' };
+      return TEAMS[code] || { code: code, name: code, flag: '🏳️' };
+    }
+
+    function tournamentPhase() {
+      var meta = WC.meta || {};
+      if (meta.tournamentPhase) return meta.tournamentPhase;
+      if (meta.phase === 'done') return 'finished';
+      if (TEAM_LIST.some(function (t) { return t.stage === 'winner'; })) return 'finished';
+      if (meta.knockoutRound || meta.knockoutsInFeed || meta.r32Published) return 'knockout';
+      if (meta.groupsComplete) return 'group_complete';
+      return 'group';
+    }
+
+    function teamSweepstakePhase(teamCode) {
+      var t = TEAMS[teamCode];
+      if (!t || !t.alive) return 'out';
+      if ((t.rounds || 0) >= 1) return 'in_knockout';
+      var meta = WC.meta || {};
+      if (!meta.groupsComplete) return 'in_group';
+      if (findCurrentBracketTie(teamCode, buildMergedKnockoutBracket())) return 'in_knockout';
+      return 'waiting_draw';
+    }
+
+    function nextFixtureFromFeed(teamCode) {
       if (!teamCode) return null;
       var candidates = (WC.FIXTURES || []).filter(function (f) {
         if (f.a !== teamCode && f.b !== teamCode) return false;
@@ -156,11 +181,150 @@
       var st = fixtureStatus(f);
       return {
         fixture: f,
-        opponent: TEAMS[oppCode] || { code: oppCode, name: oppCode, flag: '🏳️' },
+        opponent: teamInfo(oppCode),
+        stage: f.stage || 'group',
         stageLabel: stageLabelForFixture(f),
         isLive: st === 'live' || st === 'halfTime',
         status: st,
+        projected: false,
       };
+    }
+
+    function findCurrentBracketTie(teamCode, merged) {
+      var i, st, ties, ti, tie;
+      for (i = 0; i < BRACKET_TREE_STAGES.length; i++) {
+        st = BRACKET_TREE_STAGES[i];
+        ties = merged[st] || [];
+        for (ti = 0; ti < ties.length; ti++) {
+          tie = ties[ti];
+          if (tie.bracketPad) continue;
+          if (tie.a !== teamCode && tie.b !== teamCode) continue;
+          if (tieFinished(tie)) continue;
+          return { stage: st, index: ti, tie: tie };
+        }
+      }
+      return null;
+    }
+
+    function nextBracketSlot(currentStage, currentIndex, merged) {
+      var si = BRACKET_TREE_STAGES.indexOf(currentStage);
+      if (si < 0 || si >= BRACKET_TREE_STAGES.length - 1) return null;
+      var nextStage = BRACKET_TREE_STAGES[si + 1];
+      var nextIndex = Math.floor(currentIndex / 2);
+      var ties = merged[nextStage] || [];
+      var tie = ties[nextIndex];
+      if (!tie) return null;
+      return { stage: nextStage, index: nextIndex, tie: tie };
+    }
+
+    function stageLabelForRound(st) {
+      var labels = (WC.meta && WC.meta.stageLabels) || {};
+      if (labels[st]) return labels[st];
+      if (st === 'r32') return 'Round of 32';
+      if (st === 'r16') return 'Round of 16';
+      if (st === 'qf') return 'Quarter-finals';
+      if (st === 'sf') return 'Semi-finals';
+      if (st === 'final') return 'Final';
+      return String(st || '').toUpperCase();
+    }
+
+    function describeBracketSlot(tie, stage) {
+      var a = teamInfo(tie.a);
+      var b = teamInfo(tie.b);
+      var label = stageLabelForRound(stage || tie.stage);
+      if (tie.a === 'TBD' && tie.b === 'TBD') {
+        return {
+          stage: stage || tie.stage,
+          stageLabel: label,
+          slotA: 'TBD',
+          slotB: 'TBD',
+          description: label + ' berth',
+          projected: !!(tie.projectedPairing || tie.bracketPad),
+        };
+      }
+      return {
+        stage: stage || tie.stage,
+        stageLabel: label,
+        slotA: tie.a,
+        slotB: tie.b,
+        teamA: a,
+        teamB: b,
+        description: 'Winner of ' + a.name + ' vs ' + b.name,
+        projected: !!(tie.projectedPairing || tie.bracketPad),
+      };
+    }
+
+    function currentFromBracketTie(teamCode, slot) {
+      var tie = slot.tie;
+      var oppCode = tie.a === teamCode ? tie.b : tie.a;
+      var st = fixtureStatus(tie);
+      return {
+        fixture: {
+          id: tie.id,
+          a: tie.a,
+          b: tie.b,
+          stage: slot.stage,
+          score: tie.score,
+          status: tie.done ? 'done' : (st === 'upcoming' ? 'upcoming' : st),
+          dateLabel: tie.dateLabel,
+          time: tie.time,
+          dateISO: tie.dateISO,
+        },
+        opponent: teamInfo(oppCode),
+        stage: slot.stage,
+        stageLabel: stageLabelForRound(slot.stage),
+        isLive: st === 'live' || st === 'halfTime',
+        status: st,
+        projected: !!tie.projectedPairing,
+      };
+    }
+
+    function knockoutPathForTeam(teamCode) {
+      var t = TEAMS[teamCode];
+      var tsp = teamSweepstakePhase(teamCode);
+      var phase = tournamentPhase();
+      if (!t || tsp === 'out') {
+        var elim = null;
+        if (t && !t.alive) {
+          elim = String(t.stage || 'group');
+          if (elim.indexOf('out-') === 0) elim = elim.slice(4);
+          if (elim === 'group' || elim === 'out-group') elim = 'group';
+        }
+        return { current: null, next: null, eliminatedAt: elim, phase: tsp, tournamentPhase: phase };
+      }
+      if (tsp === 'waiting_draw') {
+        return { current: null, next: null, eliminatedAt: null, phase: tsp, tournamentPhase: phase, waitingDraw: true };
+      }
+      if (phase === 'group' && tsp === 'in_group') {
+        return { current: null, next: null, eliminatedAt: null, phase: tsp, tournamentPhase: phase };
+      }
+
+      var merged = buildMergedKnockoutBracket();
+      var feedTie = nextFixtureFromFeed(teamCode);
+      var curSlot = findCurrentBracketTie(teamCode, merged);
+      var current = feedTie || (curSlot ? currentFromBracketTie(teamCode, curSlot) : null);
+      var next = null;
+      if (curSlot) {
+        var nxt = nextBracketSlot(curSlot.stage, curSlot.index, merged);
+        if (nxt && nxt.tie) next = describeBracketSlot(nxt.tie, nxt.stage);
+      } else if (current && current.stage) {
+        var idx = -1;
+        var ties = merged[current.stage] || [];
+        for (var i = 0; i < ties.length; i++) {
+          if (ties[i].a === teamCode || ties[i].b === teamCode) { idx = i; break; }
+        }
+        if (idx >= 0) {
+          var nxt2 = nextBracketSlot(current.stage, idx, merged);
+          if (nxt2 && nxt2.tie) next = describeBracketSlot(nxt2.tie, nxt2.stage);
+        }
+      }
+      return { current: current, next: next, eliminatedAt: null, phase: tsp, tournamentPhase: phase, waitingDraw: false };
+    }
+
+    function nextFixtureForTeam(teamCode) {
+      var path = knockoutPathForTeam(teamCode);
+      if (path.current) return path.current;
+      return nextFixtureFromFeed(teamCode);
     }
 
     function fixtureWinnerSide(f) {
@@ -476,6 +640,9 @@
       stageLabel: stageLabelForFixture,
       stageNameForTeam: stageNameForTeam,
       nextForTeam: nextFixtureForTeam,
+      tournamentPhase: tournamentPhase,
+      teamSweepstakePhase: teamSweepstakePhase,
+      knockoutPathForTeam: knockoutPathForTeam,
       buildKnockoutBracket: buildKnockoutBracket,
       buildProjectedKnockoutBracket: buildProjectedKnockoutBracket,
       buildMergedKnockoutBracket: buildMergedKnockoutBracket,

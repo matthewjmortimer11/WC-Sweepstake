@@ -878,6 +878,22 @@ function App(){
     return unsub;
   },[flow,me&&me.id]); // eslint-disable-line
 
+  /* ---- Toast when group stage completes ---- */
+  aEffect(function(){
+    if(flow!=='app') return;
+    var prevComplete = !!(A_WC.meta && A_WC.meta.groupsComplete);
+    var ready = false;
+    var unsub = A_S.subscribe(function(){
+      var complete = !!(A_WC.meta && A_WC.meta.groupsComplete);
+      if(!ready){ prevComplete = complete; ready = true; return; }
+      if(!prevComplete && complete){
+        window.wcToast && window.wcToast('Group stage complete — knockout stage begins. Check your path on Me.', 'confident');
+      }
+      prevComplete = complete;
+    });
+    return unsub;
+  },[flow]); // eslint-disable-line
+
   /* ---- Toast when user's team advances to a new knockout stage ---- */
   aEffect(function(){
     if(flow!=='app'||!me||!me.team) return;

@@ -93,6 +93,7 @@ function DashTeam(){
     : null;
   const nextFix = tie && tie.fixture;
   const opp = tie && tie.opponent;
+  const koPath = (window.Store && window.Store.knockoutPathForTeam) ? window.Store.knockoutPathForTeam(me.team) : null;
   return (
     <Card bordered className="pop">
       <div style={{display:'flex',alignItems:'center',gap:14}}>
@@ -113,9 +114,10 @@ function DashTeam(){
         <div style={{marginTop:14,display:'flex',alignItems:'center',gap:10,background:'var(--ink)',borderRadius:14,padding:'11px 14px',color:'#fff'}}>
           <div style={{flex:1}}>
             <div style={{fontSize:11,fontWeight:800,letterSpacing:'.06em',color:'var(--yellow)'}}>
-              {(tie.isLive ? '● LIVE · ' : 'YOUR NEXT TIE · ') + (tie.stageLabel || '') + ' · ' + nextFix.dateLabel + ' · ' + nextFix.time}
+              {(tie.isLive ? '● LIVE · ' : 'YOUR NEXT TIE · ') + (tie.stageLabel || '') + (nextFix.dateLabel ? ' · ' + nextFix.dateLabel : '') + (nextFix.time ? ' · ' + nextFix.time : (tie.projected ? ' · pairing from standings' : ''))}
             </div>
             <div className="dh" style={{fontSize:19,marginTop:2}}>{t.name} <span style={{opacity:.5}}>vs</span> {opp.name} {opp.flag}</div>
+            {koPath && koPath.next && <div style={{fontSize:11.5,fontWeight:700,opacity:.72,marginTop:4}}>If you win → {koPath.next.stageLabel}: {koPath.next.description}</div>}
           </div>
           <span className="flame" style={{fontSize:26}}>🔥</span>
         </div>
