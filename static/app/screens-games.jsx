@@ -223,7 +223,7 @@ function GamesScreen() {
   const subtitle = koPhase && !showGroup
     ? (koFixtures.length
       ? stageLbl + ' · ' + koFixtures.length + ' ties' + (koFixtures.some(function (f) { return f.projectedPairing; }) ? ' (includes standings pairings)' : '')
-      : 'R32 pairings coming — check the bracket on Me')
+      : 'R32 pairings coming — see the bracket in Games')
     : (groupFixtures.length + ' group-stage fixtures · kick-off ' + (WCg.meta.kickoff || 'soon'));
 
   return (
@@ -291,7 +291,7 @@ function GamesScreen() {
           <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink2)', marginTop: 3 }}>
             {filter === 'mine' && !stillIn
               ? 'The predictions league is still live even when your nation is gone.'
-              : (koPhase && !showGroup ? 'Check the bracket on Me for projected R32 pairings.' : 'No fixtures match that filter yet.')}
+              : (koPhase && !showGroup ? 'Open Games for the full knockout bracket.' : 'No fixtures match that filter yet.')}
           </div>
         </Cg>}
 

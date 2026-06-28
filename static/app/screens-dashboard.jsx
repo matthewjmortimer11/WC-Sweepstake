@@ -720,10 +720,6 @@ function MeScreen(props) {
       </Saysd>
       <SHd>Your team</SHd>
       <TeamCard me={me} onGames={props.goGames} onPredictions={props.goPredictions} />
-      {Sd.knockoutBracketVisible && Sd.knockoutBracketVisible() && <>
-        <SHd aside={WCd.meta && WCd.meta.r32Published ? 'from the feed' : 'from group standings'}>Knockout bracket</SHd>
-        <window.KnockoutBracket embedded onOpen={props.goGames} />
-      </>}
       <SHd aside="who to beat">Your group</SHd>
       <GroupRivalCard me={me} onOpen={props.goGroup} onGames={props.goGames} />
       <SHd aside={(Sd.predictionsLocked && Sd.predictionsLocked()) ? 'locked' : 'open'}>Predictions</SHd>
