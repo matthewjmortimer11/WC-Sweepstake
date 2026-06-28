@@ -3508,6 +3508,23 @@ async def app_static(filename: str):
     return FileResponse(path, media_type=mt)
 
 
+# The Cursed Throne — self-contained static playtest app served at /dethrone.
+@app.get("/dethrone", response_class=HTMLResponse)
+@app.get("/dethrone/", response_class=HTMLResponse)
+async def dethrone_index():
+    html = (_STATIC / "dethrone" / "index.html").read_text(encoding="utf-8")
+    # inject a <base> so the app's relative css/js paths resolve under /dethrone/
+    html = html.replace("<head>", '<head>\n  <base href="/dethrone/">', 1)
+    return HTMLResponse(content=html)
+
+
+@app.get("/dethrone/{filename:path}")
+async def dethrone_static(filename: str):
+    path = _safe_static_path(_STATIC / "dethrone", filename)
+    mt = _JS_TYPES.get(path.suffix, "application/octet-stream")
+    return FileResponse(path, media_type=mt)
+
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
