@@ -171,6 +171,26 @@ def _feed_fills_r32_slot(slot: Dict[str, Any], feed: Dict[str, Any]) -> bool:
     return feed_teams[0] == known[0]
 
 
+def _clear_partial_r32_slots(merged: List[Dict[str, Any]], teams: List[str]) -> None:
+    """Drop stale one-team TBD slots when a full feed pairing arrives."""
+    team_set = set(teams)
+    for i, m in enumerate(merged):
+        ma, mb = m.get("a"), m.get("b")
+        known = {c for c in (ma, mb) if c and c != "TBD"}
+        if known & team_set and len(known) == 1:
+            fid = str(m.get("id") or f"pad-r32-{i}")
+            merged[i] = {
+                "id": fid,
+                "a": "TBD",
+                "b": "TBD",
+                "stage": "r32",
+                "status": "upcoming",
+                "score": None,
+                "winner": None,
+                "projectedPairing": False,
+            }
+
+
 def _merge_r32_feed(
     synth: List[Dict[str, Any]],
     feed: List[Dict[str, Any]],
@@ -189,16 +209,25 @@ def _merge_r32_feed(
                 placed = True
                 break
         if not placed:
-            feed_teams = [c for c in (f.get("a"), f.get("b")) if c and c != "TBD"]
-            dup = any(
-                c in (m.get("a"), m.get("b"))
-                for m in merged
-                for c in feed_teams
-            )
-            if not dup:
+            fa, fb = f.get("a"), f.get("b")
+            feed_teams = [c for c in (fa, fb) if c and c != "TBD"]
+            if any({m.get("a"), m.get("b")} == {fa, fb} for m in merged):
+                continue
+            if len(feed_teams) == 2:
+                _clear_partial_r32_slots(merged, feed_teams)
                 out = dict(f)
                 out["projectedPairing"] = False
                 merged.append(out)
+            else:
+                dup = any(
+                    c in (m.get("a"), m.get("b"))
+                    for m in merged
+                    for c in feed_teams
+                )
+                if not dup:
+                    out = dict(f)
+                    out["projectedPairing"] = False
+                    merged.append(out)
     return sorted(merged, key=_r32_sort_key)
 
 

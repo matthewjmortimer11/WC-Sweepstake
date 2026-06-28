@@ -587,6 +587,25 @@
       return feedTeams[0] === slotKnown[0];
     }
 
+    function clearPartialR32Slots(merged, teams) {
+      var teamSet = {};
+      teams.forEach(function (c) { teamSet[c] = true; });
+      merged.forEach(function (m, i) {
+        var known = [m.a, m.b].filter(function (c) { return c && c !== 'TBD'; });
+        if (known.length !== 1 || !teamSet[known[0]]) return;
+        merged[i] = {
+          id: m.id || ('pad-r32-' + i),
+          a: 'TBD',
+          b: 'TBD',
+          stage: 'r32',
+          status: 'upcoming',
+          score: null,
+          winner: null,
+          projectedPairing: false,
+        };
+      });
+    }
+
     function mergeR32Rounds(proj, feed) {
       var merged = (proj || []).map(function (t) { return Object.assign({}, t); });
       (feed || []).forEach(function (f) {
@@ -600,10 +619,17 @@
         }
         if (!placed) {
           var feedTeams = [f.a, f.b].filter(function (c) { return c && c !== 'TBD'; });
-          var dup = feedTeams.some(function (c) {
-            return merged.some(function (m) { return m.a === c || m.b === c; });
-          });
-          if (!dup) merged.push(feedOverlayR32(null, f));
+          var hasPair = merged.some(function (m) { return sameBracketPair(m.a, m.b, f.a, f.b); });
+          if (hasPair) return;
+          if (feedTeams.length === 2) {
+            clearPartialR32Slots(merged, feedTeams);
+            merged.push(feedOverlayR32(null, f));
+          } else {
+            var dup = feedTeams.some(function (c) {
+              return merged.some(function (m) { return m.a === c || m.b === c; });
+            });
+            if (!dup) merged.push(feedOverlayR32(null, f));
+          }
         }
       });
       return sortBracketRound(merged, 'r32');
