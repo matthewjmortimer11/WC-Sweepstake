@@ -105,6 +105,8 @@
     }
 
     function fixtureDone(f) {
+      if (!f) return false;
+      if (f.done && f.score && f.score[0] != null && f.score[1] != null) return true;
       return fixtureStatus(f) === 'done' && f.score && f.score[0] != null && f.score[1] != null;
     }
 
@@ -151,20 +153,37 @@
       return 'group';
     }
 
+    function knockoutFeedActive() {
+      var meta = WC.meta || {};
+      return !!(meta.groupsComplete || meta.knockoutsInFeed || meta.r32Published || meta.knockoutRound);
+    }
+
+    function teamHasFeedKnockoutFixture(teamCode) {
+      return (WC.FIXTURES || []).some(function (f) {
+        return f.stage && f.stage !== 'group' && (f.a === teamCode || f.b === teamCode);
+      });
+    }
+
     function teamSweepstakePhase(teamCode) {
       var t = TEAMS[teamCode];
       if (!t || !t.alive) return 'out';
       if ((t.rounds || 0) >= 1) return 'in_knockout';
       var meta = WC.meta || {};
       if (!meta.groupsComplete) return 'in_group';
+      if (!meta.r32Published && !teamHasFeedKnockoutFixture(teamCode)) return 'waiting_draw';
       if (findCurrentBracketTie(teamCode, buildMergedKnockoutBracket())) return 'in_knockout';
+      var mergedForPhase = buildMergedKnockoutBracket();
+      var finishedForPhase = findLastFinishedBracketSlot(teamCode, mergedForPhase);
+      if (finishedForPhase && tieWinner(finishedForPhase.tie) === teamCode) return 'in_knockout';
       return 'waiting_draw';
     }
 
     function nextFixtureFromFeed(teamCode) {
       if (!teamCode) return null;
+      var koMode = knockoutFeedActive();
       var candidates = (WC.FIXTURES || []).filter(function (f) {
         if (f.a !== teamCode && f.b !== teamCode) return false;
+        if (koMode && f.stage === 'group') return false;
         if (fixtureDone(f)) return false;
         if (fixtureStatus(f) === 'cancelled') return false;
         return true;
@@ -329,7 +348,9 @@
       var merged = buildMergedKnockoutBracket();
       var feedTie = nextFixtureFromFeed(teamCode);
       var curSlot = findCurrentBracketTie(teamCode, merged);
-      var current = feedTie || (curSlot ? currentFromBracketTie(teamCode, curSlot) : null);
+      var current = (feedTie && feedTie.stage !== 'group')
+        ? feedTie
+        : (curSlot ? currentFromBracketTie(teamCode, curSlot) : null);
       var next = null;
       if (curSlot) {
         var nxt = nextBracketSlot(curSlot.stage, curSlot.index, merged);
@@ -352,21 +373,23 @@
           if (nxt3 && nxt3.tie) next = describeBracketSlot(nxt3.tie, nxt3.stage);
         }
       }
-      if (!current && tsp === 'in_knockout' && t.stage && t.stage !== 'group' && t.stage !== 'winner') {
-        var baseStage = String(t.stage).replace(/^out-/, '');
-        var waitSt = nextKnockoutStageAfter(baseStage);
-        if (waitSt) {
-          return {
-            current: null,
-            next: next,
-            eliminatedAt: null,
-            phase: tsp,
-            tournamentPhase: phase,
-            waitingDraw: false,
-            betweenRounds: true,
-            waitingNextStage: waitSt,
-            waitingNextRound: stageLabelForRound(waitSt),
-          };
+      if (!current && tsp === 'in_knockout') {
+        var finishedSlot = findLastFinishedBracketSlot(teamCode, merged);
+        if (finishedSlot && tieWinner(finishedSlot.tie) === teamCode) {
+          var waitSt = nextKnockoutStageAfter(finishedSlot.stage);
+          if (waitSt && !findCurrentBracketTie(teamCode, merged)) {
+            return {
+              current: null,
+              next: next,
+              eliminatedAt: null,
+              phase: tsp,
+              tournamentPhase: phase,
+              waitingDraw: false,
+              betweenRounds: true,
+              waitingNextStage: waitSt,
+              waitingNextRound: stageLabelForRound(waitSt),
+            };
+          }
         }
       }
       return { current: current, next: next, eliminatedAt: null, phase: tsp, tournamentPhase: phase, waitingDraw: false };
@@ -374,6 +397,7 @@
 
     function nextFixtureForTeam(teamCode) {
       var path = knockoutPathForTeam(teamCode);
+      if (path.waitingDraw || path.betweenRounds) return null;
       if (path.current) return path.current;
       return nextFixtureFromFeed(teamCode);
     }
@@ -630,6 +654,32 @@
       }
     }
 
+    function placePartialR32Feed(merged, f) {
+      var feedTeams = [f.a, f.b].filter(function (c) { return c && c !== 'TBD'; });
+      if (feedTeams.length !== 1) return;
+      var team = feedTeams[0];
+      var i;
+      for (i = 0; i < merged.length; i++) {
+        if (feedFillsR32Slot(merged[i], f)) {
+          merged[i] = feedOverlayR32(merged[i], f);
+          return;
+        }
+      }
+      for (i = 0; i < merged.length; i++) {
+        if (merged[i].a === team || merged[i].b === team) {
+          merged[i] = feedOverlayR32(merged[i], f);
+          return;
+        }
+      }
+      for (i = 0; i < merged.length; i++) {
+        if (merged[i].a === 'TBD' && merged[i].b === 'TBD') {
+          merged[i] = feedOverlayR32(merged[i], f);
+          return;
+        }
+      }
+      if (merged.length < 16) merged.push(feedOverlayR32(null, f));
+    }
+
     function mergeR32Rounds(proj, feed) {
       var merged = (proj || []).map(function (t) { return Object.assign({}, t); });
       (feed || []).forEach(function (f) {
@@ -651,7 +701,7 @@
             var dup = feedTeams.some(function (c) {
               return merged.some(function (m) { return m.a === c || m.b === c; });
             });
-            if (!dup) merged.push(feedOverlayR32(null, f));
+            if (!dup) placePartialR32Feed(merged, f);
           }
         }
       });

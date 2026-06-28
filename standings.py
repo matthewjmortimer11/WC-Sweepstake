@@ -163,6 +163,15 @@ def _winner_of(fx: Dict[str, Any]) -> Optional[str]:
     return None
 
 
+def opening_knockout_draw_complete(
+    fixtures: List[Dict[str, Any]],
+    team_codes: set,
+    stage_ladder: List[str],
+) -> bool:
+    """Public wrapper — True once the full opening knockout round is in the feed."""
+    return _opening_knockout_draw_complete(fixtures, team_codes, stage_ladder)
+
+
 def compute_team_status(
     teams: List[Dict[str, Any]],
     fixtures: List[Dict[str, Any]],

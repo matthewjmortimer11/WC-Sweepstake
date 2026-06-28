@@ -110,7 +110,7 @@ function DashTeam(){
         </div>
         <ProgressRing value={ring.value} size={56} stroke={7} color={t.alive ? 'var(--green)' : 'var(--ink2)'}><span style={{fontSize:12}}>{ring.label}</span></ProgressRing>
       </div>
-      {nextFix && opp ? (
+      {nextFix && opp && !(koPath && (koPath.waitingDraw || koPath.betweenRounds)) ? (
         <div style={{marginTop:14,display:'flex',alignItems:'center',gap:10,background:'var(--ink)',borderRadius:14,padding:'11px 14px',color:'#fff'}}>
           <div style={{flex:1}}>
             <div style={{fontSize:11,fontWeight:800,letterSpacing:'.06em',color:'var(--yellow)'}}>

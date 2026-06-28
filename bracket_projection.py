@@ -236,6 +236,37 @@ def _place_full_r32_feed(merged: List[Dict[str, Any]], f: Dict[str, Any]) -> Non
         merged.append(out)
 
 
+def _place_partial_r32_feed(merged: List[Dict[str, Any]], f: Dict[str, Any]) -> None:
+    """Place a one-team partial R32 feed tie without growing past 16 slots."""
+    fa, fb = f.get("a"), f.get("b")
+    feed_teams = [c for c in (fa, fb) if c and c != "TBD"]
+    if len(feed_teams) != 1:
+        return
+    team = feed_teams[0]
+    for i, m in enumerate(merged):
+        if _feed_fills_r32_slot(m, f):
+            out = dict(f)
+            out["projectedPairing"] = False
+            merged[i] = out
+            return
+    for i, m in enumerate(merged):
+        if team in (m.get("a"), m.get("b")):
+            out = dict(f)
+            out["projectedPairing"] = False
+            merged[i] = out
+            return
+    for i, m in enumerate(merged):
+        if m.get("a") == "TBD" and m.get("b") == "TBD":
+            out = dict(f)
+            out["projectedPairing"] = False
+            merged[i] = out
+            return
+    if len(merged) < 16:
+        out = dict(f)
+        out["projectedPairing"] = False
+        merged.append(out)
+
+
 def _merge_r32_feed(
     synth: List[Dict[str, Any]],
     feed: List[Dict[str, Any]],
@@ -267,9 +298,7 @@ def _merge_r32_feed(
                     for c in feed_teams
                 )
                 if not dup:
-                    out = dict(f)
-                    out["projectedPairing"] = False
-                    merged.append(out)
+                    _place_partial_r32_feed(merged, f)
     return sorted(merged, key=_r32_sort_key)
 
 

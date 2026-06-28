@@ -411,10 +411,13 @@ function EditProfile(props) {
 
 function TeamCard(props) {
   const me = props.me; const t = dashTeam(me.team);
+  const path = (Sd && Sd.knockoutPathForTeam && t.alive) ? Sd.knockoutPathForTeam(t.code) : null;
   const tie = nextTieFor(me);
   const pre = PRE();
   const nextFix = tie && tie.fixture;
   const fixOpp = tie && tie.opponent;
+  const waitingDraw = !!(path && path.waitingDraw);
+  const betweenRounds = !!(path && path.betweenRounds);
   return (
     <Cd bordered className="pop" style={t.alive ? null : { background: 'var(--ink)', color: '#fff' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
@@ -445,7 +448,21 @@ function TeamCard(props) {
           </div>
           <span style={{ fontSize: 22 }}>⚽</span>
         </div>}
-      {t.alive && !pre && nextFix && fixOpp &&
+      {t.alive && !pre && waitingDraw &&
+        <div style={{ width: '100%', marginTop: 14, display: 'flex', alignItems: 'center', gap: 10, background: 'var(--yellow)', borderRadius: 14, padding: '11px 14px', color: 'var(--ink)' }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.06em' }}>WAITING ON R32 DRAW</div>
+            <div style={{ fontSize: 13, fontWeight: 700, marginTop: 4, lineHeight: 1.35 }}>Groups done — your team is through. Full knockout draw still landing.</div>
+          </div>
+        </div>}
+      {t.alive && !pre && betweenRounds &&
+        <div style={{ width: '100%', marginTop: 14, display: 'flex', alignItems: 'center', gap: 10, background: 'var(--yellow)', borderRadius: 14, padding: '11px 14px', color: 'var(--ink)' }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.06em' }}>THROUGH · {path.waitingNextRound || 'NEXT ROUND'}</div>
+            <div style={{ fontSize: 13, fontWeight: 700, marginTop: 4, lineHeight: 1.35 }}>Waiting on the next knockout tie in the feed.</div>
+          </div>
+        </div>}
+      {t.alive && !pre && nextFix && fixOpp && !waitingDraw && !betweenRounds &&
         <button onClick={props.onGames} style={{ width: '100%', marginTop: 14, display: 'flex', alignItems: 'center', gap: 10, background: 'var(--ink)', border: 'none', borderRadius: 14, padding: '11px 14px', color: '#fff', cursor: 'pointer', textAlign: 'left' }}>
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.06em', color: 'var(--yellow)' }}>

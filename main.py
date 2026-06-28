@@ -870,11 +870,11 @@ def _tournament_fixture_meta(
     if not groups:
         group_done = False
 
-    r32_paired = sum(
-        1 for f in fixtures or []
-        if f.get("stage") == "r32" and f.get("a") in codes and f.get("b") in codes
+    r32_published = standings.opening_knockout_draw_complete(
+        fixtures or [],
+        codes,
+        _wc_data["meta"]["stageLadder"],
     )
-    r32_published = r32_paired >= 16
 
     ko_order = ["r32", "r16", "qf", "sf", "final"]
     knockout_round: Optional[str] = None

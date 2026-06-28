@@ -144,6 +144,23 @@ def test_live_r32_has_no_projected_winner():
     assert not tie["projectedWinner"]
 
 
+def test_partial_r32_feed_keeps_sixteen_slots():
+    """Partial one-team R32 feed rows must not inflate the bracket past 16 ties."""
+    teams, fixtures = _four_group("A", ["A1", "A2", "A3", "A4"])
+    teams_b, fixtures_b = _four_group("B", ["B1", "B2", "B3", "B4"])
+    teams = teams + teams_b
+    fixtures = fixtures + fixtures_b
+    fixtures.append({
+        "id": "feed-r32-partial", "a": "A2", "b": "TBD", "stage": "r32",
+        "status": "upcoming", "score": None,
+        "dateISO": "2026-06-28", "time": "16:00",
+    })
+    proj = build_projected_bracket(teams, fixtures)
+    assert len(proj["rounds"]["r32"]) == 16
+    partial = next(t for t in proj["rounds"]["r32"] if t.get("id") == "feed-r32-partial" or t.get("a") == "A2")
+    assert partial["a"] == "A2"
+
+
 def test_full_r32_feed_keeps_sixteen_slots():
     """Feed-only ties must not inflate R32 beyond 16 when teams sat in separate projected slots."""
     teams = [_team("AAA", "A", "+100"), _team("BBB", "B", "+500")]
