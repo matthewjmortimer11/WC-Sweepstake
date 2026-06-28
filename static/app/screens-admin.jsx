@@ -770,6 +770,76 @@ function downloadCsv(kind) {
   });
 }
 
+function KnockoutBracketPredAdmin() {
+  var KO_STAGES = [
+    { id: 'r32', label: 'Round of 32' },
+    { id: 'r16', label: 'Round of 16' },
+    { id: 'qf', label: 'Quarter-finals' },
+    { id: 'sf', label: 'Semi-finals' },
+    { id: 'final', label: 'Final' },
+    { id: 'third', label: 'Third place' },
+  ];
+  function stageInRange(stage, fromSt, toSt) {
+    var order = { r32: 0, r16: 1, qf: 2, sf: 3, final: 4, third: 5 };
+    if (order[stage] == null || order[fromSt] == null || order[toSt] == null) return false;
+    return order[fromSt] <= order[stage] && order[stage] <= order[toSt];
+  }
+  var cfg = Sa.knockoutPredictions ? Sa.knockoutPredictions() : { enabled: false, fromStage: 'r16', toStage: 'final', type: 'winner', points: 5 };
+  var ready = (WCa.FIXTURES || []).filter(function (f) {
+    return cfg.enabled && stageInRange(f.stage, cfg.fromStage, cfg.toStage) && f.a && f.b && f.a !== 'TBD' && f.b !== 'TBD';
+  }).length;
+  var sel = { width: '100%', border: '2px solid var(--ink)', borderRadius: 11, padding: '9px 11px', fontFamily: 'var(--body)', fontWeight: 700, fontSize: 13, outline: 'none', marginTop: 6, background: '#fff' };
+  function save(patch) {
+    var next = Object.assign({}, cfg, patch);
+    if (Sa.setKnockoutPredictions) Sa.setKnockoutPredictions(next);
+    if (window.wcToast) window.wcToast('Knockout bracket predictions saved.', 'confident');
+  }
+  return (
+    <div style={{ marginTop: 22, paddingTop: 16, borderTop: '2px dashed var(--line)' }}>
+      <div className="dh" style={{ fontSize: 15, marginBottom: 6 }}>Knockout bracket predictions</div>
+      <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink2)', marginBottom: 10, lineHeight: 1.4 }}>
+        Auto-create winner picks for every knockout tie in the feed within your chosen stage range. Entrants earn points per correct call. Locks at kick-off — independent of the tournament deadline.
+      </div>
+      <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 800, fontSize: 13, marginBottom: 12 }}>
+        <input type="checkbox" checked={!!cfg.enabled} onChange={function (e) { save({ enabled: e.target.checked }); }} />
+        Enable knockout bracket predictions
+      </label>
+      {cfg.enabled && <>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          <div>
+            <Lab>From stage</Lab>
+            <select value={cfg.fromStage || 'r16'} onChange={function (e) { save({ fromStage: e.target.value }); }} style={sel}>
+              {KO_STAGES.map(function (s) { return <option key={s.id} value={s.id}>{s.label}</option>; })}
+            </select>
+          </div>
+          <div>
+            <Lab>To stage</Lab>
+            <select value={cfg.toStage || 'final'} onChange={function (e) { save({ toStage: e.target.value }); }} style={sel}>
+              {KO_STAGES.map(function (s) { return <option key={s.id} value={s.id}>{s.label}</option>; })}
+            </select>
+          </div>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 10 }}>
+          <div>
+            <Lab>Market type</Lab>
+            <select value={cfg.type || 'winner'} onChange={function (e) { save({ type: e.target.value }); }} style={sel}>
+              <option value="winner">Who wins?</option>
+              <option value="scoreline">Exact score</option>
+            </select>
+          </div>
+          <div>
+            <Lab>Points per correct pick</Lab>
+            <input type="number" min="1" max="50" value={cfg.points || 5} onChange={function (e) { save({ points: e.target.value }); }} style={sel} />
+          </div>
+        </div>
+        <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--ink2)', marginTop: 10 }}>
+          {ready ? (ready + ' tie' + (ready === 1 ? '' : 's') + ' ready to pick in the feed now.') : 'No pickable ties in the feed yet — markets appear as pairings publish (both teams must be known).'}
+        </div>
+      </>}
+    </div>
+  );
+}
+
 function MatchPredAdmin() {
   const upcoming = (WCa.FIXTURES || []).filter(function(f) { return ['live', 'halfTime', 'done'].indexOf(adminStatus(f)) < 0; });
   const [fixId, setFixId] = React.useState(upcoming.length ? upcoming[0].id : '');
@@ -1172,6 +1242,7 @@ function AdminPanel(props) {
            </div>
            <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--ink2)', marginBottom: 10 }}>Set the answer once it's known — every entrant's score and the league re-grade instantly.</div>
            {(WCa.predictions || Sa.PREDICTIONS).map(m => <PredAdmin key={m.key} m={m} />)}
+           <KnockoutBracketPredAdmin />
            <MatchPredAdmin />
          </ProLockedAdmin>}
 

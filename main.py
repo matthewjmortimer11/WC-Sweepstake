@@ -60,6 +60,7 @@ from models import (
     ProfileAsset,
 )
 from wc_data import _initials, generate_wc_data, get_admin_pin, get_league_seed
+import knockout_predictions
 
 log = logging.getLogger(__name__)
 
@@ -100,7 +101,7 @@ try:
 except ValueError:
     _STRIPE_PRO_AMOUNT_PENCE = 0
 
-_PRO_META_KEYS = frozenset({"hiddenPredictions", "predDeadline", "customFields"})
+_PRO_META_KEYS = frozenset({"hiddenPredictions", "predDeadline", "customFields", "knockoutPredictions"})
 
 _FUNNEL_EVENTS = frozenset({
     "gate_view", "demo_enter", "join_start", "join_success", "draw_complete",
@@ -707,6 +708,25 @@ def _resolve(league_people: List[Dict[str, Any]], admin: Dict[str, Any]):
                 market["answer"] = str(sc[0]) + "-" + str(sc[1])
         predictions.append(market)
 
+    kp_cfg = knockout_predictions.normalise_knockout_predictions(
+        (admin.get("meta") or {}).get("knockoutPredictions"),
+    )
+    if kp_cfg.get("enabled"):
+        taken_ids = {
+            str(m.get("fixture_id") or "")
+            for m in predictions
+            if m.get("fixture_id")
+        }
+        for km in knockout_predictions.knockout_prediction_markets(
+            fixtures,
+            team_map,
+            kp_cfg,
+            existing_fixture_ids=taken_ids,
+            status_is_done=standings._fixture_finished,
+            winner_of=standings._winner_of,
+        ):
+            predictions.append(km)
+
     for m in predictions:
         if m["key"] in admin_preds:
             ans = admin_preds[m["key"]]
@@ -767,6 +787,9 @@ def _league_state(league: League, league_people: List[Dict[str, Any]], admin: Di
     meta["customFields"] = _clean_custom_fields(list(admin_meta.get("customFields") or []))
     meta["predDeadline"] = admin_meta.get("predDeadline") or None
     meta["hiddenPredictions"] = list(admin_meta.get("hiddenPredictions") or [])
+    meta["knockoutPredictions"] = knockout_predictions.normalise_knockout_predictions(
+        admin_meta.get("knockoutPredictions"),
+    )
     meta.update(_pro_meta(league))
     meta.update(_fixture_health(fixtures))
     meta.update(_sync_meta())
@@ -1918,16 +1941,12 @@ async def export_predictions_csv(
         people = _league_people(league, rows, profile_map)
         admin = await _get_admin_data(session, league)
         hidden = set((admin.get("meta") or {}).get("hiddenPredictions") or [])
-        markets = _wc_data.get("predictions") or []
+        _, _, _, predictions, _ = _resolve(people, admin)
         dyn = [
-            {"key": k, "q": k}
-            for k in (admin.get("predictions") or {}).keys()
-            if str(k).startswith("dm_")
+            {"key": m["key"], "q": m.get("q") or m["key"]}
+            for m in predictions
+            if isinstance(m, dict) and m.get("key") and m["key"] not in hidden
         ]
-        for m in markets:
-            key = m.get("key") if isinstance(m, dict) else None
-            if key and key not in hidden:
-                dyn.append({"key": key, "q": m.get("q") or key})
         header = ["participant", "market", "pick"]
         out = [header]
         for p in people:
@@ -2022,6 +2041,14 @@ async def league_analytics(
         for k in (admin.get("predictions") or {}):
             if str(k).startswith("dm_") and k not in hidden:
                 markets.append({"key": k, "q": k})
+        kp = knockout_predictions.normalise_knockout_predictions(
+            (admin.get("meta") or {}).get("knockoutPredictions"),
+        )
+        if kp.get("enabled"):
+            _, _, _, preds, _ = _resolve(people, admin)
+            for m in preds:
+                if str(m.get("key", "")).startswith("ko_") and m["key"] not in hidden:
+                    markets.append({"key": m["key"], "q": m.get("q") or m["key"]})
         pred_stats = []
         total = len(people) or 1
         for m in markets:
@@ -3025,7 +3052,7 @@ async def put_admin(
         incoming_meta = dict(incoming.get("meta") or {})
         if not _league_has_pro(league):
             for key in _PRO_META_KEYS:
-                if key == "predDeadline":
+                if key in ("predDeadline", "knockoutPredictions"):
                     incoming_meta[key] = existing_meta.get(key)
                 elif key == "customFields":
                     incoming_meta[key] = list(existing_meta.get("customFields") or [])

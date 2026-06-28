@@ -9,8 +9,16 @@ const Sp = window.Store;
 const { Card: Cp, Btn: Bp, Flag: Fp, Avatar: Ap, Chip: Chp, WheeshtSays: Saysp, SectionHead: SHp } = window;
 const { useState: pState } = React;
 
+function isPerFixtureMarket(m) {
+  var k = String((m && m.key) || '');
+  return k.indexOf('dm_') === 0 || k.indexOf('ko_') === 0;
+}
+function isKnockoutBracketMarket(m) {
+  return String((m && m.key) || '').indexOf('ko_') === 0;
+}
+
 function isResolved(m) {
-  if (m && String(m.key || '').indexOf('dm_') === 0 && !fixtureFinished(m)) return false;
+  if (isPerFixtureMarket(m) && !fixtureFinished(m)) return false;
   if (m.kind === 'team2') return Array.isArray(m.answer) && m.answer.length > 0 && m.answer.every(function (x) { return x != null; });
   return m.answer != null;
 }
@@ -109,9 +117,11 @@ function Market(props) {
   const isScoreline = m.kind === 'scoreline';
   const isTeam = m.kind === 'team' || isTwo;
   const isDm = !!(m.key && m.key.startsWith('dm_'));
-  // dm_ markets use fixture status for locking, independent of the global predictions lock
-  const dmFixLive = isDm && fixtureKickedOff(m);
-  const locked = isDm ? dmFixLive : !!props.locked;
+  const isKo = !!(m.key && m.key.startsWith('ko_'));
+  const isPerFix = isDm || isKo;
+  // Per-fixture markets lock at kick-off, independent of the global predictions lock
+  const fixLive = isPerFix && fixtureKickedOff(m);
+  const locked = isPerFix ? fixLive : !!props.locked;
   const resolved = isResolved(m);
   const pick = me.picks ? me.picks[m.key] : null;
   const picked = (id) => isTwo ? (Array.isArray(pick) && pick.indexOf(id) >= 0) : pick === id;
@@ -165,8 +175,8 @@ function Market(props) {
       </div>
       <div style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--ink2)', marginBottom: 9 }}>
         {resolved ? 'Result is in'
-          : locked ? (isDm && fixtureActive(m) ? 'Game in progress · locked' : 'Locked · kick-off passed')
-          : isDm ? 'Open · locks at kick-off'
+          : locked ? (isPerFix && fixtureActive(m) ? 'Game in progress · locked' : 'Locked · kick-off passed')
+          : isPerFix ? 'Open · locks at kick-off'
           : isTwo ? 'Pick the two finalists'
           : isNumber ? 'Open · type your answer'
           : 'Open · tap to pick'}
@@ -320,19 +330,20 @@ function LbRow(props) {
 
 function PredictionPulse(props) {
   const { markets, missing, me, locked, deadlineLabel } = props;
-  const live = markets.filter(m => String(m.key || '').indexOf('dm_') === 0);
+  const live = markets.filter(isPerFixtureMarket);
   const lead = live[0] || missing[0];
   if (!lead && !deadlineLabel) return null;
   const hasPick = lead ? pickComplete(lead, me.picks || {}) : false;
   const active = lead && fixtureActive(lead);
   const kicked = lead && fixtureKickedOff(lead);
+  const isLiveFix = lead && isPerFixtureMarket(lead);
   return (
     <Cp bordered style={{ marginBottom: 12, background: active ? 'var(--ink)' : 'var(--yellow)', color: active ? '#fff' : 'var(--ink)' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
         <span style={{ fontSize: 28 }}>{active ? '●' : '⏱'}</span>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 10.5, fontWeight: 900, letterSpacing: '.07em', textTransform: 'uppercase', color: active ? 'var(--yellow)' : 'rgba(26,26,26,.65)' }}>
-            {active ? 'Game live · picks locked' : lead && String(lead.key || '').indexOf('dm_') === 0 ? 'Live match prediction' : 'Prediction deadline'}
+            {active ? 'Game live · picks locked' : isLiveFix ? (isKnockoutBracketMarket(lead) ? 'Knockout bracket pick' : 'Live match prediction') : 'Prediction deadline'}
           </div>
           <div className="dh" style={{ fontSize: 18, lineHeight: 1.08, marginTop: 2, color: active ? '#fff' : 'var(--ink)' }}>
             {lead ? lead.q : 'Tournament picks'}
@@ -375,19 +386,27 @@ function PredictionsScreen(props) {
     </div>;
   }
   const markets = Sp.visiblePredictions ? Sp.visiblePredictions() : (WCp.predictions || Sp.PREDICTIONS).filter(m => ((WCp.meta && WCp.meta.hiddenPredictions) || []).indexOf(m.key) < 0);
+  const KO_STAGE_SORT = { r32: 1, r16: 2, qf: 3, sf: 4, final: 5, third: 6 };
   const dmTs = k => { const p = String(k).split('_'); const n = parseInt(p[p.length - 1], 10); return isFinite(n) ? n : 0; };
   const open = markets.filter(m => !isResolved(m)).sort((a, b) => {
-    const ad = a.key.startsWith('dm_'), bd = b.key.startsWith('dm_');
-    if (ad && bd) return dmTs(b.key) - dmTs(a.key); // newest dynamic market first
-    if (ad !== bd) return ad ? -1 : 1;              // all dynamic markets above static
-    return 0;                                        // static markets keep original order
+    const aKo = isKnockoutBracketMarket(a), bKo = isKnockoutBracketMarket(b);
+    if (aKo && bKo) return (KO_STAGE_SORT[a.stage] || 99) - (KO_STAGE_SORT[b.stage] || 99);
+    const ad = String(a.key || '').indexOf('dm_') === 0, bd = String(b.key || '').indexOf('dm_') === 0;
+    if (ad && bd) return dmTs(b.key) - dmTs(a.key);
+    if (ad !== bd) return ad ? -1 : 1;
+    if (aKo !== bKo) return aKo ? -1 : 1;
+    return 0;
   });
   const graded = markets.filter(m => isResolved(m));
-  // dm_ markets that have kicked off can't be picked any more — exclude from missing
-  const dmKickedOff = function(m){ return m.key.startsWith('dm_') && fixtureKickedOff(m); };
-  const countableMarkets = markets.filter(m => !dmKickedOff(m) || pickComplete(m, me.picks || {}));
+  const perFixKickedOff = function (m) { return isPerFixtureMarket(m) && fixtureKickedOff(m); };
+  const openStatic = open.filter(function (m) { return !isPerFixtureMarket(m); });
+  const openKo = open.filter(isKnockoutBracketMarket);
+  const openDm = open.filter(function (m) { return String(m.key || '').indexOf('dm_') === 0; });
+  const koCfg = (WCp.meta && WCp.meta.knockoutPredictions) || {};
+  // Per-fixture markets that kicked off without a pick don't count as "missing"
+  const countableMarkets = markets.filter(m => !perFixKickedOff(m) || pickComplete(m, me.picks || {}));
   const made = countableMarkets.filter(m => pickComplete(m, me.picks || {})).length;
-  const missing = open.filter(m => !dmKickedOff(m) && !pickComplete(m, me.picks || {}));
+  const missing = open.filter(m => !perFixKickedOff(m) && !pickComplete(m, me.picks || {}));
   const allOpenMade = open.length > 0 && missing.length === 0;
   const nextMissing = missing[0];
   const predDeadline = WCp.meta && WCp.meta.predDeadline;
@@ -414,7 +433,7 @@ function PredictionsScreen(props) {
         <span style={{ fontSize: 18 }}>🔒</span>
         <div>
           <div>{deadlinePassed ? 'Tournament predictions locked — deadline has passed.' : 'Tournament predictions locked by the organiser.'}</div>
-              {open.some(function(m){ return m.key.startsWith('dm_') && !fixtureKickedOff(m); }) && <div style={{ fontWeight: 600, fontSize: 11.5, marginTop: 3, opacity: 0.8 }}>Match predictions above are still open until kick-off.</div>}
+              {open.some(function(m){ return isPerFixtureMarket(m) && !fixtureKickedOff(m); }) && <div style={{ fontWeight: 600, fontSize: 11.5, marginTop: 3, opacity: 0.8 }}>Knockout and match predictions above stay open until kick-off.</div>}
         </div>
       </div>}
       {!locked && predDeadline && <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--ink2)', marginBottom: 10, padding: '7px 12px', background: 'rgba(245,200,0,.2)', borderRadius: 10 }}>
@@ -431,8 +450,27 @@ function PredictionsScreen(props) {
         <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--ink2)', marginTop: 3 }}>You can still change picks until they lock. Wheesht has the draft in pencil.</div>
       </Cp>}
       <Saysp mood="mischievous" label="on the record" animate>{WCp.LINES.predOpen}</Saysp>
-      <SHp aside={open.length ? (missing.length ? missing.length + ' left' : 'all in') : 'closed'}>{allOpenMade ? 'Review your calls' : 'Make your call'}</SHp>
-      {open.map(m => <Market key={m.key} market={m} me={me} onPick={onPick} locked={locked} />)}
+      {openStatic.length > 0 && <>
+        <SHp aside={missing.filter(function (m) { return !isPerFixtureMarket(m); }).length ? missing.filter(function (m) { return !isPerFixtureMarket(m); }).length + ' left' : 'all in'}>{allOpenMade && !openKo.length && !openDm.length ? 'Review your calls' : 'Make your call'}</SHp>
+        {openStatic.map(m => <Market key={m.key} market={m} me={me} onPick={onPick} locked={locked} />)}
+      </>}
+      {openKo.length > 0 && <>
+        <SHp aside={openKo.filter(function (m) { return !pickComplete(m, me.picks || {}); }).length ? openKo.filter(function (m) { return !pickComplete(m, me.picks || {}); }).length + ' left' : 'all in'}>
+          Knockout bracket{koCfg.enabled ? ' · ' + (koCfg.points || 5) + ' pts each' : ''}
+        </SHp>
+        <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--ink2)', marginBottom: 10, lineHeight: 1.35 }}>
+          Pick the winner for each tie in the feed. New ties appear as the draw publishes. Locks at kick-off.
+        </div>
+        {openKo.map(m => <Market key={m.key} market={m} me={me} onPick={onPick} locked={locked} />)}
+      </>}
+      {openDm.length > 0 && <>
+        <SHp aside="match picks">One-off match predictions</SHp>
+        {openDm.map(m => <Market key={m.key} market={m} me={me} onPick={onPick} locked={locked} />)}
+      </>}
+      {!openStatic.length && !openKo.length && !openDm.length && open.length > 0 && <>
+        <SHp aside="open">Open picks</SHp>
+        {open.map(m => <Market key={m.key} market={m} me={me} onPick={onPick} locked={locked} />)}
+      </>}
       {graded.length > 0 && <>
         <SHp aside="graded">Already settled</SHp>
         {graded.map(m => <Market key={m.key} market={m} me={me} onPick={onPick} locked={locked} />)}

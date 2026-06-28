@@ -225,6 +225,9 @@
     WC.meta.customFields = (admin.meta && Array.isArray(admin.meta.customFields)) ? admin.meta.customFields : BASE.meta.customFields;
     WC.meta.predDeadline = (admin.meta && admin.meta.predDeadline) || BASE.meta.predDeadline || null;
     WC.meta.hiddenPredictions = (admin.meta && Array.isArray(admin.meta.hiddenPredictions)) ? admin.meta.hiddenPredictions : BASE.meta.hiddenPredictions;
+    WC.meta.knockoutPredictions = (admin.meta && admin.meta.knockoutPredictions)
+      ? admin.meta.knockoutPredictions
+      : (BASE.meta.knockoutPredictions || { enabled: false, fromStage: 'r16', toStage: 'final', type: 'winner', points: 5 });
     WC.charitySplit = (admin.meta && admin.meta.charitySplit != null) ? Number(admin.meta.charitySplit) : BASE.meta.charitySplit;
     var fee = admin.meta && admin.meta.entryFee != null ? Number(admin.meta.entryFee) : BASE.fee;
     WC.FEE = isFinite(fee) && fee >= 0 ? fee : BASE.fee;
@@ -1087,6 +1090,10 @@
           BASE.meta.r32Published = WC.meta.r32Published;
           BASE.meta.knockoutsInFeed = WC.meta.knockoutsInFeed;
           BASE.meta.knockoutRound = WC.meta.knockoutRound;
+          if (d.meta && d.meta.knockoutPredictions) {
+            WC.meta.knockoutPredictions = d.meta.knockoutPredictions;
+            BASE.meta.knockoutPredictions = d.meta.knockoutPredictions;
+          }
           if (d.meta) {
             if (d.meta.stillIn != null) { WC.meta.stillIn = d.meta.stillIn; BASE.meta.stillIn = d.meta.stillIn; }
             if (d.meta.out != null) { WC.meta.out = d.meta.out; BASE.meta.out = d.meta.out; }
@@ -1502,6 +1509,30 @@
         if (window.wcToast) window.wcToast('Prediction opened: ' + (mkt ? mkt.q : key), 'mischievous');
       });
     },
+    knockoutPredictions: function () {
+      var d = (admin.meta && admin.meta.knockoutPredictions) || (WC.meta && WC.meta.knockoutPredictions);
+      return d || { enabled: false, fromStage: 'r16', toStage: 'final', type: 'winner', points: 5 };
+    },
+    setKnockoutPredictions: function (cfg) {
+      admin.meta = admin.meta || {};
+      cfg = cfg || {};
+      var fromSt = cfg.fromStage || 'r16';
+      var toSt = cfg.toStage || 'final';
+      var order = { r32: 0, r16: 1, qf: 2, sf: 3, final: 4, third: 5 };
+      if ((order[fromSt] == null ? 1 : order[fromSt]) > (order[toSt] == null ? 4 : order[toSt])) {
+        var tmp = fromSt; fromSt = toSt; toSt = tmp;
+      }
+      var pts = parseInt(cfg.points, 10);
+      if (!isFinite(pts)) pts = 5;
+      admin.meta.knockoutPredictions = {
+        enabled: !!cfg.enabled,
+        fromStage: fromSt,
+        toStage: toSt,
+        type: cfg.type === 'scoreline' ? 'scoreline' : 'winner',
+        points: Math.max(1, Math.min(50, pts)),
+      };
+      commitAdmin();
+    },
     setCharitySplit: function (split) {
       var n = Math.max(0, Math.min(1, Number(split)));
       if (!isFinite(n)) return;
@@ -1566,6 +1597,7 @@
         customFields: keep.customFields,
         predDeadline: keep.predDeadline,
         hiddenPredictions: keep.hiddenPredictions,
+        knockoutPredictions: keep.knockoutPredictions,
       }};
       commitAdmin();
     }
