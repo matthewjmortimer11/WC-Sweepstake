@@ -587,23 +587,47 @@
       return feedTeams[0] === slotKnown[0];
     }
 
-    function clearPartialR32Slots(merged, teams) {
-      var teamSet = {};
-      teams.forEach(function (c) { teamSet[c] = true; });
+    function stripTeamsFromOtherR32Slots(merged, teamA, teamB, keepIndex) {
       merged.forEach(function (m, i) {
-        var known = [m.a, m.b].filter(function (c) { return c && c !== 'TBD'; });
-        if (known.length !== 1 || !teamSet[known[0]]) return;
-        merged[i] = {
-          id: m.id || ('pad-r32-' + i),
-          a: 'TBD',
-          b: 'TBD',
-          stage: 'r32',
-          status: 'upcoming',
-          score: null,
-          winner: null,
-          projectedPairing: false,
-        };
+        if (i === keepIndex) return;
+        if (sameBracketPair(m.a, m.b, teamA, teamB)) return;
+        var changed = false;
+        var next = Object.assign({}, m);
+        if (next.a === teamA || next.a === teamB) { next.a = 'TBD'; changed = true; }
+        if (next.b === teamA || next.b === teamB) { next.b = 'TBD'; changed = true; }
+        if (changed) {
+          next.projectedPairing = (next.a && next.a !== 'TBD') || (next.b && next.b !== 'TBD');
+          merged[i] = next;
+        }
       });
+    }
+
+    function placeFullR32Feed(merged, f) {
+      var fa = f.a;
+      var fb = f.b;
+      if (!fa || !fb || fa === 'TBD' || fb === 'TBD') return;
+      var i, target = -1;
+      for (i = 0; i < merged.length; i++) {
+        if (sameBracketPair(merged[i].a, merged[i].b, fa, fb)) {
+          merged[i] = feedOverlayR32(merged[i], f);
+          return;
+        }
+      }
+      for (i = 0; i < merged.length; i++) {
+        var known = [merged[i].a, merged[i].b].filter(function (c) { return c && c !== 'TBD'; });
+        if (known.some(function (c) { return c === fa || c === fb; })) { target = i; break; }
+      }
+      if (target < 0) {
+        for (i = 0; i < merged.length; i++) {
+          if (merged[i].a === 'TBD' && merged[i].b === 'TBD') { target = i; break; }
+        }
+      }
+      if (target >= 0) {
+        stripTeamsFromOtherR32Slots(merged, fa, fb, target);
+        merged[target] = feedOverlayR32(merged[target], f);
+      } else if (merged.length < 16) {
+        merged.push(feedOverlayR32(null, f));
+      }
     }
 
     function mergeR32Rounds(proj, feed) {
@@ -622,8 +646,7 @@
           var hasPair = merged.some(function (m) { return sameBracketPair(m.a, m.b, f.a, f.b); });
           if (hasPair) return;
           if (feedTeams.length === 2) {
-            clearPartialR32Slots(merged, feedTeams);
-            merged.push(feedOverlayR32(null, f));
+            placeFullR32Feed(merged, f);
           } else {
             var dup = feedTeams.some(function (c) {
               return merged.some(function (m) { return m.a === c || m.b === c; });

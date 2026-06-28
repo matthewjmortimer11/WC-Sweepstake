@@ -145,6 +145,22 @@ def test_penalty_knockout_eliminates_loser():
     assert by["AAA"]["alive"] is False
 
 
+def test_done_flag_eliminates_knockout_loser():
+    teams = [_team("AAA"), _team("BBB")]
+    fixtures = [
+        {
+            "id": "aaa-bbb-r32",
+            "a": "AAA", "b": "BBB", "stage": "r32",
+            "done": True, "score": [0, 1], "winner": "AWAY",
+        },
+    ]
+    out = standings.compute_team_status(teams, fixtures, LADDER)
+    by = {t["code"]: t for t in out}
+    assert by["BBB"]["alive"] is True
+    assert by["AAA"]["alive"] is False
+    assert by["AAA"]["stage"] == "out-r32"
+
+
 def test_champion_gets_winner_stage():
     teams = [_team("AAA"), _team("BBB")]
     fixtures = [

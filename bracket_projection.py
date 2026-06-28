@@ -171,24 +171,69 @@ def _feed_fills_r32_slot(slot: Dict[str, Any], feed: Dict[str, Any]) -> bool:
     return feed_teams[0] == known[0]
 
 
-def _clear_partial_r32_slots(merged: List[Dict[str, Any]], teams: List[str]) -> None:
-    """Drop stale one-team TBD slots when a full feed pairing arrives."""
-    team_set = set(teams)
+def _strip_teams_from_other_r32_slots(
+    merged: List[Dict[str, Any]],
+    team_a: str,
+    team_b: str,
+    keep_index: int,
+) -> None:
+    """Remove a feed pairing's teams from every R32 slot except the target."""
     for i, m in enumerate(merged):
+        if i == keep_index:
+            continue
         ma, mb = m.get("a"), m.get("b")
-        known = {c for c in (ma, mb) if c and c != "TBD"}
-        if known & team_set and len(known) == 1:
-            fid = str(m.get("id") or f"pad-r32-{i}")
-            merged[i] = {
-                "id": fid,
-                "a": "TBD",
-                "b": "TBD",
-                "stage": "r32",
-                "status": "upcoming",
-                "score": None,
-                "winner": None,
-                "projectedPairing": False,
-            }
+        if {ma, mb} == {team_a, team_b}:
+            continue
+        new = dict(m)
+        changed = False
+        if ma in (team_a, team_b):
+            new["a"] = "TBD"
+            changed = True
+        if mb in (team_a, team_b):
+            new["b"] = "TBD"
+            changed = True
+        if changed:
+            pa, pb = new.get("a"), new.get("b")
+            new["projectedPairing"] = bool(
+                (pa and pa != "TBD") or (pb and pb != "TBD")
+            )
+            merged[i] = new
+
+
+def _place_full_r32_feed(merged: List[Dict[str, Any]], f: Dict[str, Any]) -> None:
+    """Place a full feed R32 tie without growing past 16 slots."""
+    fa, fb = f.get("a"), f.get("b")
+    if not fa or not fb or fa == "TBD" or fb == "TBD":
+        return
+
+    for i, m in enumerate(merged):
+        if {m.get("a"), m.get("b")} == {fa, fb}:
+            out = dict(f)
+            out["projectedPairing"] = False
+            merged[i] = out
+            return
+
+    target: Optional[int] = None
+    for i, m in enumerate(merged):
+        known = {c for c in (m.get("a"), m.get("b")) if c and c != "TBD"}
+        if known & {fa, fb}:
+            target = i
+            break
+    if target is None:
+        for i, m in enumerate(merged):
+            if m.get("a") == "TBD" and m.get("b") == "TBD":
+                target = i
+                break
+
+    if target is not None:
+        _strip_teams_from_other_r32_slots(merged, fa, fb, target)
+        out = dict(f)
+        out["projectedPairing"] = False
+        merged[target] = out
+    elif len(merged) < 16:
+        out = dict(f)
+        out["projectedPairing"] = False
+        merged.append(out)
 
 
 def _merge_r32_feed(
@@ -214,10 +259,7 @@ def _merge_r32_feed(
             if any({m.get("a"), m.get("b")} == {fa, fb} for m in merged):
                 continue
             if len(feed_teams) == 2:
-                _clear_partial_r32_slots(merged, feed_teams)
-                out = dict(f)
-                out["projectedPairing"] = False
-                merged.append(out)
+                _place_full_r32_feed(merged, f)
             else:
                 dup = any(
                     c in (m.get("a"), m.get("b"))

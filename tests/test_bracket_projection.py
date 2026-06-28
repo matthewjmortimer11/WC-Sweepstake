@@ -142,3 +142,19 @@ def test_live_r32_has_no_projected_winner():
     tie = next(t for t in proj["rounds"]["r32"] if t["id"] == "ko1")
     assert tie["winner"] is None
     assert not tie["projectedWinner"]
+
+
+def test_full_r32_feed_keeps_sixteen_slots():
+    """Feed-only ties must not inflate R32 beyond 16 when teams sat in separate projected slots."""
+    teams = [_team("AAA", "A", "+100"), _team("BBB", "B", "+500")]
+    fixtures = [
+        {
+            "id": "ko1", "a": "AAA", "b": "BBB", "stage": "r32",
+            "status": "done", "score": [2, 1], "winner": "HOME",
+            "dateISO": "2026-07-01", "time": "20:00",
+        },
+    ]
+    proj = build_projected_bracket(teams, fixtures)
+    assert len(proj["rounds"]["r32"]) == 16
+    tie = next(t for t in proj["rounds"]["r32"] if t["a"] == "AAA" and t["b"] == "BBB")
+    assert tie["winner"] == "AAA"

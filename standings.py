@@ -30,6 +30,15 @@ from qualification.engine import (
     rank_third_placed_teams,
 )
 
+_DONE = frozenset({"done", "ft", "fulltime", "full_time", "full-time", "finished"})
+
+
+def _fixture_finished(fx: Dict[str, Any]) -> bool:
+    st = str(fx.get("status") or "").strip().lower()
+    if st in _DONE:
+        return True
+    return bool(fx.get("done"))
+
 
 def _first_knockout_round(stage_ladder: List[str]) -> Optional[str]:
     for stage in stage_ladder:
@@ -143,7 +152,7 @@ def _winner_of(fx: Dict[str, Any]) -> Optional[str]:
     w = fx.get("winner")
     if w in ("HOME", "AWAY", "DRAW"):
         return w
-    if fx.get("status") == "done":
+    if _fixture_finished(fx):
         score = fx.get("score")
         if score and len(score) == 2 and score[0] is not None and score[1] is not None:
             if score[0] > score[1]:
@@ -188,7 +197,7 @@ def compute_team_status(
 
         if stage == "group":
             score = f.get("score")
-            if f.get("status") == "done" and score and None not in score:
+            if _fixture_finished(f) and score and None not in score:
                 ga, gb = score[0], score[1]
                 grec[a]["GF"] += ga; grec[a]["GA"] += gb
                 grec[b]["GF"] += gb; grec[b]["GA"] += ga
@@ -220,7 +229,7 @@ def compute_team_status(
     # eliminate on an incomplete group.
     done_count: Dict[str, int] = {g: 0 for g in groups}
     for f in fixtures:
-        if f.get("stage") == "group" and f.get("status") == "done":
+        if f.get("stage") == "group" and _fixture_finished(f):
             g = f.get("group")
             if g in done_count:
                 done_count[g] += 1
