@@ -21,6 +21,12 @@ refresh resumes the same game.
 
 ## What is implemented (Phases 1–2)
 
+### Phase 4 — Throne & Succession
+A **Throne & Succession** panel tracks the crown and the line of succession.
+- **Throne control (§23)**: King / Queen / Successor controllers, set manually or via the **Claim helper** (claimant + crown; unchallenged → crowned, or challenged → "proof valid" crowns them and the challenger loses a role / "bluff" costs the claimant a role). Claim order is recorded.
+- **Royal removal (§23)**: discarding/revealing a King or Queen role automatically strips that crown's Throne control.
+- **Succession (§24, manual-first)**: open succession, record claims (Firstborn / Secondborn / Tiny Tyrant / Distant Cousin) with their rank and survive-window; each claim shows rounds-left and only **Resolve**s once matured; resolving seats the successor and closes succession.
+
 ### Phase 3 — Social mechanics
 A **Parley & Conflict** panel launches helpers that guide + log; social judgement stays at the table.
 - **Challenge (§19)**: pick claimant + challenger; record "proof valid" (challenger loses a role) or "failed bluff" (claimant loses a role) — routed through the role-discard helper.
@@ -66,8 +72,8 @@ brief — guide and track, don't over-automate.
 
 ## Known limitations / not yet built
 
-- **Phase 4**: Throne claim helper, royal removal, succession tracking.
 - **Phase 5**: richer board art, exportable playtest report, full 76 action cards, balance toggles.
+- In an all-bot auto-play, Loyal can never win — bots don't perform the social actions (accuse / Call Out / banish) Loyal needs, so the Cursed bot always closes it out. Bots test the board/economy/win-conditions, not the social layer.
 - Action cards are the §27 starter set (~30); the data model already scales to 76.
 
 ## File structure

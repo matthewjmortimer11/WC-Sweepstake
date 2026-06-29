@@ -55,7 +55,8 @@ CT.newGame = function (playersInput, undealtRoleIds, startingActionByPlayer, fir
     activePlayerIndex: firstPlayerIndex || 0,
     corruption: 0,
     innocentElims: 0,
-    throne: { kingControllerId: null, queenControllerId: null, claimOrder: [] },
+    throne: { kingControllerId: null, queenControllerId: null, successorId: null, claimOrder: [],
+              succession: { open: false, claims: [] } },
     winner: null, // null | "loyal" | "cursed"
     undealtRoleIds: undealtRoleIds.slice(),
     players: playersInput.map(function (p, i) {
@@ -199,6 +200,7 @@ CT.load = function () {
     var data = JSON.parse(raw);
     if (!data || data.version !== CT.SAVE_VERSION) return null;
     if (!data.contracts) data.contracts = []; // backfill saves from before Phase 3
+    if (data.throne && !data.throne.succession) { data.throne.successorId = null; data.throne.succession = { open: false, claims: [] }; } // pre-Phase-4
     CT.state = data;
     return CT.state;
   } catch (e) { return null; }
@@ -351,6 +353,14 @@ CT.applyRoleDiscard = function (playerId, slot, roleId) {
   // Cursed One revealed/discarded -> loyal players win (§9, §20)
   if (roleId === "cursedone") { CT.declareWinner("loyal", "The Cursed One was revealed"); CT.save(); return; }
 
+  // Royal removal (§23): a discarded King/Queen loses any Throne control they held
+  if (roleId === "king" && CT.state.throne.kingControllerId === playerId) {
+    CT.state.throne.kingControllerId = null; CT.log(p.name + " is removed as King; the crown's control is lost.", "event");
+  }
+  if (roleId === "queen" && CT.state.throne.queenControllerId === playerId) {
+    CT.state.throne.queenControllerId = null; CT.log(p.name + " is removed as Queen; the crown's control is lost.", "event");
+  }
+
   // elimination check (§20)
   var remaining = (p.publicRoleId ? 1 : 0) + p.hiddenRoleIds.length + p.extraShownRoleIds.length;
   if (remaining === 0 && p.status === "active") {
@@ -406,5 +416,74 @@ CT.resolveContract = function (id, status, breakerId) {
   } else {
     CT.log("Blood Contract fulfilled.", "note");
   }
+  CT.save();
+};
+
+/* ===================== Phase 4: Throne & Succession ===================== */
+
+/* set/clear a Throne controller. crown: "king" | "queen" | "successor" */
+CT.setThroneController = function (crown, playerId, reason) {
+  var t = CT.state.throne, p = CT.playerById(playerId);
+  if (crown === "king") t.kingControllerId = playerId;
+  else if (crown === "queen") t.queenControllerId = playerId;
+  else if (crown === "successor") t.successorId = playerId;
+  if (playerId && t.claimOrder.indexOf(playerId) === -1) t.claimOrder.push(playerId);
+  CT.log((p ? p.name : "?") + " takes the Throne as " + crown + (reason ? " (" + reason + ")" : "") + ".", "event");
+  CT.save();
+};
+CT.clearThroneController = function (crown) {
+  var t = CT.state.throne;
+  var who = crown === "king" ? t.kingControllerId : crown === "queen" ? t.queenControllerId : t.successorId;
+  if (crown === "king") t.kingControllerId = null;
+  else if (crown === "queen") t.queenControllerId = null;
+  else if (crown === "successor") t.successorId = null;
+  var p = CT.playerById(who);
+  CT.log("Throne control cleared" + (p ? " (was " + p.name + " as " + crown + ")" : "") + ".", "event");
+  CT.save();
+};
+
+/* whether any royal currently controls the Throne (used to gate succession) */
+CT.throneHeld = function () {
+  var t = CT.state.throne; return !!(t.kingControllerId || t.queenControllerId || t.successorId);
+};
+
+/* ---- succession (§24), manual-first ---- */
+CT.openSuccession = function () {
+  CT.state.throne.succession.open = true;
+  CT.log("Succession opened — claimants may move to the Throne and claim.", "system");
+  CT.save();
+};
+CT.closeSuccession = function () {
+  CT.state.throne.succession = { open: false, claims: [] };
+  CT.log("Succession closed.", "system");
+  CT.save();
+};
+CT.addSuccessionClaim = function (playerId, roleId) {
+  var meta = CT.SUCCESSION[roleId]; if (!meta) return;
+  var p = CT.playerById(playerId);
+  CT.state.throne.succession.claims.push({
+    id: CT.util.uid("sc"), playerId: playerId, roleId: roleId,
+    rank: meta.rank, startRound: CT.state.round,
+  });
+  CT.log((p ? p.name : "?") + " claims the Throne as " + CT.roleById(roleId).name + " (" + meta.note + ").", "event");
+  CT.save();
+};
+CT.removeSuccessionClaim = function (id) {
+  var s = CT.state.throne.succession;
+  s.claims = s.claims.filter(function (c) { return c.id !== id; });
+  CT.save();
+};
+/* rounds still to survive before a claim matures (0 or less = ready to resolve) */
+CT.claimRoundsLeft = function (claim) {
+  return (claim.startRound + CT.SUCCESSION[claim.roleId].window) - CT.state.round;
+};
+CT.resolveSuccessionClaim = function (id) {
+  var s = CT.state.throne.succession, c = s.claims.find(function (x) { return x.id === id; });
+  if (!c) return;
+  var p = CT.playerById(c.playerId);
+  CT.state.throne.successorId = c.playerId;
+  if (CT.state.throne.claimOrder.indexOf(c.playerId) === -1) CT.state.throne.claimOrder.push(c.playerId);
+  CT.log((p ? p.name : "?") + " survives the claim window and takes the Throne as " + CT.roleById(c.roleId).name + ".", "system");
+  CT.state.throne.succession = { open: false, claims: [] };
   CT.save();
 };

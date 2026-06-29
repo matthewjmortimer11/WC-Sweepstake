@@ -304,6 +304,15 @@ CT.actionDef = function (locId, actId) {
   return (CT.LOCATION_ACTIONS[locId] || []).find(function (a) { return a.id === actId; });
 };
 
+/* Succession ranks & claim windows (§24). window = full rounds the claimant must survive. */
+CT.SUCCESSION = {
+  firstborn:     { rank: 1, window: 0, label: "First Claim",  note: "immediate unless challenged by hidden King/Queen" },
+  secondborn:    { rank: 2, window: 1, label: "Second Claim", note: "survive 1 full round" },
+  tinytyrant:    { rank: 3, window: 2, label: "Third Claim",  note: "survive 2 full rounds" },
+  distantcousin: { rank: 4, window: 3, label: "Weak Claim",   note: "survive 3 full rounds" },
+};
+CT.SUCCESSION_ORDER = ["firstborn", "secondborn", "tinytyrant", "distantcousin"];
+
 /* lookups */
 CT.roleById = function (id) { return CT.ROLES.find(function (r) { return r.id === id; }); };
 CT.cardById = function (id) { return CT.ACTION_CARDS.find(function (c) { return c.id === id; }); };

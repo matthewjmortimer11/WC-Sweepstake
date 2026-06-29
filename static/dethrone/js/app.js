@@ -47,7 +47,7 @@ function gameScreen() {
   return winBanner()
     + trackers()
     + '<div class="grid grid-main">'
-    + '<div>' + boardPanel() + actionsPanel() + parleyPanel() + manualGlobal() + pactsPanel() + '</div>'
+    + '<div>' + boardPanel() + actionsPanel() + parleyPanel() + throneSuccPanel() + manualGlobal() + pactsPanel() + '</div>'
     + '<div>' + playersPanel() + logPanel() + '</div>'
     + '</div>';
 }
@@ -83,6 +83,7 @@ function throneLabel() {
   var names = [];
   if (t.kingControllerId) { var k = CT.playerById(t.kingControllerId); if (k) names.push(k.name); }
   if (t.queenControllerId) { var q = CT.playerById(t.queenControllerId); if (q) names.push(q.name); }
+  if (t.successorId) { var su = CT.playerById(t.successorId); if (su) names.push(su.name + " (successor)"); }
   return names.length ? names.join(" & ") : "Vacant";
 }
 
@@ -244,6 +245,43 @@ function pactsPanel() {
   }).join("");
   return '<div class="panel"><div class="panel-head"><h2>Pacts</h2><span class="faint" style="font-size:12px">' + active.length + ' active</span></div>'
     + '<hr class="rule"><div class="stack">' + rows + '</div></div>';
+}
+
+/* ---- Phase 4: Throne & Succession (§23, §24) ---- */
+function throneSuccPanel() {
+  var t = CT.state.throne, ps = CT.state.players.filter(function (p) { return p.status === "active"; });
+  var off = CT.state.winner ? " disabled" : "";
+  function crownRow(crown, label) {
+    var id = crown === "king" ? t.kingControllerId : crown === "queen" ? t.queenControllerId : t.successorId;
+    var p = CT.playerById(id);
+    var setSel = '<select data-act="h-throne-set" data-crown="' + crown + '"' + off + '><option value="">— set ' + label + ' —</option>'
+      + ps.map(function (x) { return '<option value="' + x.id + '"' + (x.id === id ? " selected" : "") + '>' + CT.esc(x.name) + "</option>"; }).join("") + "</select>";
+    return '<div class="vote-row"><span><strong>' + label + ':</strong> ' + (p ? CT.esc(p.name) : '<span class="faint">Vacant</span>') + "</span>"
+      + '<div class="row" style="gap:6px">' + setSel
+      + (p ? '<button class="btn btn-ghost btn-sm" data-act="h-throne-clear" data-crown="' + crown + '"' + off + '>Clear</button>' : "") + "</div></div>";
+  }
+  var succ = t.succession || { open: false, claims: [] };
+  var succBody;
+  if (!succ.open) {
+    succBody = '<div class="row" style="justify-content:space-between"><span class="muted" style="font-size:13px">No succession in progress.</span>'
+      + '<button class="btn btn-secondary btn-sm" data-act="h-succ-open"' + off + '>Open succession</button></div>';
+  } else {
+    var claims = succ.claims.slice().sort(function (a, b) { return a.rank - b.rank; }).map(function (c) {
+      var p = CT.playerById(c.playerId), left = CT.claimRoundsLeft(c);
+      var status = left <= 0 ? '<span class="tag moss">matured</span>' : '<span class="tag">' + left + ' round' + (left === 1 ? "" : "s") + " left</span>";
+      return '<div class="vote-row"><span><strong>#' + c.rank + "</strong> " + CT.esc(p ? p.name : "?") + " — " + CT.esc(CT.roleById(c.roleId).name) + " " + status + "</span>"
+        + '<div class="row" style="gap:6px"><button class="btn btn-gold btn-sm" data-act="h-succ-resolve" data-id="' + c.id + '"' + (left > 0 ? " disabled" : "") + '>Resolve</button>'
+        + '<button class="btn btn-ghost btn-sm" data-act="h-succ-remove" data-id="' + c.id + '">✕</button></div></div>';
+    }).join("") || '<p class="muted" style="font-size:13px">No claims yet.</p>';
+    succBody = '<div class="stack" style="gap:6px">' + claims + "</div>"
+      + '<div class="btn-row" style="margin-top:10px"><button class="btn btn-secondary btn-sm" data-act="h-open-succclaim"' + off + '>Add claim</button>'
+      + '<div class="spacer"></div><button class="btn btn-ghost btn-sm" data-act="h-succ-close">Close succession</button></div>';
+  }
+  return '<div class="panel"><div class="panel-head"><h2>Throne &amp; Succession</h2>'
+    + '<button class="btn btn-gold btn-sm" data-act="h-open-royalclaim"' + off + '>Claim helper ♛</button></div><hr class="rule">'
+    + '<div class="stack" style="gap:6px">' + crownRow("king", "King") + crownRow("queen", "Queen")
+    + (t.successorId ? crownRow("successor", "Successor") : "") + "</div>"
+    + '<h3 style="margin:16px 0 8px">Succession</h3>' + succBody + "</div>";
 }
 
 /* ---- global manual controls (§32) ---- */
@@ -462,14 +500,14 @@ CT.handleAction = function (act, el, ev) {
       CT.render(); break;
     }
     case "close-hand": CT.ui.handFixFor = null; CT.render(); break;
-    case "lose-role": CT.ui.roleDiscardFor = el.dataset.id; CT.ui.roleDiscardRevealed = false; CT.render(); break;
+    case "lose-role": CT.ui.roleDiscardFor = el.dataset.id; CT.ui.roleDiscardRevealed = false; CT.ui.afterDiscard = null; CT.render(); break;
     case "reveal-lose-role": CT.ui.roleDiscardRevealed = true; CT.render(); break;
     case "confirm-lose-role":
       CT.applyRoleDiscard(CT.ui.roleDiscardFor, el.dataset.slot, el.dataset.role);
       CT.ui.roleDiscardFor = null; CT.ui.roleDiscardRevealed = false;
       if (CT.ui.afterDiscard) { var fn = CT.ui.afterDiscard; CT.ui.afterDiscard = null; fn(); } // vote/duel follow-up effects
       CT.render(); break;
-    case "close-lose-role": CT.ui.roleDiscardFor = null; CT.ui.roleDiscardRevealed = false; CT.render(); break;
+    case "close-lose-role": CT.ui.roleDiscardFor = null; CT.ui.roleDiscardRevealed = false; CT.ui.afterDiscard = null; CT.render(); break;
     case "view-private": CT.ui.privateFor = el.dataset.id; CT.ui.privateRevealed = false; CT.render(); break;
     case "reveal-private-view": CT.ui.privateRevealed = true; CT.render(); break;
     case "close-private": CT.ui.privateFor = null; CT.ui.privateRevealed = false; CT.render(); break;

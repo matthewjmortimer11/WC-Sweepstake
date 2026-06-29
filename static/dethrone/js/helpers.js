@@ -32,6 +32,8 @@ CT.helpers.view = function () {
     case "callout":   return CT.helpers.vCallout();
     case "trade":     return CT.helpers.vTrade();
     case "contract":  return CT.helpers.vContract();
+    case "royalclaim": return CT.helpers.vRoyalClaim();
+    case "succclaim":  return CT.helpers.vSuccClaim();
   }
   return "";
 };
@@ -190,6 +192,55 @@ CT.helpers.vContract = function () {
     + '<hr class="rule"><div class="btn-row"><div class="spacer"></div><button class="btn btn-primary" data-act="h-c-swear"' + (ready ? "" : " disabled") + '>Swear contract</button></div>');
 };
 
+/* ===================== Royal claim (§23) ===================== */
+CT.helpers.openRoyalClaim = function () { CT.helpers.ui = { open: "royalclaim", claimant: "", crown: "king", challenger: "" }; CT.render(); };
+CT.helpers.vRoyalClaim = function () {
+  var u = CT.helpers.ui, ps = actives();
+  var ready = !!u.claimant;
+  var challenged = !!u.challenger && u.challenger !== u.claimant;
+  return wrap('<div class="eyebrow">Helper</div><h2 style="margin:4px 0 2px">Claim the Throne</h2>'
+    + '<p class="muted" style="font-size:14px;margin:0 0 12px">A player with King or Queen may claim the Throne. If challenged, they prove the crown privately. Truthful → challenger loses a role; lying → claimant loses a role.</p>'
+    + field("Claimant", '<select data-act="h-rc-claimant">' + opt(ps, u.claimant, "— who —") + "</select>")
+    + '<div class="seg" style="margin-bottom:14px"><button aria-pressed="' + (u.crown === "king") + '" data-act="h-rc-crown" data-c="king">King</button>'
+    + '<button aria-pressed="' + (u.crown === "queen") + '" data-act="h-rc-crown" data-c="queen">Queen</button></div>'
+    + field("Challenger (optional)", '<select data-act="h-rc-challenger">' + opt(ps.filter(function (p) { return p.id !== u.claimant; }), u.challenger, "— unchallenged —") + "</select>")
+    + '<hr class="rule">'
+    + (challenged
+        ? '<div class="btn-row"><button class="btn btn-secondary" data-act="h-rc-proved">Proof valid → challenger loses a role &amp; claimant crowned</button>'
+          + '<button class="btn btn-danger" data-act="h-rc-bluff">Bluff → claimant loses a role</button></div>'
+        : '<div class="btn-row"><div class="spacer"></div><button class="btn btn-gold" data-act="h-rc-take"' + (ready ? "" : " disabled") + '>Take the Throne ♛</button></div>'));
+};
+CT.helpers.applyRoyalTake = function () {
+  var u = CT.helpers.ui;
+  CT.setThroneController(u.crown, u.claimant, "claim");
+  u.open = null; CT.render();
+};
+CT.helpers.applyRoyalProved = function () {
+  var u = CT.helpers.ui;
+  CT.setThroneController(u.crown, u.claimant, "claim upheld");
+  CT.log(CT.playerById(u.challenger).name + " challenged the crown wrongly and must lose a role.");
+  CT.ui.roleDiscardFor = u.challenger; CT.ui.roleDiscardRevealed = false; u.open = null; CT.render();
+};
+CT.helpers.applyRoyalBluff = function () {
+  var u = CT.helpers.ui;
+  CT.log(CT.playerById(u.claimant).name + "'s claim to the Throne was a bluff — they must lose a role.");
+  CT.ui.roleDiscardFor = u.claimant; CT.ui.roleDiscardRevealed = false; u.open = null; CT.render();
+};
+
+/* ===================== Succession claim (§24) ===================== */
+CT.helpers.openSuccClaim = function () { CT.helpers.ui = { open: "succclaim", player: "", role: "firstborn" }; CT.render(); };
+CT.helpers.vSuccClaim = function () {
+  var u = CT.helpers.ui, ps = actives();
+  var roleBtns = CT.SUCCESSION_ORDER.map(function (id) {
+    return '<button aria-pressed="' + (u.role === id) + '" data-act="h-sc-role" data-r="' + id + '">' + CT.esc(CT.roleById(id).name) + "</button>";
+  }).join("");
+  return wrap('<div class="eyebrow">Helper</div><h2 style="margin:4px 0 2px">Add a succession claim</h2>'
+    + '<p class="muted" style="font-size:13px;margin:0 0 12px">' + CT.esc(CT.roleById(u.role).name) + ": " + CT.SUCCESSION[u.role].note + ". The window counts from the current round.</p>"
+    + field("Claimant", '<select data-act="h-sc-player">' + opt(ps, u.player, "— who —") + "</select>")
+    + '<div class="seg" style="flex-wrap:wrap;margin-bottom:12px">' + roleBtns + "</div>"
+    + '<hr class="rule"><div class="btn-row"><div class="spacer"></div><button class="btn btn-primary" data-act="h-sc-add"' + (u.player ? "" : " disabled") + '>Record claim</button></div>');
+};
+
 /* ===================== handler ===================== */
 CT.helpers.handle = function (act, el) {
   var u = CT.helpers.ui;
@@ -262,6 +313,29 @@ CT.helpers.handle = function (act, el) {
     case "h-c-swear": CT.addContract(u.a, u.b, u.promise.trim()); u.open = null; return CT.render();
     case "h-ct-fulfill": CT.resolveContract(el.dataset.id, "fulfilled"); return CT.render();
     case "h-ct-break": CT.resolveContract(el.dataset.id, "broken", el.dataset.breaker); return CT.render();
+
+    // royal claim
+    case "h-open-royalclaim": return CT.helpers.openRoyalClaim();
+    case "h-rc-claimant": u.claimant = el.value; if (u.challenger === u.claimant) u.challenger = ""; return CT.render();
+    case "h-rc-crown": u.crown = el.dataset.c; return CT.render();
+    case "h-rc-challenger": u.challenger = el.value; return CT.render();
+    case "h-rc-take": return CT.helpers.applyRoyalTake();
+    case "h-rc-proved": return CT.helpers.applyRoyalProved();
+    case "h-rc-bluff": return CT.helpers.applyRoyalBluff();
+
+    // succession
+    case "h-open-succclaim": return CT.helpers.openSuccClaim();
+    case "h-sc-player": u.player = el.value; return CT.render();
+    case "h-sc-role": u.role = el.dataset.r; return CT.render();
+    case "h-sc-add": CT.addSuccessionClaim(u.player, u.role); u.open = null; return CT.render();
+
+    // throne panel controls
+    case "h-throne-set": el.value ? CT.setThroneController(el.dataset.crown, el.value, "manual") : null; return CT.render();
+    case "h-throne-clear": CT.clearThroneController(el.dataset.crown); return CT.render();
+    case "h-succ-open": CT.openSuccession(); return CT.render();
+    case "h-succ-close": CT.closeSuccession(); return CT.render();
+    case "h-succ-resolve": CT.resolveSuccessionClaim(el.dataset.id); return CT.render();
+    case "h-succ-remove": CT.removeSuccessionClaim(el.dataset.id); return CT.render();
   }
 };
 
