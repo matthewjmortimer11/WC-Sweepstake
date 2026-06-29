@@ -61,6 +61,10 @@
     WC.PEOPLE = PEOPLE;
     WC.YOU = YOU;
     WC.ownersOf = ownersOf;
+    WC.scotlandEliminated = function () {
+      var t = TEAMS.SCO;
+      return !!(t && t.alive === false);
+    };
     WC.SEGMENTS = SEGMENTS;
     WC.rate = rate;
     WC.FEE = d.fee;

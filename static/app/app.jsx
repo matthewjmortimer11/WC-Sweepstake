@@ -651,7 +651,8 @@ function App(){
       window.wcToast && window.wcToast((copy.kickoffToast || '{team} are kicking off.').replace('{team}', t ? t.name : myCode), 'confident');
     }
     var scoLive = fixtures.some(function(f){ return (f.a === 'SCO' || f.b === 'SCO') && ['live','halfTime'].indexOf(String(f.status||'').toLowerCase()) >= 0; });
-    if (scoLive) {
+    var scoIn = A_WC.TEAMS && A_WC.TEAMS.SCO && A_WC.TEAMS.SCO.alive !== false;
+    if (scoLive && scoIn) {
       try { if (sessionStorage.getItem('wc_sco_live')) return; sessionStorage.setItem('wc_sco_live', '1'); } catch (e) {}
       var c2 = window.WheeshtCopy || {};
       window.wcToast && window.wcToast(c2.scotlandMoment || 'Scotland are on.', 'scottish');
@@ -805,21 +806,35 @@ function App(){
         }
       }
       if(t.bias){
-        const scotMsgs=[
-          ['Scotland are in this tournament. Just so everyone is clear.','scottish'],
-          ['Scotland. Still here. Wheesht is cautiously optimistic — emphasis on cautious.','nervous'],
-          ['A gentle reminder that Scotland are participating. Wheesht thought you should know.','scottish'],
-          ['Scotland update: still in it. Wheesht is fine. Everything is fine.','confident'],
-          ['No one asked. Wheesht is mentioning Scotland anyway.','mischievous'],
-          ['Scotland are out there competing. Wheesht has feelings about this. Mixed feelings.','nervous'],
-          ['The homeland watch continues. Scotland. Present and accounted for.','scottish'],
-        ];
-        const sp=scotMsgs[(Math.random()*scotMsgs.length)|0];
-        setTimeout(()=>window.wcToast&&window.wcToast(sp[0],sp[1]),1600);
+        const c3 = window.WheeshtCopy || {};
+        const scoOut = A_WC.scotlandEliminated && A_WC.scotlandEliminated();
+        const scotMsgs = scoOut ? (c3.scotlandBiasOut || []) : (c3.scotlandBiasIn || []);
+        if (scotMsgs.length) {
+          const sp = scotMsgs[(Math.random() * scotMsgs.length) | 0];
+          setTimeout(function () { window.wcToast && window.wcToast(sp[0], sp[1]); }, scoOut ? 900 : 1600);
+        }
       }
     },650);
     return ()=>clearTimeout(id);
   },[flow,me&&me.id]); // eslint-disable-line
+
+  aEffect(function(){
+    if (flow !== 'app' || !t.bias || (A_S.quietMode && A_S.quietMode())) return;
+    var c = window.WheeshtCopy || {};
+    var primed = false;
+    var wasIn = null;
+    var unsub = A_S.subscribe(function(){
+      if (!A_WC.scotlandEliminated) return;
+      var out = A_WC.scotlandEliminated();
+      if (!primed) { wasIn = !out; primed = true; return; }
+      if (wasIn && out) {
+        wasIn = false;
+        try { if (sessionStorage.getItem('wc_sco_elim_live')) return; sessionStorage.setItem('wc_sco_elim_live', '1'); } catch (e) {}
+        window.wcToast && window.wcToast(c.scotlandEliminatedToast || 'Scotland are out. Wheesht is devastated.', 'crying');
+      }
+    });
+    return unsub;
+  }, [flow, t.bias]); // eslint-disable-line
 
   /* ---- Toast + confetti when the user's team gets a new result ---- */
   aEffect(()=>{

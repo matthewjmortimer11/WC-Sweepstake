@@ -47,6 +47,12 @@ function matchBanter(f, a, b) {
        'Scotland see off ' + other + '. Write it down. Frame it. Wheesht aye believed.',
        'The homeland delivers. ' + other + ' sent homeward tae think again.'
      ]), mood: 'scottish' };
+     if (WCa.scotlandEliminated && WCa.scotlandEliminated()) return { text: pick([
+       'Scotland are OUT. ' + other + ' ' + a + '–' + b + '. Wheesht is devastated. That is the entire mood.',
+       'The homeland are going home. Wheesht is greeting. Wheesht is definitely greeting.',
+       'Scotland eliminated. Wheesht had hope. Wheesht is not taking this well.',
+       'Scotland fall, and the dream dies with them. Wheesht is in mourning. Officially.'
+     ]), mood: 'crying' };
      return { text: pick([
        'Scotland fall to ' + other + '. Wheesht expected nothing and is somehow still disappointed.',
        'A gallant Scotland defeat — the most Scottish result there is. Wheesht endures.',
