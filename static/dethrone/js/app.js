@@ -87,36 +87,15 @@ function throneLabel() {
   return names.length ? names.join(" & ") : "Vacant";
 }
 
-/* ---- board ---- */
+/* ---- board: hand-drawn weathered map (see board.js) ---- */
 function boardPanel() {
-  var locs = {};
-  CT.LOCATIONS.forEach(function (l) { locs[l.id] = l; });
   var ap = CT.activePlayer();
-  var legal = (ap && ap.status === "active" && !CT.state.winner) ? CT.legalMoves(ap) : [];
-  function locCell(id) {
-    var l = locs[id];
-    var here = CT.state.players.filter(function (p) { return p.location === id; });
-    var tokens = here.map(playerToken).join("");
-    var isLegal = legal.indexOf(id) > -1;
-    var cls = "loc" + (l.throne ? " throne" : "") + (l.connector ? " connector" : "") + (l.danger ? " danger" : "") + (isLegal ? " legal" : "");
-    return '<div class="' + cls + '"' + (isLegal ? ' data-act="board-move" data-id="' + id + '" role="button" tabindex="0"' : ' data-id="' + id + '"') + '>'
-      + (isLegal ? '<span class="move-here">Move ' + CT.esc(ap.name) + ' here →</span>' : '')
-      + '<div class="loc-name">' + l.name + '</div>'
-      + '<div class="loc-theme">' + l.theme + '</div>'
-      + '<div class="conn">↔ ' + CT.CONNECTIONS[id].map(function (c) { return locs[c].name; }).join(", ") + '</div>'
-      + '<div class="tokens">' + tokens + '</div></div>';
-  }
-  return '<div class="panel"><div class="panel-head"><h2>The Kingdom</h2>'
-    + '<span class="faint" style="font-size:12px">Graveyard connects Tavern ↔ Barracks</span></div><hr class="rule">'
-    + '<div class="board"><div class="board-grid">'
-    + locCell("scrolls") + locCell("college") + locCell("tavern") + locCell("market") + locCell("throne") + locCell("barracks")
-    + '</div><div class="gy-row">' + locCell("graveyard") + '</div></div></div>';
-}
-function playerToken(p) {
-  var i = CT.state.players.indexOf(p);
-  var active = p.id === CT.activePlayer().id;
-  return '<span class="token' + (active ? " active" : "") + (p.status === "eliminated" ? " elim" : "") + '">'
-    + '<span class="dot" style="background:' + tokenColor(i) + '">' + initials(p.name) + '</span>' + CT.esc(p.name) + '</span>';
+  var hint = (ap && ap.status === "active" && !CT.state.winner)
+    ? "Glowing sites are within " + CT.esc(ap.name) + "’s reach — tap to move"
+    : "Graveyard connects Tavern ↔ Barracks";
+  return '<div class="panel board-panel"><div class="panel-head"><h2>The Kingdom</h2>'
+    + '<span class="faint" style="font-size:12px">' + hint + '</span></div><hr class="rule">'
+    + '<div class="map-wrap">' + CT.boardMapSVG() + '</div></div>';
 }
 
 /* ---- active player's location actions (§13) ---- */

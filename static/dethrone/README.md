@@ -21,6 +21,9 @@ refresh resumes the same game.
 
 ## What is implemented (Phases 1–2)
 
+### Phase 5 (in progress) — the board
+The kingdom is drawn as a **hand-illustrated, weathered campaign map** (pure inline SVG in `board.js` — no raster assets, fully scalable, offline). Aged vellum with grain/stains/fold-creases, a compass rose and title cartouche, inked roads between sites (with a bridge where the river crosses), and a living landscape: the Frostspine peaks, the Tangled Wood, the Barrow Fens, and Drake's Deep with its sea-serpent. Each site is a medallion with its own ink glyph; the **Throne** is the gold focal point, the **Graveyard** glows a sickly green. Player tokens are wax-seal discs; reachable sites pulse with a gold ring and move the active player on tap. Remaining Phase 5: playtest-report export, full 76 action cards, balance toggles.
+
 ### Phase 4 — Throne & Succession
 A **Throne & Succession** panel tracks the crown and the line of succession.
 - **Throne control (§23)**: King / Queen / Successor controllers, set manually or via the **Claim helper** (claimant + crown; unchallenged → crowned, or challenged → "proof valid" crowns them and the challenger loses a role / "bluff" costs the claimant a role). Claim order is recorded.
@@ -72,7 +75,7 @@ brief — guide and track, don't over-automate.
 
 ## Known limitations / not yet built
 
-- **Phase 5**: richer board art, exportable playtest report, full 76 action cards, balance toggles.
+- **Phase 5 (remaining)**: exportable playtest report, full 76 action cards, balance toggles. (Board art done.)
 - In an all-bot auto-play, Loyal can never win — bots don't perform the social actions (accuse / Call Out / banish) Loyal needs, so the Cursed bot always closes it out. Bots test the board/economy/win-conditions, not the social layer.
 - Action cards are the §27 starter set (~30); the data model already scales to 76.
 
