@@ -246,15 +246,16 @@ svg.map { width: 100%; height: auto; display: block; }
 .token.elim { opacity: .45; text-decoration: line-through; }
 
 /* ---------- player table ---------- */
-.players { display: grid; gap: var(--s3); grid-template-columns: minmax(0, 1fr); }
-@media (min-width: 760px) { .players { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+/* wrap on the *container* width (auto-fit), not the viewport — the court can sit
+   in a narrow right-hand column on desktop, where 2 forced columns would crush the cards */
+.players { display: grid; gap: var(--s3); grid-template-columns: repeat(auto-fit, minmax(270px, 1fr)); }
 .pcard { background: var(--p-0); border: 1px solid var(--line); border-radius: var(--r-card); padding: var(--s4); box-shadow: var(--e1); }
 .pcard.active { border-color: var(--gold); box-shadow: var(--e2); }
 .pcard.elim { opacity: .55; }
 .pcard .ptop { display: flex; align-items: center; justify-content: space-between; gap: var(--s2); }
 .pcard .pname { font-family: var(--serif); font-size: 19px; font-weight: 600; display: flex; align-items: center; gap: var(--s2); }
 .pcard .prole { font-size: 13px; color: var(--ink-soft); margin-top: 2px; }
-.pstats { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--s2); margin: var(--s3) 0; }
+.pstats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--s2); margin: var(--s3) 0; }
 .pstat { background: var(--p-1); border: 1px solid var(--line); border-radius: var(--r-tag); padding: 5px 8px; text-align: center; }
 .pstat .k { font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-faint); font-weight: 700; }
 .pstat .v { font-family: var(--serif); font-size: 19px; }
