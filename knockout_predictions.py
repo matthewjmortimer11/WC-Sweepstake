@@ -61,12 +61,19 @@ def stage_in_range(stage: str, from_stage: str, to_stage: str) -> bool:
     return _STAGE_INDEX[from_stage] <= si <= _STAGE_INDEX[to_stage]
 
 
-def _fixture_pair_ready(f: Dict[str, Any]) -> bool:
+def _known_team(code: Any, team_map: Dict[str, Dict[str, Any]]) -> bool:
+    c = str(code or "").strip()
+    return bool(c) and c not in ("TBD", "UNK") and c in team_map
+
+
+def _fixture_pair_ready(f: Dict[str, Any], team_map: Optional[Dict[str, Dict[str, Any]]] = None) -> bool:
     a, b = f.get("a"), f.get("b")
     if not a or not b:
         return False
-    if a == "TBD" or b == "TBD":
+    if a == "TBD" or b == "TBD" or a == "UNK" or b == "UNK":
         return False
+    if team_map is not None:
+        return _known_team(a, team_map) and _known_team(b, team_map)
     return True
 
 
@@ -104,7 +111,7 @@ def knockout_prediction_markets(
     candidates = [
         f for f in fixtures or []
         if stage_in_range(str(f.get("stage") or ""), from_st, to_st)
-        and _fixture_pair_ready(f)
+        and _fixture_pair_ready(f, team_map)
     ]
     candidates.sort(key=_sort_key)
 

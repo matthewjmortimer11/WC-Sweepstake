@@ -60,6 +60,18 @@ def test_skips_tbd_and_out_of_range():
     assert out == []
 
 
+def test_skips_unk_teams():
+    fixtures = [_fx("UNK", "UNK", stage="r16", fid="bad-1")]
+    teams = {"AAA": _team("AAA"), "BBB": _team("BBB")}
+    out = kp.knockout_prediction_markets(
+        fixtures, teams,
+        {"enabled": True, "fromStage": "r16", "toStage": "final", "points": 5},
+        status_is_done=standings._fixture_finished,
+        winner_of=standings._winner_of,
+    )
+    assert out == []
+
+
 def test_r32_to_final_range():
     fixtures = [
         _fx("A1", "A2", stage="r32", fid="r32-1"),

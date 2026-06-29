@@ -2551,6 +2551,14 @@ async def set_pick(
             fix = next((f for f in fixtures if str(f.get("id") or "") == fid), None)
             if not _fixture_pick_open(fix):
                 raise HTTPException(status_code=400, detail="This pick is locked — kick-off has passed")
+            val = payload.value
+            if val is not None and val != "" and val != []:
+                opts = market.get("options") or []
+                kind = market.get("kind")
+                if kind == "team" and (val not in opts or val in ("UNK", "TBD")):
+                    raise HTTPException(status_code=400, detail="Pick must be one of the teams in this tie")
+                if kind == "scoreline" and isinstance(val, str) and not re.fullmatch(r"\d+-\d+", val):
+                    raise HTTPException(status_code=400, detail="Pick must be a scoreline like 2-1")
         row = await session.get(Participant, participant_id)
         if row is None or row.league_id != league.id:
             # Seeded base entry making its first pick → materialise a DB row.

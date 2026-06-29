@@ -786,7 +786,9 @@ function KnockoutBracketPredAdmin() {
   }
   var cfg = Sa.knockoutPredictions ? Sa.knockoutPredictions() : { enabled: false, fromStage: 'r16', toStage: 'final', type: 'winner', points: 5 };
   var ready = (WCa.FIXTURES || []).filter(function (f) {
-    return cfg.enabled && stageInRange(f.stage, cfg.fromStage, cfg.toStage) && f.a && f.b && f.a !== 'TBD' && f.b !== 'TBD';
+    return cfg.enabled && stageInRange(f.stage, cfg.fromStage, cfg.toStage)
+      && f.a && f.b && f.a !== 'TBD' && f.b !== 'TBD' && f.a !== 'UNK' && f.b !== 'UNK'
+      && WCa.TEAMS[f.a] && WCa.TEAMS[f.b];
   }).length;
   var sel = { width: '100%', border: '2px solid var(--ink)', borderRadius: 11, padding: '9px 11px', fontFamily: 'var(--body)', fontWeight: 700, fontSize: 13, outline: 'none', marginTop: 6, background: '#fff' };
   function save(patch) {

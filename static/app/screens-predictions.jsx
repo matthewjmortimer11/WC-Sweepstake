@@ -17,6 +17,17 @@ function isKnockoutBracketMarket(m) {
   return String((m && m.key) || '').indexOf('ko_') === 0;
 }
 
+function koMarketReady(m) {
+  if (!isKnockoutBracketMarket(m)) return true;
+  var opts = m.options || [];
+  if (opts.length < 2) return false;
+  for (var i = 0; i < opts.length; i++) {
+    var c = opts[i];
+    if (!c || c === 'UNK' || c === 'TBD' || !WCp.TEAMS[c]) return false;
+  }
+  return true;
+}
+
 function isResolved(m) {
   if (isPerFixtureMarket(m)) {
     if (m.answer != null && (m.kind !== 'team2' || (Array.isArray(m.answer) && m.answer.length > 0))) return true;
@@ -154,12 +165,17 @@ function Market(props) {
   const isDm = !!(m.key && m.key.startsWith('dm_'));
   const isKo = !!(m.key && m.key.startsWith('ko_'));
   const isPerFix = isDm || isKo;
+  const isFixtureWinner = isPerFix && m.kind === 'team' && !isTwo;
   // Per-fixture markets lock at kick-off, independent of the global predictions lock
   const fixLive = isPerFix && fixtureKickedOff(m);
   const locked = isPerFix ? fixLive : !!props.locked;
   const resolved = isResolved(m);
   const pick = me.picks ? me.picks[m.key] : null;
-  const picked = (id) => isTwo ? (Array.isArray(pick) && pick.indexOf(id) >= 0) : pick === id;
+  const picked = (id, idx) => {
+    if (isTwo) return Array.isArray(pick) && pick.indexOf(id) >= 0;
+    if (isFixtureWinner && idx != null) return pick === id && (m.options || [])[idx] === id;
+    return pick === id;
+  };
   const gotIt = resolved && (isTwo
     ? (Array.isArray(pick) && Array.isArray(m.answer) && pick.length === m.answer.length && pick.every(id => m.answer.indexOf(id) >= 0))
     : isNumber ? Number(pick) === Number(m.answer)
@@ -167,8 +183,9 @@ function Market(props) {
   const [teamQ, setTeamQ] = pState('');
   const presetCodes = isTeam ? new Set(m.options || []) : new Set();
 
-  function choose(id) {
+  function choose(id, idx) {
     if (resolved || locked) return;
+    if (isFixtureWinner && idx != null && (m.options || [])[idx] !== id) return;
     let made = false;
     if (isTwo) {
       let arr = Array.isArray(pick) ? pick.slice() : [];
@@ -176,7 +193,7 @@ function Market(props) {
       else { arr.push(id); if (arr.length > 2) arr.shift(); made = true; }
       onPick(m.key, arr);
     } else {
-      const toggling = picked(id);
+      const toggling = picked(id, idx);
       onPick(m.key, toggling ? null : id);
       made = !toggling;
     }
@@ -187,7 +204,7 @@ function Market(props) {
     }
   }
 
-  const teamResults = isTeam && !resolved && teamQ.trim()
+  const teamResults = isTeam && !isFixtureWinner && !resolved && teamQ.trim()
     ? WCp.TEAM_LIST.filter(t => !presetCodes.has(t.code) && (t.name.toLowerCase().indexOf(teamQ.toLowerCase()) >= 0 || t.code.toLowerCase().indexOf(teamQ.toLowerCase()) >= 0)).slice(0, 6)
     : [];
 
@@ -239,7 +256,7 @@ function Market(props) {
       <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
         {(m.options || []).map((opt, i) => {
           const o = optLabel(m, opt);
-          const on = picked(o.id);
+          const on = picked(o.id, i);
           const isAnswer = resolved && (isTwo ? (Array.isArray(m.answer) && m.answer.indexOf(o.id) >= 0) : o.id === m.answer);
           const wrong = resolved && on && !isAnswer;
           let bg = '#fff', bd = 'var(--line)';
@@ -247,7 +264,7 @@ function Market(props) {
           else if (wrong) { bg = 'rgba(232,39,42,.08)'; bd = 'var(--red)'; }
           else if (on && !resolved) { bg = 'var(--yellow)'; bd = 'var(--ink)'; }
           return (
-            <button key={i} onClick={() => choose(o.id)} disabled={resolved || locked} style={{
+            <button key={m.key + '-' + i + '-' + o.id} onClick={() => choose(o.id, i)} disabled={resolved || locked} style={{
               display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', cursor: (resolved || locked) ? 'default' : 'pointer',
               textAlign: 'left', border: '2.5px solid ' + bd, borderRadius: 13, background: bg, fontFamily: 'var(--body)', transition: 'all .12s'
             }}>
@@ -264,7 +281,7 @@ function Market(props) {
         })}
       </div>
       </>}
-      {isTeam && !resolved && !locked && !m.key.startsWith('dm_') && (
+      {isTeam && !resolved && !locked && !isFixtureWinner && (
         <div style={{ marginTop: 10, borderTop: '1.5px solid var(--line)', paddingTop: 10 }}>
           <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--ink2)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '.05em' }}>Search all 48 teams</div>
           <input
@@ -420,7 +437,7 @@ function PredictionsScreen(props) {
       </Cp>
     </div>;
   }
-  const markets = Sp.visiblePredictions ? Sp.visiblePredictions() : (WCp.predictions || Sp.PREDICTIONS).filter(m => ((WCp.meta && WCp.meta.hiddenPredictions) || []).indexOf(m.key) < 0);
+  const markets = (Sp.visiblePredictions ? Sp.visiblePredictions() : (WCp.predictions || Sp.PREDICTIONS).filter(m => ((WCp.meta && WCp.meta.hiddenPredictions) || []).indexOf(m.key) < 0)).filter(koMarketReady);
   const koCfg = (WCp.meta && WCp.meta.knockoutPredictions) || {};
   const koEnabled = !!koCfg.enabled;
   const dmTs = k => { const p = String(k).split('_'); const n = parseInt(p[p.length - 1], 10); return isFinite(n) ? n : 0; };
@@ -440,7 +457,7 @@ function PredictionsScreen(props) {
   const graded = markets.filter(m => isResolved(m));
   const perFixKickedOff = function (m) { return isPerFixtureMarket(m) && fixtureKickedOff(m); };
   const openStatic = open.filter(function (m) { return !isPerFixtureMarket(m); });
-  const openKo = sortKoMarkets(open.filter(isKnockoutBracketMarket));
+  const openKo = sortKoMarkets(open.filter(isKnockoutBracketMarket).filter(koMarketReady));
   const openDm = open.filter(function (m) { return String(m.key || '').indexOf('dm_') === 0; });
   // Per-fixture markets that kicked off without a pick don't count as "missing"
   const countableMarkets = markets.filter(m => !perFixKickedOff(m) || pickComplete(m, me.picks || {}));
@@ -487,6 +504,11 @@ function PredictionsScreen(props) {
         <div style={{ fontSize: 10.5, fontWeight: 900, letterSpacing: '.07em', textTransform: 'uppercase', color: 'var(--green)' }}>All calls made</div>
         <div className="dh" style={{ fontSize: 18, marginTop: 3 }}>Full card submitted.</div>
         <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--ink2)', marginTop: 3 }}>You can still change picks until they lock. Wheesht has the draft in pencil.</div>
+      </Cp>}
+      {koEnabled && openKo.length === 0 && <Cp flat style={{ marginBottom: 12, padding: '11px 13px', background: 'rgba(26,26,26,.04)' }}>
+        <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--ink2)', lineHeight: 1.4 }}>
+          Knockout picks appear here once the feed confirms both teams for each tie. R32 ties are ready now if your range includes Round of 32.
+        </div>
       </Cp>}
       {openKo.length > 0 && <>
         <SHp aside={openKo.filter(function (m) { return !pickComplete(m, me.picks || {}); }).length ? openKo.filter(function (m) { return !pickComplete(m, me.picks || {}); }).length + ' left' : 'all in'}>
