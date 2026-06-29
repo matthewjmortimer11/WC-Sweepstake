@@ -145,6 +145,13 @@ h3 { font-size: 17px; }
 .btn:disabled { opacity: .45; cursor: not-allowed; }
 .btn-row { display: flex; flex-wrap: wrap; gap: var(--s2); }
 
+/* Play / Test mode toggle (topbar) */
+.mode-toggle { border: 1px solid var(--p-4); background: var(--p-1); color: var(--ink-soft); font-weight: 700; border-radius: var(--r-pill); }
+.mode-toggle:hover { background: var(--p-2); }
+.mode-toggle.on { background: var(--ink); color: var(--p-0); border-color: var(--ink); }
+.mode-toggle::before { content: "● "; color: var(--ink-faint); font-size: 10px; }
+.mode-toggle.on::before { content: "● "; color: var(--gold-bright); }
+
 /* tiny round +/- steppers */
 .step { width: 30px; height: 30px; padding: 0; border-radius: var(--r-pill);
   border: 1px solid var(--p-4); background: var(--p-1); color: var(--ink); font-weight: 700; cursor: pointer; font-size: 16px; }

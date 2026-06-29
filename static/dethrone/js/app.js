@@ -4,6 +4,16 @@ window.CT = window.CT || {};
 CT.ui = { privateFor: null, privateRevealed: false, showImport: false,
   roleDiscardFor: null, roleDiscardRevealed: false, handFixFor: null, keepOne: null };
 
+/* Play vs Test mode — Test reveals referee & per-player override tools (§32, §35).
+ * Persisted separately so it applies to the start/setup screens too. */
+CT.TESTMODE_KEY = "cursed-throne-testmode";
+CT.testMode = false;
+CT.setTestMode = function (v) {
+  CT.testMode = !!v;
+  try { localStorage.setItem(CT.TESTMODE_KEY, v ? "1" : "0"); } catch (e) {}
+  CT.render();
+};
+
 var TOKEN_COLORS = ["#8c2f23", "#a8842c", "#3f6b4a", "#3a5a78", "#6e4a86", "#9c5a2a"];
 function tokenColor(i) { return TOKEN_COLORS[i % TOKEN_COLORS.length]; }
 function initials(name) { return (name || "?").trim().slice(0, 1).toUpperCase() || "?"; }
@@ -18,15 +28,16 @@ CT.render = function () {
 };
 
 function shell(inner) {
+  var testToggle = '<button class="btn btn-sm mode-toggle' + (CT.testMode ? " on" : "") + '" data-act="toggle-test" '
+    + 'title="Show referee &amp; override tools">' + (CT.testMode ? "🔧 Test mode" : "Play mode") + '</button>';
   return '<div class="app">'
     + '<div class="topbar"><div class="brand"><h1>The Cursed Throne</h1>'
-    + '<span class="seal">Playtest Ledger</span></div>'
-    + (CT.state ? '<div class="btn-row">'
-        + '<button class="btn btn-ghost btn-sm" data-act="export">Export</button>'
+    + '<span class="seal">' + (CT.testMode ? "Playtest Ledger" : "Court of Whispers") + '</span></div>'
+    + '<div class="btn-row">' + testToggle
+    + (CT.state ? '<button class="btn btn-ghost btn-sm" data-act="export">Export</button>'
         + '<button class="btn btn-ghost btn-sm" data-act="show-import">Import</button>'
-        + '<button class="btn btn-secondary btn-sm" data-act="new-game">New game</button>'
-        + '</div>' : "")
-    + '</div>' + inner + '</div>';
+        + '<button class="btn btn-secondary btn-sm" data-act="new-game">New game</button>' : "")
+    + '</div></div>' + inner + '</div>';
 }
 
 /* ============ start (empty state) ============ */
@@ -47,7 +58,7 @@ function gameScreen() {
   return winBanner()
     + trackers()
     + '<div class="grid grid-main">'
-    + '<div>' + boardPanel() + actionsPanel() + parleyPanel() + throneSuccPanel() + manualGlobal() + pactsPanel() + '</div>'
+    + '<div>' + boardPanel() + actionsPanel() + parleyPanel() + throneSuccPanel() + (CT.testMode ? manualGlobal() : "") + pactsPanel() + '</div>'
     + '<div>' + playersPanel() + logPanel() + '</div>'
     + '</div>';
 }
@@ -174,21 +185,22 @@ function playerCard(p) {
     + pstat("Gold", p.gold, "gold", p.id, "gold")
     + pstat("Rep", p.rep, "rep", p.id, "rep")
     + '<div class="pstat"><div class="k">Status</div><div class="v" style="font-size:14px">' + (p.status === "active" ? "Active" : "Out") + '</div>'
-    + '<div class="stepper"><button class="btn btn-ghost btn-sm" data-act="toggle-elim" data-id="' + p.id + '">' + (p.status === "active" ? "Eliminate" : "Restore") + '</button></div></div>'
+    + (CT.testMode ? '<div class="stepper"><button class="btn btn-ghost btn-sm" data-act="toggle-elim" data-id="' + p.id + '">' + (p.status === "active" ? "Eliminate" : "Restore") + '</button></div>' : "") + '</div>'
     + '</div>'
     + '<div class="pmeta">' + meta.join("") + '</div>'
     + '<div class="row" style="margin-top:10px;gap:8px">'
     + '<label class="field" style="margin:0;flex:1"><span class="lbl" style="font-size:11px">Move to</span>'
     + '<select data-act="move-player" data-id="' + p.id + '">' + moveOpts + '</select></label>'
-    + '<button class="btn btn-danger btn-sm" data-act="lose-role" data-id="' + p.id + '" style="align-self:end"'
-    + (p.status !== "active" || CT.state.winner ? " disabled" : "") + '>Lose a role</button>'
+    + (CT.testMode ? '<button class="btn btn-danger btn-sm" data-act="lose-role" data-id="' + p.id + '" style="align-self:end"'
+        + (p.status !== "active" || CT.state.winner ? " disabled" : "") + '>Lose a role</button>' : "")
     + '</div>'
     + '</div>';
 }
 function pstat(label, value, kind, pid, key) {
   return '<div class="pstat"><div class="k">' + label + '</div><div class="v">' + value + '</div>'
-    + '<div class="stepper"><button class="step" data-act="adj" data-id="' + pid + '" data-key="' + key + '" data-d="-1">−</button>'
-    + '<button class="step" data-act="adj" data-id="' + pid + '" data-key="' + key + '" data-d="1">+</button></div></div>';
+    + (CT.testMode ? '<div class="stepper"><button class="step" data-act="adj" data-id="' + pid + '" data-key="' + key + '" data-d="-1">−</button>'
+        + '<button class="step" data-act="adj" data-id="' + pid + '" data-key="' + key + '" data-d="1">+</button></div>' : "")
+    + '</div>';
 }
 
 /* ---- Phase 3: social helper launchers ---- */
@@ -428,6 +440,7 @@ CT.handleAction = function (act, el, ev) {
   if (act.indexOf("h-") === 0) { CT.helpers.handle(act, el); return; }
   switch (act) {
     case "start-setup": CT.setup.begin(); break;
+    case "toggle-test": CT.setTestMode(!CT.testMode); break;
     case "new-game":
       if (confirm("Start a new game? The current game is saved in your export but will be cleared.")) { CT.resetGame(); CT.setup.begin(); }
       break;
@@ -546,6 +559,7 @@ document.addEventListener("input", function (ev) {
 });
 
 document.addEventListener("DOMContentLoaded", function () {
+  try { CT.testMode = localStorage.getItem(CT.TESTMODE_KEY) === "1"; } catch (e) {}
   CT.load(); // resume if present
   CT.render();
 });

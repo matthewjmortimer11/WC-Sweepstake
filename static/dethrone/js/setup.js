@@ -21,8 +21,8 @@ CT.setup.begin = function () {
   CT.setup.active = true;
   CT.setup.step = "count";
   CT.setup.names = ["", "", "", "", "", ""];
-  // default to a solo test: seat 1 is you, the rest are bots
-  CT.setup.bots = [false, true, true, true, true, true];
+  // default to a proper game: everyone human (flip seats to Bot to test solo)
+  CT.setup.bots = [false, false, false, false, false, false];
   CT.render();
 };
 
