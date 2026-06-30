@@ -1,8 +1,9 @@
 /* The Cursed Throne — main render + wiring (Phase 1) */
 window.CT = window.CT || {};
 
-CT.ui = { privateFor: null, privateRevealed: false, showImport: false,
-  roleDiscardFor: null, roleDiscardRevealed: false, handFixFor: null, keepOne: null, playCard: null };
+CT.ui = { privateFor: null, privateRevealed: false, showImport: false, showGuide: false,
+  roleDiscardFor: null, roleDiscardRevealed: false, handFixFor: null, keepOne: null, playCard: null,
+  logFilter: "all" };
 
 /* Play vs Test mode — Test reveals referee & per-player override tools (§32, §35).
  * Persisted separately so it applies to the start/setup screens too. */
@@ -64,7 +65,8 @@ function shell(inner) {
     + '<div class="topbar"><div class="brand"><h1>The Cursed Throne</h1>'
     + '<span class="seal">' + (CT.net && CT.net.routeCode ? "Room " + CT.net.routeCode : (CT.testMode ? "Playtest Ledger" : "Court of Whispers")) + '</span></div>'
     + '<div class="btn-row">' + testToggle
-    + (CT.state ? '<button class="btn btn-ghost btn-sm" data-act="export-report">Report</button>'
+    + (CT.state ? '<button class="btn btn-ghost btn-sm" data-act="show-guide">Guide</button>'
+        + '<button class="btn btn-ghost btn-sm" data-act="export-report">Report</button>'
         + '<button class="btn btn-ghost btn-sm" data-act="export">Export</button>'
         + '<button class="btn btn-ghost btn-sm" data-act="show-import">Import</button>'
         + '<button class="btn btn-secondary btn-sm" data-act="new-game">New game</button>' : "")
@@ -95,24 +97,40 @@ function onlineLobbyScreen() {
   var room = CT.net.room, you = CT.net.you || {}, settings = room.settings || {};
   var count = settings.playerCount || 5;
   var players = (room.players || []).map(function (p) {
-    return '<li>' + CT.esc(p.name) + (p.isHost ? ' <span class="tag gold">host</span>' : '')
-      + (p.isBot ? ' <span class="tag">bot</span>' : '')
-      + (p.connected ? '' : ' <span class="tag">away</span>') + '</li>';
+    var kick = you.isHost && !p.isHost && p.id !== you.id
+      ? ' <button class="btn btn-ghost btn-sm" data-act="kick-player" data-id="' + p.id + '" title="Remove from lobby">×</button>'
+      : "";
+    return '<li class="lobby-player">' + CT.esc(p.name)
+      + (p.isHost ? ' <span class="tag gold">host</span>' : "")
+      + (p.isBot ? ' <span class="tag">bot</span>' : "")
+      + (p.connected ? ' <span class="tag" style="opacity:.6">here</span>' : ' <span class="tag">away</span>')
+      + kick + "</li>";
   }).join("") || '<li class="muted">Waiting for players…</li>';
   var countBtns = [4, 5, 6].map(function (c) {
     return '<button aria-pressed="' + (count === c) + '" data-act="lobby-count" data-n="' + c + '"' + (you.isHost ? "" : " disabled") + '>' + c + '</button>';
   }).join("");
   var connected = (room.players || []).filter(function (p) { return p.connected || p.isBot; }).length;
   var canDeal = you.isHost && connected >= count;
+  var waitMsg = "";
+  if (!you.isHost) {
+    waitMsg = '<div class="host-wait-banner">Waiting for the host to deal roles'
+      + (connected < count ? " (" + connected + "/" + count + " players here)" : "…") + "</div>";
+  } else if (connected < count) {
+    waitMsg = '<div class="host-wait-banner">Need ' + (count - connected) + " more player"
+      + (count - connected === 1 ? "" : "s") + ' — share the invite link or fill with bots.</div>';
+  }
   return '<div class="panel" style="max-width:560px;margin:24px auto">'
     + '<div class="eyebrow">Online room · <strong>' + CT.esc(room.code) + '</strong></div>'
     + '<h1 style="margin-top:6px">The court gathers</h1>'
+    + waitMsg
     + '<hr class="rule">'
+    + '<div class="btn-row" style="margin-bottom:12px">'
+    + '<button class="btn btn-ghost btn-sm" data-act="show-guide">Host playtest guide</button>'
+    + '<button class="btn btn-secondary btn-sm" data-act="copy-invite">Copy invite link</button></div>'
     + '<label class="field"><span class="lbl">Your name</span>'
     + '<input type="text" data-act="lobby-name" data-fkey="lobby-name" value="' + CT.esc(you.name || CT.net.playerName()) + '" autocomplete="off"></label>'
-    + '<div class="btn-row" style="margin-bottom:16px"><button class="btn btn-secondary btn-sm" data-act="copy-invite">Copy invite link</button></div>'
     + '<p class="muted" style="font-size:14px">Players (' + connected + ' / ' + count + ')</p>'
-    + '<ul class="stack" style="margin:8px 0 16px;padding-left:20px">' + players + '</ul>'
+    + '<ul class="stack lobby-list" style="margin:8px 0 16px;padding-left:0;list-style:none">' + players + '</ul>'
     + '<p class="muted" style="font-size:13px">Seats for this game</p>'
     + '<div class="seg" style="margin:8px 0 16px">' + countBtns + '</div>'
     + (you.isHost ? '<h3 style="margin:16px 0 8px">Balance toggles</h3>'
@@ -131,11 +149,16 @@ function onlineSetupScreen() {
   if (setup.setupReady) {
     var all = setup.allReady;
     var hostBegin = CT.isHost() && all;
+    var statusList = (setup.playerStatus || []).map(function (ps) {
+      return '<li>' + CT.esc(ps.name) + (ps.setupReady ? ' <span class="tag gold">ready</span>' : ' <span class="tag">choosing…</span>') + '</li>';
+    }).join("");
     return '<div class="panel" style="max-width:560px;margin:24px auto">'
       + '<div class="eyebrow">Setup</div><h1>Public role chosen</h1>'
-      + '<p class="muted">Waiting for ' + (all ? "the host to begin" : "other players to choose") + '…</p>'
+      + '<p class="muted">' + (all ? "Everyone is ready." : "Waiting for others to choose a public role…") + '</p>'
+      + '<ul class="stack" style="margin:12px 0;padding-left:20px;font-size:14px">' + statusList + '</ul>'
       + (hostBegin ? '<div class="seg" style="margin:16px 0"><button aria-pressed="true" data-act="first-mode" data-m="random">Random first player</button></div>'
-        + '<div class="btn-row"><button class="btn btn-gold" data-act="begin-online">Begin the game ✦</button></div>' : "")
+        + '<div class="btn-row"><button class="btn btn-gold" data-act="begin-online">Begin the game ✦</button></div>'
+        : '<div class="host-wait-banner">' + (CT.isHost() ? "Waiting for all players to finish choosing." : "Waiting for the host to begin…") + '</div>')
       + '</div>';
   }
   var dealt = setup.dealtRoleIds || [];
@@ -163,11 +186,25 @@ function onlineSetupScreen() {
 function gameScreen() {
   var s = CT.state;
   return winBanner()
+    + handLimitBanner()
     + trackers()
     + '<div class="grid grid-main">'
     + '<div>' + boardPanel() + actionsPanel() + parleyPanel() + throneSuccPanel() + (CT.testMode ? manualGlobal() : "") + pactsPanel() + '</div>'
     + '<div>' + playersPanel() + logPanel() + '</div>'
     + '</div>';
+}
+
+function handLimitBanner() {
+  if (CT.state.winner) return "";
+  var ap = CT.activePlayer();
+  if (!ap || ap.status !== "active") return "";
+  var isMyTurn = !CT.isOnline() || ap.id === CT.myId();
+  if (!isMyTurn || !CT.overHandLimit(ap)) return "";
+  var limit = CT.getRules().HAND_LIMIT;
+  return '<div class="hand-limit-banner" role="alert">'
+    + '<strong>Hand limit:</strong> discard to ' + limit + ' cards before ending your turn '
+    + '(' + ap.actionCardIds.length + ' now). '
+    + '<button class="btn btn-gold btn-sm" data-act="fix-hand" data-id="' + ap.id + '">Discard now</button></div>';
 }
 
 function winBanner() {
@@ -221,12 +258,13 @@ function boardPanel() {
 function actionsPanel() {
   var p = CT.activePlayer();
   if (!p) return "";
-  var isMyTurn = !CT.isOnline() || p.id === CT.myId();
-  var loc = CT.locationById(p.location);
-  var acts = CT.LOCATION_ACTIONS[p.location] || [];
   var over = CT.overHandLimit(p);
+  var isMyTurn = !CT.isOnline() || p.id === CT.myId();
+  var blockEnd = over && isMyTurn;
 
   var disabled = CT.state.winner || p.status !== "active" || (CT.isOnline() && !isMyTurn);
+  var loc = CT.locationById(p.location);
+  var acts = CT.LOCATION_ACTIONS[p.location] || [];
   var buttons = acts.map(function (a) {
     var cant = disabled || p.gold < (a.cost || 0)
       || (a.requiresThrone && p.id !== CT.state.throne.kingControllerId && p.id !== CT.state.throne.queenControllerId)
@@ -259,15 +297,20 @@ function actionsPanel() {
         + '<button class="btn btn-secondary btn-sm" data-act="fix-hand" data-id="' + p.id + '">Discard down</button></div>' : "")
     + '<div class="btn-row" style="margin-top:14px"><span class="faint" style="font-size:12px;align-self:center">'
     + (CT.isOnline() && !isMyTurn ? "Waiting for " + CT.esc(p.name) + "…" : "Movement & actions can also be overridden below.") + '</span>'
-    + '<div class="spacer"></div><button class="btn btn-secondary" data-act="end-turn"' + (CT.state.winner ? " disabled" : "") + '>End turn →</button></div>'
+    + '<div class="spacer"></div><button class="btn btn-secondary" data-act="end-turn"'
+    + (CT.state.winner || blockEnd ? " disabled" : "") + (blockEnd ? ' title="Discard down first"' : "")
+    + '>End turn →</button></div>'
     + '</div>';
 }
 
 /* ---- players panel (public table §30 + manual controls §32) ---- */
 function playersPanel() {
+  var ap = CT.activePlayer();
+  var blockEnd = ap && CT.overHandLimit(ap) && (!CT.isOnline() || ap.id === CT.myId());
   var cards = CT.state.players.map(playerCard).join("");
   return '<div class="panel"><div class="panel-head"><h2>The Court</h2>'
-    + '<button class="btn btn-secondary btn-sm" data-act="end-turn"' + (CT.state.winner ? " disabled" : "") + '>End turn →</button>'
+    + '<button class="btn btn-secondary btn-sm" data-act="end-turn"'
+    + (CT.state.winner || blockEnd ? " disabled" : "") + '>End turn →</button>'
     + '</div><hr class="rule"><div class="players">' + cards + '</div></div>';
 }
 function playerCard(p) {
@@ -414,18 +457,35 @@ function manualGlobal() {
 }
 
 /* ---- log (§34) ---- */
+var LOG_FILTERS = [
+  { id: "all", label: "All" },
+  { id: "event", label: "Events" },
+  { id: "corruption", label: "Corruption" },
+  { id: "system", label: "System" },
+  { id: "note", label: "Notes" },
+];
+
 function logPanel() {
-  var entries = CT.state.log.map(function (e) {
-    return '<div class="entry ' + e.kind + '"><span class="when">R' + e.round + ' · ' + e.label + '</span>'
-      + '<span class="what">' + CT.esc(e.text) + '</span></div>';
+  var filt = CT.ui.logFilter || "all";
+  var entries = CT.state.log.filter(function (e) {
+    return filt === "all" || e.kind === filt;
+  }).map(function (e) {
+    var kindLbl = e.kind !== "event" ? ' <span class="log-kind">' + e.kind + "</span>" : "";
+    return '<div class="entry ' + e.kind + '"><span class="when">R' + e.round + " · " + e.label + kindLbl + '</span>'
+      + '<span class="what">' + CT.esc(e.text) + "</span></div>";
+  }).join("");
+  var filters = LOG_FILTERS.map(function (f) {
+    return '<button class="btn btn-sm log-filter' + (filt === f.id ? " on" : "") + '" data-act="log-filter" data-f="' + f.id + '">' + f.label + "</button>";
   }).join("");
   return '<div class="panel"><div class="panel-head"><h2>Chronicle</h2>'
-    + '<span class="faint" style="font-size:12px">' + CT.state.log.length + ' entries</span></div><hr class="rule">'
-    + '<div class="log">' + (entries || '<div class="empty">Nothing has happened yet.</div>') + '</div></div>';
+    + '<span class="faint" style="font-size:12px">' + CT.state.log.length + " entries</span></div>"
+    + '<div class="log-filters">' + filters + "</div><hr class="rule">"
+    + '<div class="log">' + (entries || '<div class="empty">No entries for this filter.</div>') + "</div></div>";
 }
 
 /* ============ overlays (private view, import) ============ */
 function overlays() {
+  if (CT.ui.showGuide) return playtestGuideView();
   if (CT.ui.playCard) return playCardView();
   if (CT.ui.privateFor) return privateView();
   if (CT.ui.roleDiscardFor) return roleDiscardView();
@@ -551,6 +611,16 @@ function privateView() {
     + '</div></div>';
 }
 
+function playtestGuideView() {
+  return '<div class="scrim"><div class="modal" style="max-width:560px;max-height:85vh;overflow:auto">'
+    + '<div class="eyebrow">Phase 7 · table playtest</div>'
+    + '<h2 style="margin:6px 0 12px">Host playtest guide</h2>'
+    + (typeof CT.playtestGuideHtml === "function" ? CT.playtestGuideHtml() : "")
+    + '<p class="muted" style="font-size:13px;margin-top:12px">Full checklist: <code>PLAYTEST.md</code> in the app folder.</p>'
+    + '<div class="btn-row" style="margin-top:16px"><div class="spacer"></div>'
+    + '<button class="btn btn-primary" data-act="close-guide">Close</button></div></div></div>';
+}
+
 function playCardView() {
   var u = CT.ui.playCard;
   if (!u) return "";
@@ -597,10 +667,18 @@ CT.handleAction = function (act, el, ev) {
   if (CT.setup.active && CT.setup.handle && setupActs[act]) { CT.setup.handle(act, el); return; }
   if (act.indexOf("h-") === 0) { CT.helpers.handle(act, el); return; }
   switch (act) {
+    case "log-filter":
+      CT.ui.logFilter = el.dataset.f;
+      CT.render(); break;
     case "create-room":
       CT.net.createRoom(5);
       break;
     case "copy-invite": CT.net.copyInvite(); break;
+    case "show-guide": CT.ui.showGuide = true; CT.render(); break;
+    case "close-guide": CT.ui.showGuide = false; CT.render(); break;
+    case "kick-player":
+      if (CT.isHost()) CT.net.send({ type: "kickPlayer", playerId: el.dataset.id });
+      break;
     case "lobby-count":
       if (CT.isHost()) CT.net.send({ type: "setPlayerCount", playerCount: +el.dataset.n });
       break;
@@ -625,7 +703,13 @@ CT.handleAction = function (act, el, ev) {
       break;
     case "end-turn":
       if (CT.netAction({ type: "endTurn" })) break;
-      CT.endTurn(); CT.render(); break;
+      var et = CT.endTurn();
+      if (et && !et.ok) {
+        CT.showToast(et.msg);
+        var ap = CT.activePlayer();
+        if (ap && CT.overHandLimit(ap)) CT.ui.handFixFor = ap.id;
+      }
+      CT.render(); break;
     case "bot-turn": {
       var bp = CT.activePlayer();
       if (CT.isOnline() && CT.isHost() && bp) {

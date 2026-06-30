@@ -277,6 +277,18 @@ svg.map { width: 100%; height: auto; display: block; }
 .log .entry.corruption .what { color: var(--wax); font-weight: 600; }
 .log .entry.system .what { color: var(--gold); font-weight: 600; }
 .log .entry.note .what { color: var(--ink-soft); font-style: italic; }
+.log-filters { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 4px; }
+.log-filter { font-size: 12px; padding: 4px 10px; opacity: .75; }
+.log-filter.on { opacity: 1; background: var(--wax-soft); border-color: var(--wax); }
+.log-kind { font-size: 10px; text-transform: uppercase; opacity: .65; margin-left: 4px; }
+.host-wait-banner { background: var(--wax-soft); border: 1px solid #d49a8f; color: #6e201a;
+  padding: 10px 14px; border-radius: var(--r); font-size: 14px; margin: 12px 0; line-height: 1.45; }
+.hand-limit-banner { background: linear-gradient(90deg, #6e201a, #8c2f23); color: #fff;
+  padding: 12px 16px; border-radius: var(--r); margin-bottom: var(--s4); font-size: 14px;
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.hand-limit-banner .btn { flex-shrink: 0; }
+.lobby-list .lobby-player { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 6px 0; }
+.lobby-list .lobby-player .btn { margin-left: auto; min-width: 28px; padding: 2px 8px; }
 
 /* ---------- modal / cover screens (pass-and-play) ---------- */
 .scrim { position: fixed; inset: 0; background: rgba(20,14,6,.55); display: flex; overflow-y: auto; padding: var(--s5); z-index: 50; }

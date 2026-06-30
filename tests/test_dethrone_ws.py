@@ -284,6 +284,32 @@ def test_bot_auto_role_discard(client):
     assert after_roles < before_roles
 
 
+def test_kick_player_in_lobby(client):
+    code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
+    room = manager.get(code)
+    host = "host1"
+    manager.join(room, host, "Host")
+    room.players[host].connected = True
+    manager.join(room, "guest1", "Guest")
+    room.players["guest1"].connected = True
+    manager.kick_player(room, host, "guest1")
+    assert "guest1" not in room.players
+    assert len(room.players) == 1
+
+
+def test_end_turn_blocked_over_hand_limit(client):
+    code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
+    room, pids, g = _start_game(code)
+    active = g.active_player().id
+    p = g.player_by_id(active)
+    limit = g._rule("handLimit")
+    while len(p.action_card_ids) <= limit:
+        p.action_card_ids.append("spare_coin_purse")
+    from dethrone.game import MoveError
+    with pytest.raises(MoveError, match="Discard down"):
+        g.end_turn(active)
+
+
 def D_ROLE_META_PUBLIC(role_id: str) -> bool:
     from dethrone.data import ROLE_META
     return ROLE_META.get(role_id, {}).get("canBePublic", True)

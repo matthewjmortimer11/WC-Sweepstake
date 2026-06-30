@@ -234,6 +234,19 @@ class Manager:
                 seats.append((p.id, p.name, p.is_bot))
         return seats
 
+    def kick_player(self, room: Room, actor_id: str, target_id: str) -> None:
+        if room.host_id != actor_id:
+            raise MoveError("Only the host can remove a player.")
+        g = room.game
+        if g.status != STATUS_LOBBY:
+            raise MoveError("Can only remove players before dealing.")
+        if target_id == actor_id:
+            raise MoveError("Cannot remove yourself.")
+        target = room.players.pop(target_id, None)
+        if not target:
+            raise MoveError("Player not found.")
+        room.sockets.pop(target_id, None)
+
     def fill_bots(self, room: Room) -> None:
         g = room.game
         if g.status != STATUS_LOBBY:

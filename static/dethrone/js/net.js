@@ -97,6 +97,15 @@ CT.net.applyState = function (msg) {
         }
       }
     }
+    var ap = cs.players && cs.players[cs.activePlayerIndex];
+    if (ap && ap.id === CT.myId() && ap.actionCardIds && ap.actionCardIds.length > CT.getRules().HAND_LIMIT) {
+      if (CT.net._lastActiveId !== ap.id) {
+        CT.net._lastActiveId = ap.id;
+        CT.showToast("Discard to " + CT.getRules().HAND_LIMIT + " cards before ending your turn.");
+      }
+    } else if (!ap || ap.id !== CT.myId()) {
+      CT.net._lastActiveId = null;
+    }
   } else if (!CT.net.localMode && msg.room && msg.room.game && msg.room.game.status === "lobby") {
     CT.state = null;
   }

@@ -205,6 +205,12 @@ def _dispatch(room, player, mtype: str, msg: dict) -> bool:
         manager.fill_bots(room)
         return True
 
+    if mtype == "kickPlayer":
+        if not player.is_host:
+            raise MoveError("Only the host can remove players.")
+        manager.kick_player(room, player.id, str(msg.get("playerId", "")))
+        return True
+
     if mtype == "dealSetup":
         if not player.is_host:
             raise MoveError("Only the host can deal roles.")

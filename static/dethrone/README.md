@@ -33,6 +33,13 @@ open "index.html"          # macOS
 - **Referee eliminate/restore** — host toggle now syncs online (`toggleElim`)
 - **Smarter bots** — loyal bots Call Out / accuse the Cursed One (playtest engine sees hidden roles); bots auto-pick role discards when votes land; all-bot auto-play can end in a Loyal win
 
+### Phase 7 — table playtest hardening
+- **Host playtest guide** — in-app checklist (`Host playtest guide` / `Guide` button) + `PLAYTEST.md` for the full script
+- **Lobby polish** — waiting banners for host/guests, kick bots/guests before deal, rename in lobby
+- **Setup status** — who has chosen their public role before the host begins
+- **Hand-limit enforcement** — cannot end turn over limit (server + client); prominent banner + toast on your turn
+- **Chronicle filters** — All / Events / Corruption / System / Notes
+
 ### Phase 4 — Throne & Succession
 A **Throne & Succession** panel tracks the crown and the line of succession.
 - **Throne control (§23)**: King / Queen / Successor controllers, set manually or via the **Claim helper** (claimant + crown; unchallenged → crowned, or challenged → "proof valid" crowns them and the challenger loses a role / "bluff" costs the claimant a role). Claim order is recorded.
@@ -105,5 +112,4 @@ js/app.js         render loop, board/table/log UI, referee controls, event wirin
 
 ## Next improvements
 
-Confirm Phase 1 around a real table (deal a 5-player game, check the Cursed One is always hidden and
-never public), then proceed to Phase 2 (movement + location actions + role-discard helper).
+Run `PLAYTEST.md` at a real table, log friction, then proceed to Phase 8 (spectator mode) or Phase 9 (more card auto-resolution).

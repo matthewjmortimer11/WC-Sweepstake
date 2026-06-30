@@ -318,6 +318,12 @@ class CursedThroneGame:
         ap = self.active_player()
         if not ap or ap.id != actor_id:
             raise MoveError("Not your turn.")
+        if self.over_hand_limit(ap):
+            limit = self._rule("handLimit")
+            raise MoveError(
+                f"Discard down to {limit} action cards before ending your turn "
+                f"({len(ap.action_card_ids)} in hand)."
+            )
         n = len(self.players)
         start = self.active_player_index
         idx = start
@@ -1151,6 +1157,10 @@ class CursedThroneGame:
                 "dealtRoleIds": setup_dealt,
                 "setupReady": me.setup_ready if me else False,
                 "allReady": self.all_setup_ready(),
+                "playerStatus": [
+                    {"id": p.id, "name": p.name, "setupReady": p.setup_ready}
+                    for p in self.players
+                ] if self.status == STATUS_SETUP else [],
             },
         }
 

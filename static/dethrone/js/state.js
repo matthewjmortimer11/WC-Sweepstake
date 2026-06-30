@@ -106,6 +106,10 @@ CT.playerById = function (id) {
 CT.endTurn = function () {
   var s = CT.state;
   if (!s || s.winner) return;
+  var ap = CT.activePlayer();
+  if (ap && CT.overHandLimit(ap)) {
+    return { ok: false, msg: "Discard down to " + CT.getRules().HAND_LIMIT + " cards before ending your turn." };
+  }
   var n = s.players.length;
   var start = s.activePlayerIndex;
   var idx = start;
@@ -123,6 +127,7 @@ CT.endTurn = function () {
   }
   CT.log("Turn passes to " + s.players[idx].name + ".");
   CT.save();
+  return { ok: true };
 };
 
 /* ---- corruption (§15). Always log reason. Detect Cursed win / Final Rite warning. ---- */
