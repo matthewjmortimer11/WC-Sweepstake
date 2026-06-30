@@ -89,6 +89,11 @@ function renderTurnDock() {
     + '<div class="turn-meta"><div class="turn-title">Your turn</div>'
     + '<div class="turn-sub">📍 ' + CT.esc(loc ? loc.name : ap.location) + "</div>"
     + '<div class="turn-chips">' + chips + "</div></div>"
+    + '<div class="turn-parley">'
+    + '<button class="btn btn-ghost btn-sm" data-act="h-open-duel" title="Duel">⚔</button>'
+    + '<button class="btn btn-ghost btn-sm" data-act="h-open-vote" title="Vote">⚖</button>'
+    + '<button class="btn btn-ghost btn-sm" data-act="h-open-trade" title="Trade">⇄</button>'
+    + "</div>"
     + '<button class="btn btn-secondary" data-act="view-private" data-id="' + ap.id + '">Hand</button>'
     + '<button class="btn btn-primary" data-act="end-turn"' + (over ? " disabled" : "") + '>End turn</button>'
     + "</div>";
@@ -721,10 +726,20 @@ function privateView() {
       + (r.id === "cursedone" ? ' <span class="tag wax">CURSED</span>' : '') + '</div><span class="tag">' + r.family + '</span></div>'
       + '<div class="prole">' + CT.esc(r.flavour) + '</div></div>';
   }).join("") || '<p class="muted">No hidden roles remaining.</p>';
-  var cards = p.actionCardIds.map(function (id) {
+
+  var onTurn = CT.activePlayer() && CT.activePlayer().id === p.id && !CT.state.winner;
+  var groups = { OnTurn: [], Movement: [], Duel: [], Vote: [], Reaction: [], Other: [] };
+  p.actionCardIds.forEach(function (id) {
+    var c = CT.cardById(id);
+    if (!c) return;
+    var t = c.timing || "Other";
+    if (t === "Manual") t = "Other";
+    if (!groups[t]) t = "Other";
+    groups[t].push(id);
+  });
+  function cardRow(id) {
     var c = CT.cardById(id);
     var fx = CT.AUTO_PLAY[id];
-    var onTurn = CT.activePlayer() && CT.activePlayer().id === p.id && !CT.state.winner;
     var playBtn = "";
     if (fx && onTurn) {
       if (fx.needsTarget || fx.needsLocation || fx.needsDeck || fx.needsDiscardCard) {
@@ -732,17 +747,28 @@ function privateView() {
       } else {
         playBtn = ' <button class="btn btn-primary btn-sm" data-act="play-card" data-id="' + id + '">Play</button>';
       }
+    } else if (c.timing === "Reaction") {
+      playBtn = ' <span class="tag wax" style="font-size:11px">when targeted</span>';
+    } else if (c.timing === "Duel" || c.timing === "Vote") {
+      playBtn = ' <span class="tag" style="font-size:11px">use in helper</span>';
     }
     return '<div class="pcard" style="padding:12px"><div class="row" style="justify-content:space-between;align-items:flex-start;gap:8px">'
       + '<div><div class="pname" style="font-size:15px">' + CT.esc(c.name)
       + ' <span class="tag">' + c.deck + '</span></div><div class="prole" style="margin-top:4px">' + CT.esc(c.effect) + '</div></div>'
       + playBtn + '</div></div>';
-  }).join("") || '<p class="muted">No action cards.</p>';
+  }
+  var cardsBody = "";
+  ["OnTurn", "Movement", "Reaction", "Duel", "Vote", "Other"].forEach(function (g) {
+    if (!groups[g].length) return;
+    cardsBody += '<div class="eyebrow" style="margin:12px 0 6px">' + g + "</div><div class=\"stack\">"
+      + groups[g].map(cardRow).join("") + "</div>";
+  });
+  if (!cardsBody) cardsBody = '<p class="muted">No action cards.</p>';
   return '<div class="scrim"><div class="modal" style="max-width:620px">'
     + '<div class="eyebrow">Private · ' + CT.esc(p.name) + '</div>'
     + (CT.ui.privateNote ? '<div class="private-note-banner">' + CT.esc(CT.ui.privateNote) + '</div>' : '')
     + '<h2 style="margin:6px 0 12px">Your hidden roles</h2><div class="players" style="grid-template-columns:1fr;gap:10px">' + hidden + '</div>'
-    + '<h2 style="margin:18px 0 12px">Your action cards</h2><div class="stack">' + cards + '</div>'
+    + '<h2 style="margin:18px 0 12px">Your action cards</h2>' + cardsBody
     + '<div class="btn-row" style="margin-top:20px"><div class="spacer"></div>'
     + '<button class="btn btn-primary" data-act="close-private">Hide & return to table</button></div>'
     + '</div></div>';

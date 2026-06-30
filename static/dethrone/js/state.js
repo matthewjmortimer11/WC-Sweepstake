@@ -975,6 +975,23 @@ CT.disarmRandom = function (playerId, n) {
   return done;
 };
 
+/* Trade (§25) — immediate gold exchange. */
+CT.applyTrade = function (aId, bId, goldAB, goldBA, cardABIdx, cardBAIdx) {
+  var a = CT.playerById(aId), b = CT.playerById(bId);
+  if (!a || !b) return;
+  var gAB = Math.min(goldAB || 0, a.gold), gBA = Math.min(goldBA || 0, b.gold);
+  if (gAB) { a.gold -= gAB; b.gold += gAB; }
+  if (gBA) { b.gold -= gBA; a.gold += gBA; }
+  if (cardABIdx != null && cardABIdx >= 0 && cardABIdx < a.actionCardIds.length) {
+    b.actionCardIds.push(a.actionCardIds.splice(cardABIdx, 1)[0]);
+  }
+  if (cardBAIdx != null && cardBAIdx >= 0 && cardBAIdx < b.actionCardIds.length) {
+    a.actionCardIds.push(b.actionCardIds.splice(cardBAIdx, 1)[0]);
+  }
+  CT.log(a.name + " and " + b.name + " traded.");
+  CT.save();
+};
+
 /* Blood Contract (§25) — manual note with a break penalty. */
 CT.addContract = function (aId, bId, promise) {
   CT.state.contracts.push({ id: CT.util.uid("ct"), aId: aId, bId: bId, promise: promise, status: "active" });

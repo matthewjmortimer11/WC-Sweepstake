@@ -109,6 +109,43 @@ CT.bot.tryPlayCard = function (p) {
   return false;
 };
 
+CT.bot.trySuccession = function (p) {
+  var succ = CT.state.throne.succession;
+  if (!succ || !succ.open || p.location !== "throne") return false;
+  if ((succ.claims || []).some(function (c) { return c.playerId === p.id; })) return false;
+  var roles = CT.playerSuccessionRoles(p);
+  if (!roles.length) return false;
+  CT.addSuccessionClaim(p.id, roles[0]);
+  return true;
+};
+
+CT.bot.tryDuel = function (p) {
+  if (CT.bot.isCursed(p) || Math.random() > 0.22) return false;
+  var others = CT.state.players.filter(function (x) {
+    return x.status === "active" && x.id !== p.id && x.location === p.location && !CT.bot.isCursed(x);
+  });
+  if (!others.length) return false;
+  var target = others[Math.floor(Math.random() * others.length)];
+  if (!CT.helpers) return false;
+  CT.helpers.openDuel();
+  CT.helpers.ui.att = p.id;
+  CT.helpers.ui.def = target.id;
+  var conseq = ["shame", "disarm", "drive"][Math.floor(Math.random() * 3)];
+  CT.helpers.applyDuelConseq(conseq);
+  return true;
+};
+
+CT.bot.tryTrade = function (p) {
+  if (p.location !== "market" || Math.random() > 0.2 || p.gold < 1) return false;
+  var others = CT.state.players.filter(function (x) {
+    return x.status === "active" && x.id !== p.id && x.location === "market" && x.gold >= 1;
+  });
+  if (!others.length) return false;
+  var partner = others[Math.floor(Math.random() * others.length)];
+  CT.applyTrade(p.id, partner.id, 1, 1, null, null);
+  return true;
+};
+
 /* pick & perform one location action */
 CT.bot.act = function (p, cursed) {
   var loc = p.location;
@@ -177,11 +214,19 @@ CT.bot.takeTurn = function (playerId) {
   var moves = CT.legalMoves(p);
   if (moves.length && Math.random() < 0.85) {
     var cursed = CT.bot.isCursed(p);
-    var dest = cursed ? (CT.bot.stepToward(p.location, "graveyard") || moves[0]) : moves[Math.floor(Math.random() * moves.length)];
+    var dest;
+    if (!cursed && CT.state.throne.succession && CT.state.throne.succession.open) {
+      dest = CT.bot.stepToward(p.location, "throne") || moves[Math.floor(Math.random() * moves.length)];
+    } else {
+      dest = cursed ? (CT.bot.stepToward(p.location, "graveyard") || moves[0]) : moves[Math.floor(Math.random() * moves.length)];
+    }
     if (dest) CT.movePlayer(p.id, dest, false);
   }
 
   if (!CT.bot.isCursed(p) && CT.bot.trySocial(p)) { /* social */ }
+  else if (CT.bot.trySuccession(p)) { /* claim */ }
+  else if (CT.bot.tryDuel(p)) { /* duel */ }
+  else if (CT.bot.tryTrade(p)) { /* trade */ }
   else if (CT.bot.tryPlayCard(p)) { /* card or role ability */ }
   else CT.bot.act(p, CT.bot.isCursed(p));
 

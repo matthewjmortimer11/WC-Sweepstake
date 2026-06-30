@@ -1840,10 +1840,19 @@ class CursedThroneGame:
         cursed = self.bot_is_cursed(p)
         moves = self.legal_moves(p)
         if moves and rng.random() < 0.85:
-            dest = self._bot_step_toward(p.location, "graveyard") if cursed else rng.choice(moves)
+            if not cursed and self.throne.get("succession", {}).get("open"):
+                dest = self._bot_step_toward(p.location, "throne") or (rng.choice(moves) if moves else None)
+            else:
+                dest = self._bot_step_toward(p.location, "graveyard") if cursed else rng.choice(moves)
             if dest:
                 self.move_player(p.id, dest, manual=False, actor_id=p.id)
         if not cursed and self._bot_try_social(p, rng):
+            pass
+        elif self._bot_try_succession(p, rng):
+            pass
+        elif self._bot_try_duel(p, rng):
+            pass
+        elif self._bot_try_trade(p, rng):
             pass
         elif self._bot_try_play_card(p, rng):
             pass
@@ -1951,6 +1960,59 @@ class CursedThroneGame:
                 except MoveError:
                     pass
         return False
+
+    def _bot_try_succession(self, p: PlayerState, rng: random.Random) -> bool:
+        succ = self.throne.get("succession", {})
+        if not succ.get("open") or p.location != "throne":
+            return False
+        if any(c.get("playerId") == p.id for c in succ.get("claims", [])):
+            return False
+        held = self._all_role_ids(p)
+        order = sorted(D.SUCCESSION.keys(), key=lambda r: D.SUCCESSION[r]["rank"])
+        role_id = next((r for r in order if r in held), None)
+        if not role_id:
+            return False
+        try:
+            self.add_succession_claim(p.id, role_id)
+            return True
+        except MoveError:
+            return False
+
+    def _bot_try_duel(self, p: PlayerState, rng: random.Random) -> bool:
+        if self.bot_is_cursed(p) or rng.random() > 0.22:
+            return False
+        others = [
+            x for x in self.players
+            if x.status == "active" and x.id != p.id
+            and x.location == p.location and not self.bot_is_cursed(x)
+        ]
+        if not others:
+            return False
+        target = rng.choice(others)
+        self._log(f"{p.name} starts a duel with {target.name}!", "event")
+        conseq = rng.choice(["shame", "disarm", "drive"])
+        try:
+            self.duel_apply_consequence(p.id, target.id, 0, 0, False, conseq, rng)
+        except MoveError:
+            return False
+        return True
+
+    def _bot_try_trade(self, p: PlayerState, rng: random.Random) -> bool:
+        if p.location != "market" or rng.random() > 0.2 or p.gold < 1:
+            return False
+        others = [
+            x for x in self.players
+            if x.status == "active" and x.id != p.id
+            and x.location == "market" and x.gold >= 1
+        ]
+        if not others:
+            return False
+        partner = rng.choice(others)
+        try:
+            self.apply_trade(p.id, partner.id, 1, 1, None, None)
+            return True
+        except MoveError:
+            return False
 
     def _bot_auto_role_discard(self, pid: str, rng: random.Random) -> None:
         if pid not in self.pending_role_discard:

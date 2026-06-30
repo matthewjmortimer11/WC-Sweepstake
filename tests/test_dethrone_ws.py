@@ -863,6 +863,38 @@ def test_flee_reaction_cancels_duel_pending(client):
     assert dp.rep == before_rep - 1
 
 
+def test_bot_succession_claim_at_throne(client):
+    code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
+    room, pids, g = _start_game(code)
+    room.players[pids[0]].is_bot = True
+    bot = g.players[0]
+    bot.is_bot = True
+    bot.location = "throne"
+    bot.public_role_id = "firstborn"
+    bot.hidden_role_ids = ["thief", "wanderingknight"]
+    g.open_succession()
+    import random
+    assert g._bot_try_succession(bot, random.Random(0)) is True
+    claims = g.throne["succession"]["claims"]
+    assert any(c["playerId"] == bot.id and c["roleId"] == "firstborn" for c in claims)
+
+
+def test_bot_duel_same_location(client):
+    code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
+    room, pids, g = _start_game(code)
+    att = g.active_player()
+    att.is_bot = True
+    _set_non_exempt_roles(att, g)
+    victim = next(x for x in g.players if x.id != att.id and x.status == "active")
+    _set_non_exempt_roles(victim, g)
+    victim.location = att.location
+    import random
+    rng = random.Random(1)
+    before_rep = victim.rep
+    assert g._bot_try_duel(att, rng) is True
+    assert victim.rep <= before_rep
+
+
 def D_ROLE_META_PUBLIC(role_id: str) -> bool:
     from dethrone.data import ROLE_META
     return ROLE_META.get(role_id, {}).get("canBePublic", True)

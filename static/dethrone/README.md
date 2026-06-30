@@ -84,6 +84,11 @@ open "index.html"          # macOS
 - **Reaction moves** — Quick Escape (1 space) and Flee (2 spaces) prompt board moves after play
 - **Bot depth** — bots auto-resolve reactions, play simple auto-cards and public role abilities, richer local `bot.js` mirror
 
+### Phase 16 — Bot social play & hand UX
+- **Bot duels, trades, succession** — loyal bots duel same-location players, trade at Market, claim at Throne during succession; move toward Throne when succession is open
+- **Turn dock parley** — ⚔ Duel / ⚖ Vote / ⇄ Trade shortcuts on mobile
+- **Private hand groups** — action cards grouped by timing (OnTurn, Reaction, Duel, Vote); reaction cards labelled “when targeted”
+
 ### Phase 4 — Throne & Succession
 A **Throne & Succession** panel tracks the crown and the line of succession.
 - **Throne control (§23)**: King / Queen / Successor controllers, set manually or via the **Claim helper** (claimant + crown; unchallenged → crowned, or challenged → "proof valid" crowns them and the challenger loses a role / "bluff" costs the claimant a role). Claim order is recorded.
@@ -136,13 +141,13 @@ Table talk and bluffing stay verbal. The app guides, tracks, and enforces mechan
 
 ## Known limitations / not yet built
 
-- Bots still skip most social nuance (duels, trades, throne claims) — they hunt the Cursed One so all-bot runs can test a Loyal win, not to simulate table talk.
+- Bots still skip nuanced table talk — they now duel, trade, and claim succession when sensible, but won't bluff or negotiate.
 - Action cards that need table judgement (Call Out helper, Blood Contract, most Vote/Duel/Reaction cards) stay manual — auto-play covers the mechanical OnTurn subset listed in `CT.AUTO_PLAY` / `CARD_AUTO_EFFECTS` (expanded in Phase 9).
 - Reaction cards played proactively from hand (not auto-consumed like Guild Seal on tax) still need table timing.
 
 ## Next improvements
 
-Run `PLAYTEST.md` at a real table, log friction, then plan the next phase (proactive reaction plays from hand, bot duels/trades, or polish).
+Run `PLAYTEST.md` at a real table, log friction, then plan the next phase (remaining manual cards, spectator polish, or playtest report).
 
 ```
 index.html        shell; loads the scripts in order
