@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#8c2f23">
+  <meta name="theme-color" content="#0c0a08">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Dethrone">
@@ -16,11 +16,13 @@
 <body>
   <main id="app"><!-- rendered by app.js --></main>
   <div id="turn-dock" class="turn-dock" hidden></div>
+  <nav id="play-tabs" class="play-tabs" hidden aria-label="Game sections"></nav>
   <div id="toast" class="toast" hidden></div>
 
   <!-- classic scripts, in dependency order, so the app runs from file:// -->
   <script src="js/data.js"></script>
   <script src="js/cards-roles.js"></script>
+  <script src="js/cards-court.js"></script>
   <script src="js/cards-extra.js"></script>
   <script src="js/balance.js"></script>
   <script src="js/report.js"></script>

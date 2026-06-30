@@ -3,7 +3,8 @@ window.CT = window.CT || {};
 
 CT.ui = { privateFor: null, privateRevealed: false, showImport: false, showGuide: false,
   roleDiscardFor: null, roleDiscardRevealed: false, handFixFor: null, keepOne: null, playCard: null,
-  logFilter: "all", privateNote: null, finalRiteOffer: null, reactionOffer: null, reactionMove: null };
+  logFilter: "all", privateNote: null, finalRiteOffer: null, reactionOffer: null, reactionMove: null,
+  playTab: "play" };
 
 /* Play vs Test mode — Test reveals referee & per-player override tools (§32, §35).
  * Persisted separately so it applies to the start/setup screens too. */
@@ -36,6 +37,7 @@ CT.render = function () {
     }
     bind();
     renderSpectatorDock();
+    renderPlayTabs();
     return;
   }
   if (CT.net && CT.net.online && CT.net.room && (!CT.state || CT.state.phase === "lobby")) {
@@ -50,6 +52,7 @@ CT.render = function () {
   if (!CT.state)       { root.innerHTML = shell(startScreen()); bind(); return; }
   root.innerHTML = shell(gameScreen()) + overlays();
   renderTurnDock();
+  renderPlayTabs();
   bind();
 };
 
@@ -65,13 +68,27 @@ if (document.readyState === "loading") {
   CT.registerServiceWorker();
 }
 
+function renderPlayTabs() {
+  var nav = document.getElementById("play-tabs");
+  if (!nav || !CT.state || CT.state.phase !== "play" || CT.state.winner) {
+    if (nav) nav.hidden = true;
+    return;
+  }
+  var tab = CT.ui.playTab || "play";
+  nav.className = "play-tabs";
+  nav.innerHTML = '<button type="button" class="play-tabs__btn' + (tab === "play" ? " on" : "") + '" data-act="play-tab" data-tab="play">Play</button>'
+    + '<button type="button" class="play-tabs__btn' + (tab === "court" ? " on" : "") + '" data-act="play-tab" data-tab="court">Court</button>'
+    + '<button type="button" class="play-tabs__btn' + (tab === "log" ? " on" : "") + '" data-act="play-tab" data-tab="log">Log</button>';
+  nav.hidden = false;
+}
+
 function renderTurnDock() {
   var dock = document.getElementById("turn-dock");
   if (!dock || !CT.state || CT.state.phase !== "play" || CT.state.winner || CT.isSpectator()) {
     if (dock) dock.hidden = true;
     return;
   }
-  dock.className = "turn-dock";
+  dock.className = "turn-dock turn-dock--dark";
   var ap = CT.activePlayer();
   if (!ap || ap.status !== "active") { dock.hidden = true; return; }
   var isMyTurn = !CT.isOnline() || ap.id === CT.myId();
@@ -149,9 +166,9 @@ function shell(inner) {
     ? '<div class="panel" style="margin-bottom:12px;padding:10px 14px;background:var(--wax-soft);border-color:var(--wax)">'
       + '<span class="muted" style="font-size:14px">Reconnecting to room ' + CT.esc(CT.net.routeCode) + '…</span></div>'
     : "";
-  return reconnect + '<div class="app">'
+  return reconnect + '<div class="app' + (CT.state && CT.state.phase === "play" ? " app--v3b" : "") + '">'
     + '<div class="topbar"><div class="brand"><h1>The Cursed Throne</h1>'
-    + '<span class="seal">' + (CT.net && CT.net.routeCode ? (CT.isSpectator() ? "Watching " : "Room ") + CT.net.routeCode : (CT.testMode ? "Playtest Ledger" : "Court of Whispers")) + '</span></div>'
+    + '<span class="seal">' + (CT.net && CT.net.routeCode ? (CT.isSpectator() ? "Watching " : "Room ") + CT.net.routeCode : "CURSED THRONE · V3B") + '</span></div>'
     + '<div class="btn-row">' + (CT.isSpectator() ? '<span class="tag gold">Spectator</span>' : testToggle)
     + (CT.state ? '<button class="btn btn-ghost btn-sm" data-act="export-report">Report</button>'
         + (CT.isSpectator() ? "" : '<button class="btn btn-ghost btn-sm" data-act="show-guide">Guide</button>'
@@ -167,9 +184,10 @@ function startScreen() {
     ? '<div class="panel" style="max-width:560px;margin:16px auto 0;text-align:left"><h3 style="margin:0 0 8px">Balance toggles</h3>'
       + CT.balancePanel(CT.pendingBalance || CT.DEFAULT_BALANCE, true) + '</div>'
     : "";
-  return '<div class="panel" style="max-width:620px;margin:24px auto">'
-    + '<div class="empty">'
-    + '<div class="seal-big" style="margin-bottom:16px">✦</div>'
+  return '<div class="v3b-hero" style="max-width:620px;margin:24px auto">'
+    + '<div class="v3b-hero__inner">'
+    + '<div class="eyebrow eyebrow--gold">The Cursed Throne</div>'
+    + '<div class="seal-big v3b-seal" style="margin:0 auto 16px">✦</div>'
     + '<h1 style="margin-bottom:8px">Who is secretly helping the kingdom collapse?</h1>'
     + '<p class="muted" style="max-width:46ch;margin:0 auto 24px">A bluffing board game for 4–6 players. '
     + 'Everyone on their own phone, or pass one device around the table.</p>'
@@ -177,7 +195,7 @@ function startScreen() {
     + '<button class="btn btn-gold" data-act="create-room">Create online room ✦</button>'
     + '<button class="btn btn-primary" data-act="start-setup">Local pass-and-play</button>'
     + '</div>'
-    + '<p class="muted" style="font-size:13px;margin-top:20px">Already have a code? Open the invite link (<code>#/room/ABCD</code>), watch without playing (<code>#/room/ABCD/watch</code>), or pass-and-play locally.</p>'
+    + '<p class="muted" style="font-size:13px;margin-top:20px">Invite link <code>#/room/ABCD</code> · watch <code>#/room/ABCD/watch</code></p>'
     + '</div></div>' + balBlock;
 }
 
@@ -269,12 +287,13 @@ function spectatorSetupScreen() {
 }
 
 function spectatorGameScreen() {
-  return '<div class="spectator-banner">👁 Spectating — public view only. Hidden roles and action card names are never shown.</div>'
+  return '<div class="spectator-banner">Spectating — public view only. Hidden roles and action card names are never shown.</div>'
     + winBanner()
     + trackers()
-    + '<div class="grid grid-main">'
-    + '<div>' + boardPanel() + spectatorActionsPanel() + throneSuccPanel() + pactsPanel() + "</div>"
-    + '<div>' + playersPanelSpectator() + logPanel() + "</div>"
+    + '<div class="play-layout play-tab-' + (CT.ui.playTab || "play") + '">'
+    + '<section class="play-zone play-zone--kingdom">' + kingdomPanel() + throneSuccPanel() + pactsPanel() + "</section>"
+    + '<section class="play-zone play-zone--court">' + courtPanel(true) + "</section>"
+    + '<section class="play-zone play-zone--log">' + logPanel() + "</section>"
     + "</div>";
 }
 
@@ -298,9 +317,7 @@ function spectatorActionsPanel() {
 }
 
 function playersPanelSpectator() {
-  var cards = CT.state.players.map(playerCard).join("");
-  return '<div class="panel"><div class="panel-head"><h2>The Court</h2>'
-    + '<span class="tag">read-only</span></div><hr class="rule"><div class="players">' + cards + "</div></div>";
+  return courtPanel(true);
 }
 
 function onlineSetupScreen() {
@@ -345,15 +362,17 @@ function onlineSetupScreen() {
 
 /* ============ game screen ============ */
 function gameScreen() {
-  var s = CT.state;
   return winBanner()
     + waitingBanner()
     + handLimitBanner()
     + trackers()
-    + '<div class="grid grid-main">'
-    + '<div>' + boardPanel() + actionsPanel() + parleyPanel() + throneSuccPanel() + (CT.testMode ? manualGlobal() : "") + pactsPanel() + '</div>'
-    + '<div>' + playersPanel() + logPanel() + '</div>'
-    + '</div>';
+    + '<div class="play-layout play-tab-' + (CT.ui.playTab || "play") + '">'
+    + '<section class="play-zone play-zone--kingdom">'
+    + kingdomPanel() + parleyPanelCompact() + throneSuccPanel() + (CT.testMode ? manualGlobal() : "") + pactsPanel()
+    + "</section>"
+    + '<section class="play-zone play-zone--court">' + courtPanel(false) + "</section>"
+    + '<section class="play-zone play-zone--log">' + logPanel() + "</section>"
+    + "</div>";
 }
 
 function handLimitBanner() {
@@ -391,12 +410,12 @@ function trackers() {
   var corrPct = Math.round((s.corruption / R.CORRUPTION_MAX) * 100);
   var warn = s.corruption >= R.FINAL_RITE_CORRUPTION;
   var throne = throneLabel();
-  return '<div class="trackers">'
+  return '<div class="trackers trackers--v3b">'
     + tracker("Round", s.round)
-    + tracker("Active player", ap ? ap.name : "—", "active")
-    + '<div class="tracker danger"><div class="k">Corruption</div><div class="v">' + s.corruption + ' / ' + R.CORRUPTION_MAX + '</div>'
+    + tracker("Turn", ap ? ap.name : "—", "active")
+    + '<div class="tracker tracker--vial danger"><div class="k">Corruption</div><div class="v">' + s.corruption + '<span class="tracker-dim"> / ' + R.CORRUPTION_MAX + '</span></div>'
     + '<div class="vial' + (warn ? " warn" : "") + '"><span style="width:' + corrPct + '%"></span></div></div>'
-    + tracker("Innocents lost", s.innocentElims + " / " + R.INNOCENT_ELIMS_TO_LOSE, s.innocentElims >= 1 ? "danger" : "")
+    + tracker("Innocents", s.innocentElims + " / " + R.INNOCENT_ELIMS_TO_LOSE, s.innocentElims >= 1 ? "danger" : "")
     + tracker("Throne", throne, "gold")
     + '</div>';
 }
@@ -412,101 +431,139 @@ function throneLabel() {
   return names.length ? names.join(" & ") : "Vacant";
 }
 
-/* ---- board: V3b editorial kingdom map (see board.js) ---- */
-function boardPanel() {
+/* ---- V3b kingdom stack: portrait map + location action footer ---- */
+function kingdomPanel() {
   var ap = CT.activePlayer();
   var hint = CT.isSpectator()
     ? "Spectator view — tokens show where everyone is"
     : ((ap && ap.status === "active" && !CT.state.winner)
       ? "Glowing sites are within " + CT.esc(ap.name) + "’s reach — tap to move"
-      : "Graveyard connects Tavern ↔ Barracks");
-  return '<div class="panel board-panel"><div class="panel-head"><h2>The Kingdom</h2>'
-    + '<span class="faint" style="font-size:12px">' + hint + '</span></div><hr class="rule">'
-    + '<div class="map-wrap">' + CT.boardMapSVG() + '</div></div>';
+      : "Graveyard links Tavern and Barracks");
+  var locId = ap ? ap.location : "market";
+  var accent = CT.locationAccent(locId);
+  var loc = CT.locationById(locId);
+  var locLabel = loc ? loc.name.toUpperCase() : locId.toUpperCase();
+  return '<div class="v3b-kingdom">'
+    + '<div class="v3b-kingdom__card">'
+    + '<header class="v3b-kingdom__head">'
+    + '<div><h2 class="v3b-kingdom__title">The Kingdom</h2>'
+    + '<p class="v3b-kingdom__hint">' + hint + "</p></div>"
+    + (ap && !CT.isSpectator() ? '<span class="v3b-kingdom__turn">' + CT.esc(ap.name) + "</span>" : "")
+    + "</header>"
+    + '<div class="map-wrap map-wrap--kingdom">' + CT.boardMapSVG() + "</div>"
+    + '<footer class="loc-footer" style="--loc-accent:' + accent + '">'
+    + '<div class="loc-footer__label">' + locLabel + " · " + (CT.isSpectator() ? "watching" : "actions") + "</div>"
+    + actionsPanelBody()
+    + "</footer></div></div>";
 }
 
-/* ---- active player's location actions (§13) ---- */
-function actionsPanel() {
+function actionsPanelBody() {
   var p = CT.activePlayer();
-  if (!p) return "";
+  if (!p) return '<p class="loc-footer__empty muted">No active player.</p>';
   var over = CT.overHandLimit(p);
   var isMyTurn = !CT.isOnline() || p.id === CT.myId();
   var blockEnd = over && isMyTurn;
-
   var disabled = CT.state.winner || p.status !== "active" || (CT.isOnline() && !isMyTurn);
-  var loc = CT.locationById(p.location);
   var acts = CT.LOCATION_ACTIONS[p.location] || [];
   var buttons = acts.map(function (a) {
     var cant = disabled || p.gold < (a.cost || 0)
       || (a.requiresThrone && p.id !== CT.state.throne.kingControllerId && p.id !== CT.state.throne.queenControllerId)
       || (a.id === "recover" && !(p.wounded || p.rep <= 2))
       || (a.id === "serious_duel" && p.seriousDuelUsed);
-    var cls = a.kind === "basic" ? "btn-primary" : "btn-gold";
-    var costLbl = a.cost ? ' <span style="opacity:.7;font-weight:600">· ' + a.cost + 'g</span>' : "";
-    return '<button class="btn ' + cls + '" data-act="loc-action" data-id="' + a.id + '"' + (cant ? " disabled" : "") + '>'
-      + CT.esc(a.name) + costLbl + '</button>'
-      + '<div class="act-hint">' + CT.esc(a.hint) + (a.manual ? ' · manual' : '') + '</div>';
+    var cls = a.kind === "basic" ? "btn-loc btn-loc--cream" : "btn-loc btn-loc--gold";
+    var costLbl = a.cost ? ' <span class="btn-loc__cost">' + a.cost + "g</span>" : "";
+    return '<div class="loc-action"><button class="btn ' + cls + '" data-act="loc-action" data-id="' + a.id + '"' + (cant ? " disabled" : "") + '>'
+      + CT.esc(a.name) + costLbl + "</button>"
+      + '<div class="act-hint">' + CT.esc(a.hint) + (a.manual ? " · manual" : "") + "</div></div>";
   }).join("");
 
   var roleAbilities = CT.roleAbilitiesAvailable(p);
   var roleBtns = roleAbilities.map(function (a) {
-    return '<button class="btn btn-secondary" data-act="role-ability" data-id="' + a.id + '"' + (disabled ? " disabled" : "") + '>'
-      + CT.esc(a.name) + ' <span style="opacity:.7;font-size:11px">public</span></button>';
+    return '<button class="btn btn-loc btn-loc--cream" data-act="role-ability" data-id="' + a.id + '"' + (disabled ? " disabled" : "") + '>'
+      + CT.esc(a.name) + ' <span class="btn-loc__tag">public</span></button>';
   }).join("");
   var roleSection = roleBtns
-    ? '<div class="role-ability-row"><div class="eyebrow" style="margin:14px 0 8px">Public role</div><div class="act-grid">' + roleBtns + "</div></div>"
+    ? '<div class="loc-footer__roles"><div class="eyebrow eyebrow--light">Public role</div><div class="loc-footer__grid">' + roleBtns + "</div></div>"
     : "";
 
   var succ = CT.state.throne.succession || { open: false };
   var succBanner = "";
-  if (succ.open && p.location === "throne" && CT.playerSuccessionRoles(p).length) {
-    succBanner = '<div class="reminder">Succession is open — claim from the Throne. '
-      + '<button class="btn btn-gold btn-sm" data-act="h-open-succclaim-quick">Claim crown</button></div>';
+  if (succ.open && p.location === "throne" && CT.playerSuccessionRoles(p).length && !CT.isSpectator()) {
+    succBanner = '<div class="loc-footer__succ">Succession open — '
+      + '<button class="btn btn-loc btn-loc--gold btn-sm" data-act="h-open-succclaim-quick">Claim crown</button></div>';
   }
 
   var body;
-  if (disabled) {
-    body = '<p class="muted">' + (CT.state.winner ? "The game is over." : "This player is eliminated.") + '</p>';
+  if (CT.isSpectator()) {
+    var specActs = acts.map(function (a) {
+      return "<li>" + CT.esc(a.name) + (a.cost ? " · " + a.cost + "g" : "") + "</li>";
+    }).join("");
+    body = '<ul class="spectator-act-list spectator-act-list--light">' + (specActs || '<li class="muted">None</li>') + "</ul>";
+  } else if (disabled) {
+    body = '<p class="loc-footer__empty muted">' + (CT.state.winner ? "The game is over." : "This player is eliminated.") + "</p>";
   } else if (p.isBot) {
-    body = '<div class="bot-controls"><p class="muted" style="margin:0 0 10px;font-size:14px">'
-      + CT.esc(p.name) + ' is a bot.'
-      + (CT.isOnline() && !CT.isHost() ? ' Waiting for the host to play their turn.' : ' Play their turn, or auto-play through every bot until it’s a human’s turn.') + '</p>'
-      + (CT.isOnline() && !CT.isHost() ? '' : '<div class="btn-row"><button class="btn btn-primary" data-act="bot-turn">▶ Play ' + CT.esc(p.name) + '’s turn</button>'
-      + '<button class="btn btn-gold" data-act="bot-auto">⏩ Auto-play bots</button></div>')
-      + '</div>';
+    body = '<div class="bot-controls"><p class="loc-footer__empty" style="margin:0 0 10px">'
+      + CT.esc(p.name) + " is a bot."
+      + (CT.isOnline() && !CT.isHost() ? " Waiting for the host." : "") + "</p>"
+      + (CT.isOnline() && !CT.isHost() ? "" : '<div class="btn-row"><button class="btn btn-loc btn-loc--cream" data-act="bot-turn">Play turn</button>'
+      + '<button class="btn btn-loc btn-loc--gold" data-act="bot-auto">Auto bots</button></div>')
+      + "</div>";
   } else {
-    body = '<div class="act-grid">' + buttons + '</div>';
+    body = '<div class="loc-footer__grid">' + buttons + "</div>";
   }
-  return '<div class="panel"><div class="panel-head"><h2>' + CT.esc(p.name) + '’s turn'
-    + (p.isBot ? ' <span class="tag">BOT</span>' : '') + '</h2>'
-    + '<span class="tag gold">📍 ' + loc.name + '</span></div><hr class="rule">'
-    + succBanner
-    + body
-    + roleSection
-    + (over ? '<div class="reminder">Hand is over the limit of ' + CT.getRules().HAND_LIMIT + ' (' + p.actionCardIds.length + ' cards). '
-        + '<button class="btn btn-secondary btn-sm" data-act="fix-hand" data-id="' + p.id + '">Discard down</button></div>' : "")
-    + '<div class="btn-row" style="margin-top:14px"><span class="faint" style="font-size:12px;align-self:center">'
-    + (CT.isOnline() && !isMyTurn ? "Waiting for " + CT.esc(p.name) + "…" : "Movement & actions can also be overridden below.") + '</span>'
-    + '<div class="spacer"></div><button class="btn btn-secondary" data-act="end-turn"'
-    + (CT.state.winner || blockEnd ? " disabled" : "") + (blockEnd ? ' title="Discard down first"' : "")
-    + '>End turn →</button></div>'
-    + '</div>';
+
+  var endRow = CT.isSpectator() ? "" : '<div class="loc-footer__end">'
+    + '<span class="faint loc-footer__wait">' + (CT.isOnline() && !isMyTurn ? "Waiting for " + CT.esc(p.name) + "…" : "") + "</span>"
+    + '<button class="btn btn-loc btn-loc--cream" data-act="end-turn"'
+    + (CT.state.winner || blockEnd ? " disabled" : "") + ">End turn</button></div>";
+
+  return succBanner + body + roleSection
+    + (over && !CT.isSpectator() ? '<div class="loc-footer__warn">Hand over limit (' + p.actionCardIds.length + "). "
+        + '<button class="btn btn-loc btn-loc--gold btn-sm" data-act="fix-hand" data-id="' + p.id + '">Discard</button></div>' : "")
+    + endRow;
 }
 
-/* ---- players panel (public table §30 + manual controls §32) ---- */
-function playersPanel() {
+function courtPanel(spectator) {
   var ap = CT.activePlayer();
-  var blockEnd = ap && CT.overHandLimit(ap) && (!CT.isOnline() || ap.id === CT.myId());
-  var cards = CT.state.players.map(playerCard).join("");
-  return '<div class="panel"><div class="panel-head"><h2>The Court</h2>'
-    + '<button class="btn btn-secondary btn-sm" data-act="end-turn"'
-    + (CT.state.winner || blockEnd ? " disabled" : "") + '>End turn →</button>'
-    + '</div><hr class="rule"><div class="players">' + cards + '</div></div>';
+  var stubs = CT.state.players.map(function (p, i) {
+    return CT.courtStubHtml(p, { active: ap && p.id === ap.id, spectator: spectator, index: i });
+  }).join("");
+  var hostExtras = (!spectator && CT.testMode && CT.isHost())
+    ? '<details class="court-host"><summary>Referee seat controls</summary><div class="players players--detail">'
+      + CT.state.players.map(playerCard).join("") + "</div></details>"
+    : "";
+  return '<div class="v3b-panel v3b-panel--court">'
+    + '<header class="v3b-panel__head"><h2>The Court</h2>'
+    + (spectator ? '<span class="tag">read-only</span>' : "")
+    + "</header>"
+    + '<div class="court-grid">' + stubs + "</div>"
+    + hostExtras
+    + "</div>";
 }
+
+function boardPanel() { return kingdomPanel(); }
+function actionsPanel() { return ""; }
+function playersPanel() { return courtPanel(false); }
+
+function parleyPanelCompact() {
+  if (CT.isSpectator()) return "";
+  var off = CT.state.winner ? " disabled" : "";
+  function b(act, label) {
+    return '<button type="button" class="btn btn-parley" data-act="' + act + '"' + off + ">" + label + "</button>";
+  }
+  return '<div class="v3b-panel v3b-panel--parley">'
+    + '<div class="v3b-panel__head"><h2>Parley</h2><span class="faint" style="font-size:11px">Helpers</span></div>'
+    + '<div class="parley-row">'
+    + b("h-open-challenge", "Challenge") + b("h-open-vote", "Vote") + b("h-open-duel", "Duel")
+    + b("h-open-callout", "Call out") + b("h-open-trade", "Trade") + b("h-open-contract", "Pact")
+    + "</div></div>";
+}
+
 function playerCard(p) {
   var spec = CT.isSpectator();
   var i = CT.state.players.indexOf(p);
-  var active = p.id === CT.activePlayer().id;
+  var ap = CT.activePlayer();
+  var active = ap && p.id === ap.id;
   var role = CT.roleById(p.publicRoleId);
   var extra = p.extraShownRoleIds.map(function (id) { return CT.roleById(id).name; });
   var locName = CT.locationById(p.location).name;
@@ -629,7 +686,7 @@ function throneSuccPanel() {
   }
   var headBtns = spec ? '<span class="tag">read-only</span>'
     : '<button class="btn btn-gold btn-sm" data-act="h-open-royalclaim"' + off + '>Claim helper ♛</button>';
-  return '<div class="panel"><div class="panel-head"><h2>Throne &amp; Succession</h2>'
+  return '<div class="v3b-panel"><div class="v3b-panel__head"><h2>Throne &amp; Succession</h2>'
     + headBtns + '</div><hr class="rule">'
     + '<div class="stack" style="gap:6px">' + crownRow("king", "King") + crownRow("queen", "Queen")
     + (t.successorId ? crownRow("successor", "Successor") : "") + "</div>"
@@ -682,7 +739,7 @@ function logPanel() {
   var filters = LOG_FILTERS.map(function (f) {
     return '<button class="btn btn-sm log-filter' + (filt === f.id ? " on" : "") + '" data-act="log-filter" data-f="' + f.id + '">' + f.label + "</button>";
   }).join("");
-  return '<div class="panel"><div class="panel-head"><h2>Chronicle</h2>'
+  return '<div class="v3b-panel v3b-panel--log"><div class="v3b-panel__head"><h2>Chronicle</h2>'
     + '<span class="faint" style="font-size:12px">' + CT.state.log.length + " entries</span></div>"
     + '<div class="log-filters">' + filters + '</div><hr class="rule">'
     + '<div class="log">' + (entries || '<div class="empty">No entries for this filter.</div>') + "</div></div>";
@@ -1039,6 +1096,9 @@ CT.handleAction = function (act, el, ev) {
   switch (act) {
     case "log-filter":
       CT.ui.logFilter = el.dataset.f;
+      CT.render(); break;
+    case "play-tab":
+      CT.ui.playTab = el.dataset.tab || "play";
       CT.render(); break;
     case "create-room":
       CT.net.createRoom(5);

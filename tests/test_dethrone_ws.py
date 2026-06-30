@@ -89,6 +89,7 @@ def test_dethrone_v3b_board_asset(client):
     page = client.get("/dethrone")
     assert page.status_code == 200
     assert f"board.js?v={_DETHRONE_ASSET_VERSION}" in page.text
+    assert f"cards-court.js?v={_DETHRONE_ASSET_VERSION}" in page.text
 
     board = Path("static/dethrone/js/board.js").read_text(encoding="utf-8")
     assert "map-v3b" in board

@@ -34,15 +34,14 @@ CT.MAP_ROUTES = [
       ROYAL = "#8c2f23", CURSED = "#6b2420", MOSS = "#5a6e3a",
       KNIGHT = "#4a5568", GUARD = "#5b4c38", ADVISOR = "#2a2014";
 
-  var LOC_ACCENT = {
-    throne: ROYAL,
-    market: GUARD,
-    tavern: GUARD,
-    college: ADVISOR,
-    scrolls: ADVISOR,
-    barracks: KNIGHT,
-    graveyard: CURSED,
-  };
+  function locAccent(id) {
+    if (CT.LOCATION_ACCENT && CT.LOCATION_ACCENT[id]) return CT.LOCATION_ACCENT[id];
+    var fallback = {
+      throne: ROYAL, market: GUARD, tavern: GUARD, college: ADVISOR,
+      scrolls: ADVISOR, barracks: KNIGHT, graveyard: CURSED,
+    };
+    return fallback[id] || GUARD;
+  }
 
   var SERIF = "Iowan Old Style, Palatino Linotype, Palatino, Georgia, serif";
   var SANS = "Avenir Next, system-ui, sans-serif";
@@ -134,7 +133,7 @@ CT.MAP_ROUTES = [
   function node(id, legal, activeHere) {
     var loc = CT.locationById(id);
     var xy = CT.MAP_XY[id];
-    var accent = LOC_ACCENT[id] || GUARD;
+    var accent = locAccent(id);
     var hero = id === "throne";
     var cardW = hero ? 96 : 84;
     var cardH = hero ? 128 : 112;
