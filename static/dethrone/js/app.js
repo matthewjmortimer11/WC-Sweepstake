@@ -56,7 +56,11 @@ CT.netAction = function (msg) { if (CT.isOnline()) { CT.net.send(msg); return tr
 function shell(inner) {
   var testToggle = '<button class="btn btn-sm mode-toggle' + (CT.testMode ? " on" : "") + '" data-act="toggle-test" '
     + 'title="Show referee &amp; override tools">' + (CT.testMode ? "🔧 Test mode" : "Play mode") + '</button>';
-  return '<div class="app">'
+  var reconnect = (CT.net && CT.net.online && CT.net.routeCode && !CT.net.connected && !CT.net.error)
+    ? '<div class="panel" style="margin-bottom:12px;padding:10px 14px;background:var(--wax-soft);border-color:var(--wax)">'
+      + '<span class="muted" style="font-size:14px">Reconnecting to room ' + CT.esc(CT.net.routeCode) + '…</span></div>'
+    : "";
+  return reconnect + '<div class="app">'
     + '<div class="topbar"><div class="brand"><h1>The Cursed Throne</h1>'
     + '<span class="seal">' + (CT.net && CT.net.routeCode ? "Room " + CT.net.routeCode : (CT.testMode ? "Playtest Ledger" : "Court of Whispers")) + '</span></div>'
     + '<div class="btn-row">' + testToggle
@@ -87,12 +91,13 @@ function onlineLobbyScreen() {
   var count = settings.playerCount || 5;
   var players = (room.players || []).map(function (p) {
     return '<li>' + CT.esc(p.name) + (p.isHost ? ' <span class="tag gold">host</span>' : '')
+      + (p.isBot ? ' <span class="tag">bot</span>' : '')
       + (p.connected ? '' : ' <span class="tag">away</span>') + '</li>';
   }).join("") || '<li class="muted">Waiting for players…</li>';
   var countBtns = [4, 5, 6].map(function (c) {
     return '<button aria-pressed="' + (count === c) + '" data-act="lobby-count" data-n="' + c + '"' + (you.isHost ? "" : " disabled") + '>' + c + '</button>';
   }).join("");
-  var connected = (room.players || []).filter(function (p) { return p.connected; }).length;
+  var connected = (room.players || []).filter(function (p) { return p.connected || p.isBot; }).length;
   var canDeal = you.isHost && connected >= count;
   return '<div class="panel" style="max-width:560px;margin:24px auto">'
     + '<div class="eyebrow">Online room · <strong>' + CT.esc(room.code) + '</strong></div>'
@@ -105,7 +110,10 @@ function onlineLobbyScreen() {
     + '<ul class="stack" style="margin:8px 0 16px;padding-left:20px">' + players + '</ul>'
     + '<p class="muted" style="font-size:13px">Seats for this game</p>'
     + '<div class="seg" style="margin:8px 0 16px">' + countBtns + '</div>'
-    + '<div class="btn-row"><button class="btn btn-gold" data-act="deal-setup"' + (canDeal ? "" : " disabled") + '>Deal roles →</button></div>'
+    + '<div class="btn-row">'
+    + (you.isHost && connected < count ? '<button class="btn btn-secondary" data-act="fill-bots">Fill empty seats with bots</button>' : '')
+    + '<div class="spacer"></div>'
+    + '<button class="btn btn-gold" data-act="deal-setup"' + (canDeal ? "" : " disabled") + '>Deal roles →</button></div>'
     + '</div>';
 }
 
@@ -227,9 +235,11 @@ function actionsPanel() {
     body = '<p class="muted">' + (CT.state.winner ? "The game is over." : "This player is eliminated.") + '</p>';
   } else if (p.isBot) {
     body = '<div class="bot-controls"><p class="muted" style="margin:0 0 10px;font-size:14px">'
-      + CT.esc(p.name) + ' is a bot. Play their turn, or auto-play through every bot until it’s a human’s turn.</p>'
-      + '<div class="btn-row"><button class="btn btn-primary" data-act="bot-turn">▶ Play ' + CT.esc(p.name) + '’s turn</button>'
-      + '<button class="btn btn-gold" data-act="bot-auto">⏩ Auto-play bots</button></div></div>';
+      + CT.esc(p.name) + ' is a bot.'
+      + (CT.isOnline() && !CT.isHost() ? ' Waiting for the host to play their turn.' : ' Play their turn, or auto-play through every bot until it’s a human’s turn.') + '</p>'
+      + (CT.isOnline() && !CT.isHost() ? '' : '<div class="btn-row"><button class="btn btn-primary" data-act="bot-turn">▶ Play ' + CT.esc(p.name) + '’s turn</button>'
+      + '<button class="btn btn-gold" data-act="bot-auto">⏩ Auto-play bots</button></div>')
+      + '</div>';
   } else {
     body = '<div class="act-grid">' + buttons + '</div>';
   }
@@ -541,6 +551,9 @@ CT.handleAction = function (act, el, ev) {
     case "lobby-count":
       if (CT.isHost()) CT.net.send({ type: "setPlayerCount", playerCount: +el.dataset.n });
       break;
+    case "fill-bots":
+      if (CT.isHost()) CT.net.send({ type: "fillBots" });
+      break;
     case "deal-setup":
       if (CT.isHost()) CT.net.send({ type: "dealSetup" });
       break;
@@ -560,8 +573,18 @@ CT.handleAction = function (act, el, ev) {
     case "end-turn":
       if (CT.netAction({ type: "endTurn" })) break;
       CT.endTurn(); CT.render(); break;
-    case "bot-turn": { var bp = CT.activePlayer(); if (bp) CT.bot.takeTurn(bp.id); CT.render(); break; }
-    case "bot-auto": CT.bot.autoRun(); CT.render(); break;
+    case "bot-turn": {
+      var bp = CT.activePlayer();
+      if (CT.isOnline() && CT.isHost() && bp) {
+        CT.net.send({ type: "botTurn", playerId: bp.id });
+        break;
+      }
+      if (bp) CT.bot.takeTurn(bp.id);
+      CT.render(); break;
+    }
+    case "bot-auto":
+      if (CT.isOnline() && CT.isHost()) { CT.net.send({ type: "botAuto" }); break; }
+      CT.bot.autoRun(); CT.render(); break;
     case "adj": {
       var d = +el.dataset.d;
       if (CT.netAction({ type: el.dataset.key === "gold" ? "adjustGold" : "adjustRep", playerId: el.dataset.id, delta: d, reason: "manual" })) break;
@@ -625,7 +648,11 @@ CT.handleAction = function (act, el, ev) {
       CT.render(); break;
     }
     case "close-hand": CT.ui.handFixFor = null; CT.render(); break;
-    case "lose-role": CT.ui.roleDiscardFor = el.dataset.id; CT.ui.roleDiscardRevealed = false; CT.ui.afterDiscard = null; CT.render(); break;
+    case "lose-role":
+      if (CT.isOnline() && el.dataset.id !== CT.myId() && !CT.isHost()) break;
+      CT.ui.roleDiscardFor = el.dataset.id;
+      CT.ui.roleDiscardRevealed = CT.isOnline() && el.dataset.id === CT.myId();
+      CT.ui.afterDiscard = null; CT.render(); break;
     case "reveal-lose-role": CT.ui.roleDiscardRevealed = true; CT.render(); break;
     case "confirm-lose-role":
       if (CT.netAction({ type: "discardRole", playerId: CT.ui.roleDiscardFor, slot: el.dataset.slot, roleId: el.dataset.role })) {

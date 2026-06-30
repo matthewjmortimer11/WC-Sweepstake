@@ -176,6 +176,12 @@ def _dispatch(room, player, mtype: str, msg: dict) -> bool:
         g.set_player_count(int(msg.get("playerCount", 5)))
         return True
 
+    if mtype == "fillBots":
+        if not player.is_host:
+            raise MoveError("Only the host can add bots.")
+        manager.fill_bots(room)
+        return True
+
     if mtype == "dealSetup":
         if not player.is_host:
             raise MoveError("Only the host can deal roles.")
@@ -229,6 +235,7 @@ def _dispatch(room, player, mtype: str, msg: dict) -> bool:
             str(msg.get("playerId", player.id)),
             str(msg.get("slot", "")),
             str(msg.get("roleId", "")),
+            actor_id=player.id,
         )
         return True
 
@@ -265,6 +272,71 @@ def _dispatch(room, player, mtype: str, msg: dict) -> bool:
             raise MoveError("Host only.")
         g.declare_winner(str(msg.get("side", "")), "manual")
         return True
+
+    if mtype == "challenge":
+        g.resolve_challenge(
+            str(msg.get("claimantId", "")),
+            str(msg.get("challengerId", "")),
+            str(msg.get("power", "")),
+            bool(msg.get("valid")),
+        )
+        return True
+
+    if mtype == "formalVote":
+        g.apply_formal_vote(
+            str(msg.get("vtype", "accuse")),
+            str(msg.get("targetId", "")),
+            dict(msg.get("votes") or {}),
+            int(msg.get("bonusYes", 0)),
+            int(msg.get("bonusNo", 0)),
+        )
+        return True
+
+    if mtype == "duelFlee":
+        g.duel_flee(str(msg.get("defenderId", "")))
+        return True
+
+    if mtype == "duelConsequence":
+        g.duel_apply_consequence(
+            str(msg.get("attackerId", "")),
+            str(msg.get("defenderId", "")),
+            int(msg.get("attBonus", 0)),
+            int(msg.get("defBonus", 0)),
+            bool(msg.get("serious")),
+            str(msg.get("consequence", "")),
+            room.rng,
+        )
+        return True
+
+    if mtype == "royalClaim":
+        if msg.get("challengerId"):
+            g.royal_claim_resolved(
+                str(msg.get("claimantId", "")),
+                str(msg.get("challengerId", "")),
+                str(msg.get("crown", "king")),
+                bool(msg.get("valid")),
+            )
+        else:
+            g.royal_claim_unchallenged(str(msg.get("claimantId", "")), str(msg.get("crown", "king")))
+        return True
+
+    if mtype == "botTurn":
+        if not player.is_host:
+            raise MoveError("Only the host can run bots.")
+        g.bot_take_turn(str(msg.get("playerId", "")), room.rng)
+        return True
+
+    if mtype == "botAuto":
+        if not player.is_host:
+            raise MoveError("Only the host can auto-play bots.")
+        guard = 0
+        while guard < 80 and g.status == STATUS_PLAY and not g.winner:
+            ap = g.active_player()
+            if not ap or not ap.is_bot or ap.status != "active":
+                break
+            g.bot_take_turn(ap.id, room.rng)
+            guard += 1
+        return guard > 0
 
     if mtype == "callOut":
         g.call_out(player.id, str(msg.get("targetId", "")), str(msg.get("roleId", "")))
@@ -311,6 +383,10 @@ def _dispatch(room, player, mtype: str, msg: dict) -> bool:
 
     if mtype == "resolveSuccession":
         g.resolve_succession_claim(str(msg.get("claimId", "")))
+        return True
+
+    if mtype == "removeSuccessionClaim":
+        g.remove_succession_claim(str(msg.get("claimId", "")))
         return True
 
     if mtype == "closeSuccession":

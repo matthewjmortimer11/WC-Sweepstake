@@ -112,6 +112,74 @@ def test_wrong_player_cannot_move(client):
         assert err["type"] == "error"
 
 
+def _start_game(code: str, n: int = 4):
+    room, pids = _room_with_players(code, n)
+    manager.deal_setup(room)
+    g = room.game
+    for p in g.players:
+        pub = next(r for r in p.dealt_role_ids if D_ROLE_META_PUBLIC(r))
+        g.pick_public_role(p.id, pub)
+    manager.begin_game(room, "random", 0)
+    return room, pids, g
+
+
+def test_challenge_sets_pending_discard(client):
+    code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
+    room, pids, g = _start_game(code)
+    claimant, challenger = pids[0], pids[1]
+    g.resolve_challenge(claimant, challenger, "Stride", valid=True)
+    assert challenger in g.pending_role_discard
+    view = room.state_for(challenger)["room"]["game"]
+    assert view["pendingRoleDiscard"] is not None
+
+
+def test_formal_vote_accuse(client):
+    code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
+    room, pids, g = _start_game(code)
+    target = pids[2]
+    votes = {pid: "yes" for pid in pids}
+    g.apply_formal_vote("accuse", target, votes)
+    assert target in g.pending_role_discard
+
+
+def test_reconnect_mid_game(client):
+    code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
+    room, pids, g = _start_game(code)
+    pid = pids[0]
+    room.players[pid].connected = False
+    with client.websocket_connect(f"/dethrone/ws/{code}?pid={pid}&name=Rejoin") as ws:
+        hello = ws.receive_json()
+        assert hello["type"] == "hello"
+        state = ws.receive_json()
+        assert state["type"] == "state"
+        assert state["you"]["id"] == pid
+
+
+def test_fill_bots_and_bot_turn(client):
+    code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
+    room = manager.get(code)
+    manager.join(room, "human1", "Alice")
+    room.players["human1"].connected = True
+    manager.fill_bots(room)
+    assert len(room.players) == 4
+    manager.deal_setup(room)
+    g = room.game
+    for p in g.players:
+        pub = next(r for r in p.dealt_role_ids if D_ROLE_META_PUBLIC(r))
+        g.pick_public_role(p.id, pub)
+    manager.begin_game(room, "random", 0)
+    # find a bot active player or run until bot turn
+    for _ in range(8):
+        ap = g.active_player()
+        if ap and ap.is_bot:
+            g.bot_take_turn(ap.id, room.rng)
+            break
+        g.end_turn(ap.id)
+    else:
+        pytest.skip("No bot turn in sample")
+    assert g.round >= 1
+
+
 def D_ROLE_META_PUBLIC(role_id: str) -> bool:
     from dethrone.data import ROLE_META
     return ROLE_META.get(role_id, {}).get("canBePublic", True)

@@ -46,6 +46,7 @@ class PlayerState:
     action_card_ids: list[str] = field(default_factory=list)
     wounded: bool = False
     serious_duel_used: bool = False
+    is_bot: bool = False
     # setup only — dealt roles before public pick
     dealt_role_ids: list[str] = field(default_factory=list)
     setup_ready: bool = False
@@ -108,6 +109,7 @@ class CursedThroneGame:
         }
         # pending UI follow-ups keyed by player id
         self.pending_keep_one: dict[str, dict] = {}
+        self.pending_role_discard: dict[str, dict] = {}
 
     # ---- logging ----
     def _log(self, text: str, kind: str = "event") -> None:
@@ -132,8 +134,8 @@ class CursedThroneGame:
             raise MoveError(f"Player count must be {D.MIN_PLAYERS}–{D.MAX_PLAYERS}.")
         self.player_count = n
 
-    def assign_seats(self, seat_players: list[tuple[str, str]]) -> None:
-        """Map connected room players to game seats (id, name)."""
+    def assign_seats(self, seat_players: list[tuple[str, str, bool]]) -> None:
+        """Map room players to game seats (id, name, is_bot)."""
         if self.status not in (STATUS_LOBBY, STATUS_SETUP):
             raise MoveError("Cannot reassign seats mid-game.")
         n = self.player_count
@@ -142,8 +144,8 @@ class CursedThroneGame:
         if len(seat_players) > n:
             seat_players = seat_players[:n]
         self.players = [
-            PlayerState(id=pid, name=name)
-            for pid, name in seat_players
+            PlayerState(id=pid, name=name, is_bot=is_bot)
+            for pid, name, is_bot in seat_players
         ]
         self.player_ids = [p.id for p in self.players]
 
@@ -453,10 +455,24 @@ class CursedThroneGame:
         self._log(f"{p.name} kept one card and discarded the other.")
 
     # ---- role discard ----
-    def apply_role_discard(self, pid: str, slot: str, role_id: str) -> None:
+    def require_role_discard(self, player_id: str, reason: str, *, after: Optional[dict] = None) -> None:
+        p = self.player_by_id(player_id)
+        if not p or p.status != "active":
+            raise MoveError("Invalid player for role discard.")
+        self.pending_role_discard[player_id] = {"reason": reason, "after": after or {}}
+
+    def _role_bonus(self, p: PlayerState, key: str) -> int:
+        if not p.public_role_id:
+            return 0
+        return int(D.ROLE_META.get(p.public_role_id, {}).get(key, 0) or 0)
+
+    def apply_role_discard(self, pid: str, slot: str, role_id: str, *, actor_id: Optional[str] = None) -> None:
         p = self.player_by_id(pid)
         if not p:
             raise MoveError("Unknown player.")
+        pending = self.pending_role_discard.get(pid)
+        if pending and actor_id and actor_id != pid:
+            raise MoveError("Only the affected player can choose which role to lose.")
         meta = D.ROLE_META.get(role_id, {})
         name = meta.get("name", role_id)
         if slot == "public" and p.public_role_id == role_id:
@@ -472,6 +488,7 @@ class CursedThroneGame:
             raise MoveError("Invalid role discard.")
 
         if role_id == "cursedone":
+            self.pending_role_discard.pop(pid, None)
             self.declare_winner("loyal", "The Cursed One was revealed")
             return
 
@@ -489,6 +506,14 @@ class CursedThroneGame:
             self._log(f"{p.name} has no role cards left and is eliminated.", "event")
             if not self.winner:
                 self.set_innocent_elims(self.innocent_elims + 1, f"{p.name} eliminated")
+
+        after = self.pending_role_discard.pop(pid, None)
+        if after and not self.winner:
+            kind = after.get("after", {}).get("kind")
+            if kind == "vote_accuse":
+                self.adjust_corruption(2, "Cursed not revealed by accusation")
+            elif kind == "vote_banish" and after.get("after", {}).get("was_innocent"):
+                self.adjust_corruption(1, "innocent banished")
 
     def grant_extra_shown_role(self, caller_id: str, reason: str = "") -> None:
         p = self.player_by_id(caller_id)
@@ -570,6 +595,10 @@ class CursedThroneGame:
         self._log(f"{p.name if p else '?'} survives the claim window and takes the Throne as {rname}.", "system")
         self.throne["succession"] = {"open": False, "claims": []}
 
+    def remove_succession_claim(self, claim_id: str) -> None:
+        succ = self.throne["succession"]
+        succ["claims"] = [c for c in succ["claims"] if c["id"] != claim_id]
+
     # ---- contracts ----
     def add_contract(self, a_id: str, b_id: str, promise: str) -> None:
         self.contracts.append(Contract(id=_uid("ct"), a_id=a_id, b_id=b_id, promise=promise))
@@ -629,6 +658,239 @@ class CursedThroneGame:
             a.action_card_ids.append(b.action_card_ids.pop(card_ba_idx))
         self._log(f"{a.name} and {b.name} traded.")
 
+    # ---- social: challenge, vote, duel, royal claim ----
+    def resolve_challenge(self, claimant_id: str, challenger_id: str, power: str, valid: bool) -> None:
+        if self.status != STATUS_PLAY or self.winner:
+            raise MoveError("No active game.")
+        claimant = self.player_by_id(claimant_id)
+        challenger = self.player_by_id(challenger_id)
+        if not claimant or not challenger:
+            raise MoveError("Unknown player.")
+        label = power or "their power"
+        if valid:
+            self._log(
+                f"{claimant.name} proved \"{label}\". {challenger.name} challenged wrongly and must lose a role."
+            )
+            self.require_role_discard(challenger_id, "challenge")
+        else:
+            self._log(f"{claimant.name}'s \"{label}\" was a failed bluff and they must lose a role.")
+            self.require_role_discard(claimant_id, "challenge")
+
+    def apply_formal_vote(
+        self,
+        vtype: str,
+        target_id: str,
+        votes: dict[str, str],
+        bonus_yes: int = 0,
+        bonus_no: int = 0,
+    ) -> None:
+        if self.status != STATUS_PLAY or self.winner:
+            raise MoveError("No active game.")
+        target = self.player_by_id(target_id)
+        if not target:
+            raise MoveError("Unknown target.")
+        yes = bonus_yes
+        no = bonus_no
+        for p in self.players:
+            if p.status != "active":
+                continue
+            weight = 2 if p.rep >= 5 else 1
+            v = votes.get(p.id)
+            if v == "yes":
+                yes += weight
+            elif v == "no":
+                no += weight
+        passed = yes > no
+        if vtype == "accuse":
+            self._log(
+                f"Accusation vote against {target.name}: "
+                f"{'PASSES' if passed else 'fails'} ({yes}–{no})."
+            )
+            if passed:
+                self.require_role_discard(target_id, "vote", after={"kind": "vote_accuse"})
+        else:
+            was_innocent = "cursedone" not in target.hidden_role_ids
+            self._log(
+                f"Banishment vote against {target.name}: "
+                f"{'PASSES' if passed else 'fails'} ({yes}–{no})."
+            )
+            if passed:
+                self.require_role_discard(
+                    target_id, "vote",
+                    after={"kind": "vote_banish", "was_innocent": was_innocent},
+                )
+
+    def duel_flee(self, defender_id: str) -> None:
+        if self.status != STATUS_PLAY or self.winner:
+            raise MoveError("No active game.")
+        defender = self.player_by_id(defender_id)
+        if not defender:
+            raise MoveError("Unknown defender.")
+        self._log(
+            f"{defender.name} plays Flee — the duel is cancelled. Move up to 2 spaces (manual).",
+            "event",
+        )
+        self.adjust_rep(defender_id, -1, "Flee")
+
+    def duel_apply_consequence(
+        self,
+        attacker_id: str,
+        defender_id: str,
+        att_bonus: int,
+        def_bonus: int,
+        serious: bool,
+        consequence: str,
+        rng: random.Random,
+    ) -> None:
+        if self.status != STATUS_PLAY or self.winner:
+            raise MoveError("No active game.")
+        att = self.player_by_id(attacker_id)
+        defn = self.player_by_id(defender_id)
+        if not att or not defn:
+            raise MoveError("Unknown duelist.")
+        a_total = self._role_bonus(att, "duelBonusAttack") + att_bonus
+        d_total = self._role_bonus(defn, "duelBonusDefence") + def_bonus
+        attacker_wins = a_total > d_total
+        winner = att if attacker_wins else defn
+        loser = defn if attacker_wins else att
+        self._log(f"Duel: {winner.name} beat {loser.name} ({a_total}–{d_total}).")
+        if serious:
+            att.serious_duel_used = True
+        if consequence == "serious":
+            self.require_role_discard(loser.id, "serious duel")
+        elif consequence == "disarm":
+            count = min(2, len(loser.action_card_ids))
+            for _ in range(count):
+                if not loser.action_card_ids:
+                    break
+                idx = rng.randrange(len(loser.action_card_ids))
+                self.discard_card(loser.id, loser.action_card_ids[idx], "Disarm")
+        elif consequence == "shame":
+            self.adjust_rep(loser.id, -1, "Shame")
+        elif consequence == "wound":
+            loser.wounded = True
+            self._log(f"{loser.name} is Wounded — no hidden powers next turn.")
+        elif consequence == "drive":
+            moves = self.legal_moves(loser)
+            dest = moves[0] if moves else loser.location
+            if dest != loser.location:
+                self.move_player(loser.id, dest, manual=True)
+            self._log(f"{loser.name} was Driven Out.", "event")
+        elif consequence == "search":
+            self._log(
+                f"{winner.name} searches {loser.name} — resolve privately "
+                "(show a justifying role or lose 1 Rep).",
+                "note",
+            )
+
+    def royal_claim_unchallenged(self, claimant_id: str, crown: str) -> None:
+        self.set_throne_controller(crown, claimant_id, "claim")
+
+    def royal_claim_resolved(self, claimant_id: str, challenger_id: str, crown: str, valid: bool) -> None:
+        if valid:
+            self.set_throne_controller(crown, claimant_id, "claim upheld")
+            challenger = self.player_by_id(challenger_id)
+            if challenger:
+                self._log(f"{challenger.name} challenged the crown wrongly and must lose a role.")
+            self.require_role_discard(challenger_id, "royal claim")
+        else:
+            claimant = self.player_by_id(claimant_id)
+            if claimant:
+                self._log(f"{claimant.name}'s claim to the Throne was a bluff — they must lose a role.")
+            self.require_role_discard(claimant_id, "royal claim")
+
+    def disarm_random(self, player_id: str, n: int, rng: random.Random) -> int:
+        p = self.player_by_id(player_id)
+        if not p:
+            return 0
+        done = 0
+        for _ in range(min(n, len(p.action_card_ids))):
+            if not p.action_card_ids:
+                break
+            idx = rng.randrange(len(p.action_card_ids))
+            self.discard_card(player_id, p.action_card_ids[idx], "Disarm")
+            done += 1
+        return done
+
+    def _bot_step_toward(self, start: str, target: str) -> Optional[str]:
+        if start == target:
+            return None
+        queue: list[list[str]] = [[start]]
+        seen = {start}
+        while queue:
+            path = queue.pop(0)
+            last = path[-1]
+            for nbr in D.CONNECTIONS.get(last, []):
+                if nbr in seen:
+                    continue
+                if nbr == target:
+                    return path[1] if len(path) > 1 else nbr
+                seen.add(nbr)
+                queue.append(path + [nbr])
+        return None
+
+    def bot_is_cursed(self, p: PlayerState) -> bool:
+        return "cursedone" in p.hidden_role_ids
+
+    def bot_take_turn(self, player_id: str, rng: random.Random) -> None:
+        if self.status != STATUS_PLAY or self.winner:
+            return
+        p = self.player_by_id(player_id)
+        if not p or not p.is_bot or p.status != "active":
+            raise MoveError("Not a bot's turn.")
+        ap = self.active_player()
+        if not ap or ap.id != player_id:
+            raise MoveError("Not this bot's turn.")
+        cursed = self.bot_is_cursed(p)
+        moves = self.legal_moves(p)
+        if moves and rng.random() < 0.85:
+            dest = self._bot_step_toward(p.location, "graveyard") if cursed else rng.choice(moves)
+            if dest:
+                self.move_player(p.id, dest, manual=False, actor_id=p.id)
+        self._bot_act(p, cursed, rng)
+        guard = 0
+        while self.over_hand_limit(p) and guard < 10:
+            if not p.action_card_ids:
+                break
+            self.discard_card(p.id, p.action_card_ids[0], "hand limit")
+            guard += 1
+        if cursed and p.location == "graveyard" and self.corruption >= D.FINAL_RITE_CORRUPTION:
+            self._log(f"{p.name} performs the Final Rite at the Graveyard!", "system")
+            self.declare_winner("cursed", "Final Rite")
+            return
+        if not self.winner:
+            self.end_turn(p.id)
+
+    def _bot_act(self, p: PlayerState, cursed: bool, rng: random.Random) -> None:
+        loc = p.location
+        if cursed and loc == "graveyard" and p.gold >= 4:
+            self.do_location_action(p.id, "buy_grave")
+            return
+        if p.gold < 2:
+            if loc == "tavern":
+                self.do_location_action(p.id, "work_room")
+                return
+            if loc == "graveyard":
+                self.do_location_action(p.id, "scavenge")
+                return
+            if loc == "throne":
+                self.do_location_action(p.id, "petition")
+                return
+        acts = D.LOCATION_ACTIONS.get(loc, [])
+        doable = [
+            a for a in acts
+            if not a.get("manual") and p.gold >= a.get("cost", 0)
+            and not (a["id"] == "recover" and not (p.wounded or p.rep <= 2))
+        ]
+        if not doable:
+            return
+        basic = [a for a in doable if a.get("kind") == "basic"]
+        pick = basic[0] if basic and rng.random() < 0.7 else rng.choice(doable)
+        result = self.do_location_action(p.id, pick["id"])
+        if result.get("keepOne"):
+            cards = result["keepOne"]["cards"]
+            self.resolve_keep_one(p.id, result["keepOne"]["deck"], cards[0], cards[1])
+
     # ---- serialisation ----
     def _player_public(self, p: PlayerState, viewer_id: str) -> dict:
         is_self = p.id == viewer_id
@@ -647,7 +909,7 @@ class CursedThroneGame:
             "actionCardCount": len(p.action_card_ids),
             "wounded": p.wounded,
             "seriousDuelUsed": p.serious_duel_used,
-            "isBot": False,
+            "isBot": p.is_bot,
         }
 
     def _throne_public(self) -> dict:
@@ -681,6 +943,7 @@ class CursedThroneGame:
             "players": [self._player_public(p, pid) for p in self.players],
             "legalMoves": self.legal_moves(me) if me and self.status == STATUS_PLAY else [],
             "pendingKeepOne": self.pending_keep_one.get(pid),
+            "pendingRoleDiscard": self.pending_role_discard.get(pid),
             "setup": {
                 "dealtRoleIds": setup_dealt,
                 "setupReady": me.setup_ready if me else False,
@@ -697,7 +960,7 @@ class CursedThroneGame:
             players.append({
                 "id": p["id"],
                 "name": p["name"],
-                "isBot": False,
+                "isBot": p["isBot"],
                 "location": p["location"],
                 "gold": p["gold"],
                 "rep": p["rep"],
@@ -728,5 +991,6 @@ class CursedThroneGame:
             "undealtRoleIds": [],
             "legalMoves": v["legalMoves"],
             "pendingKeepOne": v["pendingKeepOne"],
+            "pendingRoleDiscard": v["pendingRoleDiscard"],
             "setup": v["setup"],
         }

@@ -49,6 +49,7 @@ class Player:
     name: str
     color: str = "#8c2f23"
     is_host: bool = False
+    is_bot: bool = False
     connected: bool = False
     last_seen: float = field(default_factory=time.time)
 
@@ -76,6 +77,7 @@ class Room:
                 "name": p.name,
                 "color": p.color,
                 "isHost": p.is_host,
+                "isBot": p.is_bot,
                 "connected": p.connected,
             })
         out.sort(key=lambda x: (not x["isHost"], x["name"].lower()))
@@ -159,13 +161,29 @@ class Manager:
         name = _clean_name(name)
         g = room.game
         existing = room.players.get(pid)
-        if existing is None and g.status == STATUS_PLAY:
-            raise MoveError("Game in progress — cannot join.")
         if existing:
             existing.name = name or existing.name
             existing.connected = True
             existing.last_seen = time.time()
             return existing
+        # Rejoin mid-game with the same device id
+        if g.status in (STATUS_SETUP, STATUS_PLAY) and pid in g.player_ids:
+            gp = g.player_by_id(pid)
+            seat_name = gp.name if gp else (name or "Player")
+            used = {p.color for p in room.players.values()}
+            color = next((c for c in _PALETTE if c not in used), secrets.choice(_PALETTE))
+            player = Player(
+                id=pid,
+                name=seat_name,
+                color=color,
+                connected=True,
+                is_bot=bool(gp and gp.is_bot),
+                is_host=(room.host_id == pid),
+            )
+            room.players[pid] = player
+            return player
+        if g.status == STATUS_PLAY:
+            raise MoveError("Game in progress — reconnect with the same device or wait for a new game.")
         if g.status == STATUS_SETUP:
             raise MoveError("Setup in progress — reconnect with the same device.")
         if len(room.players) >= g.player_count and g.status == STATUS_LOBBY:
@@ -208,12 +226,27 @@ class Manager:
             if pid in room.players:
                 room.players[pid].connected = False
 
-    def connected_seats(self, room: Room) -> list[tuple[str, str]]:
-        return [
-            (p.id, p.name)
-            for p in sorted(room.players.values(), key=lambda x: x.name.lower())
-            if p.connected
-        ]
+    def connected_seats(self, room: Room) -> list[tuple[str, str, bool]]:
+        seats = []
+        for p in sorted(room.players.values(), key=lambda x: (x.is_bot, x.name.lower())):
+            if p.connected or p.is_bot:
+                seats.append((p.id, p.name, p.is_bot))
+        return seats
+
+    def fill_bots(self, room: Room) -> None:
+        g = room.game
+        if g.status != STATUS_LOBBY:
+            raise MoveError("Can only add bots before dealing.")
+        while len(room.players) < g.player_count:
+            n = sum(1 for p in room.players.values() if p.is_bot) + 1
+            bid = f"bot-{secrets.token_hex(4)}"
+            room.players[bid] = Player(
+                id=bid,
+                name=f"Bot {n}",
+                color=secrets.choice(_PALETTE),
+                connected=True,
+                is_bot=True,
+            )
 
     def deal_setup(self, room: Room) -> None:
         g = room.game

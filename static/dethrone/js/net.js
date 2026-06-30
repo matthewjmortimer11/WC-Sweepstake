@@ -86,6 +86,17 @@ CT.net.applyState = function (msg) {
     } else if (!cs.pendingKeepOne) {
       CT.ui.keepOne = null;
     }
+    if (cs.pendingRoleDiscard && CT.myId()) {
+      CT.ui.roleDiscardFor = CT.myId();
+      CT.ui.roleDiscardRevealed = true;
+    } else if (!cs.pendingRoleDiscard || CT.ui.roleDiscardFor === CT.myId()) {
+      if (!CT.ui.roleDiscardFor || CT.ui.roleDiscardFor === CT.myId()) {
+        if (!cs.pendingRoleDiscard) {
+          CT.ui.roleDiscardFor = null;
+          CT.ui.roleDiscardRevealed = false;
+        }
+      }
+    }
   } else if (!CT.net.localMode && msg.room && msg.room.game && msg.room.game.status === "lobby") {
     CT.state = null;
   }
@@ -109,6 +120,7 @@ CT.net.connect = function (code) {
     CT.net.connected = true;
     CT.net.reconnectDelay = 800;
     CT.net.startPing();
+    CT.render();
   };
   CT.net.ws.onmessage = function (ev) {
     var msg;
@@ -132,6 +144,8 @@ CT.net.connect = function (code) {
     CT.net.connected = false;
     clearInterval(CT.net.pingTimer);
     if (CT.net.error) return;
+    CT.net.toast("Connection lost — reconnecting…");
+    CT.render();
     clearTimeout(CT.net.reconnectTimer);
     CT.net.reconnectTimer = setTimeout(function () {
       CT.net.reconnectDelay = Math.min(CT.net.reconnectDelay * 1.5, 8000);

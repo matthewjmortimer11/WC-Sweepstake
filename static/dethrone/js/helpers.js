@@ -215,17 +215,29 @@ CT.helpers.vRoyalClaim = function () {
 };
 CT.helpers.applyRoyalTake = function () {
   var u = CT.helpers.ui;
+  if (CT.isOnline()) {
+    CT.net.send({ type: "royalClaim", claimantId: u.claimant, crown: u.crown });
+    u.open = null; return CT.render();
+  }
   CT.setThroneController(u.crown, u.claimant, "claim");
   u.open = null; CT.render();
 };
 CT.helpers.applyRoyalProved = function () {
   var u = CT.helpers.ui;
+  if (CT.isOnline()) {
+    CT.net.send({ type: "royalClaim", claimantId: u.claimant, challengerId: u.challenger, crown: u.crown, valid: true });
+    u.open = null; return CT.render();
+  }
   CT.setThroneController(u.crown, u.claimant, "claim upheld");
   CT.log(CT.playerById(u.challenger).name + " challenged the crown wrongly and must lose a role.");
   CT.ui.roleDiscardFor = u.challenger; CT.ui.roleDiscardRevealed = false; u.open = null; CT.render();
 };
 CT.helpers.applyRoyalBluff = function () {
   var u = CT.helpers.ui;
+  if (CT.isOnline()) {
+    CT.net.send({ type: "royalClaim", claimantId: u.claimant, challengerId: u.challenger, crown: u.crown, valid: false });
+    u.open = null; return CT.render();
+  }
   CT.log(CT.playerById(u.claimant).name + "'s claim to the Throne was a bluff — they must lose a role.");
   CT.ui.roleDiscardFor = u.claimant; CT.ui.roleDiscardRevealed = false; u.open = null; CT.render();
 };
@@ -262,9 +274,17 @@ CT.helpers.handle = function (act, el) {
     case "h-cl-challenger": u.challenger = el.value; return CT.render();
     case "h-cl-power": u.power = el.value; return; // silent
     case "h-ch-valid":
+      if (CT.isOnline()) {
+        CT.net.send({ type: "challenge", claimantId: u.claimant, challengerId: u.challenger, power: u.power || "", valid: true });
+        u.open = null; return CT.render();
+      }
       CT.log(CT.playerById(u.claimant).name + " proved \"" + (u.power || "their power") + "\". " + CT.playerById(u.challenger).name + " challenged wrongly and must lose a role.");
       CT.ui.roleDiscardFor = u.challenger; CT.ui.roleDiscardRevealed = false; u.open = null; return CT.render();
     case "h-ch-bluff":
+      if (CT.isOnline()) {
+        CT.net.send({ type: "challenge", claimantId: u.claimant, challengerId: u.challenger, power: u.power || "", valid: false });
+        u.open = null; return CT.render();
+      }
       CT.log(CT.playerById(u.claimant).name + "'s \"" + (u.power || "claim") + "\" was a failed bluff and they must lose a role.");
       CT.ui.roleDiscardFor = u.claimant; CT.ui.roleDiscardRevealed = false; u.open = null; return CT.render();
 
@@ -356,13 +376,23 @@ CT.helpers.handle = function (act, el) {
     case "h-succ-resolve":
       if (CT.isOnline()) { CT.net.send({ type: "resolveSuccession", claimId: el.dataset.id }); return CT.render(); }
       CT.resolveSuccessionClaim(el.dataset.id); return CT.render();
-    case "h-succ-remove": CT.removeSuccessionClaim(el.dataset.id); return CT.render();
+    case "h-succ-remove":
+      if (CT.isOnline()) { CT.net.send({ type: "removeSuccessionClaim", claimId: el.dataset.id }); return CT.render(); }
+      CT.removeSuccessionClaim(el.dataset.id); return CT.render();
   }
 };
 
 /* ---------- apply functions ---------- */
 CT.helpers.applyVote = function () {
   var u = CT.helpers.ui, ps = actives();
+  if (CT.isOnline()) {
+    CT.net.send({
+      type: "formalVote", vtype: u.vtype, targetId: u.target,
+      votes: u.votes, bonusYes: u.bonusYes, bonusNo: u.bonusNo,
+    });
+    u.open = null;
+    return;
+  }
   var yes = 0, no = 0;
   ps.forEach(function (p) { var w = p.rep >= 5 ? 2 : 1; if (u.votes[p.id] === "yes") yes += w; else if (u.votes[p.id] === "no") no += w; });
   yes += u.bonusYes; no += u.bonusNo;
@@ -387,6 +417,11 @@ CT.helpers.applyVote = function () {
 
 CT.helpers.applyFlee = function () {
   var u = CT.helpers.ui, def = CT.playerById(u.def);
+  if (CT.isOnline()) {
+    CT.net.send({ type: "duelFlee", defenderId: u.def });
+    u.open = null;
+    return;
+  }
   CT.log(def.name + " plays Flee — the duel is cancelled. Move up to 2 spaces (manual).", "event");
   CT.adjustRep(u.def, -1, "Flee");
   u.open = null; CT.render();
@@ -394,6 +429,16 @@ CT.helpers.applyFlee = function () {
 
 CT.helpers.applyDuelConseq = function (c) {
   var u = CT.helpers.ui;
+  if (CT.isOnline()) {
+    CT.net.send({
+      type: "duelConsequence",
+      attackerId: u.att, defenderId: u.def,
+      attBonus: +u.attBonus || 0, defBonus: +u.defBonus || 0,
+      serious: !!u.serious, consequence: c,
+    });
+    u.open = null;
+    return;
+  }
   var att = CT.playerById(u.att), def = CT.playerById(u.def);
   var aT = roleBonus(att, "duelBonusAttack") + (+u.attBonus || 0);
   var dT = roleBonus(def, "duelBonusDefence") + (+u.defBonus || 0);

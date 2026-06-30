@@ -41,8 +41,10 @@ A **Parley & Conflict** panel launches helpers that guide + log; social judgemen
 - **Blood Contract (§25)**: sworn pacts tracked in a **Pacts** panel; marking one broken docks the breaker 1 Rep and adds corruption +1.
 
 ### Solo testing — bots
-- At setup, mark any seat **Bot** (default: seat 1 is you, the rest are bots) so one person can exercise the systems. Bots skip pass-and-play (they auto-pick a public role).
-- On a bot's turn you get **▶ Play turn** (one bot turn) and **⏩ Auto-play bots** (runs every bot until it's a human's turn or the game ends). Bots are a simple rules engine — move → one affordable location action → end turn; the Cursed bot heads to the Graveyard, buys corruption, and performs the Final Rite when corruption ≥ 8. Not a real opponent (the game is social) — just a flow-testing aid.
+
+- **Online:** in the lobby, the host can **Fill empty seats with bots**, then deal as normal. The host runs bot turns with ▶ / ⏩ (server-side logic).
+- **Local:** mark any seat **Bot** at setup so one person can exercise the systems on one device.
+- Bots are a simple rules engine — not a real opponent (the game is social), but they exercise board/economy/win conditions.
 
 ### Phase 2 — Core play
 - **Legal movement**: the active player's connected locations are highlighted on the board; click one to move there. The per-player "Move to" dropdown remains as a manual override.
