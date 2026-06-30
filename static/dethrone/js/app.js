@@ -412,7 +412,7 @@ function throneLabel() {
   return names.length ? names.join(" & ") : "Vacant";
 }
 
-/* ---- board: hand-drawn weathered map (see board.js) ---- */
+/* ---- board: V3b editorial kingdom map (see board.js) ---- */
 function boardPanel() {
   var ap = CT.activePlayer();
   var hint = CT.isSpectator()

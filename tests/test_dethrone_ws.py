@@ -81,6 +81,23 @@ def test_dethrone_role_card_assets(client):
     assert "king-card-v3b-poker.png" in r.text
 
 
+def test_dethrone_v3b_board_asset(client):
+    from pathlib import Path
+
+    from dethrone.router import _DETHRONE_ASSET_VERSION
+
+    page = client.get("/dethrone")
+    assert page.status_code == 200
+    assert f"board.js?v={_DETHRONE_ASSET_VERSION}" in page.text
+
+    board = Path("static/dethrone/js/board.js").read_text(encoding="utf-8")
+    assert "map-v3b" in board
+    assert 'viewBox="0 0 720 920"' in board
+    assert 'data-act="board-move"' in board
+    assert "CT.MAP_ROUTES" in board
+    assert len(board) > 2000
+
+
 def test_hidden_roles_not_leaked(client):
     code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
     room, pids = _room_with_players(code, 4)
