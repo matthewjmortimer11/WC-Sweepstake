@@ -96,6 +96,7 @@ class Room:
                     "minPlayers": D.MIN_PLAYERS,
                     "maxPlayers": D.MAX_PLAYERS,
                     "playerCount": g.player_count,
+                    "balance": dict(g.balance),
                 },
                 "game": g.view(pid),
                 "clientState": client,

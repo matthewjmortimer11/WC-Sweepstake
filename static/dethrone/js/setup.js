@@ -216,7 +216,9 @@ CT.setup.handle = function (act, el) {
       s.privateRevealed = false; CT.render(); break;
     case "first-mode": s.firstMode = el.dataset.m; CT.render(); break;
     case "first-pick": s.firstPlayerIndex = +el.value; break;
-    case "begin-game": s.finish(); break;
+    case "begin-game":
+      if (CT.testMode && CT.readBalanceFromUI) CT.pendingBalance = CT.readBalanceFromUI();
+      s.finish(); break;
   }
 };
 

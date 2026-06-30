@@ -64,7 +64,8 @@ function shell(inner) {
     + '<div class="topbar"><div class="brand"><h1>The Cursed Throne</h1>'
     + '<span class="seal">' + (CT.net && CT.net.routeCode ? "Room " + CT.net.routeCode : (CT.testMode ? "Playtest Ledger" : "Court of Whispers")) + '</span></div>'
     + '<div class="btn-row">' + testToggle
-    + (CT.state ? '<button class="btn btn-ghost btn-sm" data-act="export">Export</button>'
+    + (CT.state ? '<button class="btn btn-ghost btn-sm" data-act="export-report">Report</button>'
+        + '<button class="btn btn-ghost btn-sm" data-act="export">Export</button>'
         + '<button class="btn btn-ghost btn-sm" data-act="show-import">Import</button>'
         + '<button class="btn btn-secondary btn-sm" data-act="new-game">New game</button>' : "")
     + '</div></div>' + inner + '</div>';
@@ -72,6 +73,10 @@ function shell(inner) {
 
 /* ============ start (empty state) ============ */
 function startScreen() {
+  var balBlock = CT.testMode
+    ? '<div class="panel" style="max-width:560px;margin:16px auto 0;text-align:left"><h3 style="margin:0 0 8px">Balance toggles</h3>'
+      + CT.balancePanel(CT.pendingBalance || CT.DEFAULT_BALANCE, true) + '</div>'
+    : "";
   return '<div class="panel" style="max-width:620px;margin:24px auto">'
     + '<div class="empty">'
     + '<div class="seal-big" style="margin-bottom:16px">✦</div>'
@@ -83,7 +88,7 @@ function startScreen() {
     + '<button class="btn btn-primary" data-act="start-setup">Local pass-and-play</button>'
     + '</div>'
     + '<p class="muted" style="font-size:13px;margin-top:20px">Already have a code? Open the invite link, or add <code>#/room/ABCD</code> to this URL.</p>'
-    + '</div></div>';
+    + '</div></div>' + balBlock;
 }
 
 function onlineLobbyScreen() {
@@ -110,6 +115,8 @@ function onlineLobbyScreen() {
     + '<ul class="stack" style="margin:8px 0 16px;padding-left:20px">' + players + '</ul>'
     + '<p class="muted" style="font-size:13px">Seats for this game</p>'
     + '<div class="seg" style="margin:8px 0 16px">' + countBtns + '</div>'
+    + (you.isHost ? '<h3 style="margin:16px 0 8px">Balance toggles</h3>'
+      + CT.balancePanel((room.settings && room.settings.balance) || CT.DEFAULT_BALANCE, true) : "")
     + '<div class="btn-row">'
     + (you.isHost && connected < count ? '<button class="btn btn-secondary" data-act="fill-bots">Fill empty seats with bots</button>' : '')
     + '<div class="spacer"></div>'
@@ -174,15 +181,16 @@ function winBanner() {
 
 function trackers() {
   var s = CT.state, ap = CT.activePlayer();
-  var corrPct = Math.round((s.corruption / CT.CONST.CORRUPTION_MAX) * 100);
-  var warn = s.corruption >= CT.CONST.FINAL_RITE_CORRUPTION;
+  var R = CT.getRules();
+  var corrPct = Math.round((s.corruption / R.CORRUPTION_MAX) * 100);
+  var warn = s.corruption >= R.FINAL_RITE_CORRUPTION;
   var throne = throneLabel();
   return '<div class="trackers">'
     + tracker("Round", s.round)
     + tracker("Active player", ap ? ap.name : "—", "active")
-    + '<div class="tracker danger"><div class="k">Corruption</div><div class="v">' + s.corruption + ' / 10</div>'
+    + '<div class="tracker danger"><div class="k">Corruption</div><div class="v">' + s.corruption + ' / ' + R.CORRUPTION_MAX + '</div>'
     + '<div class="vial' + (warn ? " warn" : "") + '"><span style="width:' + corrPct + '%"></span></div></div>'
-    + tracker("Innocents lost", s.innocentElims + " / 2", s.innocentElims >= 1 ? "danger" : "")
+    + tracker("Innocents lost", s.innocentElims + " / " + R.INNOCENT_ELIMS_TO_LOSE, s.innocentElims >= 1 ? "danger" : "")
     + tracker("Throne", throne, "gold")
     + '</div>';
 }
@@ -247,7 +255,7 @@ function actionsPanel() {
     + (p.isBot ? ' <span class="tag">BOT</span>' : '') + '</h2>'
     + '<span class="tag gold">📍 ' + loc.name + '</span></div><hr class="rule">'
     + body
-    + (over ? '<div class="reminder">Hand is over the limit of ' + CT.CONST.HAND_LIMIT + ' (' + p.actionCardIds.length + ' cards). '
+    + (over ? '<div class="reminder">Hand is over the limit of ' + CT.getRules().HAND_LIMIT + ' (' + p.actionCardIds.length + ' cards). '
         + '<button class="btn btn-secondary btn-sm" data-act="fix-hand" data-id="' + p.id + '">Discard down</button></div>' : "")
     + '<div class="btn-row" style="margin-top:14px"><span class="faint" style="font-size:12px;align-self:center">'
     + (CT.isOnline() && !isMyTurn ? "Waiting for " + CT.esc(p.name) + "…" : "Movement & actions can also be overridden below.") + '</span>'
@@ -397,6 +405,8 @@ function manualGlobal() {
     + '<button class="btn btn-secondary btn-sm" data-act="win" data-side="loyal">Loyal</button>'
     + '<button class="btn btn-danger btn-sm" data-act="win" data-side="cursed">Cursed</button></div></div>'
     + '</div>'
+    + '<h2 style="margin:18px 0 8px">Balance toggles</h2>'
+    + CT.balancePanel(s.balance || CT.DEFAULT_BALANCE, true)
     + '<label class="field" style="margin:16px 0 0"><span class="lbl">Add a playtest note to the log</span>'
     + '<div class="row"><input type="text" id="note-input" placeholder="e.g. Shannon promised Paul a vote at the Tavern" style="flex:1">'
     + '<button class="btn btn-primary" data-act="add-note">Log it</button></div></label>'
@@ -474,7 +484,7 @@ function handFixView() {
   }).join("");
   return '<div class="scrim"><div class="modal" style="max-width:600px">'
     + '<div class="eyebrow">' + CT.esc(p.name) + ' · private</div>'
-    + '<h2 style="margin:6px 0 4px">Discard down to ' + CT.CONST.HAND_LIMIT + '</h2>'
+    + '<h2 style="margin:6px 0 4px">Discard down to ' + CT.getRules().HAND_LIMIT + '</h2>'
     + '<p class="muted" style="font-size:14px;margin:0 0 12px">' + p.actionCardIds.length + ' cards in hand. Others, look away.</p>'
     + '<div class="stack">' + cards + '</div>'
     + '<div class="btn-row" style="margin-top:16px"><div class="spacer"></div>'
@@ -668,6 +678,20 @@ CT.handleAction = function (act, el, ev) {
       CT.ui.privateFor = el.dataset.id; CT.ui.privateRevealed = CT.isOnline(); CT.render(); break;
     case "reveal-private-view": CT.ui.privateRevealed = true; CT.render(); break;
     case "close-private": CT.ui.privateFor = null; CT.ui.privateRevealed = false; CT.render(); break;
+    case "export-report":
+      if (CT.isOnline()) {
+        fetch("/dethrone/api/rooms/" + CT.net.routeCode + "/report").then(function (r) { return r.json(); })
+          .then(function (d) {
+            var blob = new Blob([d.markdown], { type: "text/markdown" });
+            var url = URL.createObjectURL(blob);
+            var a = document.createElement("a");
+            a.href = url; a.download = d.filename || "report.md";
+            document.body.appendChild(a); a.click(); document.body.removeChild(a);
+          }).catch(function () { CT.showToast("Could not export report."); });
+      } else {
+        CT.downloadPlaytestReport();
+      }
+      break;
     case "export": doExport(); break;
     case "show-import": CT.ui.showImport = true; CT.render(); break;
     case "close-import": CT.ui.showImport = false; CT.render(); break;
@@ -689,6 +713,17 @@ CT.handleChange = function (act, el) {
   }
 };
 CT.handleInput = function (act, el) {
+  if (act.indexOf("bal-") === 0) {
+    var bal = CT.readBalanceFromUI();
+    if (CT.isOnline() && CT.isHost()) {
+      clearTimeout(CT._balTimer);
+      CT._balTimer = setTimeout(function () { CT.net.send({ type: "setBalance", balance: bal }); }, 300);
+    } else if (CT.testMode) {
+      CT.pendingBalance = bal;
+      if (CT.state) CT.state.balance = Object.assign({}, bal);
+    }
+    return;
+  }
   if (act === "lobby-name") {
     CT.net.saveName(el.value);
     CT.net.queueRename(el.value);

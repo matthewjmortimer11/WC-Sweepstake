@@ -61,13 +61,6 @@ async def dethrone_page() -> HTMLResponse:
     return HTMLResponse(content=html, headers={"Content-Security-Policy": _DETHRONE_CSP})
 
 
-@router.get("/dethrone/{filename:path}")
-async def dethrone_static(filename: str) -> FileResponse:
-    path = _safe_static(filename)
-    media = _MEDIA.get(path.suffix, "application/octet-stream")
-    return FileResponse(path, media_type=media)
-
-
 @router.post("/dethrone/api/rooms")
 async def create_room(request: Request) -> JSONResponse:
     _rate_limit_create(request)
@@ -82,6 +75,28 @@ async def create_room(request: Request) -> JSONResponse:
     room = manager.create_room()
     room.game.set_player_count(player_count)
     return JSONResponse({"code": room.code, "playerCount": room.game.player_count})
+
+
+@router.get("/dethrone/api/rooms/{code}/report")
+async def room_report(code: str) -> JSONResponse:
+    manager.start()
+    room = manager.get(code)
+    if room is None:
+        raise HTTPException(status_code=404, detail="Room not found.")
+    g = room.game
+    if g.status == STATUS_LOBBY:
+        raise HTTPException(status_code=400, detail="Game has not started.")
+    return JSONResponse({
+        "markdown": g.export_report(room.code),
+        "filename": f"cursed-throne-{room.code}.md",
+    })
+
+
+@router.get("/dethrone/{filename:path}")
+async def dethrone_static(filename: str) -> FileResponse:
+    path = _safe_static(filename)
+    media = _MEDIA.get(path.suffix, "application/octet-stream")
+    return FileResponse(path, media_type=media)
 
 
 @router.websocket("/dethrone/ws/{code}")
@@ -174,6 +189,14 @@ def _dispatch(room, player, mtype: str, msg: dict) -> bool:
         if g.status != STATUS_LOBBY:
             raise MoveError("Game already started.")
         g.set_player_count(int(msg.get("playerCount", 5)))
+        return True
+
+    if mtype == "setBalance":
+        if not player.is_host:
+            raise MoveError("Only the host can change balance.")
+        bal = msg.get("balance")
+        if isinstance(bal, dict):
+            g.set_balance(bal)
         return True
 
     if mtype == "fillBots":

@@ -180,6 +180,30 @@ def test_fill_bots_and_bot_turn(client):
     assert g.round >= 1
 
 
+def test_action_deck_has_76_cards():
+    from dethrone import data as d
+    assert len(d.ACTION_CARDS) == 76
+    assert len(d.CARDS_BY_DECK["Market"]) == 13
+
+
+def test_balance_settings(client):
+    code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
+    room = manager.get(code)
+    room.game.set_balance({"corruptionMax": 12, "finalRiteAt": 9})
+    assert room.game._rule("corruptionMax") == 12
+    assert room.game._rule("finalRiteAt") == 9
+
+
+def test_report_endpoint(client):
+    code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
+    room, _, g = _start_game(code)
+    r = client.get(f"/dethrone/api/rooms/{code}/report")
+    assert r.status_code == 200
+    md = r.json()["markdown"]
+    assert "Playtest Report" in md
+    assert "Chronicle" in md
+
+
 def D_ROLE_META_PUBLIC(role_id: str) -> bool:
     from dethrone.data import ROLE_META
     return ROLE_META.get(role_id, {}).get("canBePublic", True)

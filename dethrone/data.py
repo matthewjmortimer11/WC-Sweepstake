@@ -142,6 +142,37 @@ SUCCESSION: dict[str, dict] = {
     "distantcousin": {"rank": 4, "window": 3},
 }
 
+DEFAULT_BALANCE: dict[str, int] = {
+    "handLimit": HAND_LIMIT,
+    "corruptionMax": CORRUPTION_MAX,
+    "finalRiteAt": FINAL_RITE_CORRUPTION,
+    "innocentElimsToLose": INNOCENT_ELIMS_TO_LOSE,
+    "startGold": START_GOLD,
+    "startRep": START_REP,
+}
+
+EXTRA_ACTION_CARD_IDS: list[tuple[str, str]] = [
+    ("merchants_map", "Market"), ("smugglers_run", "Market"), ("guild_seal", "Market"),
+    ("loaded_dice", "Market"), ("fence", "Market"), ("caravan_manifest", "Market"),
+    ("spare_coin_purse", "Market"), ("market_day", "Market"),
+    ("bought_round", "Tavern"), ("tavern_brawl", "Tavern"), ("whisper_network", "Tavern"),
+    ("loan_shark", "Tavern"), ("stitched_lip", "Tavern"), ("performers_tale", "Tavern"),
+    ("hangover_cure", "Tavern"), ("sow_doubt", "Tavern"),
+    ("study_companion", "Knowledge"), ("sealed_warrant", "Knowledge"), ("witness_statement", "Knowledge"),
+    ("old_prophecy", "Knowledge"), ("map_of_tunnels", "Knowledge"), ("court_summons", "Knowledge"),
+    ("alibi_check", "Knowledge"), ("secret_ledger", "Knowledge"),
+    ("training_dummy", "Barracks"), ("second_blade", "Barracks"), ("parry", "Barracks"),
+    ("intimidate", "Barracks"), ("challenged_again", "Barracks"), ("iron_gauntlet", "Barracks"),
+    ("veterans_warning", "Barracks"),
+    ("mourning_veil", "Graveyard"), ("spirit_coin", "Graveyard"), ("bone_dice", "Graveyard"),
+    ("grave_dust", "Graveyard"), ("last_rites", "Graveyard"), ("stolen_offering", "Graveyard"),
+    ("wraith_whisper", "Graveyard"), ("forbidden_tome", "Graveyard"),
+    ("queens_favour", "Royal"), ("succession_edict", "Royal"), ("herald", "Royal"),
+    ("royal_purse", "Royal"), ("banish_letter", "Royal"), ("kneel", "Royal"), ("crown_witness", "Royal"),
+]
+
+ACTION_CARDS = ACTION_CARDS + [{"id": cid, "deck": deck} for cid, deck in EXTRA_ACTION_CARD_IDS]
+
 CARDS_BY_DECK: dict[str, list[str]] = {}
 for _card in ACTION_CARDS:
     CARDS_BY_DECK.setdefault(_card["deck"], []).append(_card["id"])

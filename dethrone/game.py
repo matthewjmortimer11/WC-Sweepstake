@@ -110,6 +110,59 @@ class CursedThroneGame:
         # pending UI follow-ups keyed by player id
         self.pending_keep_one: dict[str, dict] = {}
         self.pending_role_discard: dict[str, dict] = {}
+        self.balance: dict[str, int] = dict(D.DEFAULT_BALANCE)
+
+    def _rule(self, key: str) -> int:
+        return int(self.balance.get(key, D.DEFAULT_BALANCE[key]))
+
+    def set_balance(self, updates: dict) -> None:
+        if self.status not in (STATUS_LOBBY, STATUS_SETUP):
+            raise MoveError("Balance can only change before the game begins.")
+        allowed = set(D.DEFAULT_BALANCE.keys())
+        for k, v in updates.items():
+            if k in allowed and isinstance(v, (int, float)):
+                self.balance[k] = int(v)
+        # Final Rite must be below corruption max
+        if self.balance["finalRiteAt"] >= self.balance["corruptionMax"]:
+            self.balance["finalRiteAt"] = self.balance["corruptionMax"] - 1
+
+    def export_report(self, room_code: str = "") -> str:
+        """Markdown playtest report (public info only)."""
+        lines = [
+            "# The Cursed Throne — Playtest Report",
+            "",
+            f"Generated: {time.strftime('%Y-%m-%d %H:%M UTC', time.gmtime())}",
+        ]
+        if room_code:
+            lines.append(f"Room: {room_code}")
+        lines.extend([
+            "",
+            "## Outcome",
+            f"- **Winner:** {'Loyal players' if self.winner == 'loyal' else 'Cursed player' if self.winner == 'cursed' else 'In progress'}",
+            f"- **Corruption:** {self.corruption} / {self._rule('corruptionMax')}",
+            f"- **Innocents lost:** {self.innocent_elims} / {self._rule('innocentElimsToLose')}",
+            f"- **Rounds:** {self.round}",
+            "",
+            "## Balance",
+        ])
+        for k, v in self.balance.items():
+            lines.append(f"- {k}: {v}")
+        lines.extend(["", "## Players"])
+        for p in self.players:
+            role = D.ROLE_META.get(p.public_role_id or "", {}).get("name", "—")
+            loc = next((l["name"] for l in D.LOCATIONS if l["id"] == p.location), p.location)
+            lines.extend([
+                f"### {p.name}" + (" (bot)" if p.is_bot else ""),
+                f"- Public role: {role}",
+                f"- {loc} · {p.gold}g · Rep {p.rep} · {p.status}",
+                f"- Hidden roles: {len(p.hidden_role_ids)} · Cards: {len(p.action_card_ids)}",
+                "",
+            ])
+        lines.extend(["## Chronicle", ""])
+        for e in reversed(self.log):
+            lines.append(f"- **R{e.round}** {e.label} — {e.text}")
+        lines.append("\n---\n*Public report — hidden roles omitted.*")
+        return "\n".join(lines)
 
     # ---- logging ----
     def _log(self, text: str, kind: str = "event") -> None:
@@ -203,6 +256,9 @@ class CursedThroneGame:
             starting[p.id] = deck[i * 2: i * 2 + 2]
             p.action_card_ids = starting[p.id][:]
             p.dealt_role_ids = []
+            p.gold = self._rule("startGold")
+            p.rep = self._rule("startRep")
+            p.location = D.START_LOCATION
         self.decks = {name: rng.sample(D.CARDS_BY_DECK[name][:], len(D.CARDS_BY_DECK[name]))
                       for name in D.DECK_NAMES}
         for name in D.DECK_NAMES:
@@ -279,19 +335,19 @@ class CursedThroneGame:
     # ---- corruption & wins ----
     def set_corruption(self, value: int, reason: str = "") -> None:
         prev = self.corruption
-        v = _clamp(round(value), 0, D.CORRUPTION_MAX)
+        v = _clamp(round(value), 0, self._rule("corruptionMax"))
         if v == prev:
             return
         self.corruption = v
         direction = "rose" if v > prev else "fell"
         self._log(f"Corruption {direction} to {v}" + (f": {reason}" if reason else "") + ".", "corruption")
-        if v >= D.FINAL_RITE_CORRUPTION and prev < D.FINAL_RITE_CORRUPTION:
+        if v >= self._rule("finalRiteAt") and prev < self._rule("finalRiteAt"):
             self._log(
                 f"Warning: corruption is {v}. Final Rite is now possible at the Graveyard.",
                 "corruption",
             )
-        if v >= D.CORRUPTION_MAX:
-            self.declare_winner("cursed", f"Corruption reached {D.CORRUPTION_MAX}")
+        if v >= self._rule("corruptionMax"):
+            self.declare_winner("cursed", f"Corruption reached {self._rule('corruptionMax')}")
 
     def adjust_corruption(self, delta: int, reason: str = "") -> None:
         self.set_corruption(self.corruption + delta, reason)
@@ -302,7 +358,7 @@ class CursedThroneGame:
             return
         self.innocent_elims = v
         self._log(f"Innocent eliminations now {v}" + (f": {reason}" if reason else "") + ".", "event")
-        if v >= D.INNOCENT_ELIMS_TO_LOSE:
+        if v >= self._rule("innocentElimsToLose"):
             self.declare_winner("cursed", f"{v} innocent players eliminated")
 
     def declare_winner(self, side: str, reason: str = "") -> None:
@@ -370,7 +426,7 @@ class CursedThroneGame:
         self._log(f"{p.name} discarded an action card" + (f" ({reason})" if reason else "") + ".")
 
     def over_hand_limit(self, player: PlayerState) -> bool:
-        return len(player.action_card_ids) > D.HAND_LIMIT
+        return len(player.action_card_ids) > self._rule("handLimit")
 
     # ---- location actions ----
     def do_location_action(self, actor_id: str, act_id: str) -> dict:
@@ -854,7 +910,7 @@ class CursedThroneGame:
                 break
             self.discard_card(p.id, p.action_card_ids[0], "hand limit")
             guard += 1
-        if cursed and p.location == "graveyard" and self.corruption >= D.FINAL_RITE_CORRUPTION:
+        if cursed and p.location == "graveyard" and self.corruption >= self._rule("finalRiteAt"):
             self._log(f"{p.name} performs the Final Rite at the Graveyard!", "system")
             self.declare_winner("cursed", "Final Rite")
             return
@@ -944,6 +1000,7 @@ class CursedThroneGame:
             "legalMoves": self.legal_moves(me) if me and self.status == STATUS_PLAY else [],
             "pendingKeepOne": self.pending_keep_one.get(pid),
             "pendingRoleDiscard": self.pending_role_discard.get(pid),
+            "balance": dict(self.balance),
             "setup": {
                 "dealtRoleIds": setup_dealt,
                 "setupReady": me.setup_ready if me else False,
@@ -992,5 +1049,6 @@ class CursedThroneGame:
             "legalMoves": v["legalMoves"],
             "pendingKeepOne": v["pendingKeepOne"],
             "pendingRoleDiscard": v["pendingRoleDiscard"],
+            "balance": v["balance"],
             "setup": v["setup"],
         }

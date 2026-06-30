@@ -22,8 +22,11 @@ open "index.html"          # macOS
 
 ## What is implemented (Phases 1–2)
 
-### Phase 5 (in progress) — the board
-The kingdom is drawn as a **hand-illustrated, weathered campaign map** (pure inline SVG in `board.js` — no raster assets, fully scalable, offline). Aged vellum with grain/stains/fold-creases, a compass rose and title cartouche, inked roads between sites (with a bridge where the river crosses), and a living landscape: the Frostspine peaks, the Tangled Wood, the Barrow Fens, and Drake's Deep with its sea-serpent. Each site is a medallion with its own ink glyph; the **Throne** is the gold focal point, the **Graveyard** glows a sickly green. Player tokens are wax-seal discs; reachable sites pulse with a gold ring and move the active player on tap. Remaining Phase 5: playtest-report export, full 76 action cards, balance toggles.
+### Phase 5 — playtest tooling & full card set
+- **Board art** — hand-illustrated campaign map (see `board.js`)
+- **76 action cards** — full §27 deck in `cards-extra.js` (server synced in `dethrone/data.py`)
+- **Playtest report** — **Report** button exports a markdown chronicle (public info only); online rooms also at `GET /dethrone/api/rooms/{code}/report`
+- **Balance toggles** — host adjusts hand limit, corruption cap, Final Rite threshold, innocents to lose, starting gold/Rep in the lobby (online) or Test mode (local)
 
 ### Phase 4 — Throne & Succession
 A **Throne & Succession** panel tracks the crown and the line of succession.
@@ -71,10 +74,9 @@ A **Parley & Conflict** panel launches helpers that guide + log; social judgemen
 
 ## What is manual (by design)
 
-Everything social or rules-in-flux is manual: movement is *suggested* (legal moves highlighted) but
-not hard-locked — the override dropdown always works; corruption only changes from actions that cause
-it or from the referee controls; there are no challenge/vote/duel helpers yet. This matches the design
-brief — guide and track, don't over-automate.
+Table talk and bluffing stay verbal. The app guides, tracks, and enforces mechanical consequences.
+
+**Online:** Challenge, formal vote, duel, royal claim, Call Out, trade, and Blood Contracts all sync through the server. When a player must lose a role, their device prompts them privately — only the discarded card is revealed to the table.
 
 ## Known limitations / not yet built
 
@@ -88,6 +90,9 @@ brief — guide and track, don't over-automate.
 index.html        shell; loads the scripts in order
 css/styles.css    design tokens + components ("candlelit ledger" theme)
 js/data.js        20 roles, board graph, starter action cards, constants
+js/cards-extra.js extends to full 76-card deck
+js/balance.js     playtest balance toggles
+js/report.js      markdown playtest report export
 js/state.js       game state, logging, turn/round, trackers, save/load, win detection
 js/setup.js       setup wizard + pass-and-play dealing
 js/app.js         render loop, board/table/log UI, referee controls, event wiring

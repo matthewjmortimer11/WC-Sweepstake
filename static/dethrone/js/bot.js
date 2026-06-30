@@ -73,7 +73,7 @@ CT.bot.takeTurn = function (playerId) {
   while (CT.overHandLimit(p) && guard++ < 10) CT.discardCard(p.id, p.actionCardIds[0], "hand limit");
 
   // 4) Final Rite — cursed bot ending at the Graveyard with corruption 8+ wins
-  if (cursed && p.location === "graveyard" && s.corruption >= CT.CONST.FINAL_RITE_CORRUPTION && !s.winner) {
+  if (cursed && p.location === "graveyard" && s.corruption >= CT.getRules().FINAL_RITE_CORRUPTION && !s.winner) {
     CT.log(p.name + " performs the Final Rite at the Graveyard!", "system");
     CT.declareWinner("cursed", "Final Rite");
   }

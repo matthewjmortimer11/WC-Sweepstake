@@ -47,6 +47,8 @@ CT.log = function (text, kind) {
  * startingActionByPlayer: { playerIndex: [cardId, cardId] }            */
 CT.newGame = function (playersInput, undealtRoleIds, startingActionByPlayer, firstPlayerIndex) {
   var C = CT.CONST;
+  var R = CT.getRules();
+  var balance = Object.assign({}, CT.DEFAULT_BALANCE, CT.pendingBalance || {});
   CT.state = {
     version: CT.SAVE_VERSION,
     createdAt: Date.now(),
@@ -55,6 +57,7 @@ CT.newGame = function (playersInput, undealtRoleIds, startingActionByPlayer, fir
     activePlayerIndex: firstPlayerIndex || 0,
     corruption: 0,
     innocentElims: 0,
+    balance: balance,
     throne: { kingControllerId: null, queenControllerId: null, successorId: null, claimOrder: [],
               succession: { open: false, claims: [] } },
     winner: null, // null | "loyal" | "cursed"
@@ -65,8 +68,8 @@ CT.newGame = function (playersInput, undealtRoleIds, startingActionByPlayer, fir
         name: p.name,
         isBot: !!p.isBot,
         location: C.START_LOCATION,
-        gold: C.START_GOLD,
-        rep: C.START_REP,
+        gold: balance.startGold != null ? balance.startGold : R.START_GOLD,
+        rep: balance.startRep != null ? balance.startRep : R.START_REP,
         status: "active",
         publicRoleId: p.publicRoleId,
         hiddenRoleIds: p.hiddenRoleIds.slice(),
@@ -125,15 +128,16 @@ CT.endTurn = function () {
 /* ---- corruption (§15). Always log reason. Detect Cursed win / Final Rite warning. ---- */
 CT.setCorruption = function (value, reason) {
   var s = CT.state; if (!s) return;
-  var v = CT.util.clamp(Math.round(value), 0, CT.CONST.CORRUPTION_MAX);
+  var R = CT.getRules();
+  var v = CT.util.clamp(Math.round(value), 0, R.CORRUPTION_MAX);
   var prev = s.corruption;
   if (v === prev) return;
   s.corruption = v;
   CT.log("Corruption " + (v > prev ? "rose" : "fell") + " to " + v + (reason ? ": " + reason : "") + ".", "corruption");
-  if (v >= CT.CONST.FINAL_RITE_CORRUPTION && prev < CT.CONST.FINAL_RITE_CORRUPTION) {
+  if (v >= R.FINAL_RITE_CORRUPTION && prev < R.FINAL_RITE_CORRUPTION) {
     CT.log("Warning: corruption is " + v + ". Final Rite is now possible at the Graveyard.", "corruption");
   }
-  if (v >= CT.CONST.CORRUPTION_MAX) CT.declareWinner("cursed", "Corruption reached " + CT.CONST.CORRUPTION_MAX);
+  if (v >= R.CORRUPTION_MAX) CT.declareWinner("cursed", "Corruption reached " + R.CORRUPTION_MAX);
   CT.save();
 };
 CT.adjustCorruption = function (delta, reason) {
@@ -148,7 +152,7 @@ CT.setInnocentElims = function (value, reason) {
   if (v === s.innocentElims) return;
   s.innocentElims = v;
   CT.log("Innocent eliminations now " + v + (reason ? ": " + reason : "") + ".", "event");
-  if (v >= CT.CONST.INNOCENT_ELIMS_TO_LOSE) CT.declareWinner("cursed", v + " innocent players eliminated");
+  if (v >= CT.getRules().INNOCENT_ELIMS_TO_LOSE) CT.declareWinner("cursed", v + " innocent players eliminated");
   CT.save();
 };
 
@@ -261,7 +265,7 @@ CT.discardCard = function (playerId, cardId, reason) {
   CT.save();
 };
 
-CT.overHandLimit = function (player) { return player.actionCardIds.length > CT.CONST.HAND_LIMIT; };
+CT.overHandLimit = function (player) { return player.actionCardIds.length > CT.getRules().HAND_LIMIT; };
 
 /* execute a location action's mechanical effect (§13).
  * returns { ok, manual?, keepOne?:{deck, cards:[a,b]}, msg? } so the UI can follow up. */
