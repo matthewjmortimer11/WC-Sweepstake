@@ -347,6 +347,12 @@ svg.map { width: 100%; height: auto; display: block; }
 .turn-dock .btn { min-height: 44px; }
 .turn-dock .turn-parley { display: flex; gap: 4px; align-items: center; }
 .turn-dock .turn-parley .btn { min-width: 44px; padding: 0 10px; font-size: 16px; }
+.spectator-dock { background: var(--ink); border-top-color: #3a3530; }
+.spectator-dock .turn-title, .spectator-dock .turn-sub { color: #e6dcc0; }
+.spectator-dock .turn-sub { opacity: .85; }
+.spectator-act-list { margin: 0; padding-left: 18px; font-size: 13px; color: var(--ink-soft); }
+.spectator-act-list li { margin: 4px 0; }
+.spectator-panel .panel-head h2 { font-size: 17px; }
 
 .role-ability-row .btn-secondary { border-color: var(--ink-soft); }
 .role-ability-row .act-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }

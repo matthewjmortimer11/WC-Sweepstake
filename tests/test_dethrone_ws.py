@@ -895,6 +895,29 @@ def test_bot_duel_same_location(client):
     assert victim.rep <= before_rep
 
 
+def test_export_report_includes_throne_and_chronicle_stats(client):
+    code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
+    room, pids, g = _start_game(code)
+    g.throne["kingControllerId"] = pids[0]
+    g.open_succession()
+    claimant = g.player_by_id(pids[1])
+    claimant.location = "throne"
+    claimant.hidden_role_ids = ["firstborn", "thief"]
+    g.add_succession_claim(pids[1], "firstborn")
+    g._log("Test event", "event")
+    g._log("Corruption tick", "corruption")
+    md = g.export_report(code)
+    assert "## Throne" in md
+    assert "King:" in md
+    assert "## Succession" in md
+    assert "## Chronicle" in md
+    assert "event:" in md
+    assert "corruption:" in md
+    resp = client.get(f"/dethrone/api/rooms/{code}/report")
+    assert resp.status_code == 200
+    assert "## Throne" in resp.json()["markdown"]
+
+
 def D_ROLE_META_PUBLIC(role_id: str) -> bool:
     from dethrone.data import ROLE_META
     return ROLE_META.get(role_id, {}).get("canBePublic", True)

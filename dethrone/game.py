@@ -164,7 +164,26 @@ class CursedThroneGame:
                 f"- Hidden roles: {len(p.hidden_role_ids)} · Cards: {len(p.action_card_ids)}",
                 "",
             ])
-        lines.extend(["## Chronicle", ""])
+        t = self.throne
+        lines.extend(["## Throne", ""])
+        for crown, key in [("King", "kingControllerId"), ("Queen", "queenControllerId"), ("Successor", "successorId")]:
+            pid = t.get(key)
+            if pid:
+                pl = self.player_by_id(pid)
+                lines.append(f"- {crown}: {pl.name if pl else pid}")
+        succ = t.get("succession") or {}
+        claims = succ.get("claims") or []
+        if succ.get("open") or claims:
+            lines.extend(["", "## Succession", f"- Status: {'open' if succ.get('open') else 'closed'}"])
+            for c in sorted(claims, key=lambda x: x.get("rank", 0)):
+                pl = self.player_by_id(c.get("playerId", ""))
+                role = D.ROLE_META.get(c.get("roleId", ""), {}).get("name", c.get("roleId", "?"))
+                lines.append(f"- #{c.get('rank', '?')} {pl.name if pl else '?'} — {role}")
+        kinds: dict[str, int] = {}
+        for e in self.log:
+            kinds[e.kind] = kinds.get(e.kind, 0) + 1
+        kind_summary = ", ".join(f"{k}: {v}" for k, v in sorted(kinds.items()))
+        lines.extend(["", "## Chronicle", f"- Entries: {len(self.log)}" + (f" ({kind_summary})" if kind_summary else ""), ""])
         for e in reversed(self.log):
             lines.append(f"- **R{e.round}** {e.label} — {e.text}")
         lines.append("\n---\n*Public report — hidden roles omitted.*")

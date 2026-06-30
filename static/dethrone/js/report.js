@@ -50,9 +50,23 @@ CT.buildPlaytestReport = function (state, opts) {
   ["kingControllerId", "queenControllerId", "successorId"].forEach(function (k) {
     if (throne[k]) {
       var pl = CT.playerById(throne[k]);
-      lines.push("- " + k.replace("ControllerId", "").replace("Id", "") + ": " + (pl ? pl.name : throne[k]));
+      var label = k.replace("ControllerId", "").replace("Id", "");
+      lines.push("- " + label + ": " + (pl ? pl.name : throne[k]));
     }
   });
+  var succ = throne.succession || { open: false, claims: [] };
+  if (succ.open || (succ.claims && succ.claims.length)) {
+    lines.push("");
+    lines.push("## Succession");
+    lines.push("- Status: " + (succ.open ? "open" : "closed"));
+    (succ.claims || []).slice().sort(function (a, b) { return a.rank - b.rank; }).forEach(function (c) {
+      var pl = CT.playerById(c.playerId);
+      var role = CT.roleById(c.roleId);
+      var left = CT.claimRoundsLeft ? CT.claimRoundsLeft(c) : null;
+      var mature = left != null && left <= 0 ? " (matured)" : (left != null ? " (" + left + " rounds left)" : "");
+      lines.push("- #" + c.rank + " " + (pl ? pl.name : "?") + " — " + (role ? role.name : c.roleId) + mature);
+    });
+  }
   if ((state.contracts || []).length) {
     lines.push("");
     lines.push("## Blood Contracts");
@@ -63,9 +77,14 @@ CT.buildPlaytestReport = function (state, opts) {
   }
   lines.push("");
   lines.push("## Chronicle");
+  var log = (state.log || []).slice();
+  var kinds = {};
+  log.forEach(function (e) { kinds[e.kind] = (kinds[e.kind] || 0) + 1; });
+  lines.push("- Entries: " + log.length + (Object.keys(kinds).length
+    ? " (" + Object.keys(kinds).map(function (k) { return k + ": " + kinds[k]; }).join(", ") + ")"
+    : ""));
   lines.push("");
-  var log = (state.log || []).slice().reverse();
-  log.forEach(function (e) {
+  log.slice().reverse().forEach(function (e) {
     lines.push("- **R" + e.round + "** " + e.label + " — " + e.text);
   });
   lines.push("");

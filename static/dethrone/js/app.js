@@ -34,7 +34,9 @@ CT.render = function () {
     } else {
       root.innerHTML = shell(spectatorGameScreen());
     }
-    bind(); return;
+    bind();
+    renderSpectatorDock();
+    return;
   }
   if (CT.net && CT.net.online && CT.net.room && (!CT.state || CT.state.phase === "lobby")) {
     root.innerHTML = shell(onlineLobbyScreen());
@@ -69,6 +71,7 @@ function renderTurnDock() {
     if (dock) dock.hidden = true;
     return;
   }
+  dock.className = "turn-dock";
   var ap = CT.activePlayer();
   if (!ap || ap.status !== "active") { dock.hidden = true; return; }
   var isMyTurn = !CT.isOnline() || ap.id === CT.myId();
@@ -96,6 +99,30 @@ function renderTurnDock() {
     + "</div>"
     + '<button class="btn btn-secondary" data-act="view-private" data-id="' + ap.id + '">Hand</button>'
     + '<button class="btn btn-primary" data-act="end-turn"' + (over ? " disabled" : "") + '>End turn</button>'
+    + "</div>";
+  dock.hidden = false;
+}
+
+function renderSpectatorDock() {
+  var dock = document.getElementById("turn-dock");
+  if (!dock || !CT.isSpectator() || !CT.state || CT.state.phase !== "play" || CT.state.winner) {
+    if (dock) dock.hidden = true;
+    return;
+  }
+  var ap = CT.activePlayer();
+  if (!ap || ap.status !== "active") { dock.hidden = true; return; }
+  var loc = CT.locationById(ap.location);
+  var chips = '<span class="chip ok">R' + CT.state.round + "</span>";
+  if (CT.state.throne.succession && CT.state.throne.succession.open) {
+    chips += '<span class="chip wax">♛ Succession</span>';
+  }
+  if (ap.isBot) chips += '<span class="chip">BOT</span>';
+  dock.className = "turn-dock spectator-dock";
+  dock.innerHTML = '<div class="turn-dock-inner">'
+    + '<div class="turn-meta"><div class="turn-title">' + CT.esc(ap.name) + "’s turn</div>"
+    + '<div class="turn-sub">📍 ' + CT.esc(loc ? loc.name : ap.location) + "</div>"
+    + '<div class="turn-chips">' + chips + "</div></div>"
+    + '<span class="tag gold" style="align-self:center">Spectating</span>'
     + "</div>";
   dock.hidden = false;
 }
@@ -246,9 +273,28 @@ function spectatorGameScreen() {
     + winBanner()
     + trackers()
     + '<div class="grid grid-main">'
-    + '<div>' + boardPanel() + throneSuccPanel() + pactsPanel() + "</div>"
+    + '<div>' + boardPanel() + spectatorActionsPanel() + throneSuccPanel() + pactsPanel() + "</div>"
     + '<div>' + playersPanelSpectator() + logPanel() + "</div>"
     + "</div>";
+}
+
+function spectatorActionsPanel() {
+  var ap = CT.activePlayer();
+  if (!ap || CT.state.winner) return "";
+  var loc = CT.locationById(ap.location);
+  var acts = (CT.LOCATION_ACTIONS[ap.location] || []).map(function (a) {
+    return "<li>" + CT.esc(a.name) + (a.cost ? " · " + a.cost + "g" : "") + "</li>";
+  }).join("");
+  var succ = CT.state.throne.succession || { open: false };
+  var succNote = succ.open
+    ? '<p class="tag wax" style="margin:0 0 10px">Succession open — watch for claims at the Throne.</p>'
+    : "";
+  return '<div class="panel spectator-panel"><div class="panel-head"><h2>' + CT.esc(ap.name) + "’s turn"
+    + (ap.isBot ? ' <span class="tag">BOT</span>' : "") + '</h2>'
+    + '<span class="tag gold">📍 ' + CT.esc(loc ? loc.name : ap.location) + "</span></div><hr class=\"rule\">"
+    + succNote
+    + '<p class="muted" style="font-size:13px;margin:0 0 8px">Location actions available this turn:</p>'
+    + '<ul class="spectator-act-list">' + (acts || "<li class=\"muted\">None</li>") + "</ul></div>";
 }
 
 function playersPanelSpectator() {
@@ -535,9 +581,14 @@ function pactsPanel() {
 function throneSuccPanel() {
   var t = CT.state.throne, ps = CT.state.players.filter(function (p) { return p.status === "active"; });
   var off = CT.state.winner ? " disabled" : "";
+  var spec = CT.isSpectator();
   function crownRow(crown, label) {
     var id = crown === "king" ? t.kingControllerId : crown === "queen" ? t.queenControllerId : t.successorId;
     var p = CT.playerById(id);
+    if (spec) {
+      return '<div class="vote-row"><span><strong>' + label + ':</strong> '
+        + (p ? CT.esc(p.name) : '<span class="faint">Vacant</span>') + "</span></div>";
+    }
     var setSel = '<select data-act="h-throne-set" data-crown="' + crown + '"' + off + '><option value="">— set ' + label + ' —</option>'
       + ps.map(function (x) { return '<option value="' + x.id + '"' + (x.id === id ? " selected" : "") + '>' + CT.esc(x.name) + "</option>"; }).join("") + "</select>";
     return '<div class="vote-row"><span><strong>' + label + ':</strong> ' + (p ? CT.esc(p.name) : '<span class="faint">Vacant</span>') + "</span>"
@@ -547,23 +598,30 @@ function throneSuccPanel() {
   var succ = t.succession || { open: false, claims: [] };
   var succBody;
   if (!succ.open) {
-    succBody = '<div class="row" style="justify-content:space-between"><span class="muted" style="font-size:13px">No succession in progress.</span>'
-      + '<button class="btn btn-secondary btn-sm" data-act="h-succ-open"' + off + '>Open succession</button></div>';
+    succBody = spec
+      ? '<p class="muted" style="font-size:13px;margin:0">No succession in progress.</p>'
+      : '<div class="row" style="justify-content:space-between"><span class="muted" style="font-size:13px">No succession in progress.</span>'
+        + '<button class="btn btn-secondary btn-sm" data-act="h-succ-open"' + off + '>Open succession</button></div>';
   } else {
     succBody = '<p class="tag wax" style="margin:0 0 10px">Succession open — claimants must be at the Throne and hold a succession role.</p>';
     var claims = succ.claims.slice().sort(function (a, b) { return a.rank - b.rank; }).map(function (c) {
       var p = CT.playerById(c.playerId), left = CT.claimRoundsLeft(c);
       var status = left <= 0 ? '<span class="tag moss">matured</span>' : '<span class="tag">' + left + ' round' + (left === 1 ? "" : "s") + " left</span>";
+      var actions = spec ? "" : '<div class="row" style="gap:6px"><button class="btn btn-gold btn-sm" data-act="h-succ-resolve" data-id="' + c.id + '"' + (left > 0 ? " disabled" : "") + '>Resolve</button>'
+        + '<button class="btn btn-ghost btn-sm" data-act="h-succ-remove" data-id="' + c.id + '">✕</button></div>';
       return '<div class="vote-row"><span><strong>#' + c.rank + "</strong> " + CT.esc(p ? p.name : "?") + " — " + CT.esc(CT.roleById(c.roleId).name) + " " + status + "</span>"
-        + '<div class="row" style="gap:6px"><button class="btn btn-gold btn-sm" data-act="h-succ-resolve" data-id="' + c.id + '"' + (left > 0 ? " disabled" : "") + '>Resolve</button>'
-        + '<button class="btn btn-ghost btn-sm" data-act="h-succ-remove" data-id="' + c.id + '">✕</button></div></div>';
+        + actions + "</div>";
     }).join("") || '<p class="muted" style="font-size:13px">No claims yet.</p>';
-    succBody = '<div class="stack" style="gap:6px">' + claims + "</div>"
-      + '<div class="btn-row" style="margin-top:10px"><button class="btn btn-secondary btn-sm" data-act="h-open-succclaim"' + off + '>Add claim</button>'
-      + '<div class="spacer"></div><button class="btn btn-ghost btn-sm" data-act="h-succ-close">Close succession</button></div>';
+    succBody = '<div class="stack" style="gap:6px">' + claims + "</div>";
+    if (!spec) {
+      succBody += '<div class="btn-row" style="margin-top:10px"><button class="btn btn-secondary btn-sm" data-act="h-open-succclaim"' + off + '>Add claim</button>'
+        + '<div class="spacer"></div><button class="btn btn-ghost btn-sm" data-act="h-succ-close">Close succession</button></div>';
+    }
   }
+  var headBtns = spec ? '<span class="tag">read-only</span>'
+    : '<button class="btn btn-gold btn-sm" data-act="h-open-royalclaim"' + off + '>Claim helper ♛</button>';
   return '<div class="panel"><div class="panel-head"><h2>Throne &amp; Succession</h2>'
-    + '<button class="btn btn-gold btn-sm" data-act="h-open-royalclaim"' + off + '>Claim helper ♛</button></div><hr class="rule">'
+    + headBtns + '</div><hr class="rule">'
     + '<div class="stack" style="gap:6px">' + crownRow("king", "King") + crownRow("queen", "Queen")
     + (t.successorId ? crownRow("successor", "Successor") : "") + "</div>"
     + '<h3 style="margin:16px 0 8px">Succession</h3>' + succBody + "</div>";

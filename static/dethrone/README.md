@@ -89,6 +89,11 @@ open "index.html"          # macOS
 - **Turn dock parley** — ⚔ Duel / ⚖ Vote / ⇄ Trade shortcuts on mobile
 - **Private hand groups** — action cards grouped by timing (OnTurn, Reaction, Duel, Vote); reaction cards labelled “when targeted”
 
+### Phase 17 — Spectator polish & playtest report
+- **Spectator turn dock** — sticky bar on mobile showing whose turn, location, round, and succession status
+- **Spectator actions panel** — read-only list of the active player’s location actions; throne/succession panel without edit controls
+- **Richer playtest report** — throne & succession sections, chronicle entry counts by kind (client export + `GET /dethrone/api/rooms/{code}/report`)
+
 ### Phase 4 — Throne & Succession
 A **Throne & Succession** panel tracks the crown and the line of succession.
 - **Throne control (§23)**: King / Queen / Successor controllers, set manually or via the **Claim helper** (claimant + crown; unchallenged → crowned, or challenged → "proof valid" crowns them and the challenger loses a role / "bluff" costs the claimant a role). Claim order is recorded.
@@ -147,7 +152,7 @@ Table talk and bluffing stay verbal. The app guides, tracks, and enforces mechan
 
 ## Next improvements
 
-Run `PLAYTEST.md` at a real table, log friction, then plan the next phase (remaining manual cards, spectator polish, or playtest report).
+Run `PLAYTEST.md` at a real table, log friction, then plan the next phase (remaining manual cards, more card auto-play, or playtest-driven polish).
 
 ```
 index.html        shell; loads the scripts in order
@@ -163,4 +168,4 @@ js/app.js         render loop, board/table/log UI, referee controls, event wirin
 
 ## Next improvements
 
-Run `PLAYTEST.md` at a real table, log friction, then plan the next phase (more card auto-play, bot social depth, or polish).
+Run `PLAYTEST.md` at a real table, log friction, then plan the next phase (remaining manual cards, more card auto-play, or playtest-driven polish).
