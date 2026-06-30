@@ -220,6 +220,36 @@ CARD_AUTO_EFFECTS: dict[str, dict] = {
     # Phase 9 — duel starters (opens helper on client)
     "arrest": {"open_duel": True, "needs_target": True, "same_location": True},
     "tavern_brawl": {"open_duel": True, "needs_target": True, "same_location": True, "at_location": "tavern"},
+    # Phase 12 — economy, summons, vote starters, helper openers
+    "fence": {"needs_discard_card": True},
+    "sow_doubt": {"target_rep": -1, "needs_target": True},
+    "court_summons": {"move_target": "throne", "needs_target": True},
+    "royal_sacrifice": {"royal_sacrifice": True, "at_location": "graveyard"},
+    "royal_decree": {"open_vote": {"vote_type": "accuse", "decree": True}, "needs_target": True},
+    "sealed_warrant": {"open_vote": {"vote_type": "banish", "decree": True, "max_rep": 2}, "needs_target": True},
+    "banish_letter": {"open_vote": {"vote_type": "banish", "decree": True, "max_rep": 1}, "needs_target": True},
+    "emergency_council": {"open_vote": {"vote_type": "accuse", "emergency": True}, "needs_target": True},
+    "trade_licence": {"open_trade": True},
+    "blood_contract": {"open_contract": True},
+    "call_out": {"open_callout": True},
+}
+
+# Duel / vote card hooks (played from hand during helpers)
+DUEL_CARD_VALUES: dict[str, int] = {
+    "hidden_knife": 3,
+    "shield": 2,
+    "dirty_trick": 2,
+    "disarm_card": 1,
+    "cursed_blade": 4,
+    "loaded_dice": 1,
+    "second_blade": 2,
+    "parry": 2,
+    "iron_gauntlet": 1,
+}
+
+VOTE_CARD_BONUSES: dict[str, int] = {
+    "hidden_witness": 1,
+    "crown_witness": 2,
 }
 
 # Role ids with standing exemption from royal / Tax Collector levies

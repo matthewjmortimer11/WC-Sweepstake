@@ -661,7 +661,7 @@ function privateView() {
     var onTurn = CT.activePlayer() && CT.activePlayer().id === p.id && !CT.state.winner;
     var playBtn = "";
     if (fx && onTurn) {
-      if (fx.needsTarget || fx.needsLocation || fx.needsDeck) {
+      if (fx.needsTarget || fx.needsLocation || fx.needsDeck || fx.needsDiscardCard) {
         playBtn = ' <button class="btn btn-ghost btn-sm" data-act="play-card-prompt" data-id="' + id + '">Play…</button>';
       } else {
         playBtn = ' <button class="btn btn-primary btn-sm" data-act="play-card" data-id="' + id + '">Play</button>';
@@ -721,6 +721,10 @@ function handlePlayCardResult(res) {
   if (!res.ok && res.msg) { alert(res.msg); return; }
   if (res.keepOne) CT.ui.keepOne = { playerId: CT.ui.privateFor || CT.myId(), deck: res.keepOne.deck, cards: res.keepOne.cards };
   if (res.openDuel && CT.helpers) CT.helpers.openDuelFromPending(res.openDuel);
+  if (res.openVote && CT.helpers) CT.helpers.openVoteFromPending(res.openVote);
+  if (res.openTrade && CT.helpers) CT.helpers.openTradeFromPending(res.openTrade);
+  if (res.openContract && CT.helpers) CT.helpers.openContractFromPending(res.openContract);
+  if (res.openCallout && CT.helpers) CT.helpers.openCalloutFromPending(res.openCallout);
 }
 
 function playCardView() {
@@ -765,6 +769,14 @@ function playCardView() {
   }
   if (fx.atLocation && p.location !== fx.atLocation) {
     body += '<p class="muted" style="font-size:13px">Must be at ' + CT.esc(CT.locationById(fx.atLocation).name) + ".</p>";
+  }
+  if (fx.needsDiscardCard) {
+    var sellOpts = p.actionCardIds.filter(function (id) { return id !== u.cardId; }).map(function (id) {
+      var sc = CT.cardById(id);
+      return '<option value="' + id + '">' + CT.esc(sc ? sc.name : id) + "</option>";
+    }).join("");
+    body += '<label class="field" style="display:block;margin:12px 0"><span>Card to sell</span>'
+      + '<select id="play-discard" style="width:100%">' + sellOpts + "</select></label>";
   }
   return '<div class="scrim"><div class="modal" style="max-width:480px">'
     + '<h2 style="margin-bottom:4px">Play ' + CT.esc(c.name) + '</h2>'
@@ -967,9 +979,14 @@ CT.handleAction = function (act, el, ev) {
         var ls = document.getElementById("play-location");
         if (ls) payload.locationId = ls.value;
       }
+      if (fx.needsDiscardCard) {
+        var ps = document.getElementById("play-discard");
+        if (ps) payload.discardCardId = ps.value;
+      }
       if (CT.netAction(payload)) { CT.ui.playCard = null; break; }
       handlePlayCardResult(CT.playActionCard(u.playerId, u.cardId, {
         targetId: payload.targetId, locationId: payload.locationId, deckName: payload.deckName,
+        discardCardId: payload.discardCardId,
       }));
       CT.ui.playCard = null;
       CT.render(); break;

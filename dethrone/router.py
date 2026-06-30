@@ -28,7 +28,7 @@ _DETHRONE_CSP = (
     "frame-ancestors 'none'"
 )
 
-_DETHRONE_ASSET_VERSION = "20260630-p11"
+_DETHRONE_ASSET_VERSION = "20260630-p12"
 
 _CREATE_BUCKETS: dict[str, list[float]] = {}
 _CREATE_LIMIT = 30
@@ -365,6 +365,7 @@ def _dispatch(room, player, mtype: str, msg: dict) -> bool:
             target_id=msg.get("targetId") or None,
             location_id=msg.get("locationId") or None,
             deck_name=msg.get("deckName") or None,
+            discard_card_id=msg.get("discardCardId") or None,
             rng=room.rng,
         )
         return True
@@ -437,11 +438,16 @@ def _dispatch(room, player, mtype: str, msg: dict) -> bool:
             dict(msg.get("votes") or {}),
             int(msg.get("bonusYes", 0)),
             int(msg.get("bonusNo", 0)),
+            emergency=bool(msg.get("emergency")),
+            vote_cards=list(msg.get("voteCards") or []),
         )
         return True
 
     if mtype == "duelFlee":
-        g.duel_flee(str(msg.get("defenderId", "")))
+        g.duel_flee(
+            str(msg.get("defenderId", "")),
+            att_card_ids=list(msg.get("attCardIds") or []),
+        )
         return True
 
     if mtype == "duelConsequence":
@@ -453,6 +459,8 @@ def _dispatch(room, player, mtype: str, msg: dict) -> bool:
             bool(msg.get("serious")),
             str(msg.get("consequence", "")),
             room.rng,
+            att_card_ids=list(msg.get("attCardIds") or []),
+            def_card_ids=list(msg.get("defCardIds") or []),
         )
         return True
 

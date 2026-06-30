@@ -63,6 +63,11 @@ open "index.html"          # macOS
 - **Tax exemptions** — Tax Collector and Royal Tax respect role exemptions (Firstborn, Tiny Tyrant, Spy, King vs Queen/successor), Court Favourite once/round, Guild Seal in hand
 - **Deploy safety** — Dethrone JS syntax check in CI; cache-busted static assets on `/dethrone`
 
+### Phase 12 — Card auto-play expansion & duel/vote hooks
+- **New auto-play cards** — Fence (sell a card), Sow Doubt, Court Summons, Royal Sacrifice; vote starters Royal Decree, Sealed Warrant, Banish Letter, Emergency Council; helper openers Trade Licence, Blood Contract, Call Out
+- **Duel card hooks** — Duel helper: pick duel cards from hand (Hidden Knife, Shield, Dirty Trick, etc.); auto-sum values; Iron Gauntlet blocks Flee; Loaded Dice / Shield / Parry / Disarm / Cursed Blade effects
+- **Vote card hooks** — Hidden Witness (+1) and Crown Witness (+2) playable from hand during formal vote tally
+
 ### Phase 4 — Throne & Succession
 A **Throne & Succession** panel tracks the crown and the line of succession.
 - **Throne control (§23)**: King / Queen / Successor controllers, set manually or via the **Claim helper** (claimant + crown; unchallenged → crowned, or challenged → "proof valid" crowns them and the challenger loses a role / "bluff" costs the claimant a role). Claim order is recorded.
@@ -121,7 +126,7 @@ Table talk and bluffing stay verbal. The app guides, tracks, and enforces mechan
 
 ## Next improvements
 
-Run `PLAYTEST.md` at a real table, log friction, then Phase 12 (more card auto-play + duel/vote card hooks).
+Run `PLAYTEST.md` at a real table, log friction, then Phase 13 (turn UX, mobile PWA, reaction framework).
 
 ```
 index.html        shell; loads the scripts in order

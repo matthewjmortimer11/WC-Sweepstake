@@ -92,12 +92,16 @@ CT.net.applyState = function (msg) {
     }
     if (cs.pendingUiAction && CT.myId()) {
       var pui = cs.pendingUiAction;
-      if (pui.kind === "final_rite") {
+        if (pui.kind === "final_rite") {
         CT.ui.finalRiteOffer = pui.playerId;
       } else if (CT.helpers && !CT.helpers.ui.open) {
         if (pui.kind === "duel") CT.helpers.openDuelFromPending(pui);
+        else if (pui.kind === "vote") CT.helpers.openVoteFromPending(pui);
         else if (pui.kind === "royal_command") CT.helpers.openRoyalCommandFromPending(pui);
         else if (pui.kind === "deep_research") CT.helpers.openDeepResearchFromPending(pui);
+        else if (pui.kind === "trade") CT.helpers.openTradeFromPending(pui);
+        else if (pui.kind === "callout") CT.helpers.openCalloutFromPending(pui);
+        else if (pui.kind === "contract") CT.helpers.openContractFromPending(pui);
       }
     } else if (CT.ui.finalRiteOffer === CT.myId()) {
       CT.ui.finalRiteOffer = null;

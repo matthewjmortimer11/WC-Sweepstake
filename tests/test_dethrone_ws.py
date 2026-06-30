@@ -631,6 +631,70 @@ def test_set_allow_spectators_host(client):
         assert state["room"]["settings"]["allowSpectators"] is False
 
 
+def test_fence_sells_card(client):
+    code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
+    room, pids, g = _start_game(code)
+    active = g.active_player().id
+    ap = g.player_by_id(active)
+    ap.action_card_ids = ["fence", "spare_coin_purse"]
+    before = ap.gold
+    g.play_action_card(active, "fence", discard_card_id="spare_coin_purse")
+    assert "spare_coin_purse" not in ap.action_card_ids
+    assert ap.gold == before + 1  # Market deck buy cost 2 → sell for 1
+
+
+def test_court_summons_moves_target(client):
+    code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
+    room, pids, g = _start_game(code)
+    active = g.active_player().id
+    target = next(pid for pid in pids if pid != active)
+    ap = g.player_by_id(active)
+    ap.action_card_ids.append("court_summons")
+    g.play_action_card(active, "court_summons", target_id=target)
+    assert g.player_by_id(target).location == "throne"
+
+
+def test_royal_decree_opens_vote(client):
+    code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
+    room, pids, g = _start_game(code)
+    active = g.active_player().id
+    target = next(pid for pid in pids if pid != active)
+    ap = g.player_by_id(active)
+    ap.action_card_ids.append("royal_decree")
+    g.play_action_card(active, "royal_decree", target_id=target)
+    assert active in g.pending_ui_action
+    assert g.pending_ui_action[active]["kind"] == "vote"
+    assert g.pending_ui_action[active]["decree"] is True
+
+
+def test_duel_card_bonuses(client):
+    code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
+    room, pids, g = _start_game(code)
+    att, defn = pids[0], pids[1]
+    ap = g.player_by_id(att)
+    dp = g.player_by_id(defn)
+    ap.action_card_ids = ["hidden_knife"]
+    dp.action_card_ids = []
+    ap.location = dp.location = "tavern"
+    g.duel_apply_consequence(att, defn, 0, 0, False, "shame", room.rng, att_card_ids=["hidden_knife"])
+    assert "hidden_knife" not in ap.action_card_ids
+    assert dp.rep == 2  # shame -1 from start rep 3
+
+
+def test_vote_card_hidden_witness(client):
+    code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
+    room, pids, g = _start_game(code)
+    target = pids[2]
+    voter = pids[1]
+    vp = g.player_by_id(voter)
+    vp.action_card_ids = ["hidden_witness"]
+    votes = {pid: "yes" for pid in pids}
+    g.apply_formal_vote(
+        "accuse", target, votes, vote_cards=[{"playerId": voter, "cardId": "hidden_witness", "side": "yes"}],
+    )
+    assert "hidden_witness" not in vp.action_card_ids
+
+
 def D_ROLE_META_PUBLIC(role_id: str) -> bool:
     from dethrone.data import ROLE_META
     return ROLE_META.get(role_id, {}).get("canBePublic", True)

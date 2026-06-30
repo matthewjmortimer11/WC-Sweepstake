@@ -23,6 +23,30 @@ function wrap(inner, maxw) {
 }
 function roleBonus(p, key) { var r = p && p.publicRoleId ? CT.roleById(p.publicRoleId) : null; return (r && r[key]) || 0; }
 
+function duelCardsInHand(player) {
+  if (!player || !CT.DUEL_CARD_VALUES) return [];
+  return player.actionCardIds.filter(function (id) { return CT.DUEL_CARD_VALUES[id]; });
+}
+function duelCardBonus(cardIds) {
+  var n = 0;
+  (cardIds || []).forEach(function (id) { n += CT.DUEL_CARD_VALUES[id] || 0; });
+  return n;
+}
+function duelCardPicker(player, selected, side) {
+  var cards = duelCardsInHand(player);
+  if (!cards.length) return '<p class="faint" style="font-size:12px;margin:4px 0">No duel cards in hand.</p>';
+  return cards.map(function (id) {
+    var c = CT.cardById(id);
+    var on = (selected || []).indexOf(id) !== -1;
+    return '<label class="row" style="gap:6px;font-size:13px;cursor:pointer"><input type="checkbox" data-act="h-d-duelcard" data-side="' + side + '" data-id="' + id + '" style="width:auto"' + (on ? " checked" : "") + "> "
+      + CT.esc(c ? c.name : id) + " (+" + CT.DUEL_CARD_VALUES[id] + ")</label>";
+  }).join("");
+}
+function voteCardsInHand(player) {
+  if (!player || !CT.VOTE_CARD_BONUSES) return [];
+  return player.actionCardIds.filter(function (id) { return CT.VOTE_CARD_BONUSES[id]; });
+}
+
 CT.helpers.view = function () {
   var u = CT.helpers.ui;
   switch (u.open) {
@@ -57,7 +81,34 @@ CT.helpers.vChallenge = function () {
 
 /* ===================== Formal vote (§21) ===================== */
 CT.helpers.openVote = function () {
-  CT.helpers.ui = { open: "vote", vtype: "accuse", proposer: "", target: "", seconder: false, decree: false, phase: "setup", votes: {}, bonusYes: 0, bonusNo: 0 };
+  CT.helpers.ui = {
+    open: "vote", vtype: "accuse", proposer: "", target: "", seconder: false,
+    decree: false, emergency: false, phase: "setup", votes: {}, bonusYes: 0, bonusNo: 0, voteCards: [],
+  };
+  CT.render();
+};
+CT.helpers.openVoteFromPending = function (pui) {
+  CT.helpers.ui = {
+    open: "vote", vtype: pui.voteType || "accuse", proposer: pui.proposerId || "",
+    target: pui.targetId || "", seconder: false, decree: !!pui.decree, emergency: !!pui.emergency,
+    phase: "setup", votes: {}, bonusYes: 0, bonusNo: 0, voteCards: [],
+  };
+  if (CT.isOnline()) CT.net.send({ type: "clearPendingUi" });
+  CT.render();
+};
+CT.helpers.openTradeFromPending = function (pui) {
+  CT.helpers.ui = { open: "trade", a: pui.playerId || "", b: "", goldAB: 0, goldBA: 0, cardAB: "", cardBA: "" };
+  if (CT.isOnline()) CT.net.send({ type: "clearPendingUi" });
+  CT.render();
+};
+CT.helpers.openCalloutFromPending = function (pui) {
+  CT.helpers.ui = { open: "callout", caller: pui.playerId || CT.myId() || "", target: "", role: "" };
+  if (CT.isOnline()) CT.net.send({ type: "clearPendingUi" });
+  CT.render();
+};
+CT.helpers.openContractFromPending = function (pui) {
+  CT.helpers.ui = { open: "contract", a: pui.playerId || "", b: "", promise: "" };
+  if (CT.isOnline()) CT.net.send({ type: "clearPendingUi" });
   CT.render();
 };
 CT.helpers.vVote = function () {
@@ -80,6 +131,7 @@ CT.helpers.vVote = function () {
       + '<div class="row" style="gap:18px;margin-bottom:8px">'
       + '<label class="row" style="gap:6px;cursor:pointer"><input type="checkbox" data-act="h-v-seconder" style="width:auto" ' + (u.seconder ? "checked" : "") + '> Has a seconder</label>'
       + '<label class="row" style="gap:6px;cursor:pointer"><input type="checkbox" data-act="h-v-decree" style="width:auto" ' + (u.decree ? "checked" : "") + '> Decree (no seconder needed)</label></div>'
+      + (u.emergency ? '<div class="tag wax" style="margin-bottom:10px">Emergency Council — Throne &amp; Market must vote</div>' : "")
       + '<hr class="rule"><div class="btn-row"><div class="spacer"></div><button class="btn btn-primary" data-act="h-v-start"' + (ready ? "" : " disabled") + '>Collect votes →</button></div>');
   }
   // tally phase
@@ -92,10 +144,27 @@ CT.helpers.vVote = function () {
   var yes = 0, no = 0;
   ps.forEach(function (p) { var w = p.rep >= 5 ? 2 : 1; if (u.votes[p.id] === "yes") yes += w; else if (u.votes[p.id] === "no") no += w; });
   yes += u.bonusYes; no += u.bonusNo;
+  (u.voteCards || []).forEach(function (vc) {
+    var b = CT.VOTE_CARD_BONUSES[vc.cardId] || 0;
+    if (vc.side === "yes") yes += b; else if (vc.side === "no") no += b;
+  });
   var pass = yes > no; // ties fail (§21)
+  var voteCardBtns = ps.map(function (p) {
+    return voteCardsInHand(p).map(function (cid) {
+      var used = (u.voteCards || []).some(function (vc) { return vc.playerId === p.id && vc.cardId === cid; });
+      if (used) return "";
+      var c = CT.cardById(cid);
+      return '<div class="vote-row" style="font-size:13px"><span>' + CT.esc(p.name) + ": " + CT.esc(c ? c.name : cid) + "</span>"
+        + '<div class="btn-row"><button class="btn btn-sm btn-primary" data-act="h-v-playcard" data-pid="' + p.id + '" data-id="' + cid + '" data-side="yes">+Yes</button>'
+        + '<button class="btn btn-sm btn-danger" data-act="h-v-playcard" data-pid="' + p.id + '" data-id="' + cid + '" data-side="no">+No</button></div></div>';
+    }).join("");
+  }).join("");
   return wrap('<div class="eyebrow">' + (u.vtype === "accuse" ? "Accuse Cursed" : "Banish Threat") + ' · target: ' + CT.esc((CT.playerById(u.target) || {}).name || "?") + '</div>'
-    + '<h2 style="margin:4px 0 10px">Cast votes</h2><div class="stack" style="gap:6px">' + rows + "</div>"
-    + '<div class="row" style="gap:18px;margin-top:12px"><span class="muted" style="font-size:13px">Extra weight (Whisper Vote / Hidden Witness):</span>'
+    + '<h2 style="margin:4px 0 10px">Cast votes</h2>'
+    + (u.emergency ? '<p class="tag wax" style="margin-bottom:8px">Emergency Council — players at Throne &amp; Market must vote</p>' : "")
+    + '<div class="stack" style="gap:6px">' + rows + "</div>"
+    + (voteCardBtns ? '<h3 style="margin:14px 0 8px;font-size:15px">Vote cards</h3><div class="stack" style="gap:6px">' + voteCardBtns + "</div>" : "")
+    + '<div class="row" style="gap:18px;margin-top:12px"><span class="muted" style="font-size:13px">Manual extra weight:</span>'
     + '<span>Yes <button class="step" data-act="h-v-bonus" data-side="yes" data-d="-1">−</button> ' + u.bonusYes + ' <button class="step" data-act="h-v-bonus" data-side="yes" data-d="1">+</button></span>'
     + '<span>No <button class="step" data-act="h-v-bonus" data-side="no" data-d="-1">−</button> ' + u.bonusNo + ' <button class="step" data-act="h-v-bonus" data-side="no" data-d="1">+</button></span></div>'
     + '<hr class="rule"><div class="row" style="justify-content:space-between"><strong style="font-family:var(--serif);font-size:20px">' + yes + " – " + no
@@ -105,11 +174,18 @@ CT.helpers.vVote = function () {
 };
 
 /* ===================== Duel (§22) ===================== */
-CT.helpers.openDuel = function () { CT.helpers.ui = { open: "duel", att: "", def: "", serious: false, override: false, attBonus: 0, defBonus: 0, phase: "setup" }; CT.render(); };
+CT.helpers.openDuel = function () {
+  CT.helpers.ui = {
+    open: "duel", att: "", def: "", serious: false, override: false,
+    attBonus: 0, defBonus: 0, attDuelCards: [], defDuelCards: [], phase: "setup",
+  };
+  CT.render();
+};
 CT.helpers.openDuelFromPending = function (ui) {
   CT.helpers.ui = {
     open: "duel", att: ui.attackerId, def: ui.defenderId || "",
-    serious: !!ui.serious, override: false, attBonus: 0, defBonus: 0, phase: "setup",
+    serious: !!ui.serious, override: false, attBonus: 0, defBonus: 0,
+    attDuelCards: [], defDuelCards: [], phase: "setup",
   };
   if (CT.isOnline()) CT.net.send({ type: "clearPendingUi" });
   CT.render();
@@ -251,15 +327,20 @@ CT.helpers.vDuel = function () {
       + '<label class="row" style="gap:6px;cursor:pointer' + (att && att.seriousDuelUsed ? ";opacity:.5" : "") + '"><input type="checkbox" data-act="h-d-serious" style="width:auto" ' + (u.serious ? "checked" : "") + (seriousOk && !(att && att.seriousDuelUsed) ? "" : " disabled") + '> Serious Duel (Barracks)</label></div>'
       + (att && att.seriousDuelUsed ? '<div class="tag wax" style="margin-bottom:10px">' + CT.esc(att.name) + ' has already used their Serious Duel</div>' : "")
       + '<div class="row" style="gap:12px">'
-      + field("Attacker bonus (cards/powers)", '<input type="number" data-act="h-d-attbonus" value="' + u.attBonus + '">')
-      + field("Defender bonus (cards/powers)", '<input type="number" data-act="h-d-defbonus" value="' + u.defBonus + '">') + "</div>"
-      + (att ? '<p class="faint" style="font-size:12px">Auto: attacker +' + roleBonus(att, "duelBonusAttack") + ' atk · defender +' + (def ? roleBonus(def, "duelBonusDefence") : 0) + ' def (public roles)</p>' : "")
-      + '<hr class="rule"><div class="btn-row"><button class="btn btn-secondary" data-act="h-d-flee"' + (def ? "" : " disabled") + '>Defender plays Flee</button>'
+      + field("Attacker bonus (powers)", '<input type="number" data-act="h-d-attbonus" value="' + u.attBonus + '">')
+      + field("Defender bonus (powers)", '<input type="number" data-act="h-d-defbonus" value="' + u.defBonus + '">') + "</div>"
+      + (att ? '<div style="margin-top:10px"><div class="lbl" style="font-size:12px;margin-bottom:4px">Attacker duel cards</div>' + duelCardPicker(att, u.attDuelCards, "att") + "</div>" : "")
+      + (def ? '<div style="margin-top:8px"><div class="lbl" style="font-size:12px;margin-bottom:4px">Defender duel cards</div>' + duelCardPicker(def, u.defDuelCards, "def") + "</div>" : "")
+      + (att ? '<p class="faint" style="font-size:12px;margin-top:8px">Auto: attacker +' + roleBonus(att, "duelBonusAttack") + ' atk · defender +' + (def ? roleBonus(def, "duelBonusDefence") : 0) + ' def (public roles)'
+      + (u.attDuelCards.length ? " · cards +" + duelCardBonus(u.attDuelCards) : "")
+      + (u.defDuelCards.length ? " / +" + duelCardBonus(u.defDuelCards) : "") + "</p>" : "")
+      + '<hr class="rule"><div class="btn-row"><button class="btn btn-secondary" data-act="h-d-flee"' + (def && u.attDuelCards.indexOf("iron_gauntlet") === -1 ? "" : " disabled") + '>Defender plays Flee</button>'
+      + (u.attDuelCards.indexOf("iron_gauntlet") !== -1 ? '<span class="tag wax">Iron Gauntlet blocks Flee</span>' : "")
       + '<div class="spacer"></div><button class="btn btn-primary" data-act="h-d-fight"' + (att && def ? "" : " disabled") + '>Fight →</button></div>');
   }
   // resolve
-  var aT = roleBonus(att, "duelBonusAttack") + (+u.attBonus || 0);
-  var dT = roleBonus(def, "duelBonusDefence") + (+u.defBonus || 0);
+  var aT = roleBonus(att, "duelBonusAttack") + (+u.attBonus || 0) + duelCardBonus(u.attDuelCards);
+  var dT = roleBonus(def, "duelBonusDefence") + (+u.defBonus || 0) + duelCardBonus(u.defDuelCards);
   var attackerWins = aT > dT; // tie -> defender (§22)
   var winner = attackerWins ? att : def, loser = attackerWins ? def : att;
   var conseqs = u.serious
@@ -432,15 +513,26 @@ CT.helpers.handle = function (act, el) {
     case "h-v-bonus":
       var k = el.dataset.side === "yes" ? "bonusYes" : "bonusNo";
       u[k] = Math.max(0, u[k] + (+el.dataset.d)); return CT.render();
+    case "h-v-playcard":
+      if (!u.voteCards) u.voteCards = [];
+      u.voteCards.push({ playerId: el.dataset.pid, cardId: el.dataset.id, side: el.dataset.side });
+      return CT.render();
     case "h-v-apply": return CT.helpers.applyVote();
 
     // duel
-    case "h-d-att": u.att = el.value; u.def = ""; return CT.render();
-    case "h-d-def": u.def = el.value; return CT.render();
+    case "h-d-att": u.att = el.value; u.def = ""; u.attDuelCards = []; return CT.render();
+    case "h-d-def": u.def = el.value; u.defDuelCards = []; return CT.render();
     case "h-d-override": u.override = el.checked; return CT.render();
     case "h-d-serious": u.serious = el.checked; return CT.render();
     case "h-d-attbonus": u.attBonus = +el.value || 0; return; // silent
     case "h-d-defbonus": u.defBonus = +el.value || 0; return; // silent
+    case "h-d-duelcard": {
+      var key = el.dataset.side === "def" ? "defDuelCards" : "attDuelCards";
+      if (!u[key]) u[key] = [];
+      var cid = el.dataset.id, ix = u[key].indexOf(cid);
+      if (ix === -1) u[key].push(cid); else u[key].splice(ix, 1);
+      return CT.render();
+    }
     case "h-d-fight": u.phase = "resolve"; return CT.render();
     case "h-d-back": u.phase = "setup"; return CT.render();
     case "h-d-flee": return CT.helpers.applyFlee();
@@ -550,13 +642,32 @@ CT.helpers.applyVote = function () {
     CT.net.send({
       type: "formalVote", vtype: u.vtype, targetId: u.target,
       votes: u.votes, bonusYes: u.bonusYes, bonusNo: u.bonusNo,
+      emergency: !!u.emergency, voteCards: u.voteCards || [],
     });
     u.open = null;
     return;
   }
   var yes = 0, no = 0;
+  if (u.emergency) {
+    for (var ei = 0; ei < ps.length; ei++) {
+      var ep = ps[ei];
+      if ((ep.location === "throne" || ep.location === "market") && !u.votes[ep.id]) {
+        alert(ep.name + " must vote (Emergency Council).");
+        return;
+      }
+    }
+  }
   ps.forEach(function (p) { var w = p.rep >= 5 ? 2 : 1; if (u.votes[p.id] === "yes") yes += w; else if (u.votes[p.id] === "no") no += w; });
   yes += u.bonusYes; no += u.bonusNo;
+  (u.voteCards || []).forEach(function (vc) {
+    var pl = CT.playerById(vc.playerId);
+    var bonus = CT.VOTE_CARD_BONUSES[vc.cardId] || 0;
+    if (vc.side === "yes") yes += bonus; else if (vc.side === "no") no += bonus;
+    if (pl && pl.actionCardIds.indexOf(vc.cardId) !== -1) {
+      CT.discardCard(vc.playerId, vc.cardId, "vote");
+      CT.log(pl.name + " played " + CT.cardById(vc.cardId).name + " (+" + bonus + " " + vc.side + ").", "note");
+    }
+  });
   var pass = yes > no;
   var target = CT.playerById(u.target);
   if (u.vtype === "accuse") {
@@ -578,8 +689,9 @@ CT.helpers.applyVote = function () {
 
 CT.helpers.applyFlee = function () {
   var u = CT.helpers.ui, def = CT.playerById(u.def);
+  if ((u.attDuelCards || []).indexOf("iron_gauntlet") !== -1) { alert("Iron Gauntlet blocks Flee."); return; }
   if (CT.isOnline()) {
-    CT.net.send({ type: "duelFlee", defenderId: u.def });
+    CT.net.send({ type: "duelFlee", defenderId: u.def, attCardIds: u.attDuelCards || [] });
     u.open = null;
     return;
   }
@@ -596,27 +708,48 @@ CT.helpers.applyDuelConseq = function (c) {
       attackerId: u.att, defenderId: u.def,
       attBonus: +u.attBonus || 0, defBonus: +u.defBonus || 0,
       serious: !!u.serious, consequence: c,
+      attCardIds: u.attDuelCards || [], defCardIds: u.defDuelCards || [],
     });
     u.open = null;
     return;
   }
   var att = CT.playerById(u.att), def = CT.playerById(u.def);
-  var aT = roleBonus(att, "duelBonusAttack") + (+u.attBonus || 0);
-  var dT = roleBonus(def, "duelBonusDefence") + (+u.defBonus || 0);
+  var attCards = u.attDuelCards || [], defCards = u.defDuelCards || [];
+  attCards.forEach(function (cid) { if (att.actionCardIds.indexOf(cid) !== -1) CT.discardCard(att.id, cid, "duel"); });
+  defCards.forEach(function (cid) { if (def.actionCardIds.indexOf(cid) !== -1) CT.discardCard(def.id, cid, "duel"); });
+  var aT = roleBonus(att, "duelBonusAttack") + (+u.attBonus || 0) + duelCardBonus(attCards);
+  var dT = roleBonus(def, "duelBonusDefence") + (+u.defBonus || 0) + duelCardBonus(defCards);
   var attackerWins = aT > dT;
   var winner = attackerWins ? att : def, loser = attackerWins ? def : att;
+  var winnerCards = attackerWins ? attCards : defCards;
+  var loserCards = attackerWins ? defCards : attCards;
   CT.log("Duel: " + winner.name + " beat " + loser.name + " (" + aT + "–" + dT + ").");
+  if (loserCards.indexOf("loaded_dice") !== -1) {
+    CT.log(loser.name + "'s Loaded Dice cancelled the duel loss.", "event");
+    u.open = null; CT.save(); return CT.render();
+  }
   if (u.serious) att.seriousDuelUsed = true;
+  if (attCards.indexOf("dirty_trick") !== -1 || defCards.indexOf("dirty_trick") !== -1) CT.adjustCorruption(1, "Dirty Trick");
   switch (c) {
     case "serious": CT.ui.roleDiscardFor = loser.id; CT.ui.roleDiscardRevealed = false; break;
-    case "disarm": CT.disarmRandom(loser.id, 2); break;
-    case "shame": CT.adjustRep(loser.id, -1, "Shame"); break;
-    case "wound": loser.wounded = true; CT.log(loser.name + " is Wounded — no hidden powers next turn."); break;
+    case "disarm": CT.disarmRandom(loser.id, winnerCards.indexOf("disarm_card") !== -1 ? 3 : 2); break;
+    case "shame":
+      if (loserCards.indexOf("shield") !== -1) CT.log(loser.name + "'s Shield ignored Shame.", "note");
+      else CT.adjustRep(loser.id, -1, "Shame");
+      break;
+    case "wound":
+      if (loserCards.indexOf("parry") !== -1) CT.log(loser.name + "'s Parry ignored Wound.", "note");
+      else { loser.wounded = true; CT.log(loser.name + " is Wounded — no hidden powers next turn."); }
+      break;
     case "drive": {
       var dest = (CT.legalMoves(loser)[0]) || loser.location;
       CT.movePlayer(loser.id, dest, false); CT.log(loser.name + " was Driven Out.", "event"); break;
     }
     case "search": CT.log(winner.name + " searches " + loser.name + " — resolve privately (show a justifying role or lose 1 Rep).", "note"); break;
+  }
+  if (winnerCards.indexOf("cursed_blade") !== -1) {
+    CT.adjustCorruption(1, "Cursed Blade");
+    CT.adjustRep(loser.id, -1, "Cursed Blade");
   }
   CT.save(); u.open = null; CT.render();
 };

@@ -338,5 +338,22 @@ CT.AUTO_PLAY = {
   map_of_tunnels: { needsLocation: true, tunnel: true },
   arrest: { needsTarget: true, sameLocation: true, openDuel: true },
   tavern_brawl: { needsTarget: true, sameLocation: true, atLocation: "tavern", openDuel: true },
+  fence: { needsDiscardCard: true },
+  sow_doubt: { needsTarget: true },
+  court_summons: { needsTarget: true },
+  royal_sacrifice: { atLocation: "graveyard" },
+  royal_decree: { needsTarget: true, openVote: true },
+  sealed_warrant: { needsTarget: true, openVote: true, maxRep: 2 },
+  banish_letter: { needsTarget: true, openVote: true, maxRep: 1 },
+  emergency_council: { needsTarget: true, openVote: true, emergency: true },
+  trade_licence: { openTrade: true },
+  blood_contract: { openContract: true },
+  call_out: { openCallout: true },
 };
+CT.DUEL_CARD_VALUES = {
+  hidden_knife: 3, shield: 2, dirty_trick: 2, disarm_card: 1, cursed_blade: 4,
+  loaded_dice: 1, second_blade: 2, parry: 2, iron_gauntlet: 1,
+};
+CT.VOTE_CARD_BONUSES = { hidden_witness: 1, crown_witness: 2 };
+CT.DECK_BUY_COST = { Market: 2, Tavern: 2, Knowledge: 2, Barracks: 2, Graveyard: 4, Royal: 2 };
 CT.canAutoPlayCard = function (cardId) { return !!CT.AUTO_PLAY[cardId]; };

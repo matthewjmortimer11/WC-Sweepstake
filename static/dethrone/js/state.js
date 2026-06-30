@@ -400,6 +400,13 @@ CT.playActionCard = function (playerId, cardId, opts) {
   if (fx.needsTarget && (!target || target.status !== "active")) return { ok: false, msg: "Choose a target." };
   if (fx.sameLocation && target && target.location !== p.location) return { ok: false, msg: "Target must be at your location." };
   if (fx.needsDeck && !opts.deckName) return { ok: false, msg: "Choose a deck." };
+  if (fx.needsDiscardCard) {
+    if (!opts.discardCardId || opts.discardCardId === cardId) return { ok: false, msg: "Choose a card to sell." };
+    if (p.actionCardIds.indexOf(opts.discardCardId) === -1) return { ok: false, msg: "Card not in hand." };
+  }
+  if (fx.maxRep != null && target && target.rep > fx.maxRep) {
+    return { ok: false, msg: "Target must have Rep ≤" + fx.maxRep + "." };
+  }
   if (cardId === "bought_round" && p.gold < 1) return { ok: false, msg: "Not enough gold." };
 
   var card = CT.cardById(cardId);
@@ -528,12 +535,57 @@ CT.playActionCard = function (playerId, cardId, opts) {
     if (!ga || !gb) return { ok: false, msg: "Graveyard deck ran dry." };
     extra.keepOne = { deck: dname, cards: [ga, gb] };
   }
+
+  if (cardId === "fence" && opts.discardCardId) {
+    var sold = CT.cardById(opts.discardCardId);
+    var deck = sold ? sold.deck : "Market";
+    var gain = Math.max(1, Math.floor((CT.DECK_BUY_COST[deck] || 2) / 2));
+    var ix = p.actionCardIds.indexOf(opts.discardCardId);
+    if (ix !== -1) p.actionCardIds.splice(ix, 1);
+    if (!s.discards[deck]) s.discards[deck] = [];
+    s.discards[deck].push(opts.discardCardId);
+    p.gold += gain;
+    CT.log(p.name + " sold " + (sold ? sold.name : opts.discardCardId) + " for " + gain + " gold.");
+  }
+  if (cardId === "sow_doubt" && target) CT.adjustRep(target.id, -1, cname);
+  if (cardId === "court_summons" && target) CT.movePlayer(target.id, "throne", true);
+  if (cardId === "royal_sacrifice") {
+    var rs = CT.royalSacrifice(playerId);
+    if (!rs.ok) return rs;
+  }
+  if (fx.openVote && target) {
+    var voteType = cardId === "sealed_warrant" || cardId === "banish_letter" ? "banish" : "accuse";
+    extra.openVote = {
+      proposerId: playerId, voteType: voteType, targetId: target.id,
+      decree: cardId !== "emergency_council", emergency: !!fx.emergency,
+    };
+  }
+  if (fx.openTrade) extra.openTrade = { playerId: playerId };
+  if (fx.openContract) extra.openContract = { playerId: playerId };
+  if (fx.openCallout) extra.openCallout = { playerId: playerId };
   if (fx.openDuel && target) {
     extra.openDuel = { attackerId: playerId, defenderId: target.id };
   }
 
   CT.discardCard(playerId, cardId, "played");
   return Object.assign({ ok: true }, extra);
+};
+
+CT.royalSacrifice = function (playerId) {
+  var p = CT.playerById(playerId);
+  if (!p || p.location !== "graveyard") return { ok: false, msg: "Must be at the Graveyard." };
+  var roles = (p.publicRoleId ? [p.publicRoleId] : []).concat(p.hiddenRoleIds || [], p.extraShownRoleIds || []);
+  var royal = roles.indexOf("king") !== -1 ? "king" : (roles.indexOf("queen") !== -1 ? "queen" : null);
+  if (!royal) return { ok: false, msg: "You need a King or Queen role." };
+  var slot = p.publicRoleId === royal ? "public" : (p.hiddenRoleIds.indexOf(royal) !== -1 ? "hidden" : "extra");
+  CT.applyRoleDiscard(playerId, slot, royal);
+  CT.adjustCorruption(-3, "Royal Sacrifice");
+  var t = CT.state.throne;
+  if (!t.kingControllerId && !t.queenControllerId) {
+    CT.openSuccession();
+    CT.log("No royal remains on the Throne — succession opens.", "system");
+  }
+  return { ok: true };
 };
 
 /* Resolve Deep Research investigation (Scrolls strong action). */
