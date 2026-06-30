@@ -3,6 +3,12 @@
  * Everything hangs off the global `CT` namespace. */
 window.CT = window.CT || {};
 
+CT.esc = function (str) {
+  return String(str).replace(/[&<>"]/g, function (c) {
+    return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c];
+  });
+};
+
 CT.CONST = {
   HAND_LIMIT: 5,
   START_GOLD: 2,

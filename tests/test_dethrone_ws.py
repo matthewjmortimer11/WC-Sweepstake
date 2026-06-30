@@ -49,9 +49,33 @@ def test_dethrone_page(client):
 
 
 def test_dethrone_role_card_assets(client):
-    r = client.get("/dethrone/cards/roles/king-card-v3b-poker.png")
+    import json
+    from pathlib import Path
+
+    from dethrone.router import _DETHRONE_ASSET_VERSION
+
+    page = client.get("/dethrone")
+    assert page.status_code == 200
+    assert "__DETHRONE_CARD_V" in page.text
+    assert f'__DETHRONE_CARD_V="{_DETHRONE_ASSET_VERSION}"' in page.text
+    assert f"cards-roles.js?v={_DETHRONE_ASSET_VERSION}" in page.text
+
+    manifest = json.loads(
+        Path("static/dethrone/cards/roles/manifest.json").read_text(encoding="utf-8")
+    )
+    for role_id, fname in manifest["cards"].items():
+        r = client.get(f"/dethrone/cards/roles/{fname}")
+        assert r.status_code == 200, fname
+        assert r.headers["content-type"] == "image/png", fname
+        assert len(r.content) > 5000, fname
+        busted = client.get(f"/dethrone/cards/roles/{fname}?v={_DETHRONE_ASSET_VERSION}")
+        assert busted.status_code == 200, fname
+
+    back = manifest["back"]
+    r = client.get(f"/dethrone/cards/roles/{back}")
     assert r.status_code == 200
     assert r.headers["content-type"] == "image/png"
+
     r = client.get("/dethrone/cards/roles/manifest.json")
     assert r.status_code == 200
     assert "king-card-v3b-poker.png" in r.text
