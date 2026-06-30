@@ -112,6 +112,7 @@ class CursedThroneGame:
         self.pending_role_discard: dict[str, dict] = {}
         self.pending_ui_action: dict[str, dict] = {}
         self.private_notes: dict[str, str] = {}
+        self.tax_skip_remaining: dict[str, int] = {}
         self.balance: dict[str, int] = dict(D.DEFAULT_BALANCE)
 
     def _rule(self, key: str) -> int:
@@ -271,6 +272,7 @@ class CursedThroneGame:
         else:
             self.active_player_index = _clamp(first_index, 0, n - 1)
         self.round = 1
+        self._on_new_round()
         self.corruption = 0
         self.innocent_elims = 0
         self.winner = None
@@ -314,6 +316,84 @@ class CursedThroneGame:
         p.location = location_id
         self._log(f"{p.name} moved {from_name} → {to_name}" + (" (manual)" if manual else "") + ".")
 
+    def _all_role_ids(self, p: PlayerState) -> set[str]:
+        roles: set[str] = set()
+        if p.public_role_id:
+            roles.add(p.public_role_id)
+        roles.update(p.hidden_role_ids)
+        roles.update(p.extra_shown_role_ids)
+        return roles
+
+    def _on_new_round(self) -> None:
+        """Per-round hooks (Court Favourite tax skip, etc.)."""
+        self.tax_skip_remaining = {}
+        for p in self.players:
+            if p.status == "active" and "courtfavourite" in self._all_role_ids(p):
+                self.tax_skip_remaining[p.id] = 1
+
+    def _tax_exempt_reason(self, target: PlayerState, collector_id: str) -> Optional[str]:
+        if target.id == collector_id:
+            return "self"
+        roles = self._all_role_ids(target)
+        if roles & D.TAX_EXEMPT_ROLE_IDS:
+            return "tax exempt role"
+        if "king" in roles:
+            t = self.throne
+            if collector_id in (t.get("queenControllerId"), t.get("successorId")):
+                return "Royal Tax Exemption"
+        remaining = self.tax_skip_remaining.get(target.id, 0)
+        if remaining > 0:
+            self.tax_skip_remaining[target.id] = remaining - 1
+            return "Favoured"
+        if "guild_seal" in target.action_card_ids:
+            target.action_card_ids.remove("guild_seal")
+            self.discards.setdefault("Market", []).append("guild_seal")
+            self._log(f"{target.name} played Guild Seal to ignore tax.", "note")
+            return "Guild Seal"
+        return None
+
+    def _collect_tax(self, collector: PlayerState, amount: int) -> int:
+        taken = 0
+        for other in self.players:
+            if other.status != "active" or other.id == collector.id:
+                continue
+            reason = self._tax_exempt_reason(other, collector.id)
+            if reason:
+                if reason != "self":
+                    self._log(f"{other.name} ignored tax ({reason}).", "note")
+                continue
+            amt = min(amount, other.gold)
+            if amt:
+                other.gold -= amt
+                collector.gold += amt
+                taken += amt
+        return taken
+
+    def _can_final_rite(self, p: PlayerState) -> bool:
+        if self.winner or not p or p.status != "active":
+            return False
+        if "cursedone" not in p.hidden_role_ids:
+            return False
+        if p.location != "graveyard":
+            return False
+        return self.corruption >= self._rule("finalRiteAt")
+
+    def _advance_turn(self) -> None:
+        n = len(self.players)
+        start = self.active_player_index
+        idx = start
+        for _ in range(n):
+            idx = (idx + 1) % n
+            if self.players[idx].status == "active":
+                break
+        wrapped = idx <= start
+        self.active_player_index = idx
+        if wrapped:
+            self.round += 1
+            self._on_new_round()
+            self._log(f"Round {self.round} started.", "system")
+        self._log(f"Turn passes to {self.players[idx].name}.")
+
     def end_turn(self, actor_id: str) -> None:
         if self.status != STATUS_PLAY or self.winner:
             raise MoveError("No active game.")
@@ -326,19 +406,35 @@ class CursedThroneGame:
                 f"Discard down to {limit} action cards before ending your turn "
                 f"({len(ap.action_card_ids)} in hand)."
             )
-        n = len(self.players)
-        start = self.active_player_index
-        idx = start
-        for _ in range(n):
-            idx = (idx + 1) % n
-            if self.players[idx].status == "active":
-                break
-        wrapped = idx <= start
-        self.active_player_index = idx
-        if wrapped:
-            self.round += 1
-            self._log(f"Round {self.round} started.", "system")
-        self._log(f"Turn passes to {self.players[idx].name}.")
+        if self._can_final_rite(ap):
+            self.pending_ui_action[ap.id] = {"kind": "final_rite", "playerId": ap.id}
+            return
+        self._advance_turn()
+
+    def perform_final_rite(self, pid: str) -> None:
+        if self.status != STATUS_PLAY or self.winner:
+            raise MoveError("No active game.")
+        pending = self.pending_ui_action.get(pid)
+        if not pending or pending.get("kind") != "final_rite":
+            raise MoveError("No Final Rite to perform.")
+        ap = self.active_player()
+        if not ap or ap.id != pid:
+            raise MoveError("Not your turn.")
+        if not self._can_final_rite(ap):
+            raise MoveError("Final Rite is not available.")
+        self.pending_ui_action.pop(pid, None)
+        self._log(f"{ap.name} performs the Final Rite at the Graveyard!", "system")
+        self.declare_winner("cursed", "Final Rite")
+
+    def decline_final_rite(self, pid: str) -> None:
+        pending = self.pending_ui_action.get(pid)
+        if not pending or pending.get("kind") != "final_rite":
+            raise MoveError("No Final Rite offer active.")
+        ap = self.active_player()
+        if not ap or ap.id != pid:
+            raise MoveError("Not your turn.")
+        self.pending_ui_action.pop(pid, None)
+        self._advance_turn()
 
     # ---- corruption & wins ----
     def set_corruption(self, value: int, reason: str = "") -> None:
@@ -538,15 +634,7 @@ class CursedThroneGame:
             p.gold -= cost
 
         if fx.get("tax_each"):
-            taken = 0
-            for other in self.players:
-                if other.status != "active" or other.id == pid:
-                    continue
-                amt = min(fx["tax_each"], other.gold)
-                if amt:
-                    other.gold -= amt
-                    p.gold += amt
-                    taken += amt
+            taken = self._collect_tax(p, fx["tax_each"])
             if taken:
                 self._log(f"{p.name} collected {taken} gold in taxes.")
 
@@ -695,15 +783,7 @@ class CursedThroneGame:
             raise MoveError("Must be at the Throne.")
 
         if choice == "tax":
-            taken = 0
-            for other in self.players:
-                if other.status != "active" or other.id == pid:
-                    continue
-                amt = min(1, other.gold)
-                if amt:
-                    other.gold -= amt
-                    ap.gold += amt
-                    taken += amt
+            taken = self._collect_tax(ap, 1)
             if taken:
                 self._log(f"{ap.name} levied Royal Tax — collected {taken} gold.")
             else:

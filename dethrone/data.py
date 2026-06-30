@@ -222,6 +222,9 @@ CARD_AUTO_EFFECTS: dict[str, dict] = {
     "tavern_brawl": {"open_duel": True, "needs_target": True, "same_location": True, "at_location": "tavern"},
 }
 
+# Role ids with standing exemption from royal / Tax Collector levies
+TAX_EXEMPT_ROLE_IDS = frozenset({"firstborn", "tinytyrant", "spy"})
+
 DECK_BUY_COST: dict[str, int] = {
     "Market": 2, "Tavern": 2, "Knowledge": 2, "Barracks": 2, "Graveyard": 4, "Royal": 2,
 }

@@ -160,13 +160,8 @@ CT.helpers.applyRoyalCommand = function (choice, targetId) {
   var ap = CT.playerById(u.controllerId);
   if (!ap) { u.open = null; return CT.render(); }
   if (choice === "tax") {
-    var taken = 0;
-    CT.state.players.forEach(function (other) {
-      if (other.status !== "active" || other.id === ap.id) return;
-      var amt = Math.min(1, other.gold);
-      if (amt) { other.gold -= amt; ap.gold += amt; taken += amt; }
-    });
-    CT.log(ap.name + " levied Royal Tax" + (taken ? " — collected " + taken + " gold." : " — no gold collected."), taken ? "event" : "note");
+    var royalTaken = CT.collectTax(ap, 1);
+    CT.log(ap.name + " levied Royal Tax" + (royalTaken ? " — collected " + royalTaken + " gold." : " — no gold collected."), royalTaken ? "event" : "note");
   } else if (choice === "pardon" && targetId) {
     CT.adjustRep(targetId, 1, "Royal Pardon");
     CT.log(ap.name + " issued a Royal Pardon for " + CT.playerById(targetId).name + ".");

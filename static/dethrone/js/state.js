@@ -82,6 +82,7 @@ CT.newGame = function (playersInput, undealtRoleIds, startingActionByPlayer, fir
     decks: {},     // deckName -> [cardId] draw pile (shuffled)
     discards: {},  // deckName -> [cardId]
     contracts: [], // Blood Contracts (§25): {id, aId, bId, promise, status}
+    taxSkipRemaining: {},
     log: [],
   };
   CT.DECK_NAMES.forEach(function (name) {
@@ -90,6 +91,7 @@ CT.newGame = function (playersInput, undealtRoleIds, startingActionByPlayer, fir
   });
   CT.log("Game started: " + CT.state.players.length + " players. Round 1.", "system");
   CT.log("First to act: " + CT.state.players[CT.state.activePlayerIndex].name + ".", "system");
+  CT.onNewRound();
   CT.save();
   return CT.state;
 };
@@ -103,13 +105,92 @@ CT.playerById = function (id) {
 };
 
 /* ---- turn / round advance (§11). Skip eliminated. Round ticks when wrapping. ---- */
-CT.endTurn = function () {
-  var s = CT.state;
-  if (!s || s.winner) return;
-  var ap = CT.activePlayer();
-  if (ap && CT.overHandLimit(ap)) {
-    return { ok: false, msg: "Discard down to " + CT.getRules().HAND_LIMIT + " cards before ending your turn." };
+CT.TAX_EXEMPT_ROLES = { firstborn: true, tinytyrant: true, spy: true };
+
+CT.allRoleIds = function (player) {
+  var ids = [];
+  if (player.publicRoleId) ids.push(player.publicRoleId);
+  ids = ids.concat(player.hiddenRoleIds || [], player.extraShownRoleIds || []);
+  return ids;
+};
+
+CT.onNewRound = function () {
+  if (!CT.state) return;
+  CT.state.taxSkipRemaining = {};
+  CT.state.players.forEach(function (p) {
+    if (p.status === "active" && CT.allRoleIds(p).indexOf("courtfavourite") !== -1) {
+      CT.state.taxSkipRemaining[p.id] = 1;
+    }
+  });
+};
+
+CT.taxExemptReason = function (target, collectorId) {
+  if (!target || target.id === collectorId) return "self";
+  var roles = CT.allRoleIds(target);
+  for (var i = 0; i < roles.length; i++) {
+    if (CT.TAX_EXEMPT_ROLES[roles[i]]) return "tax exempt role";
   }
+  if (roles.indexOf("king") !== -1) {
+    var t = CT.state.throne;
+    if (collectorId === t.queenControllerId || collectorId === t.successorId) return "Royal Tax Exemption";
+  }
+  var rem = CT.state.taxSkipRemaining[target.id] || 0;
+  if (rem > 0) {
+    CT.state.taxSkipRemaining[target.id] = rem - 1;
+    return "Favoured";
+  }
+  var gsi = target.actionCardIds.indexOf("guild_seal");
+  if (gsi !== -1) {
+    target.actionCardIds.splice(gsi, 1);
+    CT.state.discards.Market.push("guild_seal");
+    CT.log(target.name + " played Guild Seal to ignore tax.", "note");
+    return "Guild Seal";
+  }
+  return null;
+};
+
+CT.collectTax = function (collector, amount) {
+  var taken = 0;
+  CT.state.players.forEach(function (other) {
+    if (other.status !== "active" || other.id === collector.id) return;
+    var reason = CT.taxExemptReason(other, collector.id);
+    if (reason) {
+      if (reason !== "self") CT.log(other.name + " ignored tax (" + reason + ").", "note");
+      return;
+    }
+    var amt = Math.min(amount, other.gold);
+    if (amt) { other.gold -= amt; collector.gold += amt; taken += amt; }
+  });
+  return taken;
+};
+
+CT.canFinalRite = function (player) {
+  if (!CT.state || CT.state.winner || !player || player.status !== "active") return false;
+  if (player.hiddenRoleIds.indexOf("cursedone") === -1) return false;
+  if (player.location !== "graveyard") return false;
+  return CT.state.corruption >= CT.getRules().FINAL_RITE_CORRUPTION;
+};
+
+CT.performFinalRite = function (playerId) {
+  var p = CT.playerById(playerId);
+  if (!CT.canFinalRite(p)) return { ok: false, msg: "Final Rite is not available." };
+  CT.ui.finalRiteOffer = null;
+  CT.log(p.name + " performs the Final Rite at the Graveyard!", "system");
+  CT.declareWinner("cursed", "Final Rite");
+  CT.save();
+  return { ok: true };
+};
+
+CT.declineFinalRite = function (playerId) {
+  var ap = CT.activePlayer();
+  if (!ap || ap.id !== playerId) return { ok: false, msg: "Not your turn." };
+  CT.ui.finalRiteOffer = null;
+  return CT.advanceTurn();
+};
+
+CT.advanceTurn = function () {
+  var s = CT.state;
+  if (!s || s.winner) return { ok: false };
   var n = s.players.length;
   var start = s.activePlayerIndex;
   var idx = start;
@@ -117,17 +198,30 @@ CT.endTurn = function () {
     idx = (idx + 1) % n;
     if (s.players[idx].status === "active") break;
   }
-  // round increments when the next active player's index is <= current (wrapped around)
   var wrapped = idx <= start;
   s.activePlayerIndex = idx;
   if (wrapped) {
     s.round += 1;
-    // once-per-round flags would reset here in later phases
+    CT.onNewRound();
     CT.log("Round " + s.round + " started.", "system");
   }
   CT.log("Turn passes to " + s.players[idx].name + ".");
   CT.save();
   return { ok: true };
+};
+
+CT.endTurn = function () {
+  var s = CT.state;
+  if (!s || s.winner) return;
+  var ap = CT.activePlayer();
+  if (ap && CT.overHandLimit(ap)) {
+    return { ok: false, msg: "Discard down to " + CT.getRules().HAND_LIMIT + " cards before ending your turn." };
+  }
+  if (ap && CT.canFinalRite(ap)) {
+    CT.ui.finalRiteOffer = ap.id;
+    return { ok: false, offerFinalRite: true };
+  }
+  return CT.advanceTurn();
 };
 
 /* ---- corruption (§15). Always log reason. Detect Cursed win / Final Rite warning. ---- */
@@ -355,13 +449,8 @@ CT.playActionCard = function (playerId, cardId, opts) {
   }
 
   if (cardId === "tax_collector") {
-    var taken = 0;
-    s.players.forEach(function (other) {
-      if (other.status !== "active" || other.id === playerId) return;
-      var amt = Math.min(1, other.gold);
-      if (amt) { other.gold -= amt; p.gold += amt; taken += amt; }
-    });
-    if (taken) CT.log(p.name + " collected " + taken + " gold in taxes.");
+    var taxTaken = CT.collectTax(p, 1);
+    if (taxTaken) CT.log(p.name + " collected " + taxTaken + " gold in taxes.");
   }
   if (cardId === "stolen_offering") {
     s.players.forEach(function (other) {

@@ -28,6 +28,8 @@ _DETHRONE_CSP = (
     "frame-ancestors 'none'"
 )
 
+_DETHRONE_ASSET_VERSION = "20260630-p11"
+
 _CREATE_BUCKETS: dict[str, list[float]] = {}
 _CREATE_LIMIT = 30
 _CREATE_WINDOW = 10 * 60
@@ -58,6 +60,9 @@ async def dethrone_page() -> HTMLResponse:
         raise HTTPException(status_code=404)
     html = _INDEX.read_text(encoding="utf-8")
     html = html.replace("<head>", '<head>\n  <base href="/dethrone/">', 1)
+    v = _DETHRONE_ASSET_VERSION
+    html = html.replace('.css"', f'.css?v={v}"')
+    html = html.replace('.js"', f'.js?v={v}"')
     return HTMLResponse(content=html, headers={"Content-Security-Policy": _DETHRONE_CSP})
 
 
@@ -324,6 +329,14 @@ def _dispatch(room, player, mtype: str, msg: dict) -> bool:
 
     if mtype == "endTurn":
         g.end_turn(player.id)
+        return True
+
+    if mtype == "performFinalRite":
+        g.perform_final_rite(player.id)
+        return True
+
+    if mtype == "declineFinalRite":
+        g.decline_final_rite(player.id)
         return True
 
     if mtype == "discardRole":

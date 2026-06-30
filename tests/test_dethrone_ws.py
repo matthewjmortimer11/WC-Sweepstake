@@ -131,6 +131,12 @@ def _start_game(code: str, n: int = 4):
     return room, pids, g
 
 
+def _set_non_exempt_roles(p):
+    """Deterministic roles for tax tests (no spy/firstborn/tinytyrant/courtfavourite)."""
+    p.public_role_id = "gateguard"
+    p.hidden_role_ids = ["thief", "queen"]
+
+
 def test_challenge_sets_pending_discard(client):
     code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
     room, pids, g = _start_game(code)
@@ -247,6 +253,7 @@ def test_tax_collector_takes_from_others(client):
     room, pids, g = _start_game(code)
     active = g.active_player().id
     for p in g.players:
+        _set_non_exempt_roles(p)
         if p.id != active:
             p.gold = 2
     ap = g.player_by_id(active)
@@ -254,6 +261,84 @@ def test_tax_collector_takes_from_others(client):
     before = ap.gold
     g.play_action_card(active, "tax_collector")
     assert ap.gold == before + 3  # 3 other players × 1 gold
+
+
+def test_tax_skips_exempt_firstborn(client):
+    code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
+    room, pids, g = _start_game(code)
+    active = g.active_player().id
+    for p in g.players:
+        _set_non_exempt_roles(p)
+    victim = next(pid for pid in pids if pid != active)
+    vp = g.player_by_id(victim)
+    vp.public_role_id = "firstborn"
+    vp.gold = 5
+    ap = g.player_by_id(active)
+    ap.action_card_ids.append("tax_collector")
+    before = ap.gold
+    g.play_action_card(active, "tax_collector")
+    assert vp.gold == 5
+    assert ap.gold == before + 2  # only 2 payers
+
+
+def test_guild_seal_ignores_tax(client):
+    code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
+    room, pids, g = _start_game(code)
+    active = g.active_player().id
+    for p in g.players:
+        _set_non_exempt_roles(p)
+    victim = next(pid for pid in pids if pid != active)
+    vp = g.player_by_id(victim)
+    vp.gold = 3
+    vp.action_card_ids = ["guild_seal"]
+    ap = g.player_by_id(active)
+    ap.action_card_ids.append("tax_collector")
+    g.play_action_card(active, "tax_collector")
+    assert "guild_seal" not in vp.action_card_ids
+    assert vp.gold == 3
+
+
+def test_end_turn_offers_final_rite(client):
+    code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
+    room, pids, g = _start_game(code)
+    active = g.active_player().id
+    ap = g.player_by_id(active)
+    ap.hidden_role_ids = ["cursedone", "thief", "spy"]
+    ap.public_role_id = None
+    ap.location = "graveyard"
+    g.corruption = 8
+    g.end_turn(active)
+    assert g.active_player().id == active
+    assert g.pending_ui_action[active]["kind"] == "final_rite"
+
+
+def test_perform_final_rite_wins(client):
+    code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
+    room, pids, g = _start_game(code)
+    active = g.active_player().id
+    ap = g.player_by_id(active)
+    ap.hidden_role_ids = ["cursedone", "thief", "spy"]
+    ap.public_role_id = None
+    ap.location = "graveyard"
+    g.corruption = 8
+    g.end_turn(active)
+    g.perform_final_rite(active)
+    assert g.winner == "cursed"
+
+
+def test_decline_final_rite_advances_turn(client):
+    code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
+    room, pids, g = _start_game(code)
+    active = g.active_player().id
+    ap = g.player_by_id(active)
+    ap.hidden_role_ids = ["cursedone", "thief", "spy"]
+    ap.public_role_id = None
+    ap.location = "graveyard"
+    g.corruption = 8
+    g.end_turn(active)
+    g.decline_final_rite(active)
+    assert g.active_player().id != active
+    assert active not in g.pending_ui_action
 
 
 def test_market_day_gives_gold_at_market(client):

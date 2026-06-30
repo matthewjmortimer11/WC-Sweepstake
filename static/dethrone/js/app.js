@@ -3,7 +3,7 @@ window.CT = window.CT || {};
 
 CT.ui = { privateFor: null, privateRevealed: false, showImport: false, showGuide: false,
   roleDiscardFor: null, roleDiscardRevealed: false, handFixFor: null, keepOne: null, playCard: null,
-  logFilter: "all", privateNote: null };
+  logFilter: "all", privateNote: null, finalRiteOffer: null };
 
 /* Play vs Test mode — Test reveals referee & per-player override tools (§32, §35).
  * Persisted separately so it applies to the start/setup screens too. */
@@ -554,6 +554,7 @@ function logPanel() {
 
 /* ============ overlays (private view, import) ============ */
 function overlays() {
+  if (CT.ui.finalRiteOffer) return finalRiteView();
   if (CT.ui.showGuide) return playtestGuideView();
   if (CT.ui.playCard) return playCardView();
   if (CT.ui.privateFor) return privateView();
@@ -679,6 +680,21 @@ function privateView() {
     + '<div class="btn-row" style="margin-top:20px"><div class="spacer"></div>'
     + '<button class="btn btn-primary" data-act="close-private">Hide & return to table</button></div>'
     + '</div></div>';
+}
+
+function finalRiteView() {
+  var p = CT.playerById(CT.ui.finalRiteOffer);
+  if (!p) { CT.ui.finalRiteOffer = null; return ""; }
+  return '<div class="scrim"><div class="modal cover" style="max-width:480px">'
+    + '<div class="seal-big" style="background:var(--wax-soft);color:var(--wax)">☠</div>'
+    + '<h1 style="margin:8px 0">Final Rite</h1>'
+    + '<p class="muted" style="font-size:15px">You are at the Graveyard and corruption is '
+    + CT.state.corruption + " or higher. Reveal the Cursed One and win — or pass and end your turn normally.</p>"
+    + '<p class="muted" style="font-size:13px">Only you see this prompt. The table learns the outcome when you choose.</p>'
+    + '<div class="btn-row" style="justify-content:center;margin-top:20px;flex-wrap:wrap;gap:10px">'
+    + '<button class="btn btn-ghost" data-act="decline-final-rite">End turn without Rite</button>'
+    + '<button class="btn btn-danger" data-act="perform-final-rite">Perform Final Rite ✦</button>'
+    + '</div></div></div>';
 }
 
 function playtestGuideView() {
@@ -815,11 +831,20 @@ CT.handleAction = function (act, el, ev) {
     case "end-turn":
       if (CT.netAction({ type: "endTurn" })) break;
       var et = CT.endTurn();
+      if (et && et.offerFinalRite) { CT.render(); break; }
       if (et && !et.ok) {
         CT.showToast(et.msg);
         var ap = CT.activePlayer();
         if (ap && CT.overHandLimit(ap)) CT.ui.handFixFor = ap.id;
       }
+      CT.render(); break;
+    case "perform-final-rite":
+      if (CT.netAction({ type: "performFinalRite" })) break;
+      CT.performFinalRite(CT.ui.finalRiteOffer || CT.myId());
+      CT.render(); break;
+    case "decline-final-rite":
+      if (CT.netAction({ type: "declineFinalRite" })) break;
+      CT.declineFinalRite(CT.ui.finalRiteOffer || CT.myId());
       CT.render(); break;
     case "bot-turn": {
       var bp = CT.activePlayer();

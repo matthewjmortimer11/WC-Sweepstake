@@ -90,11 +90,17 @@ CT.net.applyState = function (msg) {
     } else if (!cs.pendingKeepOne) {
       CT.ui.keepOne = null;
     }
-    if (cs.pendingUiAction && CT.myId() && CT.helpers && !CT.helpers.ui.open) {
+    if (cs.pendingUiAction && CT.myId()) {
       var pui = cs.pendingUiAction;
-      if (pui.kind === "duel") CT.helpers.openDuelFromPending(pui);
-      else if (pui.kind === "royal_command") CT.helpers.openRoyalCommandFromPending(pui);
-      else if (pui.kind === "deep_research") CT.helpers.openDeepResearchFromPending(pui);
+      if (pui.kind === "final_rite") {
+        CT.ui.finalRiteOffer = pui.playerId;
+      } else if (CT.helpers && !CT.helpers.ui.open) {
+        if (pui.kind === "duel") CT.helpers.openDuelFromPending(pui);
+        else if (pui.kind === "royal_command") CT.helpers.openRoyalCommandFromPending(pui);
+        else if (pui.kind === "deep_research") CT.helpers.openDeepResearchFromPending(pui);
+      }
+    } else if (CT.ui.finalRiteOffer === CT.myId()) {
+      CT.ui.finalRiteOffer = null;
     }
     if (cs.privateNote && CT.myId()) {
       CT.ui.privateNote = cs.privateNote;

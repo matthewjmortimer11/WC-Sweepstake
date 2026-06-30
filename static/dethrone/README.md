@@ -58,6 +58,11 @@ open "index.html"          # macOS
 - **Serious Duel** (Barracks) — opens Duel helper with Serious mode on; once per game per player (tracked); loser discards a role on win
 - **Deep Research** (Scrolls, 2 gold) — investigate: peek a draw pile, peek/cross-reference a discard pile, or interview a witness at the Scrolls (private note only)
 
+### Phase 11 — Win conditions & tax enforcement
+- **Final Rite (human)** — Cursed player at Graveyard with corruption high enough gets a private prompt on End turn: perform Final Rite (Cursed win) or pass
+- **Tax exemptions** — Tax Collector and Royal Tax respect role exemptions (Firstborn, Tiny Tyrant, Spy, King vs Queen/successor), Court Favourite once/round, Guild Seal in hand
+- **Deploy safety** — Dethrone JS syntax check in CI; cache-busted static assets on `/dethrone`
+
 ### Phase 4 — Throne & Succession
 A **Throne & Succession** panel tracks the crown and the line of succession.
 - **Throne control (§23)**: King / Queen / Successor controllers, set manually or via the **Claim helper** (claimant + crown; unchallenged → crowned, or challenged → "proof valid" crowns them and the challenger loses a role / "bluff" costs the claimant a role). Claim order is recorded.
@@ -112,8 +117,11 @@ Table talk and bluffing stay verbal. The app guides, tracks, and enforces mechan
 
 - Bots still skip most social nuance (duels, trades, throne claims) — they hunt the Cursed One so all-bot runs can test a Loyal win, not to simulate table talk.
 - Action cards that need table judgement (Call Out helper, Blood Contract, most Vote/Duel/Reaction cards) stay manual — auto-play covers the mechanical OnTurn subset listed in `CT.AUTO_PLAY` / `CARD_AUTO_EFFECTS` (expanded in Phase 9).
+- Reaction cards played proactively from hand (not auto-consumed like Guild Seal on tax) still need table timing.
 
-## File structure
+## Next improvements
+
+Run `PLAYTEST.md` at a real table, log friction, then Phase 12 (more card auto-play + duel/vote card hooks).
 
 ```
 index.html        shell; loads the scripts in order
