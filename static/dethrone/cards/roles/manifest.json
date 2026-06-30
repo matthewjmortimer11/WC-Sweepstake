@@ -1,0 +1,39 @@
+{
+  "template": "V3b Vertical Asymmetric Editorial",
+  "trim": "2.5x3.5in",
+  "palette": {
+    "cream": "#F4ECD6",
+    "ink": "#2A2014",
+    "gold": "#A8842C",
+    "royal": "#8C2F23",
+    "cursed": "#6B2420",
+    "succession": "#5A6E3A",
+    "knight": "#4A5568",
+    "guard": "#5B4C38",
+    "thiefSpy": "#3A3530",
+    "advisor": "#2A2014"
+  },
+  "back": "role-card-back-v3b-poker.png",
+  "cards": {
+    "king": "king-card-v3b-poker.png",
+    "queen": "queen-card-v3b-poker.png",
+    "cursedone": "cursed-one-card-v3b-poker.png",
+    "firstborn": "firstborn-noble-card-v3b-poker.png",
+    "secondborn": "secondborn-noble-card-v3b-poker.png",
+    "tinytyrant": "tiny-tyrant-card-v3b-poker.png",
+    "distantcousin": "distant-cousin-card-v3b-poker.png",
+    "royalknight": "royal-knight-card-v3b-poker.png",
+    "blackknight": "black-knight-card-v3b-poker.png",
+    "wanderingknight": "wandering-knight-card-v3b-poker.png",
+    "youngknight": "young-knight-card-v3b-poker.png",
+    "royalguard": "royal-guard-card-v3b-poker.png",
+    "gateguard": "gate-guard-card-v3b-poker.png",
+    "graveyardguard": "graveyard-guard-card-v3b-poker.png",
+    "courtfavourite": "court-favourite-card-v3b-poker.png",
+    "thief": "thief-card-v3b-poker.png",
+    "spy": "spy-card-v3b-poker.png",
+    "royaladvisor": "royal-advisor-card-v3b-poker.png",
+    "collegeadvisor": "college-advisor-card-v3b-poker.png",
+    "tavernwhisperer": "tavern-whisperer-card-v3b-poker.png"
+  }
+}
