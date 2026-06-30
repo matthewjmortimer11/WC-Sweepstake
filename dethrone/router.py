@@ -34,7 +34,7 @@ _DETHRONE_CSP = (
     "frame-ancestors 'none'"
 )
 
-_DETHRONE_ASSET_VERSION = "20260630-p14"
+_DETHRONE_ASSET_VERSION = "20260630-p15"
 
 _CREATE_BUCKETS: dict[str, list[float]] = {}
 _CREATE_LIMIT = 30
@@ -362,6 +362,10 @@ def _dispatch(room, player, mtype: str, msg: dict) -> bool:
 
     if mtype == "declineReaction":
         g.resolve_reaction(player.id, None)
+        return True
+
+    if mtype == "reactionMove":
+        g.reaction_move(player.id, str(msg.get("locationId", "")))
         return True
 
     if mtype == "discardRole":

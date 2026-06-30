@@ -686,7 +686,7 @@ class CursedThroneGame:
                 p.gold += pay
                 self._log(f"{target.name} paid {pay} gold to {p.name}.")
             else:
-                self.adjust_rep(target.id, -1, cname)
+                self._maybe_offer_rep_loss(target.id, -1, cname)
 
         if fx.get("gold"):
             self.adjust_gold(pid, fx["gold"], cname)
@@ -723,7 +723,7 @@ class CursedThroneGame:
                 p.gold += 1
                 self._log(f"{target.name} paid 1 gold to {p.name} to silence the Rumour.")
             else:
-                self._maybe_offer_rep_loss(target.id, -1, "Rumour")
+                self._maybe_offer_rep_loss(target.id, -1, "Rumour", trigger="rumour")
         if fx.get("open_succession"):
             self.open_succession()
         if fx.get("bone_dice"):
@@ -731,7 +731,7 @@ class CursedThroneGame:
                 p.gold += 4
                 self._log(f"{p.name} rolled high on the Bone Dice — +4 gold.")
             else:
-                self.adjust_rep(pid, -1, "Bone Dice")
+                self._maybe_offer_rep_loss(pid, -1, "Bone Dice")
         if fx.get("peek_deck_top") and deck_name:
             pile = self._ensure_draw_pile(deck_name, rng)
             top = pile[0] if pile else None
@@ -1016,7 +1016,7 @@ class CursedThroneGame:
         elif act_id == "scavenge":
             ap.gold += 3
             self._log(f"{ap.name} scavenged the Graveyard. +3 gold → {ap.gold}.")
-            self.adjust_rep(ap.id, -1, "Scavenge")
+            self._maybe_offer_rep_loss(ap.id, -1, "Scavenge")
         elif act_id == "buy_grave":
             self._log(f"{ap.name} paid {cost} gold for a Graveyard card.")
             self.adjust_corruption(1, "bought a Graveyard card")
@@ -1137,7 +1137,7 @@ class CursedThroneGame:
                 ap.gold += 1
                 self._log(f"{target.name} paid 1 gold to {ap.name} to silence the Rumour.")
             else:
-                self._maybe_offer_rep_loss(target.id, -1, aname)
+                self._maybe_offer_rep_loss(target.id, -1, aname, trigger="rumour")
         elif fx.get("rep_gain"):
             self.adjust_rep(ap.id, int(fx["rep_gain"]), aname)
         elif fx.get("rep_loss") and target:
@@ -1350,6 +1350,8 @@ class CursedThroneGame:
                 t = self.throne
                 if not t.get("kingControllerId") and not t.get("queenControllerId"):
                     continue
+            if fx.get("requires_location") and player.location != fx["requires_location"]:
+                continue
             cards.append(cid)
         return cards
 
@@ -1366,6 +1368,8 @@ class CursedThroneGame:
             "cards": cards,
             "resume": resume,
         }
+        if target.is_bot:
+            self._bot_resolve_pending(target_id, random.Random())
         return True
 
     def resolve_reaction(self, pid: str, card_id: Optional[str] = None) -> None:
@@ -1384,6 +1388,22 @@ class CursedThroneGame:
             self.discard_card(pid, card_id, "reaction")
             if fx.get("cost_rep"):
                 self.adjust_rep(pid, -int(fx["cost_rep"]), cname)
+            action = fx.get("action")
+            if action == "flee_duel":
+                att_id = resume.get("attackerId")
+                if att_id:
+                    self.pending_ui_action.pop(att_id, None)
+                self._log(f"{p.name} plays Flee — duel cancelled. Move up to 2 spaces.", "event")
+                self.pending_ui_action[pid] = {"kind": "reaction_move", "playerId": pid, "maxSteps": 2}
+                return
+            if action == "quick_escape":
+                self._log(f"{p.name} plays Quick Escape — reputation loss avoided. Move 1 space.", "event")
+                self.pending_ui_action[pid] = {"kind": "reaction_move", "playerId": pid, "maxSteps": 1}
+                return
+            if resume.get("effect") == "duel_consequence":
+                self._log(f"{p.name} played {cname} — duel consequence cancelled.", "event")
+                self.pending_ui_action.pop(pid, None)
+                return
             self._log(f"{p.name} played {cname} — the effect was cancelled.", "event")
             if resume.get("effect") == "cancel_duel":
                 att_id = resume.get("attackerId")
@@ -1393,6 +1413,27 @@ class CursedThroneGame:
             return
         self.pending_ui_action.pop(pid, None)
         self._resume_effect(resume)
+
+    def reaction_move(self, pid: str, location_id: str) -> None:
+        pending = self.pending_ui_action.get(pid)
+        if not pending or pending.get("kind") != "reaction_move":
+            raise MoveError("No reaction move pending.")
+        p = self.player_by_id(pid)
+        if not p:
+            raise MoveError("Unknown player.")
+        if location_id not in self.legal_moves(p):
+            raise MoveError("That location is not reachable.")
+        self.move_player(pid, location_id, manual=True)
+        pending["maxSteps"] = int(pending.get("maxSteps", 1)) - 1
+        if pending["maxSteps"] <= 0:
+            self.pending_ui_action.pop(pid, None)
+
+    def _is_royal_or_throne(self, p: PlayerState) -> bool:
+        roles = self._all_role_ids(p)
+        if roles & {"king", "queen"}:
+            return True
+        t = self.throne
+        return p.id in (t.get("kingControllerId"), t.get("queenControllerId"), t.get("successorId"))
 
     def _resume_effect(self, resume: dict) -> None:
         effect = resume.get("effect")
@@ -1413,7 +1454,9 @@ class CursedThroneGame:
             after = resume.get("after") or {}
             self.require_role_discard(target_id, "vote", after=after)
         elif effect == "cancel_duel":
-            pass  # duel pending remains on attacker
+            pass
+        elif effect == "duel_consequence":
+            self._apply_duel_consequence_only(resume)
 
     def _resolve_call_out(self, caller_id: str, target_id: str, role_id: str) -> None:
         caller = self.player_by_id(caller_id)
@@ -1437,7 +1480,7 @@ class CursedThroneGame:
         delta: int,
         reason: str,
         *,
-        trigger: str = "rumour",
+        trigger: str = "rep_loss",
     ) -> bool:
         if delta >= 0:
             self.adjust_rep(target_id, delta, reason)
@@ -1668,8 +1711,19 @@ class CursedThroneGame:
         elif consequence == "shame":
             if "shield" in loser_cards:
                 self._log(f"{loser.name}'s Shield ignored Shame.", "note")
+            elif self._is_royal_or_throne(loser) and self._offer_reaction(
+                loser.id,
+                "duel_consequence",
+                {
+                    "effect": "duel_consequence",
+                    "consequence": "shame",
+                    "loserId": loser.id,
+                    "loserCards": loser_cards,
+                },
+            ):
+                return
             else:
-                self.adjust_rep(loser.id, -1, "Shame")
+                self._maybe_offer_rep_loss(loser.id, -1, "Shame")
         elif consequence == "wound":
             if "parry" in loser_cards:
                 self._log(f"{loser.name}'s Parry ignored Wound.", "note")
@@ -1677,6 +1731,17 @@ class CursedThroneGame:
                 loser.wounded = True
                 self._log(f"{loser.name} is Wounded — no hidden powers next turn.")
         elif consequence == "drive":
+            if self._is_royal_or_throne(loser) and self._offer_reaction(
+                loser.id,
+                "duel_consequence",
+                {
+                    "effect": "duel_consequence",
+                    "consequence": "drive",
+                    "loserId": loser.id,
+                    "loserCards": loser_cards,
+                },
+            ):
+                return
             moves = self.legal_moves(loser)
             dest = moves[0] if moves else loser.location
             if dest != loser.location:
@@ -1690,7 +1755,25 @@ class CursedThroneGame:
             )
         if attacker_wins and "cursed_blade" in winner_cards:
             self.adjust_corruption(1, "Cursed Blade")
-            self.adjust_rep(loser.id, -1, "Cursed Blade")
+            self._maybe_offer_rep_loss(loser.id, -1, "Cursed Blade")
+
+    def _apply_duel_consequence_only(self, resume: dict) -> None:
+        consequence = resume.get("consequence")
+        loser = self.player_by_id(resume.get("loserId", ""))
+        if not loser:
+            return
+        loser_cards = resume.get("loserCards") or []
+        if consequence == "shame":
+            if "shield" in loser_cards:
+                self._log(f"{loser.name}'s Shield ignored Shame.", "note")
+            else:
+                self._maybe_offer_rep_loss(loser.id, -1, "Shame")
+        elif consequence == "drive":
+            moves = self.legal_moves(loser)
+            dest = moves[0] if moves else loser.location
+            if dest != loser.location:
+                self.move_player(loser.id, dest, manual=True)
+            self._log(f"{loser.name} was Driven Out.", "event")
 
     def royal_claim_unchallenged(self, claimant_id: str, crown: str) -> None:
         self.set_throne_controller(crown, claimant_id, "claim")
@@ -1747,6 +1830,7 @@ class CursedThroneGame:
         p = self.player_by_id(player_id)
         if not p or not p.is_bot or p.status != "active":
             raise MoveError("Not a bot's turn.")
+        self._bot_resolve_pending(player_id, rng)
         if player_id in self.pending_role_discard:
             self._bot_auto_role_discard(player_id, rng)
             return
@@ -1760,6 +1844,8 @@ class CursedThroneGame:
             if dest:
                 self.move_player(p.id, dest, manual=False, actor_id=p.id)
         if not cursed and self._bot_try_social(p, rng):
+            pass
+        elif self._bot_try_play_card(p, rng):
             pass
         else:
             self._bot_act(p, cursed, rng)
@@ -1775,6 +1861,96 @@ class CursedThroneGame:
             return
         if not self.winner:
             self.end_turn(p.id)
+
+    def _bot_resolve_pending(self, player_id: str, rng: random.Random) -> bool:
+        """Auto-resolve reaction prompts and reaction moves for bots."""
+        pending = self.pending_ui_action.get(player_id)
+        if pending and pending.get("kind") == "reaction":
+            cards = pending.get("cards") or []
+            if cards and rng.random() < 0.75:
+                self.resolve_reaction(player_id, rng.choice(cards))
+            else:
+                self.resolve_reaction(player_id, None)
+            return True
+        if pending and pending.get("kind") == "reaction_move":
+            p = self.player_by_id(player_id)
+            if p:
+                moves = self.legal_moves(p)
+                if moves:
+                    self.reaction_move(player_id, rng.choice(moves))
+                    if player_id in self.pending_ui_action:
+                        moves2 = self.legal_moves(p)
+                        if moves2 and int(self.pending_ui_action[player_id].get("maxSteps", 0)) > 0:
+                            self.reaction_move(player_id, rng.choice(moves2))
+            else:
+                self.pending_ui_action.pop(player_id, None)
+            return True
+        if player_id in self.pending_role_discard:
+            return False
+        return False
+
+    def _bot_try_play_card(self, p: PlayerState, rng: random.Random) -> bool:
+        """Play a simple auto card or public role ability when useful."""
+        if rng.random() > 0.45:
+            return False
+        if p.public_role_id:
+            for aid, fx in D.ROLE_ABILITY_EFFECTS.items():
+                if fx.get("role") != p.public_role_id:
+                    continue
+                locs = fx.get("locations")
+                if locs and p.location not in locs:
+                    continue
+                if fx.get("once_per_round") and aid in p.abilities_used_this_round:
+                    continue
+                if fx.get("requires_royal_throne"):
+                    t = self.throne
+                    if not t.get("kingControllerId") and not t.get("queenControllerId"):
+                        continue
+                if fx.get("requires_royal_role_lost") and not self.royal_role_lost:
+                    continue
+                if int(fx.get("gold_cost", 0)) > p.gold:
+                    continue
+                target_id = None
+                if fx.get("needs_target"):
+                    others = [
+                        x for x in self.players
+                        if x.status == "active" and x.id != p.id
+                        and (not fx.get("same_location") or x.location == p.location)
+                    ]
+                    if not others:
+                        continue
+                    target_id = rng.choice(others).id
+                try:
+                    self.use_role_ability(p.id, aid, target_id)
+                    return True
+                except MoveError:
+                    continue
+        simple = [
+            cid for cid in p.action_card_ids
+            if cid in D.CARD_AUTO_EFFECTS
+            and not D.CARD_AUTO_EFFECTS[cid].get("needs_target")
+            and not D.CARD_AUTO_EFFECTS[cid].get("open_duel")
+            and not D.CARD_AUTO_EFFECTS[cid].get("open_vote")
+            and not D.CARD_AUTO_EFFECTS[cid].get("open_callout")
+        ]
+        if simple and rng.random() < 0.5:
+            try:
+                self.play_action_card(p.id, rng.choice(simple))
+                return True
+            except MoveError:
+                pass
+        rumour_cards = [c for c in p.action_card_ids if c in ("rumour_card", "false_rumour")]
+        if rumour_cards and rng.random() < 0.35:
+            others = [x for x in self.players if x.status == "active" and x.id != p.id and x.location == p.location]
+            if others:
+                try:
+                    self.play_action_card(p.id, rng.choice(rumour_cards), target_id=rng.choice(others).id)
+                    if p.id in self.pending_ui_action:
+                        self._bot_resolve_pending(p.id, rng)
+                    return True
+                except MoveError:
+                    pass
+        return False
 
     def _bot_auto_role_discard(self, pid: str, rng: random.Random) -> None:
         if pid not in self.pending_role_discard:

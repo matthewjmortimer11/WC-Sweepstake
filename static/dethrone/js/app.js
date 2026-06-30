@@ -3,7 +3,7 @@ window.CT = window.CT || {};
 
 CT.ui = { privateFor: null, privateRevealed: false, showImport: false, showGuide: false,
   roleDiscardFor: null, roleDiscardRevealed: false, handFixFor: null, keepOne: null, playCard: null,
-  logFilter: "all", privateNote: null, finalRiteOffer: null, reactionOffer: null };
+  logFilter: "all", privateNote: null, finalRiteOffer: null, reactionOffer: null, reactionMove: null };
 
 /* Play vs Test mode — Test reveals referee & per-player override tools (§32, §35).
  * Persisted separately so it applies to the start/setup screens too. */
@@ -81,6 +81,9 @@ function renderTurnDock() {
     + '<span class="chip' + (over ? " warn" : " ok") + '">🃏 ' + ap.actionCardIds.length + "/" + limit + "</span>";
   if (CT.state.throne.succession && CT.state.throne.succession.open) {
     chips += '<span class="chip wax">♛ Succession</span>';
+  }
+  if (CT.ui.reactionMove && CT.ui.reactionMove.playerId === ap.id) {
+    chips += '<span class="chip wax">Move ' + CT.ui.reactionMove.maxSteps + "</span>";
   }
   dock.innerHTML = '<div class="turn-dock-inner">'
     + '<div class="turn-meta"><div class="turn-title">Your turn</div>'
@@ -755,7 +758,7 @@ function reactionView() {
     return '<button class="btn btn-gold" data-act="play-reaction" data-id="' + id + '">Play '
       + CT.esc(c ? c.name : id) + "</button>";
   }).join("");
-  var labels = { rumour: "Rumour", callout: "Call Out", vote_pass: "Formal vote", duel_declared: "Duel" };
+  var labels = { rumour: "Rumour", callout: "Call Out", vote_pass: "Formal vote", duel_declared: "Duel", rep_loss: "Reputation loss", duel_consequence: "Duel consequence" };
   return '<div class="scrim"><div class="modal cover" style="max-width:480px">'
     + '<div class="seal-big" style="background:var(--gold-soft);color:var(--wax)">⚡</div>'
     + '<h1 style="margin:8px 0">Reaction?</h1>'
@@ -1025,6 +1028,17 @@ CT.handleAction = function (act, el, ev) {
     }
     case "board-move": {
       if (CT.isSpectator()) break;
+      var rm = CT.ui.reactionMove;
+      if (rm && (!CT.isOnline() || rm.playerId === CT.myId())) {
+        var rp = CT.playerById(rm.playerId);
+        if (rp && CT.legalMoves(rp).indexOf(el.dataset.id) !== -1) {
+          if (CT.netAction({ type: "reactionMove", locationId: el.dataset.id })) { CT.render(); break; }
+          CT.movePlayer(rm.playerId, el.dataset.id, true);
+          rm.maxSteps -= 1;
+          if (rm.maxSteps <= 0) CT.ui.reactionMove = null;
+          CT.render(); break;
+        }
+      }
       var apr = CT.activePlayer();
       if (!apr) break;
       if (CT.netAction({ type: "move", locationId: el.dataset.id })) break;

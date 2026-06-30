@@ -803,6 +803,66 @@ def test_royal_role_lost_on_king_discard(client):
     assert g.royal_role_lost is True
 
 
+def test_quick_escape_cancels_rep_loss(client):
+    code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
+    room, pids, g = _start_game(code)
+    active = g.active_player().id
+    ap = g.player_by_id(active)
+    ap.action_card_ids = ["quick_escape"]
+    before_rep = ap.rep
+    assert g._maybe_offer_rep_loss(active, -1, "Test", trigger="rep_loss")
+    g.resolve_reaction(active, "quick_escape")
+    assert g.pending_ui_action.get(active, {}).get("kind") == "reaction_move"
+    assert ap.rep == before_rep
+
+
+def test_drunken_alibi_at_tavern(client):
+    code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
+    room, pids, g = _start_game(code)
+    victim = pids[1]
+    vp = g.player_by_id(victim)
+    vp.location = "tavern"
+    vp.action_card_ids = ["drunken_alibi"]
+    before = vp.rep
+    assert g._maybe_offer_rep_loss(victim, -1, "Test", trigger="rep_loss")
+    g.resolve_reaction(victim, "drunken_alibi")
+    assert vp.rep == before
+
+
+def test_drunken_alibi_requires_tavern(client):
+    code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
+    room, pids, g = _start_game(code)
+    victim = pids[1]
+    vp = g.player_by_id(victim)
+    vp.location = "market"
+    vp.action_card_ids = ["drunken_alibi"]
+    assert g._eligible_reactions(vp, "rep_loss") == []
+    vp.location = "tavern"
+    assert "drunken_alibi" in g._eligible_reactions(vp, "rep_loss")
+
+
+def test_flee_reaction_cancels_duel_pending(client):
+    code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
+    room, pids, g = _start_game(code)
+    att = g.active_player().id
+    deff = next(pid for pid in pids if pid != att)
+    dp = g.player_by_id(deff)
+    dp.location = g.player_by_id(att).location
+    dp.action_card_ids = ["flee"]
+    g.pending_ui_action[att] = {"kind": "duel", "attackerId": att, "defenderId": deff}
+    g.pending_ui_action[deff] = {
+        "kind": "reaction",
+        "trigger": "duel_declared",
+        "cards": ["flee"],
+        "resume": {"effect": "cancel_duel", "attackerId": att},
+    }
+    before_rep = dp.rep
+    g.resolve_reaction(deff, "flee")
+    assert att not in g.pending_ui_action
+    assert g.pending_ui_action.get(deff, {}).get("kind") == "reaction_move"
+    assert dp.rep == before_rep - 1
+
+
 def D_ROLE_META_PUBLIC(role_id: str) -> bool:
     from dethrone.data import ROLE_META
     return ROLE_META.get(role_id, {}).get("canBePublic", True)

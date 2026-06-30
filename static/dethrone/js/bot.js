@@ -1,10 +1,39 @@
 /* The Cursed Throne — simple rules-based bots for solo playtesting.
- * Not a real opponent (the game is social) — just enough to drive turns so
- * one person can exercise the systems. Move -> one location action -> end turn. */
+ * Not a real opponent (the game is social) — enough to drive turns, reactions,
+ * simple cards, and role abilities so one person can exercise the systems. */
 window.CT = window.CT || {};
 CT.bot = {};
 
 CT.bot.isCursed = function (p) { return p.hiddenRoleIds.indexOf("cursedone") > -1; };
+
+CT.bot.resolvePending = function (playerId) {
+  var p = CT.playerById(playerId);
+  if (!p || !p.isBot) return false;
+  if (CT.ui.reactionOffer && CT.ui.reactionOffer.playerId === playerId) {
+    var cards = CT.ui.reactionOffer.cards || [];
+    if (cards.length && Math.random() < 0.75) CT.resolveReaction(cards[Math.floor(Math.random() * cards.length)]);
+    else CT.declineReaction();
+    return true;
+  }
+  if (CT.ui.reactionMove && CT.ui.reactionMove.playerId === playerId) {
+    var rm = CT.ui.reactionMove;
+    var moves = CT.legalMoves(p);
+    if (moves.length) {
+      CT.movePlayer(playerId, moves[Math.floor(Math.random() * moves.length)], true);
+      rm.maxSteps -= 1;
+      if (rm.maxSteps <= 0) CT.ui.reactionMove = null;
+      else if (CT.legalMoves(p).length) {
+        moves = CT.legalMoves(p);
+        CT.movePlayer(playerId, moves[Math.floor(Math.random() * moves.length)], true);
+        CT.ui.reactionMove = null;
+      }
+    } else {
+      CT.ui.reactionMove = null;
+    }
+    return true;
+  }
+  return false;
+};
 
 CT.bot.autoDiscard = function (p) {
   if (!p || !p.isBot) return false;
@@ -41,22 +70,58 @@ CT.bot.stepToward = function (a, target) {
   return null;
 };
 
+CT.bot.tryPlayCard = function (p) {
+  if (Math.random() > 0.45) return false;
+  var abilities = CT.roleAbilitiesAvailable(p);
+  if (abilities.length) {
+    var ab = abilities[Math.floor(Math.random() * abilities.length)];
+    var opts = {};
+    if (ab.needsTarget) {
+      var others = CT.state.players.filter(function (x) {
+        return x.status === "active" && x.id !== p.id && x.location === p.location;
+      });
+      if (!others.length) return false;
+      opts.targetId = others[Math.floor(Math.random() * others.length)].id;
+    }
+    var res = CT.useRoleAbility(p.id, ab.id, opts);
+    return res && res.ok;
+  }
+  var simple = p.actionCardIds.filter(function (cid) {
+    var fx = CT.AUTO_PLAY[cid];
+    return fx && !fx.needsTarget && !fx.openDuel && !fx.openVote && !fx.openCallout;
+  });
+  if (simple.length && Math.random() < 0.5) {
+    var r = CT.playActionCard(p.id, simple[Math.floor(Math.random() * simple.length)]);
+    return r && r.ok;
+  }
+  var rumour = p.actionCardIds.filter(function (cid) { return cid === "rumour_card" || cid === "false_rumour"; });
+  if (rumour.length && Math.random() < 0.35) {
+    var targets = CT.state.players.filter(function (x) { return x.status === "active" && x.id !== p.id && x.location === p.location; });
+    if (!targets.length) return false;
+    var r2 = CT.playActionCard(p.id, rumour[Math.floor(Math.random() * rumour.length)], { targetId: targets[0].id });
+    if (r2 && r2.ok) {
+      CT.state.players.forEach(function (bp) {
+        if (bp.isBot) CT.bot.resolvePending(bp.id);
+      });
+      return true;
+    }
+  }
+  return false;
+};
+
 /* pick & perform one location action */
 CT.bot.act = function (p, cursed) {
   var loc = p.location;
   var acts = CT.LOCATION_ACTIONS[loc] || [];
 
-  // Cursed bot at the Graveyard with money -> raise corruption
   if (cursed && loc === "graveyard" && p.gold >= 4) { CT.doLocationAction(p.id, "buy_grave"); return; }
 
-  // low on gold -> grab some if this location offers it
   if (p.gold < 2) {
     if (loc === "tavern") { CT.doLocationAction(p.id, "work_room"); return; }
     if (loc === "graveyard") { CT.doLocationAction(p.id, "scavenge"); return; }
     if (loc === "throne") { CT.doLocationAction(p.id, "petition"); return; }
   }
 
-  // otherwise: any affordable, non-manual action (prefer the basic one)
   var doable = acts.filter(function (a) {
     return !a.manual && p.gold >= (a.cost || 0) && !(a.id === "recover" && !(p.wounded || p.rep <= 2));
   });
@@ -107,25 +172,23 @@ CT.bot.takeTurn = function (playerId) {
   if (!s || s.winner) return;
   var p = CT.playerById(playerId);
   if (!p || !p.isBot || p.status !== "active") return;
-  var cursed = CT.bot.isCursed(p);
+  CT.bot.resolvePending(playerId);
 
-  // 1) move (cursed heads for the Graveyard; others wander)
   var moves = CT.legalMoves(p);
   if (moves.length && Math.random() < 0.85) {
+    var cursed = CT.bot.isCursed(p);
     var dest = cursed ? (CT.bot.stepToward(p.location, "graveyard") || moves[0]) : moves[Math.floor(Math.random() * moves.length)];
     if (dest) CT.movePlayer(p.id, dest, false);
   }
 
-  // 2) loyal bots hunt the Cursed One (playtest engine — bots see hidden roles)
-  if (!cursed && CT.bot.trySocial(p)) { /* social action taken */ }
-  else CT.bot.act(p, cursed);
+  if (!CT.bot.isCursed(p) && CT.bot.trySocial(p)) { /* social */ }
+  else if (CT.bot.tryPlayCard(p)) { /* card or role ability */ }
+  else CT.bot.act(p, CT.bot.isCursed(p));
 
-  // 3) respect the hand limit
   var guard = 0;
   while (CT.overHandLimit(p) && guard++ < 10) CT.discardCard(p.id, p.actionCardIds[0], "hand limit");
 
-  // 4) Final Rite — cursed bot ending at the Graveyard with corruption 8+ wins
-  if (cursed && p.location === "graveyard" && s.corruption >= CT.getRules().FINAL_RITE_CORRUPTION && !s.winner) {
+  if (CT.bot.isCursed(p) && p.location === "graveyard" && s.corruption >= CT.getRules().FINAL_RITE_CORRUPTION && !s.winner) {
     CT.log(p.name + " performs the Final Rite at the Graveyard!", "system");
     CT.declareWinner("cursed", "Final Rite");
   }
@@ -138,7 +201,10 @@ CT.bot.autoRun = function () {
   var guard = 0;
   while (CT.state && !CT.state.winner && guard++ < 80) {
     CT.state.players.forEach(function (bp) {
-      if (bp.isBot && CT.ui.roleDiscardFor === bp.id) CT.bot.autoDiscard(bp);
+      if (bp.isBot) {
+        if (CT.ui.roleDiscardFor === bp.id) CT.bot.autoDiscard(bp);
+        CT.bot.resolvePending(bp.id);
+      }
     });
     var ap = CT.activePlayer();
     if (!ap || !ap.isBot || ap.status !== "active") break;

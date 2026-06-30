@@ -222,6 +222,7 @@ CT._eligibleReactions = function (player, trigger) {
     var fx = CT.REACTION_EFFECTS[cid];
     if (!fx || fx.trigger !== trigger) return false;
     if (fx.requiresRoyalThrone && !t.kingControllerId && !t.queenControllerId) return false;
+    if (fx.requiresLocation && player.location !== fx.requiresLocation) return false;
     return true;
   });
 };
@@ -231,6 +232,7 @@ CT._offerReaction = function (targetId, trigger, resume) {
   var cards = CT._eligibleReactions(target, trigger);
   if (!cards.length) return false;
   CT.ui.reactionOffer = { playerId: targetId, trigger: trigger, cards: cards, resume: resume };
+  if (target && target.isBot && CT.bot && CT.bot.resolvePending) CT.bot.resolvePending(targetId);
   return true;
 };
 
@@ -242,6 +244,20 @@ CT._resumeDeferred = function (resume) {
     CT.ui.roleDiscardFor = resume.targetId;
     CT.ui.roleDiscardRevealed = false;
     CT.ui.afterDiscard = resume.after || null;
+  } else if (resume.effect === "duel_consequence") CT._applyDuelConsequenceOnly(resume);
+};
+
+CT._applyDuelConsequenceOnly = function (resume) {
+  var loser = CT.playerById(resume.loserId);
+  if (!loser) return;
+  var loserCards = resume.loserCards || [];
+  if (resume.consequence === "shame") {
+    if (loserCards.indexOf("shield") !== -1) CT.log(loser.name + "'s Shield ignored Shame.", "note");
+    else CT._maybeOfferRepLoss(loser.id, -1, "Shame");
+  } else if (resume.consequence === "drive") {
+    var moves = CT.legalMoves(loser);
+    if (moves.length) CT.movePlayer(loser.id, moves[0], true);
+    CT.log(loser.name + " was Driven Out.", "event");
   }
 };
 
@@ -263,12 +279,27 @@ CT.resolveReaction = function (cardId) {
   var offer = CT.ui.reactionOffer;
   if (!offer) return;
   var p = CT.playerById(offer.playerId);
-  if (!p || offer.cards.indexOf(cardId) === -1) return;
-  var fx = CT.REACTION_EFFECTS[cardId] || {};
-  var c = CT.cardById(cardId);
-  CT.discardCard(offer.playerId, cardId, "reaction");
-  if (fx.costRep) CT.adjustRep(offer.playerId, -fx.costRep, c ? c.name : cardId);
-  CT.log(p.name + " played " + (c ? c.name : cardId) + " — the effect was cancelled.", "event");
+  if (!p) return;
+  if (cardId) {
+    if (offer.cards.indexOf(cardId) === -1) return;
+    var fx = CT.REACTION_EFFECTS[cardId] || {};
+    var c = CT.cardById(cardId);
+    CT.discardCard(offer.playerId, cardId, "reaction");
+    if (fx.costRep) CT.adjustRep(offer.playerId, -fx.costRep, c ? c.name : cardId);
+    if (fx.flee) {
+      CT.log(p.name + " plays Flee — duel cancelled. Move up to 2 spaces.", "event");
+      CT.ui.reactionMove = { playerId: offer.playerId, maxSteps: 2 };
+    } else if (fx.quickEscape) {
+      CT.log(p.name + " plays Quick Escape — reputation loss avoided. Move 1 space.", "event");
+      CT.ui.reactionMove = { playerId: offer.playerId, maxSteps: 1 };
+    } else if (offer.resume && offer.resume.effect === "duel_consequence") {
+      CT.log(p.name + " played " + (c ? c.name : cardId) + " — duel consequence cancelled.", "event");
+    } else {
+      CT.log(p.name + " played " + (c ? c.name : cardId) + " — the effect was cancelled.", "event");
+    }
+  } else {
+    CT._resumeDeferred(offer.resume);
+  }
   CT.ui.reactionOffer = null;
   CT.save();
 };
@@ -281,9 +312,10 @@ CT.declineReaction = function () {
   CT.save();
 };
 
-CT._maybeOfferRepLoss = function (targetId, delta, reason) {
+CT._maybeOfferRepLoss = function (targetId, delta, reason, trigger) {
   if (delta >= 0) { CT.adjustRep(targetId, delta, reason); return false; }
-  if (CT._offerReaction(targetId, "rumour", { effect: "rep_adjust", targetId: targetId, delta: delta, reason: reason })) return true;
+  var tr = trigger || "rep_loss";
+  if (CT._offerReaction(targetId, tr, { effect: "rep_adjust", targetId: targetId, delta: delta, reason: reason })) return true;
   CT.adjustRep(targetId, delta, reason);
   return false;
 };
@@ -537,12 +569,12 @@ CT.playActionCard = function (playerId, cardId, opts) {
   }
   if (cardId === "pardon_card" && target) CT.adjustRep(target.id, 1, cname);
   if (cardId === "false_rumour" && target) {
-    CT._maybeOfferRepLoss(target.id, -1, cname);
+    CT._maybeOfferRepLoss(target.id, -1, cname, "rumour");
     CT.adjustCorruption(1, cname);
   }
   if (cardId === "rumour_card" && target) {
     if (target.gold >= 1) { target.gold -= 1; p.gold += 1; CT.log(target.name + " paid 1 gold to " + p.name + " to silence the Rumour."); }
-    else CT._maybeOfferRepLoss(target.id, -1, "Rumour");
+    else CT._maybeOfferRepLoss(target.id, -1, "Rumour", "rumour");
   }
 
   if (cardId === "tax_collector") {
@@ -568,11 +600,11 @@ CT.playActionCard = function (playerId, cardId, opts) {
   if (cardId === "loan_shark" && target) {
     var loan = Math.min(3, target.gold);
     if (loan) { target.gold -= loan; p.gold += loan; CT.log(p.name + " took " + loan + " gold from " + target.name + "."); }
-    else CT.adjustRep(target.id, -1, cname);
+    else CT._maybeOfferRepLoss(target.id, -1, cname);
   }
   if (cardId === "intimidate" && target) {
     if (target.gold >= 2) { target.gold -= 2; p.gold += 2; CT.log(target.name + " paid 2 gold to " + p.name + "."); }
-    else CT.adjustRep(target.id, -1, cname);
+    else CT._maybeOfferRepLoss(target.id, -1, cname);
   }
   if (cardId === "bought_round" && target) {
     CT.adjustRep(playerId, 1, cname);
@@ -590,7 +622,7 @@ CT.playActionCard = function (playerId, cardId, opts) {
   if (cardId === "bone_dice") {
     CT.adjustCorruption(1, cname);
     if (Math.random() < 0.5) { p.gold += 4; CT.log(p.name + " rolled high on the Bone Dice — +4 gold."); }
-    else CT.adjustRep(playerId, -1, "Bone Dice");
+    else CT._maybeOfferRepLoss(playerId, -1, "Bone Dice");
   }
   if (cardId === "old_prophecy" && opts.deckName) {
     var peekPile = CT._ensureDrawPile(opts.deckName);
@@ -747,7 +779,7 @@ CT.doLocationAction = function (playerId, actId) {
       break;
     case "scavenge":
       p.gold += 3; CT.log(p.name + " scavenged the Graveyard. +3 gold → " + p.gold + ".");
-      CT.adjustRep(playerId, -1, "Scavenge");
+      CT._maybeOfferRepLoss(playerId, -1, "Scavenge");
       break;
     case "buy_grave":
       CT.log(p.name + " paid " + def.cost + " gold for a Graveyard card.");
@@ -845,12 +877,12 @@ CT.useRoleAbility = function (playerId, abilityId, opts) {
       p.gold += 1;
       CT.log(target.name + " paid 1 gold to " + p.name + " to silence the Rumour.");
     } else {
-      CT.adjustRep(target.id, -1, fx.name);
+      CT._maybeOfferRepLoss(target.id, -1, fx.name, "rumour");
     }
   } else if (fx.repGain) {
     CT.adjustRep(playerId, fx.repGain, fx.name);
   } else if (fx.repLoss && target) {
-    CT.adjustRep(target.id, -fx.repLoss, fx.name);
+    CT._maybeOfferRepLoss(target.id, -fx.repLoss, fx.name);
   } else if (fx.goldGain) {
     p.gold += fx.goldGain;
     CT.log(p.name + " gains " + fx.goldGain + " gold (" + fx.name + ").");

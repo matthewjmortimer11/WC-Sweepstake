@@ -362,6 +362,10 @@ CT.REACTION_EFFECTS = {
   blackmail: { trigger: "vote_pass", costRep: 1 },
   kneel: { trigger: "vote_pass", requiresRoyalThrone: true },
   veterans_warning: { trigger: "duel_declared" },
+  flee: { trigger: "duel_declared", costRep: 1, flee: true },
+  drunken_alibi: { trigger: "rep_loss", requiresLocation: "tavern" },
+  quick_escape: { trigger: "rep_loss", quickEscape: true },
+  royal_guard_detail: { trigger: "duel_consequence" },
 };
 /* Public-role AtLocation abilities (Phase 14) — mechanical subset. */
 CT.ROLE_ABILITY_EFFECTS = {

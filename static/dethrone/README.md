@@ -79,6 +79,11 @@ open "index.html"          # macOS
 - **Royal role lost** — tracked when a King/Queen role is discarded (gates Quiet Ambition)
 - **Succession polish** — claimants must be at the Throne and hold the role; helper filters eligible players/roles; quick-claim from actions panel; succession banner in turn dock and throne panel
 
+### Phase 15 — Reaction expansion & bot depth
+- **More reaction hooks** — Drunken Alibi / Quick Escape on reputation loss; Flee on duel declared; Royal Guard Detail on shame/drive vs royals
+- **Reaction moves** — Quick Escape (1 space) and Flee (2 spaces) prompt board moves after play
+- **Bot depth** — bots auto-resolve reactions, play simple auto-cards and public role abilities, richer local `bot.js` mirror
+
 ### Phase 4 — Throne & Succession
 A **Throne & Succession** panel tracks the crown and the line of succession.
 - **Throne control (§23)**: King / Queen / Successor controllers, set manually or via the **Claim helper** (claimant + crown; unchallenged → crowned, or challenged → "proof valid" crowns them and the challenger loses a role / "bluff" costs the claimant a role). Claim order is recorded.
@@ -137,7 +142,7 @@ Table talk and bluffing stay verbal. The app guides, tracks, and enforces mechan
 
 ## Next improvements
 
-Run `PLAYTEST.md` at a real table, log friction, then plan the next phase (bot social depth, more reaction hooks, or polish).
+Run `PLAYTEST.md` at a real table, log friction, then plan the next phase (proactive reaction plays from hand, bot duels/trades, or polish).
 
 ```
 index.html        shell; loads the scripts in order

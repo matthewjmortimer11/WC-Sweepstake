@@ -6,6 +6,13 @@ CT.helpers = { ui: {} };
 
 /* ---------- small builders ---------- */
 function actives() { return CT.state.players.filter(function (p) { return p.status === "active"; }); }
+function isRoyalOrThrone(p) {
+  if (!p || !CT.state) return false;
+  var roles = CT.allRoleIds(p);
+  if (roles.indexOf("king") !== -1 || roles.indexOf("queen") !== -1) return true;
+  var t = CT.state.throne;
+  return p.id === t.kingControllerId || p.id === t.queenControllerId || p.id === t.successorId;
+}
 function opt(list, sel, ph) {
   var o = ph != null ? '<option value="">' + ph + '</option>' : "";
   return o + list.map(function (p) { return '<option value="' + p.id + '"' + (p.id === sel ? " selected" : "") + '>' + CT.esc(p.name) + "</option>"; }).join("");
@@ -753,21 +760,26 @@ CT.helpers.applyDuelConseq = function (c) {
     case "disarm": CT.disarmRandom(loser.id, winnerCards.indexOf("disarm_card") !== -1 ? 3 : 2); break;
     case "shame":
       if (loserCards.indexOf("shield") !== -1) CT.log(loser.name + "'s Shield ignored Shame.", "note");
-      else CT.adjustRep(loser.id, -1, "Shame");
+      else if (isRoyalOrThrone(loser) && CT._offerReaction(loser.id, "duel_consequence", {
+        effect: "duel_consequence", consequence: "shame", loserId: loser.id, loserCards: loserCards,
+      })) { break; }
+      else CT._maybeOfferRepLoss(loser.id, -1, "Shame");
       break;
     case "wound":
       if (loserCards.indexOf("parry") !== -1) CT.log(loser.name + "'s Parry ignored Wound.", "note");
       else { loser.wounded = true; CT.log(loser.name + " is Wounded — no hidden powers next turn."); }
       break;
-    case "drive": {
+    case "drive":
+      if (isRoyalOrThrone(loser) && CT._offerReaction(loser.id, "duel_consequence", {
+        effect: "duel_consequence", consequence: "drive", loserId: loser.id, loserCards: loserCards,
+      })) { break; }
       var dest = (CT.legalMoves(loser)[0]) || loser.location;
       CT.movePlayer(loser.id, dest, false); CT.log(loser.name + " was Driven Out.", "event"); break;
-    }
     case "search": CT.log(winner.name + " searches " + loser.name + " — resolve privately (show a justifying role or lose 1 Rep).", "note"); break;
   }
   if (winnerCards.indexOf("cursed_blade") !== -1) {
     CT.adjustCorruption(1, "Cursed Blade");
-    CT.adjustRep(loser.id, -1, "Cursed Blade");
+    CT._maybeOfferRepLoss(loser.id, -1, "Cursed Blade");
   }
   CT.save(); u.open = null; CT.render();
 };

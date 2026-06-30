@@ -95,7 +95,9 @@ CT.net.applyState = function (msg) {
       if (pui.kind === "final_rite") {
         CT.ui.finalRiteOffer = pui.playerId;
       } else if (pui.kind === "reaction") {
-        CT.ui.reactionOffer = { playerId: CT.myId(), trigger: pui.trigger, cards: pui.cards || [] };
+        CT.ui.reactionOffer = { playerId: CT.myId(), trigger: pui.trigger, cards: pui.cards || [], resume: pui.resume };
+      } else if (pui.kind === "reaction_move") {
+        CT.ui.reactionMove = { playerId: CT.myId(), maxSteps: pui.maxSteps || 1 };
       } else if (CT.helpers && !CT.helpers.ui.open) {
         if (pui.kind === "duel") CT.helpers.openDuelFromPending(pui);
         else if (pui.kind === "vote") CT.helpers.openVoteFromPending(pui);
@@ -108,8 +110,9 @@ CT.net.applyState = function (msg) {
     } else if (CT.ui.finalRiteOffer === CT.myId()) {
       CT.ui.finalRiteOffer = null;
     }
-    if (!cs.pendingUiAction || cs.pendingUiAction.kind !== "reaction") {
+    if (!cs.pendingUiAction || (cs.pendingUiAction.kind !== "reaction" && cs.pendingUiAction.kind !== "reaction_move")) {
       if (CT.ui.reactionOffer && CT.ui.reactionOffer.playerId === CT.myId()) CT.ui.reactionOffer = null;
+      if (CT.ui.reactionMove && CT.ui.reactionMove.playerId === CT.myId()) CT.ui.reactionMove = null;
     }
     if (cs.privateNote && CT.myId()) {
       CT.ui.privateNote = cs.privateNote;

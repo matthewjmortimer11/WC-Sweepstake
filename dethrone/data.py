@@ -259,6 +259,10 @@ REACTION_EFFECTS: dict[str, dict] = {
     "blackmail": {"trigger": "vote_pass", "action": "cancel", "cost_rep": 1},
     "kneel": {"trigger": "vote_pass", "action": "cancel", "requires_royal_throne": True},
     "veterans_warning": {"trigger": "duel_declared", "action": "cancel_duel"},
+    "flee": {"trigger": "duel_declared", "action": "flee_duel", "cost_rep": 1},
+    "drunken_alibi": {"trigger": "rep_loss", "action": "cancel", "requires_location": "tavern"},
+    "quick_escape": {"trigger": "rep_loss", "action": "quick_escape"},
+    "royal_guard_detail": {"trigger": "duel_consequence", "action": "cancel"},
 }
 
 # Public-role AtLocation abilities (Phase 14) — mechanical subset; others stay at the table.
