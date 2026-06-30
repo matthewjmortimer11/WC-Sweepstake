@@ -134,6 +134,7 @@ CT.setup.viewPrivate = function () {
       + '<div class="eyebrow">' + progress + '</div>'
       + '<h1 style="margin:8px 0">Private setup for ' + esc(name) + '</h1>'
       + '<p class="muted">Pass the device to ' + esc(name) + ' only. Everyone else, look away.</p>'
+      + CT.roleCardBacksHtml(3)
       + '<div class="btn-row" style="justify-content:center;margin-top:20px">'
       + '<button class="btn btn-primary" data-act="reveal-private">Reveal my 3 roles</button></div>'
       + '</div></div>';
@@ -144,24 +145,19 @@ CT.setup.viewPrivate = function () {
     var role = CT.roleById(id);
     var sel = s.publicChoice[s.privateIndex] === id;
     var disabled = !role.canBePublic;
-    var abilities = role.abilities.map(function (a) { return '<div style="font-size:12px;color:var(--ink-soft)"><strong>' + esc(a.name) + '</strong> — ' + esc(a.effect) + '</div>'; }).join("");
-    return '<div class="pcard' + (sel ? " active" : "") + '" style="' + (disabled ? "border-color:var(--wax-soft)" : "") + '">'
-      + '<div class="ptop"><div class="pname">' + esc(role.name) + '</div>'
-      + '<span class="tag ' + (role.family === "Cursed" ? "wax" : "") + '">' + role.family + '</span></div>'
-      + '<div class="prole">' + esc(role.flavour) + '</div>'
-      + '<div class="stack" style="margin-top:10px">' + abilities + '</div>'
-      + (disabled
-          ? '<div class="tag wax" style="margin-top:12px">Must stay hidden — cannot be public</div>'
-          : '<button class="btn ' + (sel ? "btn-gold" : "btn-secondary") + ' btn-sm" style="margin-top:12px;width:100%" data-act="choose-public" data-id="' + id + '">' + (sel ? "✓ Public role" : "Make this my public role") + '</button>')
-      + '</div>';
+    var body = disabled
+      ? '<div class="tag wax">Must stay hidden — cannot be public</div>'
+      : '<button class="btn ' + (sel ? "btn-gold" : "btn-secondary") + ' btn-sm" style="width:100%" data-act="choose-public" data-id="' + id + '">'
+        + (sel ? "✓ Public role" : "Make this my public role") + "</button>";
+    return CT.roleCardPickHtml(id, body, { active: sel, disabled: disabled });
   }).join("");
 
   var chosen = s.publicChoice[s.privateIndex];
-  return '<div class="scrim"><div class="modal">'
+  return '<div class="scrim"><div class="modal modal--roles">'
     + '<div class="eyebrow">' + progress + ' · ' + esc(name) + '</div>'
     + '<h2 style="margin:6px 0 2px">Choose your public role</h2>'
     + '<p class="muted" style="margin:0 0 8px;font-size:14px">The other two stay hidden. If the Cursed One is here, it can never be public.</p>'
-    + '<div class="players" style="grid-template-columns:1fr;gap:12px">' + cards + '</div>'
+    + '<div class="role-card-grid">' + cards + '</div>'
     + '<div class="btn-row" style="margin-top:16px"><div class="spacer"></div>'
     + '<button class="btn btn-primary" data-act="confirm-private"' + (chosen ? "" : " disabled") + '>'
     + (s.firstHumanFrom(s.privateIndex + 1) > -1 ? "Confirm & pass device →" : "Confirm — last player") + '</button></div>'

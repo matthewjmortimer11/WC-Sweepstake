@@ -44,6 +44,17 @@ def test_dethrone_page(client):
     assert r.status_code == 200
     assert "The Cursed Throne" in r.text
     assert 'base href="/dethrone/"' in r.text
+    assert "cards-roles.js" in r.text
+    assert "__DETHRONE_CARD_V" in r.text
+
+
+def test_dethrone_role_card_assets(client):
+    r = client.get("/dethrone/cards/roles/king-card-v3b-poker.png")
+    assert r.status_code == 200
+    assert r.headers["content-type"] == "image/png"
+    r = client.get("/dethrone/cards/roles/manifest.json")
+    assert r.status_code == 200
+    assert "king-card-v3b-poker.png" in r.text
 
 
 def test_hidden_roles_not_leaked(client):

@@ -327,20 +327,20 @@ function onlineSetupScreen() {
     return '<div class="scrim"><div class="modal cover">'
       + '<div class="seal-big">✦</div><h1 style="margin:8px 0">Your three role cards</h1>'
       + '<p class="muted">Only you can see this. Choose one to show the court.</p>'
+      + CT.roleCardBacksHtml(3)
       + '<div class="btn-row" style="justify-content:center;margin-top:20px">'
       + '<button class="btn btn-primary" data-act="reveal-setup">Reveal my roles</button></div></div></div>';
   }
   var cards = dealt.map(function (id) {
     var role = CT.roleById(id);
     var disabled = !role.canBePublic;
-    return '<div class="pcard"><div class="ptop"><div class="pname">' + CT.esc(role.name) + '</div>'
-      + '<span class="tag">' + role.family + '</span></div><div class="prole">' + CT.esc(role.flavour) + '</div>'
-      + (disabled ? '<div class="tag wax" style="margin-top:12px">Must stay hidden</div>'
-        : '<button class="btn btn-gold btn-sm" style="margin-top:12px;width:100%" data-act="pick-public" data-id="' + id + '">Make this my public role</button>')
-      + '</div>';
+    var body = disabled
+      ? '<div class="tag wax">Must stay hidden</div>'
+      : '<button class="btn btn-gold btn-sm" style="width:100%" data-act="pick-public" data-id="' + id + '">Make this my public role</button>';
+    return CT.roleCardPickHtml(id, body, { disabled: disabled });
   }).join("");
-  return '<div class="scrim"><div class="modal"><h2>Choose your public role</h2>'
-    + '<div class="players" style="grid-template-columns:1fr;gap:12px">' + cards + '</div></div></div>';
+  return '<div class="scrim"><div class="modal modal--roles"><h2>Choose your public role</h2>'
+    + '<div class="role-card-grid">' + cards + '</div></div></div>';
 }
 
 /* ============ game screen ============ */
@@ -525,7 +525,8 @@ function playerCard(p) {
     + '<div class="ptop"><div><div class="pname">'
     + '<span class="dot" style="background:' + tokenColor(i) + ';width:18px;height:18px;border-radius:999px;display:inline-grid;place-items:center;color:#fff;font-size:10px;font-weight:800">' + initials(p.name) + '</span>'
     + CT.esc(p.name) + (p.isBot ? ' <span class="tag">BOT</span>' : '') + '</div>'
-    + '<div class="prole">' + (role ? CT.esc(role.name) : "—") + '</div></div>'
+    + '<div class="prole-with-card">' + (role ? CT.roleCardImg(p.publicRoleId, { size: "thumb" }) : "")
+    + '<span>' + (role ? CT.esc(role.name) : "—") + '</span></div></div>'
     + (spec ? "" : '<button class="btn btn-ghost btn-sm" data-act="view-private" data-id="' + p.id + '">'
     + (CT.isOnline() && p.id !== CT.myId() ? "—" : "View private") + '</button>') + '</div>'
     + '<div class="pstats">'
@@ -712,6 +713,7 @@ function roleDiscardView() {
       + '<div class="seal-big" style="background:radial-gradient(circle at 35% 30%,#a8392a,#8c2f23)">✦</div>'
       + '<h1 style="margin:8px 0">' + CT.esc(p.name) + ' must lose a role card</h1>'
       + '<p class="muted">Pass the device to ' + CT.esc(p.name) + '. You choose which card to discard — only that card is revealed to the table.</p>'
+      + CT.roleCardBacksHtml(3)
       + '<div class="btn-row" style="justify-content:center;margin-top:20px">'
       + '<button class="btn btn-ghost" data-act="close-lose-role">Cancel</button>'
       + '<button class="btn btn-danger" data-act="reveal-lose-role">Show my role cards</button></div>'
@@ -721,22 +723,20 @@ function roleDiscardView() {
   if (p.publicRoleId) opts.push(roleChoice("public", p.publicRoleId, "Public"));
   p.hiddenRoleIds.forEach(function (id) { opts.push(roleChoice("hidden", id, "Hidden")); });
   p.extraShownRoleIds.forEach(function (id) { opts.push(roleChoice("extra", id, "Shown")); });
-  return '<div class="scrim"><div class="modal" style="max-width:560px">'
+  return '<div class="scrim"><div class="modal modal--roles">'
     + '<div class="eyebrow" style="color:var(--wax)">' + CT.esc(p.name) + ' · choose a card to lose</div>'
     + '<h2 style="margin:6px 0 4px">Which role card do you discard?</h2>'
     + '<p class="muted" style="font-size:14px;margin:0 0 12px">A discarded <strong>hidden</strong> role is revealed. Discarding the Cursed One ends the game for the Loyal side.</p>'
-    + '<div class="players" style="grid-template-columns:1fr;gap:10px">' + opts.join("") + '</div>'
+    + '<div class="role-card-grid">' + opts.join("") + '</div>'
     + '<div class="btn-row" style="margin-top:16px"><button class="btn btn-ghost" data-act="close-lose-role">Cancel</button></div>'
     + '</div></div>';
 }
 function roleChoice(slot, roleId, slotLabel) {
   var r = CT.roleById(roleId);
-  return '<div class="pcard"><div class="ptop"><div class="pname" style="font-size:16px">' + CT.esc(r.name)
-    + (r.id === "cursedone" ? ' <span class="tag wax">CURSED</span>' : '') + '</div>'
-    + '<span class="tag">' + slotLabel + '</span></div>'
-    + '<div class="prole">' + CT.esc(r.flavour) + '</div>'
-    + '<button class="btn btn-danger btn-sm" style="margin-top:10px;width:100%" data-act="confirm-lose-role" data-slot="' + slot + '" data-role="' + roleId + '">Discard ' + CT.esc(r.name) + '</button>'
-    + '</div>';
+  var body = '<span class="tag">' + slotLabel + '</span>'
+    + (r.id === "cursedone" ? ' <span class="tag wax">CURSED</span>' : '')
+    + '<button class="btn btn-danger btn-sm" style="width:100%" data-act="confirm-lose-role" data-slot="' + slot + '" data-role="' + roleId + '">Discard ' + CT.esc(r.name) + '</button>';
+  return CT.roleCardPickHtml(roleId, body);
 }
 
 /* discard down to the hand limit (§11 step 4) */
@@ -781,6 +781,7 @@ function privateView() {
     return '<div class="scrim"><div class="modal cover">'
       + '<div class="seal-big">✦</div><h1 style="margin:8px 0">Private view for ' + CT.esc(p.name) + '</h1>'
       + '<p class="muted">Pass the device to ' + CT.esc(p.name) + '. Hidden roles and cards are about to show.</p>'
+      + CT.roleCardBacksHtml(Math.max(p.hiddenRoleIds.length, 1))
       + '<div class="btn-row" style="justify-content:center;margin-top:20px">'
       + '<button class="btn btn-ghost" data-act="close-private">Cancel</button>'
       + '<button class="btn btn-primary" data-act="reveal-private-view">Reveal private cards</button></div>'
@@ -788,9 +789,9 @@ function privateView() {
   }
   var hidden = p.hiddenRoleIds.map(function (id) {
     var r = CT.roleById(id);
-    return '<div class="pcard"><div class="ptop"><div class="pname">' + CT.esc(r.name)
-      + (r.id === "cursedone" ? ' <span class="tag wax">CURSED</span>' : '') + '</div><span class="tag">' + r.family + '</span></div>'
-      + '<div class="prole">' + CT.esc(r.flavour) + '</div></div>';
+    var body = '<span class="tag">' + r.family + '</span>'
+      + (r.id === "cursedone" ? ' <span class="tag wax">CURSED</span>' : '');
+    return CT.roleCardPickHtml(id, body, { size: "private" });
   }).join("") || '<p class="muted">No hidden roles remaining.</p>';
 
   var onTurn = CT.activePlayer() && CT.activePlayer().id === p.id && !CT.state.winner;
@@ -835,10 +836,10 @@ function privateView() {
       + groups[g].map(cardRow).join("") + "</div>";
   });
   if (!cardsBody) cardsBody = '<p class="muted">No action cards.</p>';
-  return '<div class="scrim"><div class="modal" style="max-width:620px">'
+  return '<div class="scrim"><div class="modal modal--roles" style="max-width:min(96vw,720px)">'
     + '<div class="eyebrow">Private · ' + CT.esc(p.name) + '</div>'
     + (CT.ui.privateNote ? '<div class="private-note-banner">' + CT.esc(CT.ui.privateNote) + '</div>' : '')
-    + '<h2 style="margin:6px 0 12px">Your hidden roles</h2><div class="players" style="grid-template-columns:1fr;gap:10px">' + hidden + '</div>'
+    + '<h2 style="margin:6px 0 12px">Your hidden roles</h2><div class="role-card-grid">' + hidden + '</div>'
     + '<h2 style="margin:18px 0 12px">Your action cards</h2>' + cardsBody
     + '<div class="btn-row" style="margin-top:20px"><div class="spacer"></div>'
     + '<button class="btn btn-primary" data-act="close-private">Hide & return to table</button></div>'

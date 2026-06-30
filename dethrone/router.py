@@ -22,6 +22,7 @@ _MEDIA = {
     ".json": "application/json",
     ".webmanifest": "application/manifest+json",
     ".svg": "image/svg+xml",
+    ".png": "image/png",
 }
 
 _DETHRONE_CSP = (
@@ -34,7 +35,7 @@ _DETHRONE_CSP = (
     "frame-ancestors 'none'"
 )
 
-_DETHRONE_ASSET_VERSION = "20260630-p18"
+_DETHRONE_ASSET_VERSION = "20260630-p19"
 
 _CREATE_BUCKETS: dict[str, list[float]] = {}
 _CREATE_LIMIT = 30
@@ -67,6 +68,11 @@ async def dethrone_page() -> HTMLResponse:
     html = _INDEX.read_text(encoding="utf-8")
     html = html.replace("<head>", '<head>\n  <base href="/dethrone/">', 1)
     v = _DETHRONE_ASSET_VERSION
+    html = html.replace(
+        "<script src=\"js/data.js\"></script>",
+        f'<script>window.__DETHRONE_CARD_V="{v}";</script>\n  <script src="js/data.js"></script>',
+        1,
+    )
     html = html.replace('.css"', f'.css?v={v}"')
     html = html.replace('.js"', f'.js?v={v}"')
     html = html.replace('manifest.webmanifest"', f'manifest.webmanifest?v={v}"')

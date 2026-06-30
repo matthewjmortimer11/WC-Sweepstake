@@ -298,6 +298,63 @@ svg.map { width: 100%; height: auto; display: block; }
 .spectator-banner { background: var(--ink); color: #e6dcc0; padding: 10px 14px; border-radius: var(--r);
   font-size: 14px; margin-bottom: var(--s4); line-height: 1.45; }
 
+/* ---------- role card art (V3b poker 5:7) ---------- */
+.role-card {
+  display: block;
+  width: 100%;
+  aspect-ratio: 5 / 7;
+  object-fit: cover;
+  border-radius: 10px;
+  box-shadow: var(--e2);
+  background: var(--p-0);
+}
+.role-card--thumb {
+  width: 44px;
+  max-width: 44px;
+  flex: 0 0 44px;
+  border-radius: 6px;
+  box-shadow: var(--e1);
+}
+.role-card--pick { max-width: 260px; margin: 0 auto; }
+.role-card--private { max-width: 220px; margin: 0 auto; }
+.role-card--back { width: 92px; max-width: 26vw; flex: 0 0 auto; }
+.role-card-fallback {
+  display: inline-block;
+  font-family: var(--serif);
+  font-size: 14px;
+  color: var(--ink-soft);
+}
+.role-card-grid {
+  display: grid;
+  gap: var(--s3);
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  align-items: start;
+}
+.role-card-pick {
+  background: var(--p-0);
+  border: 2px solid var(--line);
+  border-radius: var(--r-card);
+  padding: var(--s3);
+  text-align: center;
+}
+.role-card-pick.active { border-color: var(--gold); box-shadow: var(--e2); }
+.role-card-pick--disabled { opacity: .72; }
+.role-card-actions { margin-top: var(--s3); display: grid; gap: var(--s2); }
+.role-card-backs {
+  display: flex;
+  gap: var(--s3);
+  justify-content: center;
+  flex-wrap: wrap;
+  margin: var(--s4) 0 var(--s2);
+}
+.prole-with-card {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  margin-top: 2px;
+}
+.modal--roles { max-width: min(96vw, 940px); }
+
 /* ---------- modal / cover screens (pass-and-play) ---------- */
 .scrim { position: fixed; inset: 0; background: rgba(20,14,6,.55); display: flex; overflow-y: auto; padding: var(--s5); z-index: 50; }
 .modal { margin: auto; background: var(--raised); border: 1px solid var(--p-4); border-radius: var(--r-panel); box-shadow: var(--e3); max-width: 560px; width: 100%; padding: var(--s6); }

@@ -101,6 +101,12 @@ open "index.html"          # macOS
 - **Guild Seal proactive** — play on your turn to ignore the next tax this round (still auto-consumes on tax if held)
 - **Online waiting banner** — “Waiting for {name}…” when it is not your turn; manual cards labelled in private hand
 
+### Phase 19 — Role card art in the UI
+- **V3b poker portraits** — 20 role faces + card back at `cards/roles/` (750×1050; see `manifest.json`)
+- **Setup & private flows** — role picks, hidden roles, and lose-a-role screens show card art; cover screens show card backs
+- **The Court** — public-role thumbnail beside each player’s shown role name
+- **Client helpers** — `js/cards-roles.js` (`CT.roleCardUrl`, `CT.roleCardImg`, `CT.roleCardPickHtml`)
+
 ### Phase 4 — Throne & Succession
 A **Throne & Succession** panel tracks the crown and the line of succession.
 - **Throne control (§23)**: King / Queen / Successor controllers, set manually or via the **Claim helper** (claimant + crown; unchallenged → crowned, or challenged → "proof valid" crowns them and the challenger loses a role / "bluff" costs the claimant a role). Claim order is recorded.
