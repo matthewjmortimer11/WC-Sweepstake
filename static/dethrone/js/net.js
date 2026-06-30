@@ -3,6 +3,7 @@ window.CT = window.CT || {};
 CT.net = {
   online: false,
   localMode: false,
+  spectator: false,
   connected: false,
   room: null,
   you: null,
@@ -15,14 +16,15 @@ CT.net = {
   renameTimer: null,
 };
 
-CT.net.LS = { pid: "dethrone.pid", name: "dethrone.name" };
+CT.net.LS = { pid: "dethrone.pid", spectatorPid: "dethrone.spectator.pid", name: "dethrone.name" };
 
 CT.net.pid = function () {
+  var key = CT.net.spectator ? CT.net.LS.spectatorPid : CT.net.LS.pid;
   try {
-    var id = localStorage.getItem(CT.net.LS.pid);
+    var id = localStorage.getItem(key);
     if (!id) {
       id = (crypto.randomUUID ? crypto.randomUUID() : String(Date.now())).replace(/-/g, "");
-      localStorage.setItem(CT.net.LS.pid, id);
+      localStorage.setItem(key, id);
     }
     return id;
   } catch (e) {
@@ -40,8 +42,10 @@ CT.net.saveName = function (n) {
 
 CT.net.parseRoute = function () {
   CT.net.localMode = /^#\/local\b/i.test(location.hash || "");
+  var watch = (location.hash || "").match(/^#\/(?:room\/([A-Za-z0-9]+)\/watch|watch\/([A-Za-z0-9]+))/i);
   var m = (location.hash || "").match(/^#\/room\/([A-Za-z0-9]+)/i);
-  CT.net.routeCode = CT.net.localMode ? null : (m ? m[1].toUpperCase() : null);
+  CT.net.spectator = !!watch;
+  CT.net.routeCode = CT.net.localMode ? null : (watch ? (watch[1] || watch[2]).toUpperCase() : (m ? m[1].toUpperCase() : null));
   CT.net.online = !!CT.net.routeCode;
 };
 
@@ -123,7 +127,8 @@ CT.net.connect = function (code) {
   var proto = location.protocol === "https:" ? "wss:" : "ws:";
   var url = proto + "//" + location.host + "/dethrone/ws/" + code
     + "?pid=" + encodeURIComponent(CT.net.pid())
-    + "&name=" + encodeURIComponent(CT.net.playerName());
+    + "&name=" + encodeURIComponent(CT.net.playerName())
+    + (CT.net.spectator ? "&spectate=1" : "");
   CT.net.ws = new WebSocket(url);
   CT.net.ws.onopen = function () {
     CT.net.connected = true;
@@ -136,8 +141,10 @@ CT.net.connect = function (code) {
     try { msg = JSON.parse(ev.data); } catch (e) { return; }
     if (msg.type === "hello") {
       CT.net.routeCode = msg.code;
-      if (location.hash.indexOf("/room/") === -1) {
-        history.replaceState(null, "", "#/room/" + msg.code);
+      CT.net.spectator = !!msg.spectator;
+      var hashPath = CT.net.spectator ? "#/room/" + msg.code + "/watch" : "#/room/" + msg.code;
+      if (location.hash.indexOf("/room/") === -1 && location.hash.indexOf("/watch/") === -1) {
+        history.replaceState(null, "", hashPath);
       }
       return;
     }
@@ -188,6 +195,21 @@ CT.net.goLocal = function () {
   location.hash = "#/local";
   CT.load();
   CT.render();
+};
+
+CT.net.watchInviteUrl = function () {
+  var base = location.origin + location.pathname;
+  var name = CT.net.playerName();
+  return base + "#/room/" + (CT.net.routeCode || "") + "/watch" + (name ? "?name=" + encodeURIComponent(name) : "");
+};
+
+CT.net.copyWatchInvite = function () {
+  var url = CT.net.watchInviteUrl();
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(url).then(function () { CT.net.toast("Watch link copied!"); });
+  } else {
+    prompt("Share this watch link:", url);
+  }
 };
 
 CT.net.inviteUrl = function () {

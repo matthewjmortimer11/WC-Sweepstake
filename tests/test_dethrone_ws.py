@@ -310,6 +310,40 @@ def test_end_turn_blocked_over_hand_limit(client):
         g.end_turn(active)
 
 
+def test_spectator_sees_no_hidden_roles(client):
+    code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
+    room, pids, g = _start_game(code)
+    with client.websocket_connect(f"/dethrone/ws/{code}?pid=spec1&name=Watcher&spectate=1") as ws:
+        hello = ws.receive_json()
+        assert hello.get("spectator") is True
+        state = ws.receive_json()
+        assert state["you"]["isSpectator"] is True
+        for p in state["room"]["game"]["players"]:
+            assert p["hiddenRoleIds"] == []
+            assert p["actionCardIds"] == []
+
+
+def test_spectators_disabled(client):
+    code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
+    room = manager.get(code)
+    room.allow_spectators = False
+    with client.websocket_connect(f"/dethrone/ws/{code}?pid=spec2&name=Watcher&spectate=1") as ws:
+        fatal = ws.receive_json()
+        assert fatal["type"] == "fatal"
+
+
+def test_set_allow_spectators_host(client):
+    code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
+    room, pids = _room_with_players(code, 2)
+    host = room.host_id
+    with client.websocket_connect(f"/dethrone/ws/{code}?pid={host}&name=Host") as ws:
+        ws.receive_json()
+        ws.receive_json()
+        ws.send_json({"type": "setAllowSpectators", "allow": False})
+        state = ws.receive_json()
+        assert state["room"]["settings"]["allowSpectators"] is False
+
+
 def D_ROLE_META_PUBLIC(role_id: str) -> bool:
     from dethrone.data import ROLE_META
     return ROLE_META.get(role_id, {}).get("canBePublic", True)

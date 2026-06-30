@@ -44,6 +44,14 @@ def _clean_name(name: str) -> str:
 
 
 @dataclass
+class Spectator:
+    id: str
+    name: str
+    connected: bool = False
+    last_seen: float = field(default_factory=time.time)
+
+
+@dataclass
 class Player:
     id: str
     name: str
@@ -60,7 +68,10 @@ class Room:
     game: CursedThroneGame
     host_id: Optional[str] = None
     players: dict = field(default_factory=dict)
+    spectators: dict = field(default_factory=dict)
     sockets: dict = field(default_factory=dict)
+    spectator_sockets: dict = field(default_factory=dict)
+    allow_spectators: bool = True
     created: float = field(default_factory=time.time)
     last_active: float = field(default_factory=time.time)
     lock: asyncio.Lock = field(default_factory=asyncio.Lock)
@@ -83,6 +94,12 @@ class Room:
         out.sort(key=lambda x: (not x["isHost"], x["name"].lower()))
         return out
 
+    def public_spectators(self) -> list[dict]:
+        return [
+            {"id": s.id, "name": s.name, "connected": s.connected}
+            for s in sorted(self.spectators.values(), key=lambda x: x.name.lower())
+        ]
+
     def state_for(self, pid: str) -> dict:
         me = self.players.get(pid)
         g = self.game
@@ -92,11 +109,13 @@ class Room:
             "room": {
                 "code": self.code,
                 "players": self.public_players(),
+                "spectators": self.public_spectators(),
                 "settings": {
                     "minPlayers": D.MIN_PLAYERS,
                     "maxPlayers": D.MAX_PLAYERS,
                     "playerCount": g.player_count,
                     "balance": dict(g.balance),
+                    "allowSpectators": self.allow_spectators,
                 },
                 "game": g.view(pid),
                 "clientState": client,
@@ -105,6 +124,35 @@ class Room:
                 "id": pid,
                 "name": me.name if me else "",
                 "isHost": bool(me and me.is_host),
+                "isSpectator": False,
+            },
+        }
+
+    def spectator_state_for(self, sid: str) -> dict:
+        spec = self.spectators.get(sid)
+        g = self.game
+        client = g.to_client_state("") if g.status in (STATUS_SETUP, STATUS_PLAY) or g.winner else None
+        return {
+            "type": "state",
+            "room": {
+                "code": self.code,
+                "players": self.public_players(),
+                "spectators": self.public_spectators(),
+                "settings": {
+                    "minPlayers": D.MIN_PLAYERS,
+                    "maxPlayers": D.MAX_PLAYERS,
+                    "playerCount": g.player_count,
+                    "balance": dict(g.balance),
+                    "allowSpectators": self.allow_spectators,
+                },
+                "game": g.view(""),
+                "clientState": client,
+            },
+            "you": {
+                "id": sid,
+                "name": spec.name if spec else "",
+                "isHost": False,
+                "isSpectator": True,
             },
         }
 
@@ -132,7 +180,10 @@ class Manager:
             room = self.rooms.get(code)
             if not room:
                 continue
-            has_conn = any(p.connected for p in room.players.values())
+            has_conn = (
+                any(p.connected for p in room.players.values())
+                or any(s.connected for s in room.spectators.values())
+            )
             if not has_conn and now - room.last_active > _ROOM_TTL_EMPTY:
                 self.rooms.pop(code, None)
                 continue
@@ -205,6 +256,22 @@ class Manager:
         room.players[pid] = player
         return player
 
+    def join_spectator(self, room: Room, sid: str, name: str) -> Spectator:
+        if not room.allow_spectators:
+            raise MoveError("Spectators are not allowed in this room.")
+        name = _clean_name(name) or "Observer"
+        existing = room.spectators.get(sid)
+        if existing:
+            existing.name = name or existing.name
+            existing.connected = True
+            existing.last_seen = time.time()
+            return existing
+        if len(room.spectators) >= 20:
+            raise MoveError("Too many spectators.")
+        spec = Spectator(id=sid, name=name, connected=True)
+        room.spectators[sid] = spec
+        return spec
+
     def _ensure_host(self, room: Room) -> None:
         if room.host_id and room.players.get(room.host_id) and room.players[room.host_id].connected:
             return
@@ -226,6 +293,16 @@ class Manager:
             room.sockets.pop(pid, None)
             if pid in room.players:
                 room.players[pid].connected = False
+        dead_spec = []
+        for sid, ws in list(room.spectator_sockets.items()):
+            try:
+                await ws.send_json(room.spectator_state_for(sid))
+            except Exception:
+                dead_spec.append(sid)
+        for sid in dead_spec:
+            room.spectator_sockets.pop(sid, None)
+            if sid in room.spectators:
+                room.spectators[sid].connected = False
 
     def connected_seats(self, room: Room) -> list[tuple[str, str, bool]]:
         seats = []

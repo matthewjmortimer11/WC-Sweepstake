@@ -110,8 +110,13 @@ async def game_socket(ws: WebSocket, code: str) -> None:
         return
 
     await ws.accept()
+    is_spectator = (ws.query_params.get("spectate") or "").lower() in ("1", "true", "yes")
     pid = (ws.query_params.get("pid") or "").strip()[:64] or uuid.uuid4().hex
     name = ws.query_params.get("name") or ""
+
+    if is_spectator:
+        await _spectator_loop(ws, room, pid, name)
+        return
 
     async with room.lock:
         try:
@@ -150,6 +155,60 @@ async def game_socket(ws: WebSocket, code: str) -> None:
             manager._ensure_host(room)
             room.touch()
             await manager._broadcast(room)
+
+
+async def _spectator_loop(ws: WebSocket, room, sid: str, name: str) -> None:
+    async with room.lock:
+        try:
+            manager.join_spectator(room, sid, name)
+        except MoveError as exc:
+            await ws.send_json({"type": "fatal", "message": str(exc)})
+            await ws.close()
+            return
+        old = room.spectator_sockets.get(sid)
+        room.spectator_sockets[sid] = ws
+        room.touch()
+        await ws.send_json({"type": "hello", "pid": sid, "code": room.code, "spectator": True})
+        await manager._broadcast(room)
+
+    if old is not None and old is not ws:
+        try:
+            await old.close()
+        except Exception:
+            pass
+
+    try:
+        while True:
+            msg = await ws.receive_json()
+            await _handle_spectator(room, sid, msg)
+    except WebSocketDisconnect:
+        pass
+    except Exception:
+        pass
+    finally:
+        async with room.lock:
+            if room.spectator_sockets.get(sid) is ws:
+                room.spectator_sockets.pop(sid, None)
+            if sid in room.spectators:
+                room.spectators[sid].connected = False
+                room.spectators[sid].last_seen = time.time()
+            room.touch()
+            await manager._broadcast(room)
+
+
+async def _handle_spectator(room, sid: str, msg: dict) -> None:
+    if not isinstance(msg, dict):
+        return
+    mtype = msg.get("type")
+    async with room.lock:
+        spec = room.spectators.get(sid)
+        if spec is None:
+            return
+        if mtype == "rename":
+            spec.name = _clean_name(msg.get("name", "")) or spec.name
+            room.touch()
+            await manager._broadcast(room)
+        # ping and unknown types are ignored
 
 
 async def _handle(room, pid: str, msg: dict) -> None:
@@ -209,6 +268,14 @@ def _dispatch(room, player, mtype: str, msg: dict) -> bool:
         if not player.is_host:
             raise MoveError("Only the host can remove players.")
         manager.kick_player(room, player.id, str(msg.get("playerId", "")))
+        return True
+
+    if mtype == "setAllowSpectators":
+        if not player.is_host:
+            raise MoveError("Only the host can change spectator settings.")
+        if g.status != STATUS_LOBBY:
+            raise MoveError("Change spectator settings before dealing.")
+        room.allow_spectators = bool(msg.get("allow", True))
         return True
 
     if mtype == "dealSetup":

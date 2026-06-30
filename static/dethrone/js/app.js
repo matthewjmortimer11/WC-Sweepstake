@@ -26,6 +26,16 @@ CT.render = function () {
     root.innerHTML = shell('<div class="panel" style="max-width:560px;margin:24px auto"><p class="muted">' + CT.esc(CT.net.error) + '</p></div>');
     bind(); return;
   }
+  if (CT.isSpectator() && CT.net && CT.net.online && CT.net.connected) {
+    if (!CT.state || CT.state.phase === "lobby") {
+      root.innerHTML = shell(spectatorLobbyScreen());
+    } else if (CT.state.phase === "setup") {
+      root.innerHTML = shell(spectatorSetupScreen());
+    } else {
+      root.innerHTML = shell(spectatorGameScreen());
+    }
+    bind(); return;
+  }
   if (CT.net && CT.net.online && CT.net.room && (!CT.state || CT.state.phase === "lobby")) {
     root.innerHTML = shell(onlineLobbyScreen());
     bind(); return;
@@ -49,10 +59,11 @@ CT.showToast = function (msg) {
   CT.showToast._t = setTimeout(function () { el.hidden = true; }, 3200);
 };
 
-CT.isOnline = function () { return CT.net && CT.net.online && CT.net.connected; };
-CT.myId = function () { return CT.isOnline() && CT.net.you ? CT.net.you.id : null; };
-CT.isHost = function () { return CT.isOnline() ? !!(CT.net.you && CT.net.you.isHost) : true; };
-CT.netAction = function (msg) { if (CT.isOnline()) { CT.net.send(msg); return true; } return false; };
+CT.isOnline = function () { return CT.net && CT.net.online && CT.net.connected && !CT.isSpectator(); };
+CT.isSpectator = function () { return !!(CT.net && CT.net.spectator); };
+CT.myId = function () { return CT.isSpectator() ? null : (CT.isOnline() || (CT.net && CT.net.connected && !CT.net.spectator) ? (CT.net.you && CT.net.you.id) : null); };
+CT.isHost = function () { return CT.isSpectator() ? false : (CT.isOnline() ? !!(CT.net.you && CT.net.you.isHost) : true); };
+CT.netAction = function (msg) { if (CT.isSpectator()) return false; if (CT.net && CT.net.online && CT.net.connected) { CT.net.send(msg); return true; } return false; };
 
 function shell(inner) {
   var testToggle = '<button class="btn btn-sm mode-toggle' + (CT.testMode ? " on" : "") + '" data-act="toggle-test" '
@@ -63,13 +74,13 @@ function shell(inner) {
     : "";
   return reconnect + '<div class="app">'
     + '<div class="topbar"><div class="brand"><h1>The Cursed Throne</h1>'
-    + '<span class="seal">' + (CT.net && CT.net.routeCode ? "Room " + CT.net.routeCode : (CT.testMode ? "Playtest Ledger" : "Court of Whispers")) + '</span></div>'
-    + '<div class="btn-row">' + testToggle
-    + (CT.state ? '<button class="btn btn-ghost btn-sm" data-act="show-guide">Guide</button>'
-        + '<button class="btn btn-ghost btn-sm" data-act="export-report">Report</button>'
+    + '<span class="seal">' + (CT.net && CT.net.routeCode ? (CT.isSpectator() ? "Watching " : "Room ") + CT.net.routeCode : (CT.testMode ? "Playtest Ledger" : "Court of Whispers")) + '</span></div>'
+    + '<div class="btn-row">' + (CT.isSpectator() ? '<span class="tag gold">Spectator</span>' : testToggle)
+    + (CT.state ? '<button class="btn btn-ghost btn-sm" data-act="export-report">Report</button>'
+        + (CT.isSpectator() ? "" : '<button class="btn btn-ghost btn-sm" data-act="show-guide">Guide</button>'
         + '<button class="btn btn-ghost btn-sm" data-act="export">Export</button>'
         + '<button class="btn btn-ghost btn-sm" data-act="show-import">Import</button>'
-        + '<button class="btn btn-secondary btn-sm" data-act="new-game">New game</button>' : "")
+        + '<button class="btn btn-secondary btn-sm" data-act="new-game">New game</button>') : "")
     + '</div></div>' + inner + '</div>';
 }
 
@@ -89,7 +100,7 @@ function startScreen() {
     + '<button class="btn btn-gold" data-act="create-room">Create online room ✦</button>'
     + '<button class="btn btn-primary" data-act="start-setup">Local pass-and-play</button>'
     + '</div>'
-    + '<p class="muted" style="font-size:13px;margin-top:20px">Already have a code? Open the invite link, or add <code>#/room/ABCD</code> to this URL.</p>'
+    + '<p class="muted" style="font-size:13px;margin-top:20px">Already have a code? Open the invite link (<code>#/room/ABCD</code>), watch without playing (<code>#/room/ABCD/watch</code>), or pass-and-play locally.</p>'
     + '</div></div>' + balBlock;
 }
 
@@ -126,7 +137,8 @@ function onlineLobbyScreen() {
     + '<hr class="rule">'
     + '<div class="btn-row" style="margin-bottom:12px">'
     + '<button class="btn btn-ghost btn-sm" data-act="show-guide">Host playtest guide</button>'
-    + '<button class="btn btn-secondary btn-sm" data-act="copy-invite">Copy invite link</button></div>'
+    + '<button class="btn btn-secondary btn-sm" data-act="copy-invite">Copy invite link</button>'
+    + '<button class="btn btn-secondary btn-sm" data-act="copy-watch">Copy watch link</button></div>'
     + '<label class="field"><span class="lbl">Your name</span>'
     + '<input type="text" data-act="lobby-name" data-fkey="lobby-name" value="' + CT.esc(you.name || CT.net.playerName()) + '" autocomplete="off"></label>'
     + '<p class="muted" style="font-size:14px">Players (' + connected + ' / ' + count + ')</p>'
@@ -134,12 +146,65 @@ function onlineLobbyScreen() {
     + '<p class="muted" style="font-size:13px">Seats for this game</p>'
     + '<div class="seg" style="margin:8px 0 16px">' + countBtns + '</div>'
     + (you.isHost ? '<h3 style="margin:16px 0 8px">Balance toggles</h3>'
-      + CT.balancePanel((room.settings && room.settings.balance) || CT.DEFAULT_BALANCE, true) : "")
+      + CT.balancePanel((room.settings && room.settings.balance) || CT.DEFAULT_BALANCE, true)
+      + '<label class="field" style="margin:12px 0 0;display:flex;align-items:center;gap:8px;font-size:14px">'
+      + '<input type="checkbox" data-act="toggle-spectators"' + ((room.settings && room.settings.allowSpectators !== false) ? " checked" : "") + '> Allow spectators (watch link)</label>' : "")
     + '<div class="btn-row">'
     + (you.isHost && connected < count ? '<button class="btn btn-secondary" data-act="fill-bots">Fill empty seats with bots</button>' : '')
     + '<div class="spacer"></div>'
     + '<button class="btn btn-gold" data-act="deal-setup"' + (canDeal ? "" : " disabled") + '>Deal roles →</button></div>'
     + '</div>';
+}
+
+function spectatorLobbyScreen() {
+  var room = CT.net.room, you = CT.net.you || {}, settings = room.settings || {};
+  var players = (room.players || []).map(function (p) {
+    return "<li>" + CT.esc(p.name) + (p.isHost ? ' <span class="tag gold">host</span>' : "") + "</li>";
+  }).join("") || '<li class="muted">No players yet</li>';
+  var specs = (room.spectators || []).map(function (s) {
+    return "<li>" + CT.esc(s.name) + (s.id === you.id ? " (you)" : "") + "</li>";
+  }).join("");
+  var status = CT.state && CT.state.phase !== "lobby" ? "Game in progress — loading view…" : "Waiting for the host to deal.";
+  return '<div class="panel" style="max-width:560px;margin:24px auto">'
+    + '<div class="eyebrow">Spectating · <strong>' + CT.esc(room.code) + '</strong></div>'
+    + '<h1 style="margin-top:6px">Watching the court</h1>'
+    + '<div class="spectator-banner">Public view only — you cannot play or see hidden cards.</div>'
+    + '<p class="muted" style="font-size:14px">' + status + '</p>'
+    + '<label class="field"><span class="lbl">Your display name</span>'
+    + '<input type="text" data-act="lobby-name" value="' + CT.esc(you.name || CT.net.playerName()) + '" autocomplete="off"></label>'
+    + '<p class="muted" style="font-size:14px;margin-top:16px">Players</p>'
+    + '<ul class="stack" style="margin:8px 0;padding-left:20px;font-size:14px">' + players + "</ul>"
+    + (specs ? '<p class="muted" style="font-size:14px">Also watching</p><ul class="stack" style="margin:8px 0;padding-left:20px;font-size:14px">' + specs + "</ul>" : "")
+    + "</div>";
+}
+
+function spectatorSetupScreen() {
+  var setup = CT.state.setup || {};
+  var statusList = (setup.playerStatus || []).map(function (ps) {
+    return "<li>" + CT.esc(ps.name) + (ps.setupReady ? ' <span class="tag gold">ready</span>' : ' <span class="tag">choosing…</span>') + "</li>";
+  }).join("");
+  return '<div class="panel" style="max-width:560px;margin:24px auto">'
+    + '<div class="eyebrow">Spectating · setup</div>'
+    + '<h1>Players choose public roles</h1>'
+    + '<div class="spectator-banner">Hidden roles are not shown to spectators.</div>'
+    + '<ul class="stack" style="margin:12px 0;padding-left:20px;font-size:14px">' + statusList + "</ul>"
+    + '<p class="muted">The game will begin when the host starts play.</p></div>';
+}
+
+function spectatorGameScreen() {
+  return '<div class="spectator-banner">👁 Spectating — public view only. Hidden roles and action card names are never shown.</div>'
+    + winBanner()
+    + trackers()
+    + '<div class="grid grid-main">'
+    + '<div>' + boardPanel() + throneSuccPanel() + pactsPanel() + "</div>"
+    + '<div>' + playersPanelSpectator() + logPanel() + "</div>"
+    + "</div>";
+}
+
+function playersPanelSpectator() {
+  var cards = CT.state.players.map(playerCard).join("");
+  return '<div class="panel"><div class="panel-head"><h2>The Court</h2>'
+    + '<span class="tag">read-only</span></div><hr class="rule"><div class="players">' + cards + "</div></div>";
 }
 
 function onlineSetupScreen() {
@@ -246,9 +311,11 @@ function throneLabel() {
 /* ---- board: hand-drawn weathered map (see board.js) ---- */
 function boardPanel() {
   var ap = CT.activePlayer();
-  var hint = (ap && ap.status === "active" && !CT.state.winner)
-    ? "Glowing sites are within " + CT.esc(ap.name) + "’s reach — tap to move"
-    : "Graveyard connects Tavern ↔ Barracks";
+  var hint = CT.isSpectator()
+    ? "Spectator view — tokens show where everyone is"
+    : ((ap && ap.status === "active" && !CT.state.winner)
+      ? "Glowing sites are within " + CT.esc(ap.name) + "’s reach — tap to move"
+      : "Graveyard connects Tavern ↔ Barracks");
   return '<div class="panel board-panel"><div class="panel-head"><h2>The Kingdom</h2>'
     + '<span class="faint" style="font-size:12px">' + hint + '</span></div><hr class="rule">'
     + '<div class="map-wrap">' + CT.boardMapSVG() + '</div></div>';
@@ -314,6 +381,7 @@ function playersPanel() {
     + '</div><hr class="rule"><div class="players">' + cards + '</div></div>';
 }
 function playerCard(p) {
+  var spec = CT.isSpectator();
   var i = CT.state.players.indexOf(p);
   var active = p.id === CT.activePlayer().id;
   var role = CT.roleById(p.publicRoleId);
@@ -335,16 +403,16 @@ function playerCard(p) {
     + '<span class="dot" style="background:' + tokenColor(i) + ';width:18px;height:18px;border-radius:999px;display:inline-grid;place-items:center;color:#fff;font-size:10px;font-weight:800">' + initials(p.name) + '</span>'
     + CT.esc(p.name) + (p.isBot ? ' <span class="tag">BOT</span>' : '') + '</div>'
     + '<div class="prole">' + (role ? CT.esc(role.name) : "—") + '</div></div>'
-    + '<button class="btn btn-ghost btn-sm" data-act="view-private" data-id="' + p.id + '">'
-    + (CT.isOnline() && p.id !== CT.myId() ? "—" : "View private") + '</button></div>'
+    + (spec ? "" : '<button class="btn btn-ghost btn-sm" data-act="view-private" data-id="' + p.id + '">'
+    + (CT.isOnline() && p.id !== CT.myId() ? "—" : "View private") + '</button>') + '</div>'
     + '<div class="pstats">'
     + pstat("Gold", p.gold, "gold", p.id, "gold")
     + pstat("Rep", p.rep, "rep", p.id, "rep")
     + '<div class="pstat"><div class="k">Status</div><div class="v" style="font-size:14px">' + (p.status === "active" ? "Active" : "Out") + '</div>'
-    + (CT.testMode && CT.isHost() ? '<div class="stepper"><button class="btn btn-ghost btn-sm" data-act="toggle-elim" data-id="' + p.id + '">' + (p.status === "active" ? "Eliminate" : "Restore") + '</button></div>' : "") + '</div>'
+    + (CT.testMode && CT.isHost() && !spec ? '<div class="stepper"><button class="btn btn-ghost btn-sm" data-act="toggle-elim" data-id="' + p.id + '">' + (p.status === "active" ? "Eliminate" : "Restore") + '</button></div>' : "") + '</div>'
     + '</div>'
     + '<div class="pmeta">' + meta.join("") + '</div>'
-    + ((!CT.isOnline() || CT.isHost()) ? '<div class="row" style="margin-top:10px;gap:8px">'
+    + ((!spec && (!CT.isOnline() || CT.isHost())) ? '<div class="row" style="margin-top:10px;gap:8px">'
     + '<label class="field" style="margin:0;flex:1"><span class="lbl" style="font-size:11px">Move to</span>'
     + '<select data-act="move-player" data-id="' + p.id + '">' + moveOpts + '</select></label>'
     + (CT.testMode && CT.isHost() ? '<button class="btn btn-danger btn-sm" data-act="lose-role" data-id="' + p.id + '" style="align-self:end"'
@@ -674,6 +742,9 @@ CT.handleAction = function (act, el, ev) {
       CT.net.createRoom(5);
       break;
     case "copy-invite": CT.net.copyInvite(); break;
+    case "copy-watch": CT.net.copyWatchInvite(); break;
+    case "toggle-spectators":
+      break;
     case "show-guide": CT.ui.showGuide = true; CT.render(); break;
     case "close-guide": CT.ui.showGuide = false; CT.render(); break;
     case "kick-player":
@@ -752,6 +823,7 @@ CT.handleAction = function (act, el, ev) {
       break;
     }
     case "board-move": {
+      if (CT.isSpectator()) break;
       var apr = CT.activePlayer();
       if (!apr) break;
       if (CT.netAction({ type: "move", locationId: el.dataset.id })) break;
@@ -863,7 +935,11 @@ CT.handleAction = function (act, el, ev) {
 
 CT.handleChange = function (act, el) {
   if (CT.setup.active && setupChangeActs[act]) { CT.setup.handle(act, el); return; }
-  if (act.indexOf("h-") === 0) { CT.helpers.handle(act, el); return; } // helper selects & checkboxes
+  if (act.indexOf("h-") === 0) { CT.helpers.handle(act, el); return; }
+  if (act === "toggle-spectators") {
+    if (CT.isHost()) CT.net.send({ type: "setAllowSpectators", allow: el.checked });
+    return;
+  }
   if (act === "move-player") {
     if (CT.netAction({ type: "movePlayer", playerId: el.dataset.id, locationId: el.value })) return;
     CT.movePlayer(el.dataset.id, el.value, true); CT.render();

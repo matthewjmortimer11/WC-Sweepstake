@@ -40,6 +40,12 @@ open "index.html"          # macOS
 - **Hand-limit enforcement** — cannot end turn over limit (server + client); prominent banner + toast on your turn
 - **Chronicle filters** — All / Events / Corruption / System / Notes
 
+### Phase 8 — Spectator mode
+- **Watch link** — `#/room/ABCD/watch` (or **Copy watch link** in lobby); read-only WebSocket with `spectate=1`
+- **Public view only** — board, court table, throne, pacts, chronicle; no hidden roles, card names, or actions
+- **Host control** — **Allow spectators** checkbox in lobby (off before deal to close the room to watchers)
+- **Mid-game join** — spectators can attach while play is in progress
+
 ### Phase 4 — Throne & Succession
 A **Throne & Succession** panel tracks the crown and the line of succession.
 - **Throne control (§23)**: King / Queen / Successor controllers, set manually or via the **Claim helper** (claimant + crown; unchallenged → crowned, or challenged → "proof valid" crowns them and the challenger loses a role / "bluff" costs the claimant a role). Claim order is recorded.
@@ -94,7 +100,6 @@ Table talk and bluffing stay verbal. The app guides, tracks, and enforces mechan
 
 - Bots still skip most social nuance (duels, trades, throne claims) — they hunt the Cursed One so all-bot runs can test a Loyal win, not to simulate table talk.
 - Action cards that need table judgement (Call Out helper, Blood Contract, most Vote/Duel/Reaction cards) stay manual — auto-play covers the mechanical OnTurn subset listed in `CT.AUTO_PLAY` / `CARD_AUTO_EFFECTS`.
-- Spectator mode not built.
 
 ## File structure
 
@@ -112,4 +117,4 @@ js/app.js         render loop, board/table/log UI, referee controls, event wirin
 
 ## Next improvements
 
-Run `PLAYTEST.md` at a real table, log friction, then proceed to Phase 8 (spectator mode) or Phase 9 (more card auto-resolution).
+Run `PLAYTEST.md` at a real table, log friction, then proceed to Phase 9 (more card auto-resolution) or Phase 10 (structured strong location actions).
