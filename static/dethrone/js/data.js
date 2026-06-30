@@ -289,7 +289,7 @@ CT.LOCATION_ACTIONS = {
   ],
   scrolls: [
     { id: "research", kind: "basic", name: "Research", cost: 2, hint: "Draw 1 Knowledge card", deck: "Knowledge" },
-    { id: "deep_research", kind: "strong", name: "Deep Research", cost: 2, hint: "Investigate (manual — needs access)", manual: true },
+    { id: "deep_research", kind: "strong", name: "Deep Research", cost: 2, hint: "Investigate — peek decks, discards, or interview a witness" },
   ],
   barracks: [
     { id: "arm", kind: "basic", name: "Arm Yourself", cost: 2, hint: "Draw 1 Barracks card", deck: "Barracks" },

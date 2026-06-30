@@ -725,6 +725,71 @@ class CursedThroneGame:
             raise MoveError("Unknown Royal Command choice.")
         self.pending_ui_action.pop(pid, None)
 
+    def apply_deep_research(
+        self,
+        pid: str,
+        mode: str,
+        *,
+        deck_name: Optional[str] = None,
+        target_id: Optional[str] = None,
+        rng: Optional[random.Random] = None,
+    ) -> None:
+        pending = self.pending_ui_action.get(pid)
+        if not pending or pending.get("kind") != "deep_research":
+            raise MoveError("No Deep Research in progress.")
+        ap = self.player_by_id(pid)
+        if not ap:
+            raise MoveError("Unknown player.")
+        if ap.location != "scrolls":
+            raise MoveError("Must be at the Scrolls.")
+        rng = rng or random.Random()
+
+        if mode == "deck_top":
+            if not deck_name or deck_name not in D.DECK_NAMES:
+                raise MoveError("Choose a deck.")
+            pile = self._ensure_draw_pile(deck_name, rng)
+            top = pile[0] if pile else None
+            label = D.CARD_BY_ID.get(top or "", {}).get("name", top or "nothing")
+            self._set_private_note(pid, f"Top of {deck_name} deck: {label}")
+            self._log(f"{ap.name} surveyed the {deck_name} archives (Deep Research).", "note")
+        elif mode == "discard_top":
+            if not deck_name or deck_name not in D.DECK_NAMES:
+                raise MoveError("Choose a deck.")
+            disc = self.discards.get(deck_name, [])
+            top = disc[-1] if disc else None
+            label = D.CARD_BY_ID.get(top or "", {}).get("name", top or "empty")
+            self._set_private_note(pid, f"Top of {deck_name} discard: {label}")
+            self._log(f"{ap.name} read the {deck_name} ledgers (Deep Research).", "note")
+        elif mode == "discard_random":
+            if not deck_name or deck_name not in D.DECK_NAMES:
+                raise MoveError("Choose a deck.")
+            disc = self.discards.get(deck_name, [])
+            if disc:
+                pick = disc[rng.randrange(len(disc))]
+                label = D.CARD_BY_ID.get(pick, {}).get("name", pick)
+                self._set_private_note(pid, f"{deck_name} discard (random): {label}")
+            else:
+                self._set_private_note(pid, f"{deck_name} discard pile is empty.")
+            self._log(f"{ap.name} cross-referenced the {deck_name} records (Deep Research).", "note")
+        elif mode == "witness":
+            if not target_id:
+                raise MoveError("Choose a witness.")
+            target = self.player_by_id(target_id)
+            if not target or target.status != "active" or target.id == pid:
+                raise MoveError("Invalid witness.")
+            if target.location != ap.location:
+                raise MoveError("Witness must be at the Scrolls.")
+            if not target.action_card_ids:
+                self._set_private_note(pid, f"{target.name} carries no action cards.")
+            else:
+                pick = target.action_card_ids[rng.randrange(len(target.action_card_ids))]
+                label = D.CARD_BY_ID.get(pick, {}).get("name", pick)
+                self._set_private_note(pid, f"{target.name}'s hand includes: {label}")
+            self._log(f"{ap.name} interviewed {target.name} at the Scrolls (Deep Research).", "note")
+        else:
+            raise MoveError("Unknown investigation type.")
+        self.pending_ui_action.pop(pid, None)
+
     def over_hand_limit(self, player: PlayerState) -> bool:
         return len(player.action_card_ids) > self._rule("handLimit")
 
@@ -809,6 +874,12 @@ class CursedThroneGame:
                 "attackerId": ap.id,
                 "serious": True,
             }
+            return {"ok": True}
+        elif act_id == "deep_research":
+            if ap.location != "scrolls":
+                raise MoveError("Must be at the Scrolls.")
+            self._log(f"{ap.name} begins Deep Research at the Scrolls (paid {cost} gold).", "event")
+            self.pending_ui_action[ap.id] = {"kind": "deep_research", "researcherId": ap.id}
             return {"ok": True}
         else:
             self._log(f"{ap.name} used {defn['name']} (resolve at the table).", "note")

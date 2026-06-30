@@ -123,7 +123,7 @@ LOCATION_ACTIONS: dict[str, list[dict]] = {
     ],
     "scrolls": [
         {"id": "research", "kind": "basic", "name": "Research", "cost": 2, "deck": "Knowledge"},
-        {"id": "deep_research", "kind": "strong", "name": "Deep Research", "cost": 2, "manual": True},
+        {"id": "deep_research", "kind": "strong", "name": "Deep Research", "cost": 2},
     ],
     "barracks": [
         {"id": "arm", "kind": "basic", "name": "Arm Yourself", "cost": 2, "deck": "Barracks"},

@@ -35,6 +35,7 @@ CT.helpers.view = function () {
     case "royalclaim": return CT.helpers.vRoyalClaim();
     case "succclaim":  return CT.helpers.vSuccClaim();
     case "royalcommand": return CT.helpers.vRoyalCommand();
+    case "deepresearch": return CT.helpers.vDeepResearch();
   }
   return "";
 };
@@ -177,6 +178,67 @@ CT.helpers.applyRoyalCommand = function (choice, targetId) {
   }
   u.open = null;
   CT.save();
+  CT.render();
+};
+
+/* ===================== Deep Research (§13 Scrolls strong action) ===================== */
+CT.helpers.openDeepResearchFromPending = function (ui) {
+  CT.helpers.ui = {
+    open: "deepresearch", researcherId: ui.researcherId, phase: "choice",
+    mode: "", deck: "", target: "",
+  };
+  if (CT.isOnline()) CT.net.send({ type: "clearPendingUi" });
+  CT.render();
+};
+CT.helpers.vDeepResearch = function () {
+  var u = CT.helpers.ui, ps = actives();
+  var researcher = CT.playerById(u.researcherId);
+  if (u.phase === "deck") {
+    var decks = CT.DECK_NAMES.map(function (d) {
+      return '<option value="' + d + '"' + (u.deck === d ? " selected" : "") + ">" + d + "</option>";
+    }).join("");
+    var deckLabel = u.mode === "deck_top" ? "Which deck to survey?"
+      : (u.mode === "discard_top" ? "Which discard pile to read?" : "Which records to cross-reference?");
+    return wrap('<div class="eyebrow">Deep Research</div><h2 style="margin:4px 0 2px">Choose archives</h2>'
+      + '<p class="muted" style="font-size:13px;margin:0 0 12px">' + deckLabel + "</p>"
+      + field("Deck", '<select data-act="h-dr-deck">' + decks + "</select>")
+      + '<hr class="rule"><div class="btn-row"><button class="btn btn-ghost" data-act="h-dr-back">← Back</button>'
+      + '<div class="spacer"></div><button class="btn btn-primary" data-act="h-dr-apply">Investigate</button></div>');
+  }
+  if (u.phase === "witness") {
+    var witnesses = ps.filter(function (p) {
+      return p.id !== u.researcherId && researcher && p.location === researcher.location;
+    });
+    return wrap('<div class="eyebrow">Deep Research</div><h2 style="margin:4px 0 2px">Interview a witness</h2>'
+      + '<p class="muted" style="font-size:13px;margin:0 0 12px">Choose someone at the Scrolls. You glimpse one card from their hand — only you see the result.</p>'
+      + field("Witness", '<select data-act="h-dr-target">' + opt(witnesses, u.target, "— who —") + "</select>")
+      + '<hr class="rule"><div class="btn-row"><button class="btn btn-ghost" data-act="h-dr-back">← Back</button>'
+      + '<div class="spacer"></div><button class="btn btn-primary" data-act="h-dr-apply"' + (u.target ? "" : " disabled") + '>Interview</button></div>');
+  }
+  return wrap('<div class="eyebrow">Deep Research</div><h2 style="margin:4px 0 2px">'
+    + CT.esc(researcher ? researcher.name : "Researcher") + " investigates</h2>"
+    + '<p class="muted" style="font-size:13px;margin:0 0 14px">Paid 2 gold. Pick an investigation — result shows in your private view only.</p>'
+    + '<div class="stack" style="gap:10px">'
+    + '<button class="btn btn-secondary" data-act="h-dr-mode" data-m="deck_top">Survey archives — peek top of a draw pile</button>'
+    + '<button class="btn btn-secondary" data-act="h-dr-mode" data-m="discard_top">Read ledgers — peek top of a discard pile</button>'
+    + '<button class="btn btn-secondary" data-act="h-dr-mode" data-m="discard_random">Cross-reference — random card from a discard pile</button>'
+    + '<button class="btn btn-gold" data-act="h-dr-mode" data-m="witness">Interview witness — glimpse one card at the Scrolls</button>'
+    + "</div>");
+};
+CT.helpers.applyDeepResearch = function (mode, deckName, targetId) {
+  if (CT.isOnline()) {
+    var msg = { type: "deepResearch", mode: mode };
+    if (deckName) msg.deckName = deckName;
+    if (targetId) msg.targetId = targetId;
+    CT.net.send(msg);
+    CT.helpers.ui.open = null;
+    return CT.render();
+  }
+  var res = CT.applyDeepResearch(CT.helpers.ui.researcherId, mode, {
+    deckName: deckName, targetId: targetId,
+  });
+  if (res && !res.ok && res.msg) alert(res.msg);
+  CT.helpers.ui.open = null;
   CT.render();
 };
 CT.helpers.vDuel = function () {
@@ -440,6 +502,21 @@ CT.helpers.handle = function (act, el) {
         return CT.helpers.openVoteFromDecree(u.controllerId);
       }
       return CT.helpers.applyRoyalCommand("decree");
+
+    // deep research (Scrolls strong action)
+    case "h-dr-mode":
+      u.mode = el.dataset.m;
+      u.deck = CT.DECK_NAMES[0];
+      u.target = "";
+      u.phase = u.mode === "witness" ? "witness" : "deck";
+      return CT.render();
+    case "h-dr-back": u.phase = "choice"; u.mode = ""; return CT.render();
+    case "h-dr-deck": u.deck = el.value; return CT.render();
+    case "h-dr-target": u.target = el.value; return CT.render();
+    case "h-dr-apply":
+      return CT.helpers.applyDeepResearch(
+        u.mode, u.mode === "witness" ? null : u.deck, u.mode === "witness" ? u.target : null
+      );
 
     // succession
     case "h-open-succclaim": return CT.helpers.openSuccClaim();

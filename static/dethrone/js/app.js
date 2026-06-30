@@ -697,6 +697,7 @@ function handleLocActionResult(r) {
   if (r.keepOne) CT.ui.keepOne = { playerId: CT.activePlayer().id, deck: r.keepOne.deck, cards: r.keepOne.cards };
   if (r.openDuel && CT.helpers) CT.helpers.openDuelFromPending(r.openDuel);
   if (r.openRoyalCommand && CT.helpers) CT.helpers.openRoyalCommandFromPending(r.openRoyalCommand);
+  if (r.openDeepResearch && CT.helpers) CT.helpers.openDeepResearchFromPending(r.openDeepResearch);
 }
 
 function handlePlayCardResult(res) {

@@ -14,6 +14,14 @@ def client():
         yield c
 
 
+@pytest.fixture(autouse=True)
+def _clear_dethrone_create_rate_limit():
+    from dethrone.router import _CREATE_BUCKETS
+    _CREATE_BUCKETS.clear()
+    yield
+    _CREATE_BUCKETS.clear()
+
+
 def _room_with_players(code: str, n: int = 4):
     room = manager.get(code)
     pids = [f"p{i}" for i in range(1, n + 1)]
@@ -377,6 +385,50 @@ def test_serious_duel_blocked_if_used(client):
     from dethrone.game import MoveError
     with pytest.raises(MoveError, match="Serious Duel already used"):
         g.do_location_action(active, "serious_duel")
+
+
+def test_deep_research_opens_pending(client):
+    code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
+    room, pids, g = _start_game(code)
+    active = g.active_player().id
+    ap = g.player_by_id(active)
+    ap.location = "scrolls"
+    ap.gold = 5
+    g.do_location_action(active, "deep_research")
+    assert ap.gold == 3
+    view = room.state_for(active)["room"]["game"]
+    assert view["pendingUiAction"]["kind"] == "deep_research"
+
+
+def test_deep_research_deck_top_note(client):
+    code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
+    room, pids, g = _start_game(code)
+    active = g.active_player().id
+    ap = g.player_by_id(active)
+    ap.location = "scrolls"
+    ap.gold = 5
+    g.do_location_action(active, "deep_research")
+    g.decks["Knowledge"] = ["old_prophecy", "read_records"]
+    g.apply_deep_research(active, "deck_top", deck_name="Knowledge")
+    view = room.state_for(active)["room"]["game"]
+    assert "old_prophecy" in view["privateNote"]
+    assert active not in g.pending_ui_action
+
+
+def test_deep_research_witness_note(client):
+    code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
+    room, pids, g = _start_game(code)
+    active = g.active_player().id
+    witness = next(pid for pid in pids if pid != active)
+    ap = g.player_by_id(active)
+    wp = g.player_by_id(witness)
+    ap.location = wp.location = "scrolls"
+    ap.gold = 5
+    wp.action_card_ids = ["spare_coin_purse"]
+    g.do_location_action(active, "deep_research")
+    g.apply_deep_research(active, "witness", target_id=witness, rng=__import__("random").Random(0))
+    view = room.state_for(active)["room"]["game"]
+    assert "spare_coin_purse" in view["privateNote"]
 
 
 def test_loyal_bot_can_call_out_cursed(client):

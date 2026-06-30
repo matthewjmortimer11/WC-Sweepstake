@@ -447,6 +447,54 @@ CT.playActionCard = function (playerId, cardId, opts) {
   return Object.assign({ ok: true }, extra);
 };
 
+/* Resolve Deep Research investigation (Scrolls strong action). */
+CT.applyDeepResearch = function (playerId, mode, opts) {
+  opts = opts || {};
+  var s = CT.state;
+  if (!s || s.winner) return { ok: false, msg: "Game over." };
+  var p = CT.playerById(playerId);
+  if (!p || p.location !== "scrolls") return { ok: false, msg: "Must be at the Scrolls." };
+
+  if (mode === "deck_top" && opts.deckName) {
+    var pile = CT._ensureDrawPile(opts.deckName);
+    var topId = pile.length ? pile[0] : null;
+    var topCard = topId ? CT.cardById(topId) : null;
+    CT.ui.privateNote = "Top of " + opts.deckName + " deck: " + (topCard ? topCard.name : topId || "nothing");
+    CT.log(p.name + " surveyed the " + opts.deckName + " archives (Deep Research).", "note");
+  } else if (mode === "discard_top" && opts.deckName) {
+    var disc = CT.state.discards[opts.deckName] || [];
+    var discTop = disc.length ? disc[disc.length - 1] : null;
+    var discCard = discTop ? CT.cardById(discTop) : null;
+    CT.ui.privateNote = "Top of " + opts.deckName + " discard: " + (discCard ? discCard.name : discTop || "empty");
+    CT.log(p.name + " read the " + opts.deckName + " ledgers (Deep Research).", "note");
+  } else if (mode === "discard_random" && opts.deckName) {
+    var pile2 = CT.state.discards[opts.deckName] || [];
+    if (pile2.length) {
+      var pick = pile2[Math.floor(Math.random() * pile2.length)];
+      var pickCard = CT.cardById(pick);
+      CT.ui.privateNote = opts.deckName + " discard (random): " + (pickCard ? pickCard.name : pick);
+    } else CT.ui.privateNote = opts.deckName + " discard pile is empty.";
+    CT.log(p.name + " cross-referenced the " + opts.deckName + " records (Deep Research).", "note");
+  } else if (mode === "witness" && opts.targetId) {
+    var target = CT.playerById(opts.targetId);
+    if (!target || target.status !== "active" || target.location !== p.location) {
+      return { ok: false, msg: "Witness must be at the Scrolls." };
+    }
+    if (!target.actionCardIds.length) {
+      CT.ui.privateNote = target.name + " carries no action cards.";
+    } else {
+      var cardId = target.actionCardIds[Math.floor(Math.random() * target.actionCardIds.length)];
+      var card = CT.cardById(cardId);
+      CT.ui.privateNote = target.name + "'s hand includes: " + (card ? card.name : cardId);
+    }
+    CT.log(p.name + " interviewed " + target.name + " at the Scrolls (Deep Research).", "note");
+  } else {
+    return { ok: false, msg: "Invalid investigation." };
+  }
+  CT.save();
+  return { ok: true };
+};
+
 /* execute a location action's mechanical effect (§13).
  * returns { ok, manual?, keepOne?:{deck, cards:[a,b]}, msg? } so the UI can follow up. */
 CT.doLocationAction = function (playerId, actId) {
@@ -503,8 +551,12 @@ CT.doLocationAction = function (playerId, actId) {
       if (p.seriousDuelUsed) return { ok: false, msg: "Serious Duel already used this game." };
       CT.log(p.name + " starts a Serious Duel at the Barracks.", "event");
       return { ok: true, openDuel: { attackerId: playerId, serious: true } };
+    case "deep_research":
+      if (p.location !== "scrolls") return { ok: false, msg: "Must be at the Scrolls." };
+      CT.log(p.name + " begins Deep Research at the Scrolls (paid 2 gold).", "event");
+      return { ok: true, openDeepResearch: { researcherId: playerId } };
     default:
-      // manual actions (deep_research)
+      // manual actions (none at strong tier)
       CT.log(p.name + " used " + def.name + " (resolve at the table).", "note");
       CT.save();
       return { ok: true, manual: true };

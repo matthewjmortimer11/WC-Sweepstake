@@ -368,6 +368,16 @@ def _dispatch(room, player, mtype: str, msg: dict) -> bool:
         )
         return True
 
+    if mtype == "deepResearch":
+        g.apply_deep_research(
+            player.id,
+            str(msg.get("mode", "")),
+            deck_name=msg.get("deckName") or None,
+            target_id=msg.get("targetId") or None,
+            rng=room.rng,
+        )
+        return True
+
     if mtype == "adjustGold":
         if not player.is_host:
             raise MoveError("Host only.")
