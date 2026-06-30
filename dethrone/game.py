@@ -110,6 +110,8 @@ class CursedThroneGame:
         # pending UI follow-ups keyed by player id
         self.pending_keep_one: dict[str, dict] = {}
         self.pending_role_discard: dict[str, dict] = {}
+        self.pending_ui_action: dict[str, dict] = {}
+        self.private_notes: dict[str, str] = {}
         self.balance: dict[str, int] = dict(D.DEFAULT_BALANCE)
 
     def _rule(self, key: str) -> int:
@@ -442,6 +444,30 @@ class CursedThroneGame:
             p.status = "active"
             self._log(f"{p.name} was restored (manual).", "event")
 
+    def _ensure_draw_pile(self, deck_name: str, rng: random.Random) -> list[str]:
+        pile = self.decks.setdefault(deck_name, [])
+        if not pile:
+            disc = self.discards.get(deck_name, [])
+            if disc:
+                self.decks[deck_name] = disc[:]
+                rng.shuffle(self.decks[deck_name])
+                self.discards[deck_name] = []
+            else:
+                self.decks[deck_name] = D.CARDS_BY_DECK[deck_name][:]
+                rng.shuffle(self.decks[deck_name])
+            self._log(f"{deck_name} deck reshuffled.", "system")
+            pile = self.decks[deck_name]
+        return pile
+
+    def _set_private_note(self, pid: str, text: str) -> None:
+        self.private_notes[pid] = text
+
+    def _players_at(self, location_id: str, *, exclude: Optional[str] = None) -> list[PlayerState]:
+        return [
+            p for p in self.players
+            if p.status == "active" and p.location == location_id and p.id != exclude
+        ]
+
     def play_action_card(
         self,
         pid: str,
@@ -449,6 +475,8 @@ class CursedThroneGame:
         *,
         target_id: Optional[str] = None,
         location_id: Optional[str] = None,
+        deck_name: Optional[str] = None,
+        rng: Optional[random.Random] = None,
     ) -> dict:
         if self.status != STATUS_PLAY or self.winner:
             raise MoveError("No active game.")
@@ -463,18 +491,38 @@ class CursedThroneGame:
             raise MoveError("This card must be resolved manually at the table.")
         if fx.get("needs_target") and not target_id:
             raise MoveError("Choose a target player.")
+        if fx.get("needs_deck") and not deck_name:
+            raise MoveError("Choose a deck.")
         target = self.player_by_id(target_id) if target_id else None
         if fx.get("needs_target") and (not target or target.status != "active"):
             raise MoveError("Invalid target.")
+        if fx.get("at_location") and p.location != fx["at_location"]:
+            loc_name = next((l["name"] for l in D.LOCATIONS if l["id"] == fx["at_location"]), fx["at_location"])
+            raise MoveError(f"Must be at {loc_name} to play this card.")
+        if fx.get("same_location") and target and target.location != p.location:
+            raise MoveError("Target must be at your location.")
+        if deck_name and deck_name not in D.DECK_NAMES:
+            raise MoveError("Unknown deck.")
 
         card = D.CARD_BY_ID.get(card_id, {})
         cname = card.get("name", card_id)
         self._log(f"{p.name} plays {cname}.")
+        rng = rng or random.Random()
+        extra: dict[str, Any] = {}
 
         if fx.get("move_pair"):
             src, dest = fx["move_pair"]
             if p.location != src:
                 raise MoveError(f"Must be at {src.title()} to play this card.")
+            self.move_player(pid, dest, manual=True)
+        elif fx.get("tunnel_pairs"):
+            dest = fx["tunnel_pairs"].get(p.location)
+            if not dest:
+                raise MoveError("Cannot play Map of Tunnels from here.")
+            if not location_id:
+                raise MoveError("Choose a destination.")
+            if location_id != dest:
+                raise MoveError("Invalid tunnel route.")
             self.move_player(pid, dest, manual=True)
         elif fx.get("move_connected"):
             if not location_id:
@@ -483,10 +531,64 @@ class CursedThroneGame:
                 raise MoveError("That location is not reachable.")
             self.move_player(pid, location_id, manual=True)
 
+        if fx.get("cost_gold"):
+            cost = fx["cost_gold"]
+            if p.gold < cost:
+                raise MoveError("Not enough gold.")
+            p.gold -= cost
+
+        if fx.get("tax_each"):
+            taken = 0
+            for other in self.players:
+                if other.status != "active" or other.id == pid:
+                    continue
+                amt = min(fx["tax_each"], other.gold)
+                if amt:
+                    other.gold -= amt
+                    p.gold += amt
+                    taken += amt
+            if taken:
+                self._log(f"{p.name} collected {taken} gold in taxes.")
+
+        if fx.get("take_at_location"):
+            loc = fx["at_location"]
+            for other in self._players_at(loc, exclude=pid):
+                amt = min(fx["take_at_location"], other.gold)
+                if amt:
+                    other.gold -= amt
+                    p.gold += amt
+            self._log(f"{p.name} collected offerings at the Graveyard.")
+
+        if fx.get("give_at_location"):
+            loc = fx["at_location"]
+            for other in self._players_at(loc):
+                other.gold += fx["give_at_location"]
+                self._log(f"{other.name} gains {fx['give_at_location']} gold (Market Day).")
+
+        if fx.get("take_gold") and target:
+            amt = min(fx["take_gold"], target.gold)
+            if amt:
+                target.gold -= amt
+                p.gold += amt
+                self._log(f"{p.name} took {amt} gold from {target.name}.")
+            elif fx.get("or_target_rep"):
+                self.adjust_rep(target.id, fx["or_target_rep"], cname)
+
+        if fx.get("pay_or_rep") and target:
+            pay = fx["pay_or_rep"]
+            if target.gold >= pay:
+                target.gold -= pay
+                p.gold += pay
+                self._log(f"{target.name} paid {pay} gold to {p.name}.")
+            else:
+                self.adjust_rep(target.id, -1, cname)
+
         if fx.get("gold"):
             self.adjust_gold(pid, fx["gold"], cname)
         if fx.get("rep"):
             self.adjust_rep(pid, fx["rep"], cname)
+        if fx.get("rep_self"):
+            self.adjust_rep(pid, fx["rep_self"], cname)
         if fx.get("corruption"):
             self.adjust_corruption(fx["corruption"], cname)
         if fx.get("draw"):
@@ -517,9 +619,61 @@ class CursedThroneGame:
                 self._log(f"{target.name} paid 1 gold to {p.name} to silence the Rumour.")
             else:
                 self.adjust_rep(target.id, -1, "Rumour")
+        if fx.get("open_succession"):
+            self.open_succession()
+        if fx.get("bone_dice"):
+            if rng.random() < 0.5:
+                p.gold += 4
+                self._log(f"{p.name} rolled high on the Bone Dice — +4 gold.")
+            else:
+                self.adjust_rep(pid, -1, "Bone Dice")
+        if fx.get("peek_deck_top") and deck_name:
+            pile = self._ensure_draw_pile(deck_name, rng)
+            top = pile[0] if pile else None
+            cmeta = D.CARD_BY_ID.get(top or "", {})
+            label = cmeta.get("name", top or "nothing")
+            self._set_private_note(pid, f"Top of {deck_name} deck: {label}")
+            self._log(f"{p.name} consulted the {deck_name} deck.", "note")
+        if fx.get("peek_discard_top") and deck_name:
+            disc = self.discards.get(deck_name, [])
+            top = disc[-1] if disc else None
+            cmeta = D.CARD_BY_ID.get(top or "", {})
+            label = cmeta.get("name", top or "empty")
+            self._set_private_note(pid, f"Top of {deck_name} discard: {label}")
+            self._log(f"{p.name} read the {deck_name} discard pile.", "note")
+        if fx.get("peek_discard_random"):
+            dname = fx["peek_discard_random"]
+            disc = self.discards.get(dname, [])
+            if disc:
+                pick = disc[rng.randrange(len(disc))]
+                cmeta = D.CARD_BY_ID.get(pick, {})
+                label = cmeta.get("name", pick)
+                self._set_private_note(pid, f"Graveyard discard (random): {label}")
+            else:
+                self._set_private_note(pid, "Graveyard discard pile is empty.")
+            self._log(f"{p.name} listened to the Graveyard whispers.", "note")
+        if fx.get("draw_keep_one"):
+            dname = fx["draw_keep_one"]
+            pile = self._ensure_draw_pile(dname, rng)
+            a = pile.pop(0) if pile else None
+            pile = self._ensure_draw_pile(dname, rng)
+            b = pile.pop(0) if pile else None
+            if not a or not b:
+                raise MoveError(f"{dname} deck ran dry.")
+            self.pending_keep_one[pid] = {"deck": dname, "cards": [a, b]}
+            extra["keepOne"] = True
+        if fx.get("open_duel") and target:
+            self.pending_ui_action[pid] = {
+                "kind": "duel",
+                "attackerId": pid,
+                "defenderId": target.id,
+            }
 
         self.discard_card(pid, card_id, "played")
-        return {"ok": True}
+        return {"ok": True, **extra}
+
+    def clear_pending_ui(self, pid: str) -> None:
+        self.pending_ui_action.pop(pid, None)
 
     def over_hand_limit(self, player: PlayerState) -> bool:
         return len(player.action_card_ids) > self._rule("handLimit")
@@ -1152,6 +1306,8 @@ class CursedThroneGame:
             "legalMoves": self.legal_moves(me) if me and self.status == STATUS_PLAY else [],
             "pendingKeepOne": self.pending_keep_one.get(pid),
             "pendingRoleDiscard": self.pending_role_discard.get(pid),
+            "pendingUiAction": self.pending_ui_action.get(pid),
+            "privateNote": self.private_notes.get(pid),
             "balance": dict(self.balance),
             "setup": {
                 "dealtRoleIds": setup_dealt,
@@ -1205,6 +1361,8 @@ class CursedThroneGame:
             "legalMoves": v["legalMoves"],
             "pendingKeepOne": v["pendingKeepOne"],
             "pendingRoleDiscard": v["pendingRoleDiscard"],
+            "pendingUiAction": v.get("pendingUiAction"),
+            "privateNote": v.get("privateNote"),
             "balance": v["balance"],
             "setup": v["setup"],
         }

@@ -236,21 +236,28 @@ CT.legalMoves = function (player) {
   return (CT.CONNECTIONS[player.location] || []).slice();
 };
 
-/* draw 1 from a deck into a hand (§26). Generic public log — never reveal the card name. */
-CT.drawCard = function (playerId, deckName, reason) {
-  var p = CT.playerById(playerId); if (!p) return null;
+/* ensure a deck draw pile has cards (reshuffle if needed) without drawing. */
+CT._ensureDrawPile = function (deckName) {
   var pile = CT.state.decks[deckName];
-  if (!pile.length) {
-    // recycle discard, else regenerate the deck (prototype set is small — §26)
+  if (!pile || !pile.length) {
     if (CT.state.discards[deckName].length) {
       CT.state.decks[deckName] = CT.util.shuffle(CT.state.discards[deckName]);
       CT.state.discards[deckName] = [];
     } else {
       CT.state.decks[deckName] = CT.util.shuffle(CT.ACTION_CARDS.filter(function (c) { return c.deck === deckName; }).map(function (c) { return c.id; }));
     }
-    CT.log(deckName + " deck reshuffled.", "system");
     pile = CT.state.decks[deckName];
   }
+  return pile;
+};
+
+/* draw 1 from a deck into a hand (§26). Generic public log — never reveal the card name. */
+CT.drawCard = function (playerId, deckName, reason) {
+  var p = CT.playerById(playerId); if (!p) return null;
+  var hadCards = CT.state.decks[deckName] && CT.state.decks[deckName].length;
+  var pile = CT._ensureDrawPile(deckName);
+  if (!hadCards && pile.length) CT.log(deckName + " deck reshuffled.", "system");
+  if (!pile.length) return null;
   var id = pile.shift();
   p.actionCardIds.push(id);
   CT.log(p.name + " drew a " + deckName + " card" + (reason ? " (" + reason + ")" : "") + ".");
@@ -291,17 +298,34 @@ CT.playActionCard = function (playerId, cardId, opts) {
   if (!p || p.actionCardIds.indexOf(cardId) === -1) return { ok: false, msg: "Card not in hand." };
   var fx = CT.AUTO_PLAY[cardId];
   if (!fx) return { ok: false, msg: "Resolve this card manually at the table." };
+  if (fx.atLocation && p.location !== fx.atLocation) {
+    var needLoc = CT.locationById(fx.atLocation);
+    return { ok: false, msg: "Must be at " + (needLoc ? needLoc.name : fx.atLocation) + "." };
+  }
   var target = opts.targetId ? CT.playerById(opts.targetId) : null;
   if (fx.needsTarget && (!target || target.status !== "active")) return { ok: false, msg: "Choose a target." };
+  if (fx.sameLocation && target && target.location !== p.location) return { ok: false, msg: "Target must be at your location." };
+  if (fx.needsDeck && !opts.deckName) return { ok: false, msg: "Choose a deck." };
+  if (cardId === "bought_round" && p.gold < 1) return { ok: false, msg: "Not enough gold." };
+
   var card = CT.cardById(cardId);
   var cname = card ? card.name : cardId;
+  var extra = {};
+
+  if (cardId === "bought_round") p.gold -= 1;
   CT.log(p.name + " plays " + cname + ".");
 
   if (cardId === "route_pass") {
     if (p.location !== "college") return { ok: false, msg: "Must be at College." };
     CT.movePlayer(playerId, "scrolls", true);
   } else if (fx.needsLocation) {
-    if (!opts.locationId || CT.legalMoves(p).indexOf(opts.locationId) === -1) return { ok: false, msg: "Choose a reachable location." };
+    if (!opts.locationId) return { ok: false, msg: "Choose a destination." };
+    if (fx.tunnel) {
+      var tun = p.location === "market" ? "scrolls" : (p.location === "college" ? "barracks" : null);
+      if (!tun || opts.locationId !== tun) return { ok: false, msg: "Invalid tunnel route." };
+    } else if (CT.legalMoves(p).indexOf(opts.locationId) === -1) {
+      return { ok: false, msg: "Choose a reachable location." };
+    }
     CT.movePlayer(playerId, opts.locationId, true);
   }
 
@@ -330,8 +354,97 @@ CT.playActionCard = function (playerId, cardId, opts) {
     else CT.adjustRep(target.id, -1, "Rumour");
   }
 
+  if (cardId === "tax_collector") {
+    var taken = 0;
+    s.players.forEach(function (other) {
+      if (other.status !== "active" || other.id === playerId) return;
+      var amt = Math.min(1, other.gold);
+      if (amt) { other.gold -= amt; p.gold += amt; taken += amt; }
+    });
+    if (taken) CT.log(p.name + " collected " + taken + " gold in taxes.");
+  }
+  if (cardId === "stolen_offering") {
+    s.players.forEach(function (other) {
+      if (other.status !== "active" || other.id === playerId || other.location !== "graveyard") return;
+      var amt = Math.min(1, other.gold);
+      if (amt) { other.gold -= amt; p.gold += amt; }
+    });
+    CT.log(p.name + " collected offerings at the Graveyard.");
+  }
+  if (cardId === "market_day") {
+    s.players.forEach(function (other) {
+      if (other.status === "active" && other.location === "market") {
+        other.gold += 1;
+        CT.log(other.name + " gains 1 gold (Market Day).");
+      }
+    });
+  }
+  if (cardId === "loan_shark" && target) {
+    var loan = Math.min(3, target.gold);
+    if (loan) { target.gold -= loan; p.gold += loan; CT.log(p.name + " took " + loan + " gold from " + target.name + "."); }
+    else CT.adjustRep(target.id, -1, cname);
+  }
+  if (cardId === "intimidate" && target) {
+    if (target.gold >= 2) { target.gold -= 2; p.gold += 2; CT.log(target.name + " paid 2 gold to " + p.name + "."); }
+    else CT.adjustRep(target.id, -1, cname);
+  }
+  if (cardId === "bought_round" && target) {
+    CT.adjustRep(playerId, 1, cname);
+    CT.adjustRep(target.id, 1, cname);
+  }
+  if (cardId === "queens_favour" && target) {
+    CT.adjustRep(target.id, 1, cname);
+    p.gold += 1;
+    CT.log(p.name + " gained 1 gold. Now " + p.gold + ".");
+  }
+  if (cardId === "herald") CT.adjustRep(playerId, 1, cname);
+  if (cardId === "succession_edict") CT.openSuccession();
+  if (cardId === "caravan_manifest") CT.drawCard(playerId, "Market", cname);
+  if (cardId === "study_companion") CT.drawCard(playerId, "Knowledge", cname);
+  if (cardId === "bone_dice") {
+    CT.adjustCorruption(1, cname);
+    if (Math.random() < 0.5) { p.gold += 4; CT.log(p.name + " rolled high on the Bone Dice — +4 gold."); }
+    else CT.adjustRep(playerId, -1, "Bone Dice");
+  }
+  if (cardId === "old_prophecy" && opts.deckName) {
+    var peekPile = CT._ensureDrawPile(opts.deckName);
+    var topId = peekPile.length ? peekPile[0] : null;
+    var topCard = topId ? CT.cardById(topId) : null;
+    CT.ui.privateNote = "Top of " + opts.deckName + " deck: " + (topCard ? topCard.name : topId || "nothing");
+    CT.log(p.name + " consulted the " + opts.deckName + " deck.", "note");
+  }
+  if (cardId === "read_records" && opts.deckName) {
+    var disc = CT.state.discards[opts.deckName] || [];
+    var discTop = disc.length ? disc[disc.length - 1] : null;
+    var discCard = discTop ? CT.cardById(discTop) : null;
+    CT.ui.privateNote = "Top of " + opts.deckName + " discard: " + (discCard ? discCard.name : discTop || "empty");
+    CT.log(p.name + " read the " + opts.deckName + " discard pile.", "note");
+  }
+  if (cardId === "wraith_whisper") {
+    var gdisc = CT.state.discards.Graveyard || [];
+    if (gdisc.length) {
+      var pick = gdisc[Math.floor(Math.random() * gdisc.length)];
+      var pickCard = CT.cardById(pick);
+      CT.ui.privateNote = "Graveyard discard (random): " + (pickCard ? pickCard.name : pick);
+    } else CT.ui.privateNote = "Graveyard discard pile is empty.";
+    CT.log(p.name + " listened to the Graveyard whispers.", "note");
+  }
+  if (cardId === "grave_pact") {
+    CT.adjustCorruption(1, cname);
+    var dname = "Graveyard";
+    var pactPile = CT._ensureDrawPile(dname);
+    var ga = pactPile.shift();
+    pactPile = CT._ensureDrawPile(dname);
+    var gb = pactPile.shift();
+    if (!ga || !gb) return { ok: false, msg: "Graveyard deck ran dry." };
+    extra.keepOne = { deck: dname, cards: [ga, gb] };
+  }
+  if (fx.openDuel && target) {
+    extra.openDuel = { attackerId: playerId, defenderId: target.id };
+  }
+
   CT.discardCard(playerId, cardId, "played");
-  return { ok: true };
+  return Object.assign({ ok: true }, extra);
 };
 
 /* execute a location action's mechanical effect (§13).

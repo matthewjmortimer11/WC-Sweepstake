@@ -351,7 +351,13 @@ def _dispatch(room, player, mtype: str, msg: dict) -> bool:
             str(msg.get("cardId", "")),
             target_id=msg.get("targetId") or None,
             location_id=msg.get("locationId") or None,
+            deck_name=msg.get("deckName") or None,
+            rng=room.rng,
         )
+        return True
+
+    if mtype == "clearPendingUi":
+        g.clear_pending_ui(player.id)
         return True
 
     if mtype == "adjustGold":

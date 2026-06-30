@@ -234,6 +234,92 @@ def test_play_action_card(client):
         assert "spare_coin_purse" not in me["actionCardIds"]
 
 
+def test_tax_collector_takes_from_others(client):
+    code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
+    room, pids, g = _start_game(code)
+    active = g.active_player().id
+    for p in g.players:
+        if p.id != active:
+            p.gold = 2
+    ap = g.player_by_id(active)
+    ap.action_card_ids.append("tax_collector")
+    before = ap.gold
+    g.play_action_card(active, "tax_collector")
+    assert ap.gold == before + 3  # 3 other players × 1 gold
+
+
+def test_market_day_gives_gold_at_market(client):
+    code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
+    room, pids, g = _start_game(code)
+    active = g.active_player().id
+    ap = g.player_by_id(active)
+    ap.location = "market"
+    ap.action_card_ids.append("market_day")
+    before = ap.gold
+    g.play_action_card(active, "market_day")
+    assert ap.gold == before + 1
+
+
+def test_bought_round_costs_gold_and_boosts_rep(client):
+    code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
+    room, pids, g = _start_game(code)
+    active = g.active_player().id
+    target = next(pid for pid in pids if pid != active)
+    ap = g.player_by_id(active)
+    tp = g.player_by_id(target)
+    ap.location = tp.location = "tavern"
+    ap.gold = 3
+    ap.action_card_ids.append("bought_round")
+    before_gold = ap.gold
+    before_rep = ap.rep
+    g.play_action_card(active, "bought_round", target_id=target)
+    assert ap.gold == before_gold - 1
+    assert ap.rep == before_rep + 1
+    assert tp.rep == 4  # started at 3
+
+
+def test_old_prophecy_sets_private_note(client):
+    code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
+    room, pids, g = _start_game(code)
+    active = g.active_player().id
+    ap = g.player_by_id(active)
+    ap.action_card_ids.append("old_prophecy")
+    g.decks["Market"] = ["caravan_manifest", "tax_collector"]
+    g.play_action_card(active, "old_prophecy", deck_name="Market")
+    view = room.state_for(active)["room"]["game"]
+    assert "caravan_manifest" in view["privateNote"]
+
+
+def test_grave_pact_pending_keep_one(client):
+    code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
+    room, pids, g = _start_game(code)
+    active = g.active_player().id
+    ap = g.player_by_id(active)
+    ap.action_card_ids.append("grave_pact")
+    g.decks["Graveyard"] = ["forbidden_tome", "grave_dust", "last_rites"]
+    result = g.play_action_card(active, "grave_pact", rng=__import__("random").Random(0))
+    assert result.get("keepOne")
+    assert active in g.pending_keep_one
+    view = room.state_for(active)["room"]["game"]
+    assert view["pendingKeepOne"] is not None
+    assert len(view["pendingKeepOne"]["cards"]) == 2
+
+
+def test_arrest_opens_duel_pending(client):
+    code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
+    room, pids, g = _start_game(code)
+    active = g.active_player().id
+    target = next(pid for pid in pids if pid != active)
+    ap = g.player_by_id(active)
+    tp = g.player_by_id(target)
+    ap.location = tp.location = "barracks"
+    ap.action_card_ids.append("arrest")
+    g.play_action_card(active, "arrest", target_id=target)
+    view = room.state_for(active)["room"]["game"]
+    assert view["pendingUiAction"]["kind"] == "duel"
+    assert view["pendingUiAction"]["defenderId"] == target
+
+
 def test_loyal_bot_can_call_out_cursed(client):
     code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
     room = manager.get(code)

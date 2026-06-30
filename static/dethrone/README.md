@@ -46,6 +46,13 @@ open "index.html"          # macOS
 - **Host control** — **Allow spectators** checkbox in lobby (off before deal to close the room to watchers)
 - **Mid-game join** — spectators can attach while play is in progress
 
+### Phase 9 — Card auto-resolution expansion
+- **Economy & location cards** — Tax Collector, Stolen Offering, Market Day, Loan Shark, Intimidate, Bought Round, Queen's Favour, Herald, Succession Edict, Caravan Manifest, Study Companion
+- **Risk & investigation** — Bone Dice, Old Prophecy, Read Records, Wraith Whisper, Grave Pact (keep-one), Map of Tunnels
+- **Duel starters** — Arrest and Tavern Brawl open the Duel helper after play (same-location target)
+- **Private notes** — peek cards show only in your private view (`privateNote` banner); never leaked to other players or spectators
+- **Online + local** — `playCard` WebSocket sync; local pass-and-play mirrors the same effects in `state.js`
+
 ### Phase 4 — Throne & Succession
 A **Throne & Succession** panel tracks the crown and the line of succession.
 - **Throne control (§23)**: King / Queen / Successor controllers, set manually or via the **Claim helper** (claimant + crown; unchallenged → crowned, or challenged → "proof valid" crowns them and the challenger loses a role / "bluff" costs the claimant a role). Claim order is recorded.
@@ -99,7 +106,7 @@ Table talk and bluffing stay verbal. The app guides, tracks, and enforces mechan
 ## Known limitations / not yet built
 
 - Bots still skip most social nuance (duels, trades, throne claims) — they hunt the Cursed One so all-bot runs can test a Loyal win, not to simulate table talk.
-- Action cards that need table judgement (Call Out helper, Blood Contract, most Vote/Duel/Reaction cards) stay manual — auto-play covers the mechanical OnTurn subset listed in `CT.AUTO_PLAY` / `CARD_AUTO_EFFECTS`.
+- Action cards that need table judgement (Call Out helper, Blood Contract, most Vote/Duel/Reaction cards) stay manual — auto-play covers the mechanical OnTurn subset listed in `CT.AUTO_PLAY` / `CARD_AUTO_EFFECTS` (expanded in Phase 9).
 
 ## File structure
 

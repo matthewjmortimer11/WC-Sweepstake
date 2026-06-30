@@ -3,7 +3,7 @@ window.CT = window.CT || {};
 
 CT.ui = { privateFor: null, privateRevealed: false, showImport: false, showGuide: false,
   roleDiscardFor: null, roleDiscardRevealed: false, handFixFor: null, keepOne: null, playCard: null,
-  logFilter: "all" };
+  logFilter: "all", privateNote: null };
 
 /* Play vs Test mode — Test reveals referee & per-player override tools (§32, §35).
  * Persisted separately so it applies to the start/setup screens too. */
@@ -659,7 +659,7 @@ function privateView() {
     var onTurn = CT.activePlayer() && CT.activePlayer().id === p.id && !CT.state.winner;
     var playBtn = "";
     if (fx && onTurn) {
-      if (fx.needsTarget || fx.needsLocation) {
+      if (fx.needsTarget || fx.needsLocation || fx.needsDeck) {
         playBtn = ' <button class="btn btn-ghost btn-sm" data-act="play-card-prompt" data-id="' + id + '">Play…</button>';
       } else {
         playBtn = ' <button class="btn btn-primary btn-sm" data-act="play-card" data-id="' + id + '">Play</button>';
@@ -672,6 +672,7 @@ function privateView() {
   }).join("") || '<p class="muted">No action cards.</p>';
   return '<div class="scrim"><div class="modal" style="max-width:620px">'
     + '<div class="eyebrow">Private · ' + CT.esc(p.name) + '</div>'
+    + (CT.ui.privateNote ? '<div class="private-note-banner">' + CT.esc(CT.ui.privateNote) + '</div>' : '')
     + '<h2 style="margin:6px 0 12px">Your hidden roles</h2><div class="players" style="grid-template-columns:1fr;gap:10px">' + hidden + '</div>'
     + '<h2 style="margin:18px 0 12px">Your action cards</h2><div class="stack">' + cards + '</div>'
     + '<div class="btn-row" style="margin-top:20px"><div class="spacer"></div>'
@@ -689,6 +690,13 @@ function playtestGuideView() {
     + '<button class="btn btn-primary" data-act="close-guide">Close</button></div></div></div>';
 }
 
+function handlePlayCardResult(res) {
+  if (!res) return;
+  if (!res.ok && res.msg) { alert(res.msg); return; }
+  if (res.keepOne) CT.ui.keepOne = { playerId: CT.ui.privateFor || CT.myId(), deck: res.keepOne.deck, cards: res.keepOne.cards };
+  if (res.openDuel && CT.helpers) CT.helpers.openDuelFromPending(res.openDuel);
+}
+
 function playCardView() {
   var u = CT.ui.playCard;
   if (!u) return "";
@@ -698,17 +706,39 @@ function playCardView() {
   var fx = CT.AUTO_PLAY[u.cardId] || {};
   var body = "";
   if (fx.needsTarget) {
-    var opts = CT.state.players.filter(function (x) { return x.status === "active" && x.id !== p.id; })
-      .map(function (x) { return '<option value="' + x.id + '">' + CT.esc(x.name) + '</option>'; }).join("");
+    var targets = CT.state.players.filter(function (x) {
+      if (x.status !== "active" || x.id === p.id) return false;
+      if (fx.sameLocation && x.location !== p.location) return false;
+      return true;
+    });
+    var opts = targets.map(function (x) {
+      return '<option value="' + x.id + '">' + CT.esc(x.name) + "</option>";
+    }).join("");
     body += '<label class="field" style="display:block;margin:12px 0"><span>Target</span>'
-      + '<select id="play-target" style="width:100%">' + opts + '</select></label>';
+      + '<select id="play-target" style="width:100%">' + opts + "</select></label>";
+  }
+  if (fx.needsDeck) {
+    var decks = CT.DECK_NAMES.map(function (d) {
+      return '<option value="' + d + '">' + d + "</option>";
+    }).join("");
+    body += '<label class="field" style="display:block;margin:12px 0"><span>Deck</span>'
+      + '<select id="play-deck" style="width:100%">' + decks + "</select></label>";
   }
   if (fx.needsLocation) {
-    var moves = CT.legalMoves(p).map(function (lid) {
-      return '<option value="' + lid + '">' + CT.esc(CT.locationById(lid).name) + '</option>';
-    }).join("");
+    var moves;
+    if (fx.tunnel) {
+      var tun = p.location === "market" ? "scrolls" : (p.location === "college" ? "barracks" : null);
+      moves = tun ? '<option value="' + tun + '">' + CT.esc(CT.locationById(tun).name) + "</option>" : "";
+    } else {
+      moves = CT.legalMoves(p).map(function (lid) {
+        return '<option value="' + lid + '">' + CT.esc(CT.locationById(lid).name) + "</option>";
+      }).join("");
+    }
     body += '<label class="field" style="display:block;margin:12px 0"><span>Move to</span>'
-      + '<select id="play-location" style="width:100%">' + moves + '</select></label>';
+      + '<select id="play-location" style="width:100%">' + moves + "</select></label>";
+  }
+  if (fx.atLocation && p.location !== fx.atLocation) {
+    body += '<p class="muted" style="font-size:13px">Must be at ' + CT.esc(CT.locationById(fx.atLocation).name) + ".</p>";
   }
   return '<div class="scrim"><div class="modal" style="max-width:480px">'
     + '<h2 style="margin-bottom:4px">Play ' + CT.esc(c.name) + '</h2>'
@@ -880,8 +910,7 @@ CT.handleAction = function (act, el, ev) {
       var pid = CT.ui.privateFor || CT.myId();
       var msg = { type: "playCard", cardId: el.dataset.id };
       if (CT.netAction(msg)) { CT.ui.playCard = null; break; }
-      var res = CT.playActionCard(pid, el.dataset.id);
-      if (res && !res.ok && res.msg) alert(res.msg);
+      handlePlayCardResult(CT.playActionCard(pid, el.dataset.id));
       CT.render(); break;
     }
     case "play-card-prompt":
@@ -897,13 +926,18 @@ CT.handleAction = function (act, el, ev) {
         var ts = document.getElementById("play-target");
         if (ts) payload.targetId = ts.value;
       }
+      if (fx.needsDeck) {
+        var ds = document.getElementById("play-deck");
+        if (ds) payload.deckName = ds.value;
+      }
       if (fx.needsLocation) {
         var ls = document.getElementById("play-location");
         if (ls) payload.locationId = ls.value;
       }
       if (CT.netAction(payload)) { CT.ui.playCard = null; break; }
-      var r2 = CT.playActionCard(u.playerId, u.cardId, { targetId: payload.targetId, locationId: payload.locationId });
-      if (r2 && !r2.ok && r2.msg) alert(r2.msg);
+      handlePlayCardResult(CT.playActionCard(u.playerId, u.cardId, {
+        targetId: payload.targetId, locationId: payload.locationId, deckName: payload.deckName,
+      }));
       CT.ui.playCard = null;
       CT.render(); break;
     }

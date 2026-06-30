@@ -198,4 +198,30 @@ CARD_AUTO_EFFECTS: dict[str, dict] = {
     "merchants_map": {"move_connected": True, "needs_location": True},
     "counterfeit_pass": {"move_connected": True, "needs_location": True},
     "route_pass": {"move_pair": ("college", "scrolls"), "needs_location": False},
+    # Phase 9 — economy & location
+    "tax_collector": {"tax_each": 1},
+    "stolen_offering": {"take_at_location": 1, "at_location": "graveyard"},
+    "market_day": {"give_at_location": 1, "at_location": "market"},
+    "loan_shark": {"take_gold": 3, "or_target_rep": -1, "needs_target": True, "same_location": True},
+    "intimidate": {"pay_or_rep": 2, "needs_target": True, "same_location": True},
+    "bought_round": {"cost_gold": 1, "rep_self": 1, "target_rep": 1, "needs_target": True, "same_location": True},
+    "queens_favour": {"target_rep": 1, "gold": 1, "needs_target": True},
+    "herald": {"rep": 1},
+    "succession_edict": {"open_succession": True},
+    "caravan_manifest": {"draw": "Market"},
+    "study_companion": {"draw": "Knowledge"},
+    # Phase 9 — risk & investigation
+    "bone_dice": {"bone_dice": True, "corruption": 1},
+    "old_prophecy": {"peek_deck_top": True, "needs_deck": True},
+    "read_records": {"peek_discard_top": True, "needs_deck": True},
+    "wraith_whisper": {"peek_discard_random": "Graveyard"},
+    "grave_pact": {"draw_keep_one": "Graveyard", "corruption": 1},
+    "map_of_tunnels": {"tunnel_pairs": {"market": "scrolls", "college": "barracks"}, "needs_location": True},
+    # Phase 9 — duel starters (opens helper on client)
+    "arrest": {"open_duel": True, "needs_target": True, "same_location": True},
+    "tavern_brawl": {"open_duel": True, "needs_target": True, "same_location": True, "at_location": "tavern"},
+}
+
+DECK_BUY_COST: dict[str, int] = {
+    "Market": 2, "Tavern": 2, "Knowledge": 2, "Barracks": 2, "Graveyard": 4, "Royal": 2,
 }

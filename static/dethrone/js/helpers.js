@@ -104,6 +104,14 @@ CT.helpers.vVote = function () {
 
 /* ===================== Duel (§22) ===================== */
 CT.helpers.openDuel = function () { CT.helpers.ui = { open: "duel", att: "", def: "", serious: false, override: false, attBonus: 0, defBonus: 0, phase: "setup" }; CT.render(); };
+CT.helpers.openDuelFromPending = function (ui) {
+  CT.helpers.ui = {
+    open: "duel", att: ui.attackerId, def: ui.defenderId,
+    serious: false, override: false, attBonus: 0, defBonus: 0, phase: "setup",
+  };
+  if (CT.isOnline()) CT.net.send({ type: "clearPendingUi" });
+  CT.render();
+};
 CT.helpers.vDuel = function () {
   var u = CT.helpers.ui, ps = actives();
   var att = CT.playerById(u.att), def = CT.playerById(u.def);

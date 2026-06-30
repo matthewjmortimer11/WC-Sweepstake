@@ -325,5 +325,18 @@ CT.AUTO_PLAY = {
   pardon_card: { needsTarget: true }, false_rumour: { needsTarget: true }, rumour_card: { needsTarget: true },
   secret_passage: { needsLocation: true }, merchants_map: { needsLocation: true },
   counterfeit_pass: { needsLocation: true }, route_pass: {},
+  tax_collector: {},
+  stolen_offering: { atLocation: "graveyard" },
+  market_day: { atLocation: "market" },
+  loan_shark: { needsTarget: true, sameLocation: true },
+  intimidate: { needsTarget: true, sameLocation: true },
+  bought_round: { needsTarget: true, sameLocation: true },
+  queens_favour: { needsTarget: true }, herald: {}, succession_edict: {},
+  caravan_manifest: {}, study_companion: {},
+  bone_dice: {}, old_prophecy: { needsDeck: true }, read_records: { needsDeck: true },
+  wraith_whisper: {}, grave_pact: {},
+  map_of_tunnels: { needsLocation: true, tunnel: true },
+  arrest: { needsTarget: true, sameLocation: true, openDuel: true },
+  tavern_brawl: { needsTarget: true, sameLocation: true, atLocation: "tavern", openDuel: true },
 };
 CT.canAutoPlayCard = function (cardId) { return !!CT.AUTO_PLAY[cardId]; };

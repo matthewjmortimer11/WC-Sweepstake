@@ -90,6 +90,13 @@ CT.net.applyState = function (msg) {
     } else if (!cs.pendingKeepOne) {
       CT.ui.keepOne = null;
     }
+    if (cs.pendingUiAction && CT.myId() && CT.helpers && !CT.helpers.ui.open) {
+      var pui = cs.pendingUiAction;
+      if (pui.kind === "duel") CT.helpers.openDuelFromPending(pui);
+    }
+    if (cs.privateNote && CT.myId()) {
+      CT.ui.privateNote = cs.privateNote;
+    }
     if (cs.pendingRoleDiscard && CT.myId()) {
       CT.ui.roleDiscardFor = CT.myId();
       CT.ui.roleDiscardRevealed = true;
