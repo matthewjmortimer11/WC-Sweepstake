@@ -273,7 +273,7 @@ CT.DECK_NAMES = ["Market", "Tavern", "Knowledge", "Barracks", "Graveyard", "Roya
 CT.LOCATION_ACTIONS = {
   throne: [
     { id: "petition", kind: "basic", name: "Petition", cost: 0, hint: "Gain +1 Reputation (max 4)" },
-    { id: "royal_command", kind: "strong", name: "Royal Command", cost: 0, hint: "Tax / Pardon / Decree — Throne controller only", manual: true, requiresThrone: true },
+    { id: "royal_command", kind: "strong", name: "Royal Command", cost: 0, hint: "Tax / Pardon / Decree — Throne controller only", requiresThrone: true },
   ],
   market: [
     { id: "buy", kind: "basic", name: "Buy", cost: 2, hint: "Draw 1 Market card", deck: "Market" },
@@ -293,7 +293,7 @@ CT.LOCATION_ACTIONS = {
   ],
   barracks: [
     { id: "arm", kind: "basic", name: "Arm Yourself", cost: 2, hint: "Draw 1 Barracks card", deck: "Barracks" },
-    { id: "serious_duel", kind: "strong", name: "Serious Duel", cost: 0, hint: "Start a Serious Duel (duel helper — Phase 3)", manual: true },
+    { id: "serious_duel", kind: "strong", name: "Serious Duel", cost: 0, hint: "Start a Serious Duel — Barracks, once per game", oncePerGame: true },
   ],
   graveyard: [
     { id: "scavenge", kind: "basic", name: "Scavenge", cost: 0, hint: "Gain 3 gold, lose 1 Reputation" },

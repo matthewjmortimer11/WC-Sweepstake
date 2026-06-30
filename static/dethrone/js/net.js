@@ -93,6 +93,7 @@ CT.net.applyState = function (msg) {
     if (cs.pendingUiAction && CT.myId() && CT.helpers && !CT.helpers.ui.open) {
       var pui = cs.pendingUiAction;
       if (pui.kind === "duel") CT.helpers.openDuelFromPending(pui);
+      else if (pui.kind === "royal_command") CT.helpers.openRoyalCommandFromPending(pui);
     }
     if (cs.privateNote && CT.myId()) {
       CT.ui.privateNote = cs.privateNote;

@@ -335,7 +335,8 @@ function actionsPanel() {
   var buttons = acts.map(function (a) {
     var cant = disabled || p.gold < (a.cost || 0)
       || (a.requiresThrone && p.id !== CT.state.throne.kingControllerId && p.id !== CT.state.throne.queenControllerId)
-      || (a.id === "recover" && !(p.wounded || p.rep <= 2));
+      || (a.id === "recover" && !(p.wounded || p.rep <= 2))
+      || (a.id === "serious_duel" && p.seriousDuelUsed);
     var cls = a.kind === "basic" ? "btn-primary" : "btn-gold";
     var costLbl = a.cost ? ' <span style="opacity:.7;font-weight:600">· ' + a.cost + 'g</span>' : "";
     return '<button class="btn ' + cls + '" data-act="loc-action" data-id="' + a.id + '"' + (cant ? " disabled" : "") + '>'
@@ -690,6 +691,14 @@ function playtestGuideView() {
     + '<button class="btn btn-primary" data-act="close-guide">Close</button></div></div></div>';
 }
 
+function handleLocActionResult(r) {
+  if (!r) return;
+  if (!r.ok && r.msg) { alert(r.msg); return; }
+  if (r.keepOne) CT.ui.keepOne = { playerId: CT.activePlayer().id, deck: r.keepOne.deck, cards: r.keepOne.cards };
+  if (r.openDuel && CT.helpers) CT.helpers.openDuelFromPending(r.openDuel);
+  if (r.openRoyalCommand && CT.helpers) CT.helpers.openRoyalCommandFromPending(r.openRoyalCommand);
+}
+
 function handlePlayCardResult(res) {
   if (!res) return;
   if (!res.ok && res.msg) { alert(res.msg); return; }
@@ -864,9 +873,7 @@ CT.handleAction = function (act, el, ev) {
       var ap2 = CT.activePlayer();
       if (!ap2) break;
       if (CT.netAction({ type: "locAction", actionId: el.dataset.id })) break;
-      var r = CT.doLocationAction(ap2.id, el.dataset.id);
-      if (r && r.keepOne) CT.ui.keepOne = { playerId: ap2.id, deck: r.keepOne.deck, cards: r.keepOne.cards };
-      else if (r && !r.ok && r.msg) alert(r.msg);
+      handleLocActionResult(CT.doLocationAction(ap2.id, el.dataset.id));
       CT.render(); break;
     }
     case "keep-card": {

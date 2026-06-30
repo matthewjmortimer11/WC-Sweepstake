@@ -320,6 +320,65 @@ def test_arrest_opens_duel_pending(client):
     assert view["pendingUiAction"]["defenderId"] == target
 
 
+def test_royal_command_tax(client):
+    code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
+    room, pids, g = _start_game(code)
+    active = g.active_player().id
+    ap = g.player_by_id(active)
+    ap.location = "throne"
+    g.throne["kingControllerId"] = active
+    for p in g.players:
+        if p.id != active:
+            p.gold = 2
+    g.do_location_action(active, "royal_command")
+    assert active in g.pending_ui_action
+    before = ap.gold
+    g.apply_royal_command(active, "tax")
+    assert ap.gold == before + 3
+    assert active not in g.pending_ui_action
+
+
+def test_royal_command_pardon(client):
+    code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
+    room, pids, g = _start_game(code)
+    active = g.active_player().id
+    target = next(pid for pid in pids if pid != active)
+    ap = g.player_by_id(active)
+    tp = g.player_by_id(target)
+    ap.location = "throne"
+    g.throne["queenControllerId"] = active
+    g.do_location_action(active, "royal_command")
+    before = tp.rep
+    g.apply_royal_command(active, "pardon", target_id=target)
+    assert tp.rep == before + 1
+
+
+def test_serious_duel_location_action(client):
+    code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
+    room, pids, g = _start_game(code)
+    active = g.active_player().id
+    ap = g.player_by_id(active)
+    ap.location = "barracks"
+    g.do_location_action(active, "serious_duel")
+    view = room.state_for(active)["room"]["game"]
+    pui = view["pendingUiAction"]
+    assert pui["kind"] == "duel"
+    assert pui["attackerId"] == active
+    assert pui["serious"] is True
+
+
+def test_serious_duel_blocked_if_used(client):
+    code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
+    room, pids, g = _start_game(code)
+    active = g.active_player().id
+    ap = g.player_by_id(active)
+    ap.location = "barracks"
+    ap.serious_duel_used = True
+    from dethrone.game import MoveError
+    with pytest.raises(MoveError, match="Serious Duel already used"):
+        g.do_location_action(active, "serious_duel")
+
+
 def test_loyal_bot_can_call_out_cursed(client):
     code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
     room = manager.get(code)

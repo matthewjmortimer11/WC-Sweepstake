@@ -107,7 +107,7 @@ ACTION_CARDS: list[dict] = [
 LOCATION_ACTIONS: dict[str, list[dict]] = {
     "throne": [
         {"id": "petition", "kind": "basic", "name": "Petition", "cost": 0},
-        {"id": "royal_command", "kind": "strong", "name": "Royal Command", "cost": 0, "manual": True, "requiresThrone": True},
+        {"id": "royal_command", "kind": "strong", "name": "Royal Command", "cost": 0, "requiresThrone": True},
     ],
     "market": [
         {"id": "buy", "kind": "basic", "name": "Buy", "cost": 2, "deck": "Market"},
@@ -127,7 +127,7 @@ LOCATION_ACTIONS: dict[str, list[dict]] = {
     ],
     "barracks": [
         {"id": "arm", "kind": "basic", "name": "Arm Yourself", "cost": 2, "deck": "Barracks"},
-        {"id": "serious_duel", "kind": "strong", "name": "Serious Duel", "cost": 0, "manual": True},
+        {"id": "serious_duel", "kind": "strong", "name": "Serious Duel", "cost": 0},
     ],
     "graveyard": [
         {"id": "scavenge", "kind": "basic", "name": "Scavenge", "cost": 0},

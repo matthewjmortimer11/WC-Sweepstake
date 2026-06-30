@@ -360,6 +360,14 @@ def _dispatch(room, player, mtype: str, msg: dict) -> bool:
         g.clear_pending_ui(player.id)
         return True
 
+    if mtype == "royalCommand":
+        g.apply_royal_command(
+            player.id,
+            str(msg.get("choice", "")),
+            target_id=msg.get("targetId") or None,
+        )
+        return True
+
     if mtype == "adjustGold":
         if not player.is_host:
             raise MoveError("Host only.")

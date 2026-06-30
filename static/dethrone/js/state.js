@@ -495,8 +495,16 @@ CT.doLocationAction = function (playerId, actId) {
       }
       CT.save();
       return { ok: true, keepOne: { deck: "Market", cards: [a, b] } };
+    case "royal_command":
+      CT.log(p.name + " exercises Royal Command.", "event");
+      return { ok: true, openRoyalCommand: { controllerId: playerId } };
+    case "serious_duel":
+      if (p.location !== "barracks") return { ok: false, msg: "Must be at the Barracks." };
+      if (p.seriousDuelUsed) return { ok: false, msg: "Serious Duel already used this game." };
+      CT.log(p.name + " starts a Serious Duel at the Barracks.", "event");
+      return { ok: true, openDuel: { attackerId: playerId, serious: true } };
     default:
-      // manual actions (royal_command, deep_research, serious_duel)
+      // manual actions (deep_research)
       CT.log(p.name + " used " + def.name + " (resolve at the table).", "note");
       CT.save();
       return { ok: true, manual: true };

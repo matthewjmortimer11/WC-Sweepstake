@@ -34,6 +34,7 @@ CT.helpers.view = function () {
     case "contract":  return CT.helpers.vContract();
     case "royalclaim": return CT.helpers.vRoyalClaim();
     case "succclaim":  return CT.helpers.vSuccClaim();
+    case "royalcommand": return CT.helpers.vRoyalCommand();
   }
   return "";
 };
@@ -106,10 +107,76 @@ CT.helpers.vVote = function () {
 CT.helpers.openDuel = function () { CT.helpers.ui = { open: "duel", att: "", def: "", serious: false, override: false, attBonus: 0, defBonus: 0, phase: "setup" }; CT.render(); };
 CT.helpers.openDuelFromPending = function (ui) {
   CT.helpers.ui = {
-    open: "duel", att: ui.attackerId, def: ui.defenderId,
-    serious: false, override: false, attBonus: 0, defBonus: 0, phase: "setup",
+    open: "duel", att: ui.attackerId, def: ui.defenderId || "",
+    serious: !!ui.serious, override: false, attBonus: 0, defBonus: 0, phase: "setup",
   };
   if (CT.isOnline()) CT.net.send({ type: "clearPendingUi" });
+  CT.render();
+};
+
+/* ===================== Royal Command (§23 strong action) ===================== */
+CT.helpers.openRoyalCommandFromPending = function (ui) {
+  CT.helpers.ui = { open: "royalcommand", controllerId: ui.controllerId, phase: "choice", target: "" };
+  if (CT.isOnline()) CT.net.send({ type: "clearPendingUi" });
+  CT.render();
+};
+CT.helpers.openVoteFromDecree = function (proposerId) {
+  CT.helpers.ui = {
+    open: "vote", vtype: "accuse", proposer: proposerId || "", target: "",
+    seconder: false, decree: true, phase: "setup", votes: {}, bonusYes: 0, bonusNo: 0,
+  };
+  CT.render();
+};
+CT.helpers.vRoyalCommand = function () {
+  var u = CT.helpers.ui, ps = actives();
+  var ctrl = CT.playerById(u.controllerId);
+  if (u.phase === "pardon") {
+    var targets = ps.filter(function (p) { return p.id !== u.controllerId; });
+    return wrap('<div class="eyebrow">Royal Command</div><h2 style="margin:4px 0 2px">Royal Pardon</h2>'
+      + '<p class="muted" style="font-size:13px;margin:0 0 12px">Choose a player to grant +1 Reputation.</p>'
+      + field("Pardon", '<select data-act="h-rcmd-target">' + opt(targets, u.target, "— who —") + "</select>")
+      + '<hr class="rule"><div class="btn-row"><button class="btn btn-ghost" data-act="h-rcmd-back">← Back</button>'
+      + '<div class="spacer"></div><button class="btn btn-primary" data-act="h-rcmd-pardon"' + (u.target ? "" : " disabled") + '>Issue pardon</button></div>');
+  }
+  return wrap('<div class="eyebrow">Royal Command</div><h2 style="margin:4px 0 2px">'
+    + CT.esc(ctrl ? ctrl.name : "Throne") + " commands</h2>"
+    + '<p class="muted" style="font-size:13px;margin:0 0 14px">Tax, Pardon, or Decree. Challengeable at the table unless you are the confirmed public controller.</p>'
+    + '<div class="stack" style="gap:10px">'
+    + '<button class="btn btn-gold" data-act="h-rcmd-tax">Royal Tax — take 1 gold from each player</button>'
+    + '<button class="btn btn-secondary" data-act="h-rcmd-pardon-pick">Royal Pardon — +1 Reputation to one player</button>'
+    + '<button class="btn btn-secondary" data-act="h-rcmd-decree">Royal Decree — formal vote without seconder</button>'
+    + "</div>");
+};
+CT.helpers.applyRoyalCommand = function (choice, targetId) {
+  if (CT.isOnline()) {
+    var msg = { type: "royalCommand", choice: choice };
+    if (targetId) msg.targetId = targetId;
+    CT.net.send(msg);
+    CT.helpers.ui.open = null;
+    return CT.render();
+  }
+  var u = CT.helpers.ui;
+  var ap = CT.playerById(u.controllerId);
+  if (!ap) { u.open = null; return CT.render(); }
+  if (choice === "tax") {
+    var taken = 0;
+    CT.state.players.forEach(function (other) {
+      if (other.status !== "active" || other.id === ap.id) return;
+      var amt = Math.min(1, other.gold);
+      if (amt) { other.gold -= amt; ap.gold += amt; taken += amt; }
+    });
+    CT.log(ap.name + " levied Royal Tax" + (taken ? " — collected " + taken + " gold." : " — no gold collected."), taken ? "event" : "note");
+  } else if (choice === "pardon" && targetId) {
+    CT.adjustRep(targetId, 1, "Royal Pardon");
+    CT.log(ap.name + " issued a Royal Pardon for " + CT.playerById(targetId).name + ".");
+  } else if (choice === "decree") {
+    CT.log(ap.name + " issued a Royal Decree — formal vote may proceed without a seconder.", "event");
+    u.open = null;
+    CT.save();
+    return CT.helpers.openVoteFromDecree(ap.id);
+  }
+  u.open = null;
+  CT.save();
   CT.render();
 };
 CT.helpers.vDuel = function () {
@@ -359,6 +426,20 @@ CT.helpers.handle = function (act, el) {
     case "h-rc-take": return CT.helpers.applyRoyalTake();
     case "h-rc-proved": return CT.helpers.applyRoyalProved();
     case "h-rc-bluff": return CT.helpers.applyRoyalBluff();
+
+    // royal command (strong location action)
+    case "h-rcmd-tax": return CT.helpers.applyRoyalCommand("tax");
+    case "h-rcmd-pardon-pick": u.phase = "pardon"; return CT.render();
+    case "h-rcmd-target": u.target = el.value; return CT.render();
+    case "h-rcmd-back": u.phase = "choice"; u.target = ""; return CT.render();
+    case "h-rcmd-pardon": return CT.helpers.applyRoyalCommand("pardon", u.target);
+    case "h-rcmd-decree":
+      if (CT.isOnline()) {
+        CT.net.send({ type: "royalCommand", choice: "decree" });
+        u.open = null;
+        return CT.helpers.openVoteFromDecree(u.controllerId);
+      }
+      return CT.helpers.applyRoyalCommand("decree");
 
     // succession
     case "h-open-succclaim": return CT.helpers.openSuccClaim();

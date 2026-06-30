@@ -675,6 +675,56 @@ class CursedThroneGame:
     def clear_pending_ui(self, pid: str) -> None:
         self.pending_ui_action.pop(pid, None)
 
+    def apply_royal_command(
+        self,
+        pid: str,
+        choice: str,
+        *,
+        target_id: Optional[str] = None,
+    ) -> None:
+        pending = self.pending_ui_action.get(pid)
+        if not pending or pending.get("kind") != "royal_command":
+            raise MoveError("No Royal Command in progress.")
+        ap = self.player_by_id(pid)
+        if not ap:
+            raise MoveError("Unknown player.")
+        t = self.throne
+        if ap.id not in (t.get("kingControllerId"), t.get("queenControllerId")):
+            raise MoveError("Throne controller only.")
+        if ap.location != "throne":
+            raise MoveError("Must be at the Throne.")
+
+        if choice == "tax":
+            taken = 0
+            for other in self.players:
+                if other.status != "active" or other.id == pid:
+                    continue
+                amt = min(1, other.gold)
+                if amt:
+                    other.gold -= amt
+                    ap.gold += amt
+                    taken += amt
+            if taken:
+                self._log(f"{ap.name} levied Royal Tax — collected {taken} gold.")
+            else:
+                self._log(f"{ap.name} levied Royal Tax — no gold collected.", "note")
+        elif choice == "pardon":
+            if not target_id:
+                raise MoveError("Choose a player to pardon.")
+            target = self.player_by_id(target_id)
+            if not target or target.status != "active":
+                raise MoveError("Invalid target.")
+            self.adjust_rep(target_id, 1, "Royal Pardon")
+            self._log(f"{ap.name} issued a Royal Pardon for {target.name}.")
+        elif choice == "decree":
+            self._log(
+                f"{ap.name} issued a Royal Decree — formal vote may proceed without a seconder.",
+                "event",
+            )
+        else:
+            raise MoveError("Unknown Royal Command choice.")
+        self.pending_ui_action.pop(pid, None)
+
     def over_hand_limit(self, player: PlayerState) -> bool:
         return len(player.action_card_ids) > self._rule("handLimit")
 
@@ -744,6 +794,22 @@ class CursedThroneGame:
                     b = market.pop(0) if market else None
             self.pending_keep_one[ap.id] = {"deck": "Market", "cards": [a, b]}
             return {"ok": True, "keepOne": {"deck": "Market", "cards": [a, b]}}
+        elif act_id == "royal_command":
+            self._log(f"{ap.name} exercises Royal Command.", "event")
+            self.pending_ui_action[ap.id] = {"kind": "royal_command", "controllerId": ap.id}
+            return {"ok": True}
+        elif act_id == "serious_duel":
+            if ap.location != "barracks":
+                raise MoveError("Must be at the Barracks.")
+            if ap.serious_duel_used:
+                raise MoveError("Serious Duel already used this game.")
+            self._log(f"{ap.name} starts a Serious Duel at the Barracks.", "event")
+            self.pending_ui_action[ap.id] = {
+                "kind": "duel",
+                "attackerId": ap.id,
+                "serious": True,
+            }
+            return {"ok": True}
         else:
             self._log(f"{ap.name} used {defn['name']} (resolve at the table).", "note")
             return {"ok": True, "manual": True}

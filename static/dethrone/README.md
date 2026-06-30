@@ -53,6 +53,11 @@ open "index.html"          # macOS
 - **Private notes** — peek cards show only in your private view (`privateNote` banner); never leaked to other players or spectators
 - **Online + local** — `playCard` WebSocket sync; local pass-and-play mirrors the same effects in `state.js`
 
+### Phase 10 — Strong location actions
+- **Royal Command** (Throne, controller only) — structured helper: Royal Tax (1g from each player), Royal Pardon (+1 Rep to one player), Royal Decree (opens formal vote with Decree pre-checked)
+- **Serious Duel** (Barracks) — opens Duel helper with Serious mode on; once per game per player (tracked); loser discards a role on win
+- **Deep Research** — still manual (needs table access rules)
+
 ### Phase 4 — Throne & Succession
 A **Throne & Succession** panel tracks the crown and the line of succession.
 - **Throne control (§23)**: King / Queen / Successor controllers, set manually or via the **Claim helper** (claimant + crown; unchallenged → crowned, or challenged → "proof valid" crowns them and the challenger loses a role / "bluff" costs the claimant a role). Claim order is recorded.
@@ -76,7 +81,7 @@ A **Parley & Conflict** panel launches helpers that guide + log; social judgemen
 
 ### Phase 2 — Core play
 - **Legal movement**: the active player's connected locations are highlighted on the board; click one to move there. The per-player "Move to" dropdown remains as a manual override.
-- **Location actions (§13)**: each location shows its basic + strong action as buttons for the active player, with gold costs enforced and effects applied automatically — Petition (+1 Rep, cap 4), Buy / Backroom / Study / Research / Arm (pay → draw the right deck), Haggle (draw 2, **keep-one** helper), Work the Room (+2g), Scavenge (+3g, −1 Rep), Buy Graveyard Card (pay 4, **corruption +1**, draw), Recover (clear Wound or regain Rep). Royal Command / Deep Research / Serious Duel are log-only "manual" buttons for now.
+- **Location actions (§13)**: each location shows its basic + strong action as buttons for the active player, with gold costs enforced and effects applied automatically — Petition (+1 Rep, cap 4), Buy / Backroom / Study / Research / Arm (pay → draw the right deck), Haggle (draw 2, **keep-one** helper), Work the Room (+2g), Scavenge (+3g, −1 Rep), Buy Graveyard Card (pay 4, **corruption +1**, draw), Recover (clear Wound or regain Rep). **Royal Command** and **Serious Duel** open structured helpers (Phase 10). Deep Research stays manual.
 - **Deck draws (§26)**: per-deck draw piles + discard piles; auto-reshuffle when a pile runs dry. Draws are logged generically (no card-name leak).
 - **Hand-limit handling**: a reminder appears when a hand exceeds 5, with a private discard-down helper.
 - **Role-discard helper (§20)** — the central flow: cover screen → the player privately picks which card to lose → only the discarded card is revealed. Discarding a hidden role reveals it; discarding the **Cursed One ends the game for the Loyal side**; losing the last role eliminates the player and increments innocents-lost (which can trigger the Cursed win).
