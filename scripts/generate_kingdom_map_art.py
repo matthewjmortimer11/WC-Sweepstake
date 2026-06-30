@@ -1,5 +1,11 @@
 #!/usr/bin/env python3
-"""Generate V3b editorial kingdom map PNGs (background + location vignettes)."""
+"""Fallback placeholder generator for V3b kingdom map art.
+
+NOTE: The shipped map assets (static/dethrone/cards/map/*.jpg) are AI-painted
+illustrations matching the V3b role-card style. This script only produces simple
+programmatic PNG placeholders and is kept as an offline fallback; it is not the
+source of the live art.
+"""
 from __future__ import annotations
 
 import json

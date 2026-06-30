@@ -96,23 +96,24 @@ def test_dethrone_v3b_board_asset(client):
     board = Path("static/dethrone/js/board.js").read_text(encoding="utf-8")
     assert "map-v3b--layered" in board
     assert "map-bg" in board
-    assert "CT.mapLocationUrl" in board or "mapLocationUrl" in Path("static/dethrone/js/cards-map.js").read_text(encoding="utf-8")
-    assert 'viewBox="0 0 720 920"' in board
+    assert "mapLocationUrl" in Path("static/dethrone/js/cards-map.js").read_text(encoding="utf-8")
+    assert 'viewBox="0 0 1200 800"' in board
     assert 'data-act="board-move"' in board
     assert "CT.MAP_ROUTES" in board
     assert len(board) > 1500
     assert '0.7)"/>' not in board  # syntax error that prevented board.js from loading
 
     manifest = json.loads(Path("static/dethrone/cards/map/manifest.json").read_text(encoding="utf-8"))
-    assert manifest["kingdom"]["file"] == "kingdom-background-v3b.png"
+    assert manifest["kingdom"]["file"] == "kingdom-background-v3b.jpg"
     for loc_id, fname in manifest["locations"].items():
+        assert fname.endswith(".jpg"), fname
         r = client.get(f"/dethrone/cards/map/{fname}?v={_DETHRONE_ASSET_VERSION}")
         assert r.status_code == 200, fname
-        assert r.headers["content-type"] == "image/png", fname
-        assert len(r.content) > 3000, fname
+        assert r.headers["content-type"] in ("image/jpeg", "image/jpg"), fname
+        assert len(r.content) > 10000, fname
     bg = client.get(f"/dethrone/cards/map/{manifest['kingdom']['file']}")
     assert bg.status_code == 200
-    assert len(bg.content) > 10000
+    assert len(bg.content) > 50000
 
 
 def test_hidden_roles_not_leaked(client):

@@ -1,11 +1,12 @@
 /* The Cursed Throne — offline shell for installed PWA */
-var CACHE = "dethrone-20260630-p24";
+var CACHE = "dethrone-20260630-p25";
 var SHELL = [
   "./",
   "./index.html",
   "./manifest.webmanifest",
   "./css/styles.css",
   "./icons/icon.svg",
+  "./cards/map/kingdom-background-v3b.jpg",
   "./js/data.js",
   "./js/cards-roles.js",
   "./js/cards-court.js",

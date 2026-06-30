@@ -1,16 +1,16 @@
-/* The Cursed Throne — kingdom map art (V3b layered poster + location vignettes). */
+/* The Cursed Throne — kingdom map art (V3b illustrated poster + location vignettes). */
 window.CT = window.CT || {};
 
-CT.MAP_ART_VERSION = window.__DETHRONE_CARD_V || "20260630-p24";
-CT.MAP_BACKGROUND = "kingdom-background-v3b.png";
+CT.MAP_ART_VERSION = window.__DETHRONE_CARD_V || "20260630-p25";
+CT.MAP_BACKGROUND = "kingdom-background-v3b.jpg";
 CT.MAP_LOCATION_FILES = {
-  scrolls: "location-scrolls-v3b.png",
-  college: "location-college-v3b.png",
-  tavern: "location-tavern-v3b.png",
-  market: "location-market-v3b.png",
-  throne: "location-throne-v3b.png",
-  barracks: "location-barracks-v3b.png",
-  graveyard: "location-graveyard-v3b.png",
+  scrolls: "location-scrolls-v3b.jpg",
+  college: "location-college-v3b.jpg",
+  tavern: "location-tavern-v3b.jpg",
+  market: "location-market-v3b.jpg",
+  throne: "location-throne-v3b.jpg",
+  barracks: "location-barracks-v3b.jpg",
+  graveyard: "location-graveyard-v3b.jpg",
 };
 
 CT.mapBackgroundUrl = function (opts) {

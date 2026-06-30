@@ -443,15 +443,19 @@ function kingdomPanel() {
   var accent = CT.locationAccent(locId);
   var loc = CT.locationById(locId);
   var locLabel = loc ? loc.name.toUpperCase() : locId.toUpperCase();
+  var vignette = CT.mapLocationUrl ? CT.mapLocationUrl(locId) : "";
+  var artBanner = vignette
+    ? '<div class="loc-footer__art" style="background-image:url(' + vignette.replace(/'/g, "%27") + ')" aria-hidden="true"></div>'
+    : "";
   return '<div class="v3b-kingdom">'
     + '<div class="v3b-kingdom__card">'
     + '<header class="v3b-kingdom__head">'
-    + '<div><h2 class="v3b-kingdom__title">The Kingdom</h2>'
-    + '<p class="v3b-kingdom__hint">' + hint + "</p></div>"
+    + '<p class="v3b-kingdom__hint">' + hint + "</p>"
     + (ap && !CT.isSpectator() ? '<span class="v3b-kingdom__turn">' + CT.esc(ap.name) + "</span>" : "")
     + "</header>"
     + '<div class="map-wrap map-wrap--kingdom">' + CT.boardMapSVG() + "</div>"
     + '<footer class="loc-footer" style="--loc-accent:' + accent + '">'
+    + artBanner
     + '<div class="loc-footer__label">' + locLabel + " · " + (CT.isSpectator() ? "watching" : "actions") + "</div>"
     + actionsPanelBody()
     + "</footer></div></div>";
