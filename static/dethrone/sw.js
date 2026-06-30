@@ -1,5 +1,5 @@
 /* The Cursed Throne — offline shell for installed PWA */
-var CACHE = "dethrone-20260630-p20";
+var CACHE = "dethrone-20260630-p21";
 var SHELL = [
   "./",
   "./index.html",

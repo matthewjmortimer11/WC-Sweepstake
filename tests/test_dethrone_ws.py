@@ -96,6 +96,7 @@ def test_dethrone_v3b_board_asset(client):
     assert 'data-act="board-move"' in board
     assert "CT.MAP_ROUTES" in board
     assert len(board) > 2000
+    assert '0.7)"/>' not in board  # syntax error that prevented board.js from loading
 
 
 def test_hidden_roles_not_leaked(client):

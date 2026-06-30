@@ -88,7 +88,7 @@ CT.MAP_ROUTES = [
     var grave = a === "graveyard" || b === "graveyard";
     var d = "M" + p[0] + " " + p[1] + " L" + q[0] + " " + q[1];
     return '<path d="' + d + '" fill="none" stroke="' + (grave ? CURSED : GOLD) + '" stroke-width="2.2" '
-      + 'stroke-linecap="round" opacity="' + (grave ? 0.55 : 0.7)"/>'
+      + 'stroke-linecap="round" opacity="' + (grave ? 0.55 : 0.7) + '"/>'
       + '<circle cx="' + ((p[0] + q[0]) / 2) + '" cy="' + ((p[1] + q[1]) / 2) + '" r="3.2" fill="' + GOLDS + '" stroke="' + GOLD + '" stroke-width="1"/>';
   }
 
@@ -117,9 +117,10 @@ CT.MAP_ROUTES = [
     if (!here.length) return "";
     var n = here.length, gap = 20, x0 = -((n - 1) * gap) / 2;
     var y = cardH / 2 + 16;
+    var ap = CT.activePlayer();
     return here.map(function (p, k) {
       var idx = CT.state.players.indexOf(p);
-      var active = p.id === CT.activePlayer().id;
+      var active = ap && p.id === ap.id;
       var elim = p.status === "eliminated";
       var x = x0 + k * gap;
       return '<g transform="translate(' + x + "," + y + ')" opacity="' + (elim ? 0.42 : 1) + '">'
