@@ -347,6 +347,7 @@ function onlineSetupScreen() {
 function gameScreen() {
   var s = CT.state;
   return winBanner()
+    + waitingBanner()
     + handLimitBanner()
     + trackers()
     + '<div class="grid grid-main">'
@@ -366,6 +367,13 @@ function handLimitBanner() {
     + '<strong>Hand limit:</strong> discard to ' + limit + ' cards before ending your turn '
     + '(' + ap.actionCardIds.length + ' now). '
     + '<button class="btn btn-gold btn-sm" data-act="fix-hand" data-id="' + ap.id + '">Discard now</button></div>';
+}
+
+function waitingBanner() {
+  if (CT.isSpectator() || !CT.isOnline() || CT.state.winner) return "";
+  var ap = CT.activePlayer();
+  if (!ap || ap.id === CT.myId()) return "";
+  return '<div class="wait-banner" role="status">Waiting for <strong>' + CT.esc(ap.name) + "</strong>…</div>";
 }
 
 function winBanner() {
@@ -800,15 +808,20 @@ function privateView() {
     var fx = CT.AUTO_PLAY[id];
     var playBtn = "";
     if (fx && onTurn) {
-      if (fx.needsTarget || fx.needsLocation || fx.needsDeck || fx.needsDiscardCard) {
+      if (fx.needsTarget || fx.needsLocation || fx.needsDeck || fx.needsDiscardCard || fx.optionalTarget) {
         playBtn = ' <button class="btn btn-ghost btn-sm" data-act="play-card-prompt" data-id="' + id + '">Play…</button>';
       } else {
         playBtn = ' <button class="btn btn-primary btn-sm" data-act="play-card" data-id="' + id + '">Play</button>';
       }
+    } else if (CT.PROACTIVE_REACTIONS && CT.PROACTIVE_REACTIONS[id] && onTurn) {
+      playBtn = ' <button class="btn btn-primary btn-sm" data-act="play-card" data-id="' + id + '">Play now</button>'
+        + ' <span class="tag" style="font-size:11px">or hold for tax</span>';
     } else if (c.timing === "Reaction") {
       playBtn = ' <span class="tag wax" style="font-size:11px">when targeted</span>';
     } else if (c.timing === "Duel" || c.timing === "Vote") {
       playBtn = ' <span class="tag" style="font-size:11px">use in helper</span>';
+    } else if (!fx && c.requiresManualResolution !== false) {
+      playBtn = ' <span class="tag wax" style="font-size:11px">manual at table</span>';
     }
     return '<div class="pcard" style="padding:12px"><div class="row" style="justify-content:space-between;align-items:flex-start;gap:8px">'
       + '<div><div class="pname" style="font-size:15px">' + CT.esc(c.name)
@@ -944,6 +957,16 @@ function playCardView() {
     body += '<label class="field" style="display:block;margin:12px 0"><span>Target</span>'
       + '<select id="play-target" style="width:100%">' + opts + "</select></label>";
   }
+  if (fx.optionalTarget) {
+    var allies = CT.state.players.filter(function (x) {
+      return x.status === "active" && x.id !== p.id && x.location === p.location;
+    });
+    var allyOpts = '<option value="">— none —</option>' + allies.map(function (x) {
+      return '<option value="' + x.id + '">' + CT.esc(x.name) + "</option>";
+    }).join("");
+    body += '<label class="field" style="display:block;margin:12px 0"><span>Ally at your location (optional)</span>'
+      + '<select id="play-target" style="width:100%">' + allyOpts + "</select></label>";
+  }
   if (fx.needsDeck) {
     var decks = CT.DECK_NAMES.map(function (d) {
       return '<option value="' + d + '">' + d + "</option>";
@@ -953,16 +976,29 @@ function playCardView() {
   }
   if (fx.needsLocation) {
     var moves;
-    if (fx.tunnel) {
-      var tun = p.location === "market" ? "scrolls" : (p.location === "college" ? "barracks" : null);
-      moves = tun ? '<option value="' + tun + '">' + CT.esc(CT.locationById(tun).name) + "</option>" : "";
-    } else {
-      moves = CT.legalMoves(p).map(function (lid) {
-        return '<option value="' + lid + '">' + CT.esc(CT.locationById(lid).name) + "</option>";
+    if (fx.smuggleRun) {
+      var smDest = p.location === "tavern" ? "barracks" : (p.location === "barracks" ? "tavern" : null);
+      moves = smDest ? '<option value="' + smDest + '">' + CT.esc(CT.locationById(smDest).name) + " (via Graveyard)</option>" : "";
+      body += '<label class="field" style="display:block;margin:12px 0"><span>Destination</span>'
+        + '<select id="play-location" style="width:100%">' + moves + "</select></label>";
+    } else if (fx.namedLocation) {
+      moves = CT.LOCATIONS.map(function (l) {
+        return '<option value="' + l.id + '">' + CT.esc(l.name) + "</option>";
       }).join("");
+      body += '<label class="field" style="display:block;margin:12px 0"><span>Location to check</span>'
+        + '<select id="play-location" style="width:100%">' + moves + "</select></label>";
+    } else {
+      if (fx.tunnel) {
+        var tun = p.location === "market" ? "scrolls" : (p.location === "college" ? "barracks" : null);
+        moves = tun ? '<option value="' + tun + '">' + CT.esc(CT.locationById(tun).name) + "</option>" : "";
+      } else {
+        moves = CT.legalMoves(p).map(function (lid) {
+          return '<option value="' + lid + '">' + CT.esc(CT.locationById(lid).name) + "</option>";
+        }).join("");
+      }
+      body += '<label class="field" style="display:block;margin:12px 0"><span>Move to</span>'
+        + '<select id="play-location" style="width:100%">' + moves + "</select></label>";
     }
-    body += '<label class="field" style="display:block;margin:12px 0"><span>Move to</span>'
-      + '<select id="play-location" style="width:100%">' + moves + "</select></label>";
   }
   if (fx.atLocation && p.location !== fx.atLocation) {
     body += '<p class="muted" style="font-size:13px">Must be at ' + CT.esc(CT.locationById(fx.atLocation).name) + ".</p>";
@@ -1221,6 +1257,10 @@ CT.handleAction = function (act, el, ev) {
       if (fx.needsTarget) {
         var ts = document.getElementById("play-target");
         if (ts) payload.targetId = ts.value;
+      }
+      if (fx.optionalTarget) {
+        var als = document.getElementById("play-target");
+        if (als && als.value) payload.targetId = als.value;
       }
       if (fx.needsDeck) {
         var ds = document.getElementById("play-deck");

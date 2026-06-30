@@ -208,7 +208,7 @@ CARD_AUTO_EFFECTS: dict[str, dict] = {
     "queens_favour": {"target_rep": 1, "gold": 1, "needs_target": True},
     "herald": {"rep": 1},
     "succession_edict": {"open_succession": True},
-    "caravan_manifest": {"draw": "Market"},
+    "caravan_manifest": {"draw": "Market", "ally_draw": "Market", "optional_target": True, "same_location": True},
     "study_companion": {"draw": "Knowledge"},
     # Phase 9 — risk & investigation
     "bone_dice": {"bone_dice": True, "corruption": 1},
@@ -232,6 +232,14 @@ CARD_AUTO_EFFECTS: dict[str, dict] = {
     "trade_licence": {"open_trade": True},
     "blood_contract": {"open_contract": True},
     "call_out": {"open_callout": True},
+    # Phase 18 — movement, investigation, proactive reactions
+    "smugglers_run": {"smuggle_run": True, "needs_location": True},
+    "whisper_network": {"peek_hidden_role": True, "needs_target": True, "same_location": True, "at_location": "tavern"},
+    "witness_statement": {"witness_graveyard": True, "needs_target": True},
+    "alibi_check": {"alibi_check": True, "needs_target": True, "needs_location": True, "named_location": True},
+    "trace_steps": {"trace_steps": True, "needs_target": True},
+    "secret_ledger": {"peek_gold": True, "needs_target": True},
+    "guild_seal": {"guild_seal_proactive": True},
 }
 
 # Duel / vote card hooks (played from hand during helpers)

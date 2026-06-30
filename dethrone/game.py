@@ -47,6 +47,8 @@ class PlayerState:
     wounded: bool = False
     serious_duel_used: bool = False
     moved_this_turn: bool = False
+    prev_location: Optional[str] = None
+    location_last_round: str = D.START_LOCATION
     abilities_used_this_round: list[str] = field(default_factory=list)
     is_bot: bool = False
     # setup only — dealt roles before public pick
@@ -336,6 +338,7 @@ class CursedThroneGame:
             return
         from_name = next((l["name"] for l in D.LOCATIONS if l["id"] == p.location), "?")
         to_name = next((l["name"] for l in D.LOCATIONS if l["id"] == location_id), "?")
+        p.prev_location = p.location
         p.location = location_id
         if not manual:
             ap = self.active_player()
@@ -353,6 +356,9 @@ class CursedThroneGame:
 
     def _on_new_round(self) -> None:
         """Per-round hooks (Court Favourite tax skip, etc.)."""
+        for p in self.players:
+            if p.status == "active":
+                p.location_last_round = p.location
         self.tax_skip_remaining = {}
         for p in self.players:
             p.abilities_used_this_round = []
@@ -616,7 +622,7 @@ class CursedThroneGame:
         fx = D.CARD_AUTO_EFFECTS.get(card_id)
         if not fx:
             raise MoveError("This card must be resolved manually at the table.")
-        if fx.get("needs_target") and not target_id:
+        if fx.get("needs_target") and not fx.get("optional_target") and not target_id:
             raise MoveError("Choose a target player.")
         if fx.get("needs_deck") and not deck_name:
             raise MoveError("Choose a deck.")
@@ -631,6 +637,10 @@ class CursedThroneGame:
         if fx.get("at_location") and p.location != fx["at_location"]:
             loc_name = next((l["name"] for l in D.LOCATIONS if l["id"] == fx["at_location"]), fx["at_location"])
             raise MoveError(f"Must be at {loc_name} to play this card.")
+        if fx.get("smuggle_run") and p.location not in ("tavern", "barracks"):
+            raise MoveError("Smuggler's Run must be played from Tavern or Barracks.")
+        if fx.get("alibi_check") and not location_id:
+            raise MoveError("Name a location.")
         if fx.get("same_location") and target and target.location != p.location:
             raise MoveError("Target must be at your location.")
         if deck_name and deck_name not in D.DECK_NAMES:
@@ -661,6 +671,14 @@ class CursedThroneGame:
                 raise MoveError("Choose a destination.")
             if location_id not in self.legal_moves(p):
                 raise MoveError("That location is not reachable.")
+            self.move_player(pid, location_id, manual=True)
+        elif fx.get("smuggle_run"):
+            if not location_id:
+                raise MoveError("Choose a destination.")
+            routes = {"tavern": "barracks", "barracks": "tavern"}
+            expected = routes.get(p.location)
+            if not expected or location_id != expected:
+                raise MoveError("Smuggler's Run only connects Tavern ↔ Barracks through the Graveyard.")
             self.move_player(pid, location_id, manual=True)
 
         if fx.get("cost_gold"):
@@ -717,6 +735,50 @@ class CursedThroneGame:
             self.adjust_corruption(fx["corruption"], cname)
         if fx.get("draw"):
             self.draw_card(pid, fx["draw"], cname)
+        if fx.get("ally_draw") and target and target.location == p.location:
+            self.draw_card(target.id, fx["ally_draw"], cname)
+        if fx.get("guild_seal_proactive"):
+            self.tax_skip_remaining[pid] = self.tax_skip_remaining.get(pid, 0) + 1
+            self._log(f"{p.name} plays Guild Seal — ignores the next tax this round.", "note")
+        if fx.get("peek_hidden_role") and target:
+            if not target.hidden_role_ids:
+                self._set_private_note(pid, f"{target.name} has no hidden roles.")
+            else:
+                pick = target.hidden_role_ids[0]
+                rname = D.ROLE_META.get(pick, {}).get("name", pick)
+                self._set_private_note(pid, f"{target.name}'s hidden role: {rname}")
+            self._log(f"{p.name} used Whisper Network on {target.name}.", "note")
+        if fx.get("witness_graveyard") and target:
+            was = target.location_last_round == "graveyard"
+            self._set_private_note(
+                pid,
+                f"{target.name} {'was' if was else 'was not'} at the Graveyard last round.",
+            )
+            self._log(f"{p.name} took a witness statement from {target.name}.", "note")
+        if fx.get("alibi_check") and target and location_id:
+            loc_name = next((l["name"] for l in D.LOCATIONS if l["id"] == location_id), location_id)
+            was = target.location_last_round == location_id
+            self._set_private_note(
+                pid,
+                f"{target.name} {'was' if was else 'was not'} at {loc_name} last round.",
+            )
+            self._log(f"{p.name} ran an alibi check on {target.name}.", "note")
+        if fx.get("trace_steps") and target:
+            if target.prev_location:
+                from_name = next(
+                    (l["name"] for l in D.LOCATIONS if l["id"] == target.prev_location),
+                    target.prev_location,
+                )
+                self._set_private_note(pid, f"{target.name} last moved from {from_name}.")
+            else:
+                self._set_private_note(pid, f"No recorded move for {target.name} yet.")
+            self._log(f"{p.name} traced {target.name}'s steps.", "note")
+        if fx.get("peek_gold") and target:
+            self._set_private_note(
+                pid,
+                f"{target.name} has {target.gold} gold. (They may lie once per game.)",
+            )
+            self._log(f"{p.name} inspected {target.name}'s ledger.", "note")
         if fx.get("hangover_cure"):
             if p.wounded:
                 p.wounded = False

@@ -78,6 +78,8 @@ CT.newGame = function (playersInput, undealtRoleIds, startingActionByPlayer, fir
         wounded: false,
         seriousDuelUsed: false,
         movedThisTurn: false,
+        prevLocation: null,
+        locationLastRound: C.START_LOCATION,
         abilitiesUsedThisRound: [],
       };
     }),
@@ -119,6 +121,9 @@ CT.allRoleIds = function (player) {
 
 CT.onNewRound = function () {
   if (!CT.state) return;
+  CT.state.players.forEach(function (p) {
+    if (p.status === "active") p.locationLastRound = p.location;
+  });
   CT.state.taxSkipRemaining = {};
   CT.state.players.forEach(function (p) {
     p.abilitiesUsedThisRound = [];
@@ -385,6 +390,7 @@ CT.movePlayer = function (playerId, locationId, manual) {
   var p = CT.playerById(playerId); if (!p) return;
   var from = CT.locationById(p.location), to = CT.locationById(locationId);
   if (!to || p.location === locationId) return;
+  p.prevLocation = p.location;
   p.location = locationId;
   if (!manual) {
     var ap = CT.activePlayer();
@@ -422,6 +428,8 @@ CT.load = function () {
     if (data.players) data.players.forEach(function (p) {
       if (!p.abilitiesUsedThisRound) p.abilitiesUsedThisRound = [];
       if (p.movedThisTurn == null) p.movedThisTurn = false;
+      if (p.prevLocation == null) p.prevLocation = null;
+      if (!p.locationLastRound) p.locationLastRound = p.location || "market";
     });
     CT.state = data;
     return CT.state;
@@ -516,7 +524,10 @@ CT.playActionCard = function (playerId, cardId, opts) {
     return { ok: false, msg: "Must be at " + (needLoc ? needLoc.name : fx.atLocation) + "." };
   }
   var target = opts.targetId ? CT.playerById(opts.targetId) : null;
-  if (fx.needsTarget && (!target || target.status !== "active")) return { ok: false, msg: "Choose a target." };
+  if (fx.needsTarget && !fx.optionalTarget && (!target || target.status !== "active")) return { ok: false, msg: "Choose a target." };
+  if (fx.optionalTarget && target && fx.sameLocation && target.location !== p.location) {
+    return { ok: false, msg: "Ally must be at your location." };
+  }
   if (fx.sameLocation && target && target.location !== p.location) return { ok: false, msg: "Target must be at your location." };
   if (fx.needsDeck && !opts.deckName) return { ok: false, msg: "Choose a deck." };
   if (fx.needsDiscardCard) {
@@ -540,7 +551,13 @@ CT.playActionCard = function (playerId, cardId, opts) {
     CT.movePlayer(playerId, "scrolls", true);
   } else if (fx.needsLocation) {
     if (!opts.locationId) return { ok: false, msg: "Choose a destination." };
-    if (fx.tunnel) {
+    if (fx.smuggleRun) {
+      var smRoutes = { tavern: "barracks", barracks: "tavern" };
+      var smDest = smRoutes[p.location];
+      if (!smDest || opts.locationId !== smDest) return { ok: false, msg: "Smuggler's Run only connects Tavern ↔ Barracks." };
+    } else if (fx.namedLocation) {
+      if (!CT.locationById(opts.locationId)) return { ok: false, msg: "Choose a location." };
+    } else if (fx.tunnel) {
       var tun = p.location === "market" ? "scrolls" : (p.location === "college" ? "barracks" : null);
       if (!tun || opts.locationId !== tun) return { ok: false, msg: "Invalid tunnel route." };
     } else if (CT.legalMoves(p).indexOf(opts.locationId) === -1) {
@@ -617,8 +634,46 @@ CT.playActionCard = function (playerId, cardId, opts) {
   }
   if (cardId === "herald") CT.adjustRep(playerId, 1, cname);
   if (cardId === "succession_edict") CT.openSuccession();
-  if (cardId === "caravan_manifest") CT.drawCard(playerId, "Market", cname);
+  if (cardId === "caravan_manifest") {
+    CT.drawCard(playerId, "Market", cname);
+    if (target && target.location === p.location) CT.drawCard(target.id, "Market", cname);
+  }
   if (cardId === "study_companion") CT.drawCard(playerId, "Knowledge", cname);
+  if (cardId === "guild_seal") {
+    if (!s.taxSkipRemaining) s.taxSkipRemaining = {};
+    s.taxSkipRemaining[playerId] = (s.taxSkipRemaining[playerId] || 0) + 1;
+    CT.log(p.name + " plays Guild Seal — ignores the next tax this round.", "note");
+  }
+  if (cardId === "whisper_network" && target) {
+    if (!target.hiddenRoleIds.length) CT.ui.privateNote = target.name + " has no hidden roles.";
+    else {
+      var hid = CT.roleById(target.hiddenRoleIds[0]);
+      CT.ui.privateNote = target.name + "'s hidden role: " + (hid ? hid.name : target.hiddenRoleIds[0]);
+    }
+    CT.log(p.name + " used Whisper Network on " + target.name + ".", "note");
+  }
+  if (cardId === "witness_statement" && target) {
+    var atGrave = target.locationLastRound === "graveyard";
+    CT.ui.privateNote = target.name + (atGrave ? " was" : " was not") + " at the Graveyard last round.";
+    CT.log(p.name + " took a witness statement from " + target.name + ".", "note");
+  }
+  if (cardId === "alibi_check" && target && opts.locationId) {
+    var alibiLoc = CT.locationById(opts.locationId);
+    var wasThere = target.locationLastRound === opts.locationId;
+    CT.ui.privateNote = target.name + (wasThere ? " was" : " was not") + " at " + (alibiLoc ? alibiLoc.name : opts.locationId) + " last round.";
+    CT.log(p.name + " ran an alibi check on " + target.name + ".", "note");
+  }
+  if (cardId === "trace_steps" && target) {
+    if (target.prevLocation) {
+      var prevLoc = CT.locationById(target.prevLocation);
+      CT.ui.privateNote = target.name + " last moved from " + (prevLoc ? prevLoc.name : target.prevLocation) + ".";
+    } else CT.ui.privateNote = "No recorded move for " + target.name + " yet.";
+    CT.log(p.name + " traced " + target.name + "'s steps.", "note");
+  }
+  if (cardId === "secret_ledger" && target) {
+    CT.ui.privateNote = target.name + " has " + target.gold + " gold. (They may lie once per game.)";
+    CT.log(p.name + " inspected " + target.name + "'s ledger.", "note");
+  }
   if (cardId === "bone_dice") {
     CT.adjustCorruption(1, cname);
     if (Math.random() < 0.5) { p.gold += 4; CT.log(p.name + " rolled high on the Bone Dice — +4 gold."); }

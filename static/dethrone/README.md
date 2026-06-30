@@ -94,6 +94,13 @@ open "index.html"          # macOS
 - **Spectator actions panel** — read-only list of the active player’s location actions; throne/succession panel without edit controls
 - **Richer playtest report** — throne & succession sections, chronicle entry counts by kind (client export + `GET /dethrone/api/rooms/{code}/report`)
 
+### Phase 18 — Card auto-play expansion & playtest polish
+- **Investigation cards** — Whisper Network, Witness Statement, Alibi Check, Trace Steps, Secret Ledger auto-resolve with private notes (location history tracked per round)
+- **Smuggler's Run** — Tavern ↔ Barracks movement through the Graveyard
+- **Caravan Manifest** — optional ally at your location also draws Market
+- **Guild Seal proactive** — play on your turn to ignore the next tax this round (still auto-consumes on tax if held)
+- **Online waiting banner** — “Waiting for {name}…” when it is not your turn; manual cards labelled in private hand
+
 ### Phase 4 — Throne & Succession
 A **Throne & Succession** panel tracks the crown and the line of succession.
 - **Throne control (§23)**: King / Queen / Successor controllers, set manually or via the **Claim helper** (claimant + crown; unchallenged → crowned, or challenged → "proof valid" crowns them and the challenger loses a role / "bluff" costs the claimant a role). Claim order is recorded.
@@ -147,8 +154,8 @@ Table talk and bluffing stay verbal. The app guides, tracks, and enforces mechan
 ## Known limitations / not yet built
 
 - Bots still skip nuanced table talk — they now duel, trade, and claim succession when sensible, but won't bluff or negotiate.
-- Action cards that need table judgement (Call Out helper, Blood Contract, most Vote/Duel/Reaction cards) stay manual — auto-play covers the mechanical OnTurn subset listed in `CT.AUTO_PLAY` / `CARD_AUTO_EFFECTS` (expanded in Phase 9).
-- Reaction cards played proactively from hand (not auto-consumed like Guild Seal on tax) still need table timing.
+- Action cards that need table judgement (Call Out helper, Blood Contract, Vote/Duel timing cards) stay manual — auto-play covers the mechanical subset in `CT.AUTO_PLAY` / `CARD_AUTO_EFFECTS` (expanded through Phase 18).
+- Reaction cards can be played proactively from hand when listed in `CT.AUTO_PLAY` (e.g. Guild Seal); others still fire when targeted.
 
 ## Next improvements
 

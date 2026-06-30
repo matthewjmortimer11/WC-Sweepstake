@@ -332,7 +332,7 @@ CT.AUTO_PLAY = {
   intimidate: { needsTarget: true, sameLocation: true },
   bought_round: { needsTarget: true, sameLocation: true },
   queens_favour: { needsTarget: true }, herald: {}, succession_edict: {},
-  caravan_manifest: {}, study_companion: {},
+  caravan_manifest: { optionalTarget: true, sameLocation: true }, study_companion: {},
   bone_dice: {}, old_prophecy: { needsDeck: true }, read_records: { needsDeck: true },
   wraith_whisper: {}, grave_pact: {},
   map_of_tunnels: { needsLocation: true, tunnel: true },
@@ -349,7 +349,15 @@ CT.AUTO_PLAY = {
   trade_licence: { openTrade: true },
   blood_contract: { openContract: true },
   call_out: { openCallout: true },
+  smugglers_run: { needsLocation: true, smuggleRun: true },
+  whisper_network: { needsTarget: true, sameLocation: true, atLocation: "tavern" },
+  witness_statement: { needsTarget: true },
+  alibi_check: { needsTarget: true, needsLocation: true, namedLocation: true },
+  trace_steps: { needsTarget: true },
+  secret_ledger: { needsTarget: true },
+  guild_seal: {},
 };
+CT.PROACTIVE_REACTIONS = { guild_seal: true };
 CT.DUEL_CARD_VALUES = {
   hidden_knife: 3, shield: 2, dirty_trick: 2, disarm_card: 1, cursed_blade: 4,
   loaded_dice: 1, second_blade: 2, parry: 2, iron_gauntlet: 1,

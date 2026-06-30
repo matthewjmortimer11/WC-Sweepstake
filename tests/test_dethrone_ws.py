@@ -918,6 +918,57 @@ def test_export_report_includes_throne_and_chronicle_stats(client):
     assert "## Throne" in resp.json()["markdown"]
 
 
+def test_smugglers_run_tavern_to_barracks(client):
+    code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
+    room, pids, g = _start_game(code)
+    active = g.active_player()
+    active.location = "tavern"
+    active.action_card_ids.append("smugglers_run")
+    g.play_action_card(active.id, "smugglers_run", location_id="barracks")
+    assert active.location == "barracks"
+    assert "smugglers_run" not in active.action_card_ids
+
+
+def test_witness_statement_graveyard_last_round(client):
+    code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
+    room, pids, g = _start_game(code)
+    active = g.active_player()
+    target = next(p for p in g.players if p.id != active.id)
+    target.location_last_round = "graveyard"
+    active.action_card_ids.append("witness_statement")
+    g.play_action_card(active.id, "witness_statement", target_id=target.id)
+    assert "Graveyard" in g.private_notes.get(active.id, "")
+    assert "was" in g.private_notes.get(active.id, "")
+
+
+def test_guild_seal_proactive_tax_skip(client):
+    code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
+    room, pids, g = _start_game(code)
+    active = g.active_player()
+    collector = next(p for p in g.players if p.id != active.id)
+    _set_non_exempt_roles(active, g)
+    active.gold = 5
+    active.action_card_ids.append("guild_seal")
+    g.play_action_card(active.id, "guild_seal")
+    assert g.tax_skip_remaining.get(active.id) == 1
+    assert "guild_seal" not in active.action_card_ids
+    g._collect_tax(collector, 1)
+    assert active.gold == 5
+
+
+def test_trace_steps_prev_location(client):
+    code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
+    room, pids, g = _start_game(code)
+    active = g.active_player()
+    target = next(p for p in g.players if p.id != active.id)
+    target.prev_location = "market"
+    target.location = "tavern"
+    active.action_card_ids.append("trace_steps")
+    g.play_action_card(active.id, "trace_steps", target_id=target.id)
+    note = g.private_notes.get(active.id, "")
+    assert "Market" in note or "market" in note.lower()
+
+
 def D_ROLE_META_PUBLIC(role_id: str) -> bool:
     from dethrone.data import ROLE_META
     return ROLE_META.get(role_id, {}).get("canBePublic", True)
