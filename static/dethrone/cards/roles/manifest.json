@@ -1,6 +1,7 @@
 {
   "template": "V3b Vertical Asymmetric Editorial",
   "trim": "2.5x3.5in",
+  "pixels": "750x1050",
   "palette": {
     "cream": "#F4ECD6",
     "ink": "#2A2014",
