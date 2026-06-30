@@ -548,7 +548,7 @@ function logPanel() {
   }).join("");
   return '<div class="panel"><div class="panel-head"><h2>Chronicle</h2>'
     + '<span class="faint" style="font-size:12px">' + CT.state.log.length + " entries</span></div>"
-    + '<div class="log-filters">' + filters + "</div><hr class="rule">"
+    + '<div class="log-filters">' + filters + '</div><hr class="rule">'
     + '<div class="log">' + (entries || '<div class="empty">No entries for this filter.</div>') + "</div></div>";
 }
 
