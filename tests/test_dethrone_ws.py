@@ -131,10 +131,14 @@ def _start_game(code: str, n: int = 4):
     return room, pids, g
 
 
-def _set_non_exempt_roles(p):
+def _set_non_exempt_roles(p, g=None):
     """Deterministic roles for tax tests (no spy/firstborn/tinytyrant/courtfavourite)."""
     p.public_role_id = "gateguard"
-    p.hidden_role_ids = ["thief", "queen"]
+    p.hidden_role_ids = ["thief", "wanderingknight"]
+    p.extra_shown_role_ids = []
+    p.action_card_ids = [c for c in p.action_card_ids if c != "guild_seal"]
+    if g is not None:
+        g.tax_skip_remaining.pop(p.id, None)
 
 
 def test_challenge_sets_pending_discard(client):
@@ -253,7 +257,7 @@ def test_tax_collector_takes_from_others(client):
     room, pids, g = _start_game(code)
     active = g.active_player().id
     for p in g.players:
-        _set_non_exempt_roles(p)
+        _set_non_exempt_roles(p, g)
         if p.id != active:
             p.gold = 2
     ap = g.player_by_id(active)
@@ -268,7 +272,7 @@ def test_tax_skips_exempt_firstborn(client):
     room, pids, g = _start_game(code)
     active = g.active_player().id
     for p in g.players:
-        _set_non_exempt_roles(p)
+        _set_non_exempt_roles(p, g)
     victim = next(pid for pid in pids if pid != active)
     vp = g.player_by_id(victim)
     vp.public_role_id = "firstborn"
@@ -286,7 +290,7 @@ def test_guild_seal_ignores_tax(client):
     room, pids, g = _start_game(code)
     active = g.active_player().id
     for p in g.players:
-        _set_non_exempt_roles(p)
+        _set_non_exempt_roles(p, g)
     victim = next(pid for pid in pids if pid != active)
     vp = g.player_by_id(victim)
     vp.gold = 3
@@ -421,6 +425,7 @@ def test_royal_command_tax(client):
     ap.location = "throne"
     g.throne["kingControllerId"] = active
     for p in g.players:
+        _set_non_exempt_roles(p, g)
         if p.id != active:
             p.gold = 2
     g.do_location_action(active, "royal_command")
