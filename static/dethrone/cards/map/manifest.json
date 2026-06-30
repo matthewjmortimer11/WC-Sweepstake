@@ -1,0 +1,27 @@
+{
+  "template": "V3b Vertical Asymmetric Editorial",
+  "kingdom": {
+    "file": "kingdom-background-v3b.png",
+    "pixels": "1440x1840",
+    "viewBox": "0 0 720 920"
+  },
+  "palette": {
+    "cream": "#F4ECD6",
+    "ink": "#2A2014",
+    "gold": "#A8842C",
+    "royal": "#8C2F23",
+    "cursed": "#6B2420",
+    "knight": "#4A5568",
+    "guard": "#5B4C38",
+    "advisor": "#2A2014"
+  },
+  "locations": {
+    "scrolls": "location-scrolls-v3b.png",
+    "college": "location-college-v3b.png",
+    "tavern": "location-tavern-v3b.png",
+    "market": "location-market-v3b.png",
+    "throne": "location-throne-v3b.png",
+    "barracks": "location-barracks-v3b.png",
+    "graveyard": "location-graveyard-v3b.png"
+  }
+}

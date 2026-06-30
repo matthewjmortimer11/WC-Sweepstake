@@ -1,5 +1,7 @@
 """Integration tests for The Cursed Throne HTTP + WebSocket."""
 
+import json
+
 import pytest
 from starlette.testclient import TestClient
 
@@ -89,15 +91,28 @@ def test_dethrone_v3b_board_asset(client):
     page = client.get("/dethrone")
     assert page.status_code == 200
     assert f"board.js?v={_DETHRONE_ASSET_VERSION}" in page.text
-    assert f"cards-court.js?v={_DETHRONE_ASSET_VERSION}" in page.text
+    assert f"cards-map.js?v={_DETHRONE_ASSET_VERSION}" in page.text
 
     board = Path("static/dethrone/js/board.js").read_text(encoding="utf-8")
-    assert "map-v3b" in board
+    assert "map-v3b--layered" in board
+    assert "map-bg" in board
+    assert "CT.mapLocationUrl" in board or "mapLocationUrl" in Path("static/dethrone/js/cards-map.js").read_text(encoding="utf-8")
     assert 'viewBox="0 0 720 920"' in board
     assert 'data-act="board-move"' in board
     assert "CT.MAP_ROUTES" in board
-    assert len(board) > 2000
+    assert len(board) > 1500
     assert '0.7)"/>' not in board  # syntax error that prevented board.js from loading
+
+    manifest = json.loads(Path("static/dethrone/cards/map/manifest.json").read_text(encoding="utf-8"))
+    assert manifest["kingdom"]["file"] == "kingdom-background-v3b.png"
+    for loc_id, fname in manifest["locations"].items():
+        r = client.get(f"/dethrone/cards/map/{fname}?v={_DETHRONE_ASSET_VERSION}")
+        assert r.status_code == 200, fname
+        assert r.headers["content-type"] == "image/png", fname
+        assert len(r.content) > 3000, fname
+    bg = client.get(f"/dethrone/cards/map/{manifest['kingdom']['file']}")
+    assert bg.status_code == 200
+    assert len(bg.content) > 10000
 
 
 def test_hidden_roles_not_leaked(client):

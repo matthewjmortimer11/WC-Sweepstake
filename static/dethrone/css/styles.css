@@ -261,6 +261,8 @@ textarea { min-height: 64px; resize: vertical; }
 }
 svg.map { width: 100%; height: auto; display: block; vertical-align: top; }
 svg.map-v3b { aspect-ratio: 720 / 920; }
+svg.map-v3b--layered { background: #f4ecd6; }
+.map-bg { pointer-events: none; }
 .map-node .legal-ring { opacity: 0.92; animation: mapdash 7s linear infinite; }
 .map-node.legal { cursor: pointer; }
 .map-node.legal:hover { filter: drop-shadow(0 0 8px rgba(199,154,58,.7)); }
