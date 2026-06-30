@@ -46,6 +46,7 @@ class PlayerState:
     action_card_ids: list[str] = field(default_factory=list)
     wounded: bool = False
     serious_duel_used: bool = False
+    moved_this_turn: bool = False
     is_bot: bool = False
     # setup only — dealt roles before public pick
     dealt_role_ids: list[str] = field(default_factory=list)
@@ -314,6 +315,10 @@ class CursedThroneGame:
         from_name = next((l["name"] for l in D.LOCATIONS if l["id"] == p.location), "?")
         to_name = next((l["name"] for l in D.LOCATIONS if l["id"] == location_id), "?")
         p.location = location_id
+        if not manual:
+            ap = self.active_player()
+            if ap and ap.id == pid:
+                ap.moved_this_turn = True
         self._log(f"{p.name} moved {from_name} → {to_name}" + (" (manual)" if manual else "") + ".")
 
     def _all_role_ids(self, p: PlayerState) -> set[str]:
@@ -392,6 +397,8 @@ class CursedThroneGame:
             self.round += 1
             self._on_new_round()
             self._log(f"Round {self.round} started.", "system")
+        for p in self.players:
+            p.moved_this_turn = False
         self._log(f"Turn passes to {self.players[idx].name}.")
 
     def end_turn(self, actor_id: str) -> None:
@@ -705,14 +712,14 @@ class CursedThroneGame:
             else:
                 self._log(f"{p.name} does not control the Throne — no gold from Royal Purse.", "note")
         if fx.get("target_rep") and target:
-            self.adjust_rep(target.id, fx["target_rep"], cname)
+            self._maybe_offer_rep_loss(target.id, fx["target_rep"], cname)
         if fx.get("rumour") and target:
             if target.gold >= 1:
                 target.gold -= 1
                 p.gold += 1
                 self._log(f"{target.name} paid 1 gold to {p.name} to silence the Rumour.")
             else:
-                self.adjust_rep(target.id, -1, "Rumour")
+                self._maybe_offer_rep_loss(target.id, -1, "Rumour")
         if fx.get("open_succession"):
             self.open_succession()
         if fx.get("bone_dice"):
@@ -815,6 +822,11 @@ class CursedThroneGame:
             }
             self.pending_ui_action[pid] = pending_duel
             extra["openDuel"] = pending_duel
+            self._offer_reaction(
+                target.id,
+                "duel_declared",
+                {"effect": "cancel_duel", "attackerId": pid},
+            )
 
         self.discard_card(pid, card_id, "played")
         return {"ok": True, **extra}
@@ -1234,15 +1246,87 @@ class CursedThroneGame:
         else:
             self._log("Blood Contract fulfilled.", "note")
 
-    # ---- call out ----
-    def call_out(self, caller_id: str, target_id: str, role_id: str) -> None:
+    def _eligible_reactions(self, player: PlayerState, trigger: str) -> list[str]:
+        cards: list[str] = []
+        for cid in player.action_card_ids:
+            fx = D.REACTION_EFFECTS.get(cid)
+            if not fx or fx.get("trigger") != trigger:
+                continue
+            if fx.get("requires_royal_throne"):
+                t = self.throne
+                if not t.get("kingControllerId") and not t.get("queenControllerId"):
+                    continue
+            cards.append(cid)
+        return cards
+
+    def _offer_reaction(self, target_id: str, trigger: str, resume: dict) -> bool:
+        target = self.player_by_id(target_id)
+        if not target or target.status != "active":
+            return False
+        cards = self._eligible_reactions(target, trigger)
+        if not cards:
+            return False
+        self.pending_ui_action[target_id] = {
+            "kind": "reaction",
+            "trigger": trigger,
+            "cards": cards,
+            "resume": resume,
+        }
+        return True
+
+    def resolve_reaction(self, pid: str, card_id: Optional[str] = None) -> None:
+        pending = self.pending_ui_action.get(pid)
+        if not pending or pending.get("kind") != "reaction":
+            raise MoveError("No reaction offered.")
+        resume = pending.get("resume") or {}
+        if card_id:
+            if card_id not in pending.get("cards", []):
+                raise MoveError("That reaction is not available.")
+            p = self.player_by_id(pid)
+            if not p or card_id not in p.action_card_ids:
+                raise MoveError("Card not in hand.")
+            fx = D.REACTION_EFFECTS.get(card_id, {})
+            cname = D.CARD_BY_ID.get(card_id, {}).get("name", card_id)
+            self.discard_card(pid, card_id, "reaction")
+            if fx.get("cost_rep"):
+                self.adjust_rep(pid, -int(fx["cost_rep"]), cname)
+            self._log(f"{p.name} played {cname} — the effect was cancelled.", "event")
+            if resume.get("effect") == "cancel_duel":
+                att_id = resume.get("attackerId")
+                if att_id:
+                    self.pending_ui_action.pop(att_id, None)
+            self.pending_ui_action.pop(pid, None)
+            return
+        self.pending_ui_action.pop(pid, None)
+        self._resume_effect(resume)
+
+    def _resume_effect(self, resume: dict) -> None:
+        effect = resume.get("effect")
+        if effect == "rep_adjust":
+            self.adjust_rep(
+                resume["targetId"],
+                int(resume.get("delta", 0)),
+                resume.get("reason", ""),
+            )
+        elif effect == "callout_resolve":
+            self._resolve_call_out(
+                resume["callerId"],
+                resume["targetId"],
+                resume["roleId"],
+            )
+        elif effect == "vote_discard":
+            target_id = resume["targetId"]
+            after = resume.get("after") or {}
+            self.require_role_discard(target_id, "vote", after=after)
+        elif effect == "cancel_duel":
+            pass  # duel pending remains on attacker
+
+    def _resolve_call_out(self, caller_id: str, target_id: str, role_id: str) -> None:
         caller = self.player_by_id(caller_id)
         target = self.player_by_id(target_id)
         if not caller or not target:
-            raise MoveError("Unknown player.")
+            return
         rname = D.ROLE_META.get(role_id, {}).get("name", role_id)
-        self._log(f"{caller.name} calls out {target.name} as {rname}!")
-        self.adjust_corruption(2, "Call Out")
         correct = role_id in target.hidden_role_ids
         if correct:
             self._log(f"Correct — {rname} is revealed.")
@@ -1252,6 +1336,53 @@ class CursedThroneGame:
         else:
             self._log(f"Wrong — {target.name} reveals nothing. {caller.name} loses 1 Reputation.")
             self.adjust_rep(caller_id, -1, "wrong Call Out")
+
+    def _maybe_offer_rep_loss(
+        self,
+        target_id: str,
+        delta: int,
+        reason: str,
+        *,
+        trigger: str = "rumour",
+    ) -> bool:
+        if delta >= 0:
+            self.adjust_rep(target_id, delta, reason)
+            return False
+        if self._offer_reaction(
+            target_id,
+            trigger,
+            {
+                "effect": "rep_adjust",
+                "targetId": target_id,
+                "delta": delta,
+                "reason": reason,
+            },
+        ):
+            return True
+        self.adjust_rep(target_id, delta, reason)
+        return False
+
+    # ---- call out ----
+    def call_out(self, caller_id: str, target_id: str, role_id: str) -> None:
+        caller = self.player_by_id(caller_id)
+        target = self.player_by_id(target_id)
+        if not caller or not target:
+            raise MoveError("Unknown player.")
+        rname = D.ROLE_META.get(role_id, {}).get("name", role_id)
+        self._log(f"{caller.name} calls out {target.name} as {rname}!")
+        self.adjust_corruption(2, "Call Out")
+        if self._offer_reaction(
+            target_id,
+            "callout",
+            {
+                "effect": "callout_resolve",
+                "callerId": caller_id,
+                "targetId": target_id,
+                "roleId": role_id,
+            },
+        ):
+            return
+        self._resolve_call_out(caller_id, target_id, role_id)
 
     # ---- trade ----
     def apply_trade(self, a_id: str, b_id: str, gold_ab: int, gold_ba: int,
@@ -1348,7 +1479,14 @@ class CursedThroneGame:
                 f"{'PASSES' if passed else 'fails'} ({yes}–{no})."
             )
             if passed:
-                self.require_role_discard(target_id, "vote", after={"kind": "vote_accuse"})
+                after = {"kind": "vote_accuse"}
+                if self._offer_reaction(
+                    target_id,
+                    "vote_pass",
+                    {"effect": "vote_discard", "targetId": target_id, "after": after},
+                ):
+                    return
+                self.require_role_discard(target_id, "vote", after=after)
         else:
             was_innocent = "cursedone" not in target.hidden_role_ids
             self._log(
@@ -1356,10 +1494,14 @@ class CursedThroneGame:
                 f"{'PASSES' if passed else 'fails'} ({yes}–{no})."
             )
             if passed:
-                self.require_role_discard(
-                    target_id, "vote",
-                    after={"kind": "vote_banish", "was_innocent": was_innocent},
-                )
+                after = {"kind": "vote_banish", "was_innocent": was_innocent}
+                if self._offer_reaction(
+                    target_id,
+                    "vote_pass",
+                    {"effect": "vote_discard", "targetId": target_id, "after": after},
+                ):
+                    return
+                self.require_role_discard(target_id, "vote", after=after)
 
     def duel_flee(
         self,
@@ -1638,6 +1780,7 @@ class CursedThroneGame:
             "actionCardCount": len(p.action_card_ids),
             "wounded": p.wounded,
             "seriousDuelUsed": p.serious_duel_used,
+            "movedThisTurn": p.moved_this_turn,
             "isBot": p.is_bot,
         }
 

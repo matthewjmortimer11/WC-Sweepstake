@@ -205,9 +205,83 @@ CT.advanceTurn = function () {
     CT.onNewRound();
     CT.log("Round " + s.round + " started.", "system");
   }
+  s.players.forEach(function (pl) { pl.movedThisTurn = false; });
   CT.log("Turn passes to " + s.players[idx].name + ".");
   CT.save();
   return { ok: true };
+};
+
+CT._eligibleReactions = function (player, trigger) {
+  if (!player) return [];
+  var t = CT.state.throne;
+  return player.actionCardIds.filter(function (cid) {
+    var fx = CT.REACTION_EFFECTS[cid];
+    if (!fx || fx.trigger !== trigger) return false;
+    if (fx.requiresRoyalThrone && !t.kingControllerId && !t.queenControllerId) return false;
+    return true;
+  });
+};
+
+CT._offerReaction = function (targetId, trigger, resume) {
+  var target = CT.playerById(targetId);
+  var cards = CT._eligibleReactions(target, trigger);
+  if (!cards.length) return false;
+  CT.ui.reactionOffer = { playerId: targetId, trigger: trigger, cards: cards, resume: resume };
+  return true;
+};
+
+CT._resumeDeferred = function (resume) {
+  if (!resume) return;
+  if (resume.effect === "rep_adjust") CT.adjustRep(resume.targetId, resume.delta, resume.reason || "");
+  else if (resume.effect === "callout_resolve") CT._resolveCallOut(resume.callerId, resume.targetId, resume.roleId);
+  else if (resume.effect === "vote_discard") {
+    CT.ui.roleDiscardFor = resume.targetId;
+    CT.ui.roleDiscardRevealed = false;
+    CT.ui.afterDiscard = resume.after || null;
+  }
+};
+
+CT._resolveCallOut = function (callerId, targetId, roleId) {
+  var caller = CT.playerById(callerId), target = CT.playerById(targetId), role = CT.roleById(roleId);
+  if (!caller || !target) return;
+  var correct = target.hiddenRoleIds.indexOf(roleId) > -1;
+  if (correct) {
+    CT.log("Correct — " + role.name + " is revealed.");
+    CT.applyRoleDiscard(target.id, "hidden", roleId);
+    if (!CT.state.winner) CT.grantExtraShownRole(caller.id, "Call Out");
+  } else {
+    CT.log("Wrong — " + target.name + " reveals nothing. " + caller.name + " loses 1 Reputation.");
+    CT.adjustRep(caller.id, -1, "wrong Call Out");
+  }
+};
+
+CT.resolveReaction = function (cardId) {
+  var offer = CT.ui.reactionOffer;
+  if (!offer) return;
+  var p = CT.playerById(offer.playerId);
+  if (!p || offer.cards.indexOf(cardId) === -1) return;
+  var fx = CT.REACTION_EFFECTS[cardId] || {};
+  var c = CT.cardById(cardId);
+  CT.discardCard(offer.playerId, cardId, "reaction");
+  if (fx.costRep) CT.adjustRep(offer.playerId, -fx.costRep, c ? c.name : cardId);
+  CT.log(p.name + " played " + (c ? c.name : cardId) + " — the effect was cancelled.", "event");
+  CT.ui.reactionOffer = null;
+  CT.save();
+};
+
+CT.declineReaction = function () {
+  var offer = CT.ui.reactionOffer;
+  if (!offer) return;
+  CT._resumeDeferred(offer.resume);
+  CT.ui.reactionOffer = null;
+  CT.save();
+};
+
+CT._maybeOfferRepLoss = function (targetId, delta, reason) {
+  if (delta >= 0) { CT.adjustRep(targetId, delta, reason); return false; }
+  if (CT._offerReaction(targetId, "rumour", { effect: "rep_adjust", targetId: targetId, delta: delta, reason: reason })) return true;
+  CT.adjustRep(targetId, delta, reason);
+  return false;
 };
 
 CT.endTurn = function () {
@@ -276,6 +350,10 @@ CT.movePlayer = function (playerId, locationId, manual) {
   var from = CT.locationById(p.location), to = CT.locationById(locationId);
   if (!to || p.location === locationId) return;
   p.location = locationId;
+  if (!manual) {
+    var ap = CT.activePlayer();
+    if (ap && ap.id === playerId) p.movedThisTurn = true;
+  }
   CT.log(p.name + " moved " + (from ? from.name : "?") + " → " + to.name + (manual ? " (manual)" : "") + ".");
   CT.save();
 };
@@ -449,10 +527,13 @@ CT.playActionCard = function (playerId, cardId, opts) {
     else CT.log(p.name + " had nothing to cure.", "note");
   }
   if (cardId === "pardon_card" && target) CT.adjustRep(target.id, 1, cname);
-  if (cardId === "false_rumour" && target) { CT.adjustRep(target.id, -1, cname); CT.adjustCorruption(1, cname); }
+  if (cardId === "false_rumour" && target) {
+    CT._maybeOfferRepLoss(target.id, -1, cname);
+    CT.adjustCorruption(1, cname);
+  }
   if (cardId === "rumour_card" && target) {
     if (target.gold >= 1) { target.gold -= 1; p.gold += 1; CT.log(target.name + " paid 1 gold to " + p.name + " to silence the Rumour."); }
-    else CT.adjustRep(target.id, -1, "Rumour");
+    else CT._maybeOfferRepLoss(target.id, -1, "Rumour");
   }
 
   if (cardId === "tax_collector") {

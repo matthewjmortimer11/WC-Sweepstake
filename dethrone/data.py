@@ -252,6 +252,15 @@ VOTE_CARD_BONUSES: dict[str, int] = {
     "crown_witness": 2,
 }
 
+# Reaction cards — offered to the affected player before the effect resolves
+REACTION_EFFECTS: dict[str, dict] = {
+    "stitched_lip": {"trigger": "rumour", "action": "cancel"},
+    "mourning_veil": {"trigger": "callout", "action": "cancel"},
+    "blackmail": {"trigger": "vote_pass", "action": "cancel", "cost_rep": 1},
+    "kneel": {"trigger": "vote_pass", "action": "cancel", "requires_royal_throne": True},
+    "veterans_warning": {"trigger": "duel_declared", "action": "cancel_duel"},
+}
+
 # Role ids with standing exemption from royal / Tax Collector levies
 TAX_EXEMPT_ROLE_IDS = frozenset({"firstborn", "tinytyrant", "spy"})
 

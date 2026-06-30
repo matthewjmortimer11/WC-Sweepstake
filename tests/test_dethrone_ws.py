@@ -695,6 +695,48 @@ def test_vote_card_hidden_witness(client):
     assert "hidden_witness" not in vp.action_card_ids
 
 
+def test_stitched_lip_offers_on_rumour(client):
+    code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
+    room, pids, g = _start_game(code)
+    active = g.active_player().id
+    victim = next(pid for pid in pids if pid != active)
+    vp = g.player_by_id(victim)
+    vp.gold = 0
+    vp.action_card_ids = ["stitched_lip"]
+    ap = g.player_by_id(active)
+    ap.action_card_ids.append("rumour_card")
+    g.play_action_card(active, "rumour_card", target_id=victim)
+    assert victim in g.pending_ui_action
+    assert g.pending_ui_action[victim]["kind"] == "reaction"
+
+
+def test_stitched_lip_cancels_rumour(client):
+    code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
+    room, pids, g = _start_game(code)
+    active = g.active_player().id
+    victim = next(pid for pid in pids if pid != active)
+    vp = g.player_by_id(victim)
+    before_rep = vp.rep
+    vp.gold = 0
+    vp.action_card_ids = ["stitched_lip"]
+    ap = g.player_by_id(active)
+    ap.action_card_ids.append("rumour_card")
+    g.play_action_card(active, "rumour_card", target_id=victim)
+    g.resolve_reaction(victim, "stitched_lip")
+    assert vp.rep == before_rep
+    assert "stitched_lip" not in vp.action_card_ids
+
+
+def test_move_sets_moved_flag(client):
+    code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
+    room, pids, g = _start_game(code)
+    active = g.active_player().id
+    ap = g.player_by_id(active)
+    dest = g.legal_moves(ap)[0]
+    g.move_player(active, dest)
+    assert ap.moved_this_turn is True
+
+
 def D_ROLE_META_PUBLIC(role_id: str) -> bool:
     from dethrone.data import ROLE_META
     return ROLE_META.get(role_id, {}).get("canBePublic", True)

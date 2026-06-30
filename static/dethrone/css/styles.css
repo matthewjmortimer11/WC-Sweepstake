@@ -78,7 +78,11 @@ h3 { font-size: 17px; }
 }
 
 /* ---------- layout shell ---------- */
-.app { max-width: 1180px; margin: 0 auto; padding: var(--s5) var(--s5) var(--s8); }
+.app { max-width: 1180px; margin: 0 auto; padding: var(--s5) var(--s5) max(var(--s8), calc(72px + env(safe-area-inset-bottom))); }
+@media (min-width: 920px) {
+  .app { padding-bottom: var(--s8); }
+  .turn-dock { display: none !important; }
+}
 .topbar {
   display: flex; align-items: baseline; justify-content: space-between;
   gap: var(--s4); flex-wrap: wrap; margin-bottom: var(--s2);
@@ -314,6 +318,43 @@ svg.map { width: 100%; height: auto; display: block; }
 .win-banner.cursed { background: var(--wax); }
 .win-banner h2 { color: var(--p-0); }
 
-.toast { position: fixed; left: 50%; bottom: max(16px, env(safe-area-inset-bottom)); transform: translateX(-50%);
+.toast { position: fixed; left: 50%; bottom: max(72px, calc(56px + env(safe-area-inset-bottom))); transform: translateX(-50%);
   background: var(--ink); border: 1px solid var(--p-4); color: var(--p-0); padding: 12px 18px;
   border-radius: 12px; font-weight: 600; z-index: 60; box-shadow: var(--e3); max-width: min(92vw, 420px); text-align: center; }
+
+/* ---------- Phase 13: mobile turn dock & safe areas ---------- */
+.turn-dock {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 50;
+  padding: 10px 12px max(10px, env(safe-area-inset-bottom));
+  background: linear-gradient(180deg, transparent, rgba(244,236,214,.92) 18%, var(--p-1) 40%);
+  border-top: 1px solid var(--line);
+  box-shadow: 0 -8px 24px rgba(42,32,20,.08);
+}
+.turn-dock-inner {
+  max-width: 1180px; margin: 0 auto;
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+}
+.turn-dock .turn-meta { flex: 1; min-width: 140px; }
+.turn-dock .turn-title { font-family: var(--serif); font-size: 17px; font-weight: 600; }
+.turn-dock .turn-sub { font-size: 12px; color: var(--ink-soft); margin-top: 2px; }
+.turn-dock .turn-chips { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+.turn-dock .chip {
+  font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: var(--r-pill);
+  background: var(--p-2); border: 1px solid var(--p-4); color: var(--ink-soft);
+}
+.turn-dock .chip.ok { background: #e6efe0; border-color: #b8cfa8; color: var(--moss-deep); }
+.turn-dock .chip.warn { background: var(--wax-soft); border-color: #d9a59c; color: var(--wax); }
+.turn-dock .btn { min-height: 44px; }
+
+@media (max-width: 919px) {
+  .app { padding-left: max(var(--s4), env(safe-area-inset-left)); padding-right: max(var(--s4), env(safe-area-inset-right)); }
+  .btn, .step { min-height: 44px; }
+  .map-wrap svg { touch-action: manipulation; }
+}
+
+.reaction-banner {
+  background: var(--p-0); border: 1px solid var(--gold-soft); border-radius: var(--r-card);
+  padding: var(--s4); margin-bottom: var(--s4); box-shadow: var(--e1);
+}
+.reaction-banner h2 { font-size: 18px; margin-bottom: 6px; }
+.reaction-cards { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }

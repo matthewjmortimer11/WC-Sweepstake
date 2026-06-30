@@ -3,7 +3,7 @@ window.CT = window.CT || {};
 
 CT.ui = { privateFor: null, privateRevealed: false, showImport: false, showGuide: false,
   roleDiscardFor: null, roleDiscardRevealed: false, handFixFor: null, keepOne: null, playCard: null,
-  logFilter: "all", privateNote: null, finalRiteOffer: null };
+  logFilter: "all", privateNote: null, finalRiteOffer: null, reactionOffer: null };
 
 /* Play vs Test mode — Test reveals referee & per-player override tools (§32, §35).
  * Persisted separately so it applies to the start/setup screens too. */
@@ -47,8 +47,47 @@ CT.render = function () {
   if (CT.setup.active) { root.innerHTML = shell(CT.setup.view()); bind(); return; }
   if (!CT.state)       { root.innerHTML = shell(startScreen()); bind(); return; }
   root.innerHTML = shell(gameScreen()) + overlays();
+  renderTurnDock();
   bind();
 };
+
+CT.registerServiceWorker = function () {
+  if (!("serviceWorker" in navigator)) return;
+  var scope = (document.querySelector("base") || {}).href || "/dethrone/";
+  navigator.serviceWorker.register(scope + "sw.js", { scope: scope }).catch(function () {});
+};
+
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", CT.registerServiceWorker);
+} else {
+  CT.registerServiceWorker();
+}
+
+function renderTurnDock() {
+  var dock = document.getElementById("turn-dock");
+  if (!dock || !CT.state || CT.state.phase !== "play" || CT.state.winner || CT.isSpectator()) {
+    if (dock) dock.hidden = true;
+    return;
+  }
+  var ap = CT.activePlayer();
+  if (!ap || ap.status !== "active") { dock.hidden = true; return; }
+  var isMyTurn = !CT.isOnline() || ap.id === CT.myId();
+  if (!isMyTurn) { dock.hidden = true; return; }
+  var loc = CT.locationById(ap.location);
+  var limit = CT.getRules().HAND_LIMIT;
+  var over = CT.overHandLimit(ap);
+  var moved = !!ap.movedThisTurn;
+  var chips = '<span class="chip' + (moved ? " ok" : "") + '">' + (moved ? "✓ Moved" : "— Move") + '</span>'
+    + '<span class="chip' + (over ? " warn" : " ok") + '">🃏 ' + ap.actionCardIds.length + "/" + limit + "</span>";
+  dock.innerHTML = '<div class="turn-dock-inner">'
+    + '<div class="turn-meta"><div class="turn-title">Your turn</div>'
+    + '<div class="turn-sub">📍 ' + CT.esc(loc ? loc.name : ap.location) + "</div>"
+    + '<div class="turn-chips">' + chips + "</div></div>"
+    + '<button class="btn btn-secondary" data-act="view-private" data-id="' + ap.id + '">Hand</button>'
+    + '<button class="btn btn-primary" data-act="end-turn"' + (over ? " disabled" : "") + '>End turn</button>'
+    + "</div>";
+  dock.hidden = false;
+}
 
 CT.showToast = function (msg) {
   var el = document.getElementById("toast");
@@ -554,6 +593,7 @@ function logPanel() {
 
 /* ============ overlays (private view, import) ============ */
 function overlays() {
+  if (CT.ui.reactionOffer) return reactionView();
   if (CT.ui.finalRiteOffer) return finalRiteView();
   if (CT.ui.showGuide) return playtestGuideView();
   if (CT.ui.playCard) return playCardView();
@@ -680,6 +720,28 @@ function privateView() {
     + '<div class="btn-row" style="margin-top:20px"><div class="spacer"></div>'
     + '<button class="btn btn-primary" data-act="close-private">Hide & return to table</button></div>'
     + '</div></div>';
+}
+
+function reactionView() {
+  var offer = CT.ui.reactionOffer;
+  if (!offer) return "";
+  var p = CT.playerById(offer.playerId || CT.myId());
+  if (!p) { CT.ui.reactionOffer = null; return ""; }
+  var cards = (offer.cards || []).map(function (id) {
+    var c = CT.cardById(id);
+    return '<button class="btn btn-gold" data-act="play-reaction" data-id="' + id + '">Play '
+      + CT.esc(c ? c.name : id) + "</button>";
+  }).join("");
+  var labels = { rumour: "Rumour", callout: "Call Out", vote_pass: "Formal vote", duel_declared: "Duel" };
+  return '<div class="scrim"><div class="modal cover" style="max-width:480px">'
+    + '<div class="seal-big" style="background:var(--gold-soft);color:var(--wax)">⚡</div>'
+    + '<h1 style="margin:8px 0">Reaction?</h1>'
+    + '<p class="muted" style="font-size:15px">A ' + CT.esc(labels[offer.trigger] || "game") + ' effect targets you. '
+    + 'Play a reaction card from your hand, or let it resolve.</p>'
+    + '<div class="reaction-cards">' + cards + "</div>"
+    + '<div class="btn-row" style="justify-content:center;margin-top:20px">'
+    + '<button class="btn btn-ghost" data-act="decline-reaction">Let it happen</button>'
+    + "</div></div></div>";
 }
 
 function finalRiteView() {
@@ -857,6 +919,20 @@ CT.handleAction = function (act, el, ev) {
     case "decline-final-rite":
       if (CT.netAction({ type: "declineFinalRite" })) break;
       CT.declineFinalRite(CT.ui.finalRiteOffer || CT.myId());
+      CT.render(); break;
+    case "play-reaction":
+      if (CT.netAction({ type: "resolveReaction", cardId: el.dataset.id })) {
+        CT.ui.reactionOffer = null; break;
+      }
+      CT.resolveReaction(el.dataset.id);
+      CT.ui.reactionOffer = null;
+      CT.render(); break;
+    case "decline-reaction":
+      if (CT.netAction({ type: "declineReaction" })) {
+        CT.ui.reactionOffer = null; break;
+      }
+      CT.declineReaction();
+      CT.ui.reactionOffer = null;
       CT.render(); break;
     case "bot-turn": {
       var bp = CT.activePlayer();

@@ -92,8 +92,10 @@ CT.net.applyState = function (msg) {
     }
     if (cs.pendingUiAction && CT.myId()) {
       var pui = cs.pendingUiAction;
-        if (pui.kind === "final_rite") {
+      if (pui.kind === "final_rite") {
         CT.ui.finalRiteOffer = pui.playerId;
+      } else if (pui.kind === "reaction") {
+        CT.ui.reactionOffer = { playerId: CT.myId(), trigger: pui.trigger, cards: pui.cards || [] };
       } else if (CT.helpers && !CT.helpers.ui.open) {
         if (pui.kind === "duel") CT.helpers.openDuelFromPending(pui);
         else if (pui.kind === "vote") CT.helpers.openVoteFromPending(pui);
@@ -105,6 +107,9 @@ CT.net.applyState = function (msg) {
       }
     } else if (CT.ui.finalRiteOffer === CT.myId()) {
       CT.ui.finalRiteOffer = null;
+    }
+    if (!cs.pendingUiAction || cs.pendingUiAction.kind !== "reaction") {
+      if (CT.ui.reactionOffer && CT.ui.reactionOffer.playerId === CT.myId()) CT.ui.reactionOffer = null;
     }
     if (cs.privateNote && CT.myId()) {
       CT.ui.privateNote = cs.privateNote;

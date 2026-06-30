@@ -764,15 +764,13 @@ CT.helpers.applyCallout = function () {
   var caller = CT.playerById(u.caller), target = CT.playerById(u.target), role = CT.roleById(u.role);
   CT.log(caller.name + " calls out " + target.name + " as " + role.name + "!");
   CT.adjustCorruption(2, "Call Out");
-  var correct = target.hiddenRoleIds.indexOf(u.role) > -1;
-  if (correct) {
-    CT.log("Correct — " + role.name + " is revealed.");
-    CT.applyRoleDiscard(target.id, "hidden", u.role); // reveals; Cursed -> loyal win; handles elimination
-    if (!CT.state.winner) CT.grantExtraShownRole(caller.id, "Call Out");
-  } else {
-    CT.log("Wrong — " + target.name + " reveals nothing. " + caller.name + " loses 1 Reputation.");
-    CT.adjustRep(caller.id, -1, "wrong Call Out");
+  if (CT._offerReaction(target.id, "callout", {
+    effect: "callout_resolve", callerId: caller.id, targetId: target.id, roleId: u.role,
+  })) {
+    CT.helpers.ui.open = null;
+    return CT.render();
   }
+  CT._resolveCallOut(caller.id, target.id, u.role);
   CT.helpers.ui.open = null; CT.render();
 };
 

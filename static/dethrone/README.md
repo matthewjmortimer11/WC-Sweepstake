@@ -68,6 +68,12 @@ open "index.html"          # macOS
 - **Duel card hooks** — Duel helper: pick duel cards from hand (Hidden Knife, Shield, Dirty Trick, etc.); auto-sum values; Iron Gauntlet blocks Flee; Loaded Dice / Shield / Parry / Disarm / Cursed Blade effects
 - **Vote card hooks** — Hidden Witness (+1) and Crown Witness (+2) playable from hand during formal vote tally
 
+### Phase 13 — Turn UX, mobile PWA, reactions
+- **Turn dock** — sticky bottom bar on mobile: your turn, location, move/hand chips, Hand + End turn
+- **Moved-this-turn** — tracked on board moves (resets each turn)
+- **Installable PWA** — `manifest.webmanifest`, service worker, safe-area padding, 44px touch targets
+- **Reaction framework** — Stitched Lip (Rumour), Mourning Veil (Call Out), Blackmail/Kneel (passed vote), Veteran's Warning (duel declared); private prompt to play or decline
+
 ### Phase 4 — Throne & Succession
 A **Throne & Succession** panel tracks the crown and the line of succession.
 - **Throne control (§23)**: King / Queen / Successor controllers, set manually or via the **Claim helper** (claimant + crown; unchallenged → crowned, or challenged → "proof valid" crowns them and the challenger loses a role / "bluff" costs the claimant a role). Claim order is recorded.
@@ -126,7 +132,7 @@ Table talk and bluffing stay verbal. The app guides, tracks, and enforces mechan
 
 ## Next improvements
 
-Run `PLAYTEST.md` at a real table, log friction, then Phase 13 (turn UX, mobile PWA, reaction framework).
+Run `PLAYTEST.md` at a real table, log friction, then Phase 14 (top role abilities + succession polish).
 
 ```
 index.html        shell; loads the scripts in order

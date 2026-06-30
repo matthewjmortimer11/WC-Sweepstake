@@ -16,7 +16,13 @@ router = APIRouter()
 
 _STATIC = Path("static/dethrone")
 _INDEX = _STATIC / "index.html"
-_MEDIA = {".js": "application/javascript", ".css": "text/css"}
+_MEDIA = {
+    ".js": "application/javascript",
+    ".css": "text/css",
+    ".json": "application/json",
+    ".webmanifest": "application/manifest+json",
+    ".svg": "image/svg+xml",
+}
 
 _DETHRONE_CSP = (
     "default-src 'self'; "
@@ -28,7 +34,7 @@ _DETHRONE_CSP = (
     "frame-ancestors 'none'"
 )
 
-_DETHRONE_ASSET_VERSION = "20260630-p12"
+_DETHRONE_ASSET_VERSION = "20260630-p13"
 
 _CREATE_BUCKETS: dict[str, list[float]] = {}
 _CREATE_LIMIT = 30
@@ -63,6 +69,8 @@ async def dethrone_page() -> HTMLResponse:
     v = _DETHRONE_ASSET_VERSION
     html = html.replace('.css"', f'.css?v={v}"')
     html = html.replace('.js"', f'.js?v={v}"')
+    html = html.replace('manifest.webmanifest"', f'manifest.webmanifest?v={v}"')
+    html = html.replace('icons/icon.svg"', f'icons/icon.svg?v={v}"')
     return HTMLResponse(content=html, headers={"Content-Security-Policy": _DETHRONE_CSP})
 
 
@@ -337,6 +345,15 @@ def _dispatch(room, player, mtype: str, msg: dict) -> bool:
 
     if mtype == "declineFinalRite":
         g.decline_final_rite(player.id)
+        return True
+
+    if mtype == "resolveReaction":
+        card_id = msg.get("cardId")
+        g.resolve_reaction(player.id, str(card_id) if card_id else None)
+        return True
+
+    if mtype == "declineReaction":
+        g.resolve_reaction(player.id, None)
         return True
 
     if mtype == "discardRole":

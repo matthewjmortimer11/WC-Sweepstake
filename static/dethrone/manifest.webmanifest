@@ -1,0 +1,19 @@
+{
+  "name": "The Cursed Throne",
+  "short_name": "Dethrone",
+  "description": "Playtest ledger for The Cursed Throne bluffing board game",
+  "start_url": "/dethrone",
+  "scope": "/dethrone",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f4ecd6",
+  "theme_color": "#8c2f23",
+  "icons": [
+    {
+      "src": "icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

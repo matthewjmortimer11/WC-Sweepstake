@@ -356,4 +356,11 @@ CT.DUEL_CARD_VALUES = {
 };
 CT.VOTE_CARD_BONUSES = { hidden_witness: 1, crown_witness: 2 };
 CT.DECK_BUY_COST = { Market: 2, Tavern: 2, Knowledge: 2, Barracks: 2, Graveyard: 4, Royal: 2 };
+CT.REACTION_EFFECTS = {
+  stitched_lip: { trigger: "rumour", costRep: 0 },
+  mourning_veil: { trigger: "callout" },
+  blackmail: { trigger: "vote_pass", costRep: 1 },
+  kneel: { trigger: "vote_pass", requiresRoyalThrone: true },
+  veterans_warning: { trigger: "duel_declared" },
+};
 CT.canAutoPlayCard = function (cardId) { return !!CT.AUTO_PLAY[cardId]; };
