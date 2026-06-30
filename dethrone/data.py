@@ -178,3 +178,24 @@ for _card in ACTION_CARDS:
     CARDS_BY_DECK.setdefault(_card["deck"], []).append(_card["id"])
 
 CARD_BY_ID = {c["id"]: c for c in ACTION_CARDS}
+
+# Auto-resolvable action cards (OnTurn / simple Movement). Others stay manual at the table.
+CARD_AUTO_EFFECTS: dict[str, dict] = {
+    "spare_coin_purse": {"gold": 2},
+    "spirit_coin": {"gold": 2, "corruption": 1},
+    "soul_debt": {"gold": 5, "corruption": 1},
+    "performers_tale": {"rep": 1},
+    "grave_dust": {"corruption": -1, "rep": -1},
+    "training_dummy": {"draw": "Barracks"},
+    "forbidden_tome": {"draw": "Graveyard", "corruption": 2},
+    "last_rites": {"last_rites": True, "corruption": 1},
+    "royal_purse": {"royal_purse": True},
+    "hangover_cure": {"hangover_cure": True},
+    "pardon_card": {"target_rep": 1, "needs_target": True},
+    "false_rumour": {"target_rep": -1, "corruption": 1, "needs_target": True},
+    "rumour_card": {"rumour": True, "needs_target": True},
+    "secret_passage": {"move_connected": True, "needs_location": True},
+    "merchants_map": {"move_connected": True, "needs_location": True},
+    "counterfeit_pass": {"move_connected": True, "needs_location": True},
+    "route_pass": {"move_pair": ("college", "scrolls"), "needs_location": False},
+}

@@ -6,6 +6,22 @@ CT.bot = {};
 
 CT.bot.isCursed = function (p) { return p.hiddenRoleIds.indexOf("cursedone") > -1; };
 
+CT.bot.autoDiscard = function (p) {
+  if (!p || !p.isBot) return false;
+  var choices = [];
+  if (p.publicRoleId) choices.push(["public", p.publicRoleId]);
+  p.hiddenRoleIds.forEach(function (id) { choices.push(["hidden", id]); });
+  p.extraShownRoleIds.forEach(function (id) { choices.push(["extra", id]); });
+  if (!choices.length) return false;
+  var nonCursed = choices.filter(function (c) { return c[1] !== "cursedone"; });
+  var pick = nonCursed.length ? nonCursed[Math.floor(Math.random() * nonCursed.length)] : choices[0];
+  CT.applyRoleDiscard(p.id, pick[0], pick[1]);
+  if (CT.ui.afterDiscard) { var fn = CT.ui.afterDiscard; CT.ui.afterDiscard = null; fn(); }
+  CT.ui.roleDiscardFor = null;
+  CT.ui.roleDiscardRevealed = false;
+  return true;
+};
+
 /* BFS: next step from `a` along the shortest path toward `target` */
 CT.bot.stepToward = function (a, target) {
   if (a === target) return null;
@@ -51,6 +67,41 @@ CT.bot.act = function (p, cursed) {
   if (r && r.keepOne) CT.resolveKeepOne(p.id, r.keepOne.deck, r.keepOne.cards[0], r.keepOne.cards[1]);
 };
 
+CT.bot.trySocial = function (p) {
+  var s = CT.state;
+  if (!s || s.winner || CT.bot.isCursed(p) || Math.random() > 0.4) return false;
+  var cursed = s.players.find(function (x) {
+    return x.status === "active" && x.id !== p.id && CT.bot.isCursed(x);
+  });
+  if (!cursed) return false;
+  if (s.corruption >= 3 && Math.random() < 0.55) {
+    CT.log(p.name + " calls out " + cursed.name + " as Cursed One!");
+    CT.adjustCorruption(2, "Call Out");
+    CT.log("Correct — Cursed One is revealed.");
+    CT.applyRoleDiscard(cursed.id, "hidden", "cursedone");
+    if (!s.winner) CT.grantExtraShownRole(p.id, "Call Out");
+    return true;
+  }
+  if (s.corruption >= 1 && Math.random() < 0.45) {
+    var yes = 0, no = 0;
+    s.players.forEach(function (v) {
+      if (v.status !== "active") return;
+      var w = v.rep >= 5 ? 2 : 1;
+      if ((v.isBot && !CT.bot.isCursed(v)) || v.id === p.id) yes += w;
+      else no += w;
+    });
+    var pass = yes > no;
+    CT.log("Accusation vote against " + cursed.name + ": " + (pass ? "PASSES" : "fails") + " (" + yes + "–" + no + ").");
+    if (pass) {
+      CT.ui.roleDiscardFor = cursed.id;
+      CT.ui.roleDiscardRevealed = false;
+      CT.ui.afterDiscard = function () { if (!s.winner) CT.adjustCorruption(2, "Cursed not revealed by accusation"); };
+    }
+    return true;
+  }
+  return false;
+};
+
 CT.bot.takeTurn = function (playerId) {
   var s = CT.state;
   if (!s || s.winner) return;
@@ -65,8 +116,9 @@ CT.bot.takeTurn = function (playerId) {
     if (dest) CT.movePlayer(p.id, dest, false);
   }
 
-  // 2) one action
-  CT.bot.act(p, cursed);
+  // 2) loyal bots hunt the Cursed One (playtest engine — bots see hidden roles)
+  if (!cursed && CT.bot.trySocial(p)) { /* social action taken */ }
+  else CT.bot.act(p, cursed);
 
   // 3) respect the hand limit
   var guard = 0;
@@ -85,6 +137,9 @@ CT.bot.takeTurn = function (playerId) {
 CT.bot.autoRun = function () {
   var guard = 0;
   while (CT.state && !CT.state.winner && guard++ < 80) {
+    CT.state.players.forEach(function (bp) {
+      if (bp.isBot && CT.ui.roleDiscardFor === bp.id) CT.bot.autoDiscard(bp);
+    });
     var ap = CT.activePlayer();
     if (!ap || !ap.isBot || ap.status !== "active") break;
     CT.bot.takeTurn(ap.id);

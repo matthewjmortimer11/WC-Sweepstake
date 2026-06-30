@@ -267,6 +267,68 @@ CT.discardCard = function (playerId, cardId, reason) {
 
 CT.overHandLimit = function (player) { return player.actionCardIds.length > CT.getRules().HAND_LIMIT; };
 
+CT.togglePlayerElim = function (playerId) {
+  var p = CT.playerById(playerId);
+  if (!p) return;
+  p.status = p.status === "active" ? "eliminated" : "active";
+  CT.log(p.name + " was " + (p.status === "eliminated" ? "eliminated" : "restored") + " (manual).");
+  CT.save();
+};
+
+/* Play an auto-resolvable action card from hand (active player, OnTurn). */
+CT.playActionCard = function (playerId, cardId, opts) {
+  opts = opts || {};
+  var s = CT.state;
+  if (!s || s.winner) return { ok: false, msg: "Game over." };
+  var ap = CT.activePlayer();
+  if (!ap || ap.id !== playerId) return { ok: false, msg: "Not your turn." };
+  var p = CT.playerById(playerId);
+  if (!p || p.actionCardIds.indexOf(cardId) === -1) return { ok: false, msg: "Card not in hand." };
+  var fx = CT.AUTO_PLAY[cardId];
+  if (!fx) return { ok: false, msg: "Resolve this card manually at the table." };
+  var target = opts.targetId ? CT.playerById(opts.targetId) : null;
+  if (fx.needsTarget && (!target || target.status !== "active")) return { ok: false, msg: "Choose a target." };
+  var card = CT.cardById(cardId);
+  var cname = card ? card.name : cardId;
+  CT.log(p.name + " plays " + cname + ".");
+
+  if (cardId === "route_pass") {
+    if (p.location !== "college") return { ok: false, msg: "Must be at College." };
+    CT.movePlayer(playerId, "scrolls", true);
+  } else if (fx.needsLocation) {
+    if (!opts.locationId || CT.legalMoves(p).indexOf(opts.locationId) === -1) return { ok: false, msg: "Choose a reachable location." };
+    CT.movePlayer(playerId, opts.locationId, true);
+  }
+
+  if (cardId === "spare_coin_purse") { p.gold += 2; CT.log(p.name + " gained 2 gold. Now " + p.gold + "."); }
+  if (cardId === "spirit_coin") { p.gold += 2; CT.adjustCorruption(1, cname); CT.log(p.name + " gained 2 gold. Now " + p.gold + "."); }
+  if (cardId === "soul_debt") { p.gold += 5; CT.adjustCorruption(1, cname); CT.log(p.name + " gained 5 gold. Now " + p.gold + "."); }
+  if (cardId === "performers_tale") CT.adjustRep(playerId, 1, cname);
+  if (cardId === "grave_dust") { CT.adjustCorruption(-1, cname); CT.adjustRep(playerId, -1, cname); }
+  if (cardId === "training_dummy") CT.drawCard(playerId, "Barracks", cname);
+  if (cardId === "forbidden_tome") { CT.drawCard(playerId, "Graveyard", cname); CT.adjustCorruption(2, cname); }
+  if (cardId === "last_rites") { if (s.corruption >= 6) CT.adjustRep(playerId, 1, "Last Rites"); CT.adjustCorruption(1, cname); }
+  if (cardId === "royal_purse") {
+    var t = s.throne;
+    if (p.id === t.kingControllerId || p.id === t.queenControllerId) { p.gold += 3; CT.log(p.name + " gained 3 gold. Now " + p.gold + "."); }
+    else CT.log(p.name + " does not control the Throne — no gold from Royal Purse.", "note");
+  }
+  if (cardId === "hangover_cure") {
+    if (p.wounded) { p.wounded = false; CT.log(p.name + " removed Wound (Hangover Cure)."); }
+    else if (p.rep <= 2) CT.adjustRep(playerId, 1, "Hangover Cure");
+    else CT.log(p.name + " had nothing to cure.", "note");
+  }
+  if (cardId === "pardon_card" && target) CT.adjustRep(target.id, 1, cname);
+  if (cardId === "false_rumour" && target) { CT.adjustRep(target.id, -1, cname); CT.adjustCorruption(1, cname); }
+  if (cardId === "rumour_card" && target) {
+    if (target.gold >= 1) { target.gold -= 1; p.gold += 1; CT.log(target.name + " paid 1 gold to " + p.name + " to silence the Rumour."); }
+    else CT.adjustRep(target.id, -1, "Rumour");
+  }
+
+  CT.discardCard(playerId, cardId, "played");
+  return { ok: true };
+};
+
 /* execute a location action's mechanical effect (§13).
  * returns { ok, manual?, keepOne?:{deck, cards:[a,b]}, msg? } so the UI can follow up. */
 CT.doLocationAction = function (playerId, actId) {

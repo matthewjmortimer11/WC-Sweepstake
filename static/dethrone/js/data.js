@@ -317,3 +317,13 @@ CT.SUCCESSION_ORDER = ["firstborn", "secondborn", "tinytyrant", "distantcousin"]
 CT.roleById = function (id) { return CT.ROLES.find(function (r) { return r.id === id; }); };
 CT.cardById = function (id) { return CT.ACTION_CARDS.find(function (c) { return c.id === id; }); };
 CT.locationById = function (id) { return CT.LOCATIONS.find(function (l) { return l.id === id; }); };
+
+/* Auto-playable action cards (mirrors dethrone/data.py CARD_AUTO_EFFECTS). */
+CT.AUTO_PLAY = {
+  spare_coin_purse: {}, spirit_coin: {}, soul_debt: {}, performers_tale: {}, grave_dust: {},
+  training_dummy: {}, forbidden_tome: {}, last_rites: {}, royal_purse: {}, hangover_cure: {},
+  pardon_card: { needsTarget: true }, false_rumour: { needsTarget: true }, rumour_card: { needsTarget: true },
+  secret_passage: { needsLocation: true }, merchants_map: { needsLocation: true },
+  counterfeit_pass: { needsLocation: true }, route_pass: {},
+};
+CT.canAutoPlayCard = function (cardId) { return !!CT.AUTO_PLAY[cardId]; };

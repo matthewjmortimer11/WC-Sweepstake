@@ -266,6 +266,21 @@ def _dispatch(room, player, mtype: str, msg: dict) -> bool:
         g.discard_card(player.id, str(msg.get("cardId", "")), str(msg.get("reason", "")))
         return True
 
+    if mtype == "toggleElim":
+        if not player.is_host:
+            raise MoveError("Host only.")
+        g.toggle_player_status(str(msg.get("playerId", "")))
+        return True
+
+    if mtype == "playCard":
+        g.play_action_card(
+            player.id,
+            str(msg.get("cardId", "")),
+            target_id=msg.get("targetId") or None,
+            location_id=msg.get("locationId") or None,
+        )
+        return True
+
     if mtype == "adjustGold":
         if not player.is_host:
             raise MoveError("Host only.")
@@ -354,6 +369,9 @@ def _dispatch(room, player, mtype: str, msg: dict) -> bool:
             raise MoveError("Only the host can auto-play bots.")
         guard = 0
         while guard < 80 and g.status == STATUS_PLAY and not g.winner:
+            for bp in g.players:
+                if bp.is_bot and bp.id in g.pending_role_discard:
+                    g._bot_auto_role_discard(bp.id, room.rng)
             ap = g.active_player()
             if not ap or not ap.is_bot or ap.status != "active":
                 break

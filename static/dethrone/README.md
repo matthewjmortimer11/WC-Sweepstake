@@ -28,6 +28,11 @@ open "index.html"          # macOS
 - **Playtest report** — **Report** button exports a markdown chronicle (public info only); online rooms also at `GET /dethrone/api/rooms/{code}/report`
 - **Balance toggles** — host adjusts hand limit, corruption cap, Final Rite threshold, innocents to lose, starting gold/Rep in the lobby (online) or Test mode (local)
 
+### Phase 6 — action cards & bot playtesting
+- **Play action cards** — auto-resolve simple OnTurn cards from your private view (gold, Rep, corruption, draws, movement, Rumour/Pardon with target picker); online sync via `playCard` WebSocket message
+- **Referee eliminate/restore** — host toggle now syncs online (`toggleElim`)
+- **Smarter bots** — loyal bots Call Out / accuse the Cursed One (playtest engine sees hidden roles); bots auto-pick role discards when votes land; all-bot auto-play can end in a Loyal win
+
 ### Phase 4 — Throne & Succession
 A **Throne & Succession** panel tracks the crown and the line of succession.
 - **Throne control (§23)**: King / Queen / Successor controllers, set manually or via the **Claim helper** (claimant + crown; unchallenged → crowned, or challenged → "proof valid" crowns them and the challenger loses a role / "bluff" costs the claimant a role). Claim order is recorded.
@@ -80,9 +85,9 @@ Table talk and bluffing stay verbal. The app guides, tracks, and enforces mechan
 
 ## Known limitations / not yet built
 
-- **Phase 5 (remaining)**: exportable playtest report, full 76 action cards, balance toggles. (Board art done.)
-- In an all-bot auto-play, Loyal can never win — bots don't perform the social actions (accuse / Call Out / banish) Loyal needs, so the Cursed bot always closes it out. Bots test the board/economy/win-conditions, not the social layer.
-- Action cards are the §27 starter set (~30); the data model already scales to 76.
+- Bots still skip most social nuance (duels, trades, throne claims) — they hunt the Cursed One so all-bot runs can test a Loyal win, not to simulate table talk.
+- Action cards that need table judgement (Call Out helper, Blood Contract, most Vote/Duel/Reaction cards) stay manual — auto-play covers the mechanical OnTurn subset listed in `CT.AUTO_PLAY` / `CARD_AUTO_EFFECTS`.
+- Spectator mode not built.
 
 ## File structure
 

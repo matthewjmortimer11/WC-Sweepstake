@@ -204,6 +204,86 @@ def test_report_endpoint(client):
     assert "Chronicle" in md
 
 
+def test_toggle_elimination_host(client):
+    code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
+    room, pids, g = _start_game(code)
+    target = pids[1]
+    host = room.host_id
+    with client.websocket_connect(f"/dethrone/ws/{code}?pid={host}&name=Host") as ws:
+        ws.receive_json()
+        ws.receive_json()
+        ws.send_json({"type": "toggleElim", "playerId": target})
+        state = ws.receive_json()
+        pub = next(p for p in state["room"]["game"]["players"] if p["id"] == target)
+        assert pub["status"] == "eliminated"
+
+
+def test_play_action_card(client):
+    code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
+    room, pids, g = _start_game(code)
+    active = g.active_player().id
+    g.player_by_id(active).action_card_ids.append("spare_coin_purse")
+    before = g.player_by_id(active).gold
+    with client.websocket_connect(f"/dethrone/ws/{code}?pid={active}&name=Active") as ws:
+        ws.receive_json()
+        ws.receive_json()
+        ws.send_json({"type": "playCard", "cardId": "spare_coin_purse"})
+        state = ws.receive_json()
+        me = next(p for p in state["room"]["game"]["players"] if p["id"] == active)
+        assert me["gold"] == before + 2
+        assert "spare_coin_purse" not in me["actionCardIds"]
+
+
+def test_loyal_bot_can_call_out_cursed(client):
+    code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
+    room = manager.get(code)
+    manager.join(room, "human1", "Alice")
+    room.players["human1"].connected = True
+    manager.fill_bots(room)
+    manager.deal_setup(room)
+    g = room.game
+    for p in g.players:
+        pub = next(r for r in p.dealt_role_ids if D_ROLE_META_PUBLIC(r))
+        g.pick_public_role(p.id, pub)
+    manager.begin_game(room, "random", 0)
+    cursed = next(p for p in g.players if g.bot_is_cursed(p))
+    loyal = next(p for p in g.players if p.is_bot and not g.bot_is_cursed(p))
+    g.corruption = 4
+
+    class _Rng:
+        def __init__(self):
+            self.n = 0
+        def random(self):
+            self.n += 1
+            return 0.1  # always take social branch
+        def choice(self, seq):
+            return seq[0]
+        def randrange(self, n):
+            return 0
+
+    g._bot_try_social(loyal, _Rng())
+    assert g.winner == "loyal"
+
+
+def test_bot_auto_role_discard(client):
+    code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
+    room = manager.get(code)
+    manager.fill_bots(room)
+    manager.deal_setup(room)
+    g = room.game
+    for p in g.players:
+        pub = next(r for r in p.dealt_role_ids if D_ROLE_META_PUBLIC(r))
+        g.pick_public_role(p.id, pub)
+    manager.begin_game(room, "random", 0)
+    bot = next(p for p in g.players if p.is_bot)
+    before_roles = len(bot.hidden_role_ids) + (1 if bot.public_role_id else 0)
+    g.require_role_discard(bot.id, "test")
+    g._bot_auto_role_discard(bot.id, room.rng)
+    assert bot.id not in g.pending_role_discard
+    after_roles = len(bot.hidden_role_ids) + (1 if bot.public_role_id else 0)
+    assert after_roles < before_roles
+
+
 def D_ROLE_META_PUBLIC(role_id: str) -> bool:
     from dethrone.data import ROLE_META
     return ROLE_META.get(role_id, {}).get("canBePublic", True)

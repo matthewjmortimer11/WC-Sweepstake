@@ -2,7 +2,7 @@
 window.CT = window.CT || {};
 
 CT.ui = { privateFor: null, privateRevealed: false, showImport: false,
-  roleDiscardFor: null, roleDiscardRevealed: false, handFixFor: null, keepOne: null };
+  roleDiscardFor: null, roleDiscardRevealed: false, handFixFor: null, keepOne: null, playCard: null };
 
 /* Play vs Test mode — Test reveals referee & per-player override tools (§32, §35).
  * Persisted separately so it applies to the start/setup screens too. */
@@ -426,6 +426,7 @@ function logPanel() {
 
 /* ============ overlays (private view, import) ============ */
 function overlays() {
+  if (CT.ui.playCard) return playCardView();
   if (CT.ui.privateFor) return privateView();
   if (CT.ui.roleDiscardFor) return roleDiscardView();
   if (CT.ui.handFixFor) return handFixView();
@@ -526,8 +527,20 @@ function privateView() {
   }).join("") || '<p class="muted">No hidden roles remaining.</p>';
   var cards = p.actionCardIds.map(function (id) {
     var c = CT.cardById(id);
-    return '<div class="pcard" style="padding:12px"><div class="pname" style="font-size:15px">' + CT.esc(c.name)
-      + ' <span class="tag">' + c.deck + '</span></div><div class="prole" style="margin-top:4px">' + CT.esc(c.effect) + '</div></div>';
+    var fx = CT.AUTO_PLAY[id];
+    var onTurn = CT.activePlayer() && CT.activePlayer().id === p.id && !CT.state.winner;
+    var playBtn = "";
+    if (fx && onTurn) {
+      if (fx.needsTarget || fx.needsLocation) {
+        playBtn = ' <button class="btn btn-ghost btn-sm" data-act="play-card-prompt" data-id="' + id + '">Play…</button>';
+      } else {
+        playBtn = ' <button class="btn btn-primary btn-sm" data-act="play-card" data-id="' + id + '">Play</button>';
+      }
+    }
+    return '<div class="pcard" style="padding:12px"><div class="row" style="justify-content:space-between;align-items:flex-start;gap:8px">'
+      + '<div><div class="pname" style="font-size:15px">' + CT.esc(c.name)
+      + ' <span class="tag">' + c.deck + '</span></div><div class="prole" style="margin-top:4px">' + CT.esc(c.effect) + '</div></div>'
+      + playBtn + '</div></div>';
   }).join("") || '<p class="muted">No action cards.</p>';
   return '<div class="scrim"><div class="modal" style="max-width:620px">'
     + '<div class="eyebrow">Private · ' + CT.esc(p.name) + '</div>'
@@ -536,6 +549,36 @@ function privateView() {
     + '<div class="btn-row" style="margin-top:20px"><div class="spacer"></div>'
     + '<button class="btn btn-primary" data-act="close-private">Hide & return to table</button></div>'
     + '</div></div>';
+}
+
+function playCardView() {
+  var u = CT.ui.playCard;
+  if (!u) return "";
+  var p = CT.playerById(u.playerId);
+  var c = CT.cardById(u.cardId);
+  if (!p || !c) { CT.ui.playCard = null; return ""; }
+  var fx = CT.AUTO_PLAY[u.cardId] || {};
+  var body = "";
+  if (fx.needsTarget) {
+    var opts = CT.state.players.filter(function (x) { return x.status === "active" && x.id !== p.id; })
+      .map(function (x) { return '<option value="' + x.id + '">' + CT.esc(x.name) + '</option>'; }).join("");
+    body += '<label class="field" style="display:block;margin:12px 0"><span>Target</span>'
+      + '<select id="play-target" style="width:100%">' + opts + '</select></label>';
+  }
+  if (fx.needsLocation) {
+    var moves = CT.legalMoves(p).map(function (lid) {
+      return '<option value="' + lid + '">' + CT.esc(CT.locationById(lid).name) + '</option>';
+    }).join("");
+    body += '<label class="field" style="display:block;margin:12px 0"><span>Move to</span>'
+      + '<select id="play-location" style="width:100%">' + moves + '</select></label>';
+  }
+  return '<div class="scrim"><div class="modal" style="max-width:480px">'
+    + '<h2 style="margin-bottom:4px">Play ' + CT.esc(c.name) + '</h2>'
+    + '<p class="muted" style="font-size:14px;margin:0 0 8px">' + CT.esc(c.effect) + '</p>'
+    + body
+    + '<div class="btn-row" style="margin-top:16px"><button class="btn btn-ghost" data-act="close-play-card">Cancel</button>'
+    + '<div class="spacer"></div><button class="btn btn-primary" data-act="confirm-play-card" data-id="' + u.cardId + '">Play</button>'
+    + '</div></div></div>';
 }
 function importView() {
   return '<div class="scrim"><div class="modal">'
@@ -609,10 +652,9 @@ CT.handleAction = function (act, el, ev) {
       if (CT.netAction({ type: "adjustInnocents", delta: +el.dataset.d, reason: "manual adjustment" })) break;
       CT.setInnocentElims(CT.state.innocentElims + (+el.dataset.d), "manual adjustment"); CT.render(); break;
     case "toggle-elim": {
-      var p = CT.playerById(el.dataset.id);
-      p.status = p.status === "active" ? "eliminated" : "active";
-      CT.log(p.name + " was " + (p.status === "eliminated" ? "eliminated" : "restored") + " (manual).");
-      CT.save(); CT.render(); break;
+      if (CT.netAction({ type: "toggleElim", playerId: el.dataset.id })) break;
+      CT.togglePlayerElim(el.dataset.id);
+      CT.render(); break;
     }
     case "win":
       if (CT.netAction({ type: "declareWinner", side: el.dataset.side })) break;
@@ -678,6 +720,37 @@ CT.handleAction = function (act, el, ev) {
       CT.ui.privateFor = el.dataset.id; CT.ui.privateRevealed = CT.isOnline(); CT.render(); break;
     case "reveal-private-view": CT.ui.privateRevealed = true; CT.render(); break;
     case "close-private": CT.ui.privateFor = null; CT.ui.privateRevealed = false; CT.render(); break;
+    case "play-card": {
+      var pid = CT.ui.privateFor || CT.myId();
+      var msg = { type: "playCard", cardId: el.dataset.id };
+      if (CT.netAction(msg)) { CT.ui.playCard = null; break; }
+      var res = CT.playActionCard(pid, el.dataset.id);
+      if (res && !res.ok && res.msg) alert(res.msg);
+      CT.render(); break;
+    }
+    case "play-card-prompt":
+      CT.ui.playCard = { playerId: CT.ui.privateFor || CT.myId(), cardId: el.dataset.id };
+      CT.render(); break;
+    case "close-play-card": CT.ui.playCard = null; CT.render(); break;
+    case "confirm-play-card": {
+      var u = CT.ui.playCard;
+      if (!u) break;
+      var fx = CT.AUTO_PLAY[u.cardId] || {};
+      var payload = { type: "playCard", cardId: u.cardId };
+      if (fx.needsTarget) {
+        var ts = document.getElementById("play-target");
+        if (ts) payload.targetId = ts.value;
+      }
+      if (fx.needsLocation) {
+        var ls = document.getElementById("play-location");
+        if (ls) payload.locationId = ls.value;
+      }
+      if (CT.netAction(payload)) { CT.ui.playCard = null; break; }
+      var r2 = CT.playActionCard(u.playerId, u.cardId, { targetId: payload.targetId, locationId: payload.locationId });
+      if (r2 && !r2.ok && r2.msg) alert(r2.msg);
+      CT.ui.playCard = null;
+      CT.render(); break;
+    }
     case "export-report":
       if (CT.isOnline()) {
         fetch("/dethrone/api/rooms/" + CT.net.routeCode + "/report").then(function (r) { return r.json(); })
