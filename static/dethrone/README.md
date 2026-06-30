@@ -6,18 +6,19 @@ it supports the social game, it does not replace it.
 
 ## How to run
 
-No build step, no Node, no server, no internet. Just open the file:
+### Online (recommended)
+
+Open `/dethrone` on the Wheesht server. **Create online room** → share the invite link → everyone joins on their own phone. The server deals roles, tracks the board, and keeps hidden information private per player.
+
+### Local pass-and-play
+
+Choose **Local pass-and-play** on the start screen, or open with `#/local` in the URL. No server required beyond static hosting; state auto-saves to `localStorage`.
+
+Offline file open still works:
 
 ```
 open "index.html"          # macOS
 ```
-
-or double-click `index.html` in Finder. State auto-saves to the browser's `localStorage`, so a
-refresh resumes the same game.
-
-> Built as plain HTML/CSS/JS with classic `<script>` tags specifically so it runs from `file://`
-> at a table with no wifi. If you later want hot-reload, any static server works
-> (`python3 -m http.server`), but it is not required.
 
 ## What is implemented (Phases 1–2)
 

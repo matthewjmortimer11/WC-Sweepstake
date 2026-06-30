@@ -21,18 +21,44 @@ function initials(name) { return (name || "?").trim().slice(0, 1).toUpperCase() 
 /* ============ top-level render / routing ============ */
 CT.render = function () {
   var root = document.getElementById("app");
+  if (CT.net && CT.net.online && CT.net.error) {
+    root.innerHTML = shell('<div class="panel" style="max-width:560px;margin:24px auto"><p class="muted">' + CT.esc(CT.net.error) + '</p></div>');
+    bind(); return;
+  }
+  if (CT.net && CT.net.online && CT.net.room && (!CT.state || CT.state.phase === "lobby")) {
+    root.innerHTML = shell(onlineLobbyScreen());
+    bind(); return;
+  }
+  if (CT.net && CT.net.online && CT.state && CT.state.phase === "setup") {
+    root.innerHTML = shell(onlineSetupScreen()) + overlays();
+    bind(); return;
+  }
   if (CT.setup.active) { root.innerHTML = shell(CT.setup.view()); bind(); return; }
   if (!CT.state)       { root.innerHTML = shell(startScreen()); bind(); return; }
   root.innerHTML = shell(gameScreen()) + overlays();
   bind();
 };
 
+CT.showToast = function (msg) {
+  var el = document.getElementById("toast");
+  if (!el) return;
+  el.textContent = msg;
+  el.hidden = false;
+  clearTimeout(CT.showToast._t);
+  CT.showToast._t = setTimeout(function () { el.hidden = true; }, 3200);
+};
+
+CT.isOnline = function () { return CT.net && CT.net.online && CT.net.connected; };
+CT.myId = function () { return CT.isOnline() && CT.net.you ? CT.net.you.id : null; };
+CT.isHost = function () { return CT.isOnline() ? !!(CT.net.you && CT.net.you.isHost) : true; };
+CT.netAction = function (msg) { if (CT.isOnline()) { CT.net.send(msg); return true; } return false; };
+
 function shell(inner) {
   var testToggle = '<button class="btn btn-sm mode-toggle' + (CT.testMode ? " on" : "") + '" data-act="toggle-test" '
     + 'title="Show referee &amp; override tools">' + (CT.testMode ? "🔧 Test mode" : "Play mode") + '</button>';
   return '<div class="app">'
     + '<div class="topbar"><div class="brand"><h1>The Cursed Throne</h1>'
-    + '<span class="seal">' + (CT.testMode ? "Playtest Ledger" : "Court of Whispers") + '</span></div>'
+    + '<span class="seal">' + (CT.net && CT.net.routeCode ? "Room " + CT.net.routeCode : (CT.testMode ? "Playtest Ledger" : "Court of Whispers")) + '</span></div>'
     + '<div class="btn-row">' + testToggle
     + (CT.state ? '<button class="btn btn-ghost btn-sm" data-act="export">Export</button>'
         + '<button class="btn btn-ghost btn-sm" data-act="show-import">Import</button>'
@@ -46,10 +72,76 @@ function startScreen() {
     + '<div class="empty">'
     + '<div class="seal-big" style="margin-bottom:16px">✦</div>'
     + '<h1 style="margin-bottom:8px">Who is secretly helping the kingdom collapse?</h1>'
-    + '<p class="muted" style="max-width:46ch;margin:0 auto 24px">A digital dealer, board tracker and referee for the bluffing board game. '
-    + 'Gather 4–6 players around one device and pass it for private moments.</p>'
-    + '<button class="btn btn-gold" data-act="start-setup">Set up a new game ✦</button>'
+    + '<p class="muted" style="max-width:46ch;margin:0 auto 24px">A bluffing board game for 4–6 players. '
+    + 'Everyone on their own phone, or pass one device around the table.</p>'
+    + '<div class="btn-row" style="justify-content:center;flex-wrap:wrap;gap:10px">'
+    + '<button class="btn btn-gold" data-act="create-room">Create online room ✦</button>'
+    + '<button class="btn btn-primary" data-act="start-setup">Local pass-and-play</button>'
+    + '</div>'
+    + '<p class="muted" style="font-size:13px;margin-top:20px">Already have a code? Open the invite link, or add <code>#/room/ABCD</code> to this URL.</p>'
     + '</div></div>';
+}
+
+function onlineLobbyScreen() {
+  var room = CT.net.room, you = CT.net.you || {}, settings = room.settings || {};
+  var count = settings.playerCount || 5;
+  var players = (room.players || []).map(function (p) {
+    return '<li>' + CT.esc(p.name) + (p.isHost ? ' <span class="tag gold">host</span>' : '')
+      + (p.connected ? '' : ' <span class="tag">away</span>') + '</li>';
+  }).join("") || '<li class="muted">Waiting for players…</li>';
+  var countBtns = [4, 5, 6].map(function (c) {
+    return '<button aria-pressed="' + (count === c) + '" data-act="lobby-count" data-n="' + c + '"' + (you.isHost ? "" : " disabled") + '>' + c + '</button>';
+  }).join("");
+  var connected = (room.players || []).filter(function (p) { return p.connected; }).length;
+  var canDeal = you.isHost && connected >= count;
+  return '<div class="panel" style="max-width:560px;margin:24px auto">'
+    + '<div class="eyebrow">Online room · <strong>' + CT.esc(room.code) + '</strong></div>'
+    + '<h1 style="margin-top:6px">The court gathers</h1>'
+    + '<hr class="rule">'
+    + '<label class="field"><span class="lbl">Your name</span>'
+    + '<input type="text" data-act="lobby-name" data-fkey="lobby-name" value="' + CT.esc(you.name || CT.net.playerName()) + '" autocomplete="off"></label>'
+    + '<div class="btn-row" style="margin-bottom:16px"><button class="btn btn-secondary btn-sm" data-act="copy-invite">Copy invite link</button></div>'
+    + '<p class="muted" style="font-size:14px">Players (' + connected + ' / ' + count + ')</p>'
+    + '<ul class="stack" style="margin:8px 0 16px;padding-left:20px">' + players + '</ul>'
+    + '<p class="muted" style="font-size:13px">Seats for this game</p>'
+    + '<div class="seg" style="margin:8px 0 16px">' + countBtns + '</div>'
+    + '<div class="btn-row"><button class="btn btn-gold" data-act="deal-setup"' + (canDeal ? "" : " disabled") + '>Deal roles →</button></div>'
+    + '</div>';
+}
+
+function onlineSetupScreen() {
+  var you = CT.net.you || {}, setup = CT.state.setup || {};
+  var me = CT.state.players.find(function (p) { return p.id === you.id; });
+  if (!me) return '<div class="panel"><p class="muted">Waiting for setup…</p></div>';
+  if (setup.setupReady) {
+    var all = setup.allReady;
+    var hostBegin = CT.isHost() && all;
+    return '<div class="panel" style="max-width:560px;margin:24px auto">'
+      + '<div class="eyebrow">Setup</div><h1>Public role chosen</h1>'
+      + '<p class="muted">Waiting for ' + (all ? "the host to begin" : "other players to choose") + '…</p>'
+      + (hostBegin ? '<div class="seg" style="margin:16px 0"><button aria-pressed="true" data-act="first-mode" data-m="random">Random first player</button></div>'
+        + '<div class="btn-row"><button class="btn btn-gold" data-act="begin-online">Begin the game ✦</button></div>' : "")
+      + '</div>';
+  }
+  var dealt = setup.dealtRoleIds || [];
+  if (!CT.ui.setupRevealed) {
+    return '<div class="scrim"><div class="modal cover">'
+      + '<div class="seal-big">✦</div><h1 style="margin:8px 0">Your three role cards</h1>'
+      + '<p class="muted">Only you can see this. Choose one to show the court.</p>'
+      + '<div class="btn-row" style="justify-content:center;margin-top:20px">'
+      + '<button class="btn btn-primary" data-act="reveal-setup">Reveal my roles</button></div></div></div>';
+  }
+  var cards = dealt.map(function (id) {
+    var role = CT.roleById(id);
+    var disabled = !role.canBePublic;
+    return '<div class="pcard"><div class="ptop"><div class="pname">' + CT.esc(role.name) + '</div>'
+      + '<span class="tag">' + role.family + '</span></div><div class="prole">' + CT.esc(role.flavour) + '</div>'
+      + (disabled ? '<div class="tag wax" style="margin-top:12px">Must stay hidden</div>'
+        : '<button class="btn btn-gold btn-sm" style="margin-top:12px;width:100%" data-act="pick-public" data-id="' + id + '">Make this my public role</button>')
+      + '</div>';
+  }).join("");
+  return '<div class="scrim"><div class="modal"><h2>Choose your public role</h2>'
+    + '<div class="players" style="grid-template-columns:1fr;gap:12px">' + cards + '</div></div></div>';
 }
 
 /* ============ game screen ============ */
@@ -113,11 +205,12 @@ function boardPanel() {
 function actionsPanel() {
   var p = CT.activePlayer();
   if (!p) return "";
+  var isMyTurn = !CT.isOnline() || p.id === CT.myId();
   var loc = CT.locationById(p.location);
   var acts = CT.LOCATION_ACTIONS[p.location] || [];
   var over = CT.overHandLimit(p);
 
-  var disabled = CT.state.winner || p.status !== "active";
+  var disabled = CT.state.winner || p.status !== "active" || (CT.isOnline() && !isMyTurn);
   var buttons = acts.map(function (a) {
     var cant = disabled || p.gold < (a.cost || 0)
       || (a.requiresThrone && p.id !== CT.state.throne.kingControllerId && p.id !== CT.state.throne.queenControllerId)
@@ -146,7 +239,8 @@ function actionsPanel() {
     + body
     + (over ? '<div class="reminder">Hand is over the limit of ' + CT.CONST.HAND_LIMIT + ' (' + p.actionCardIds.length + ' cards). '
         + '<button class="btn btn-secondary btn-sm" data-act="fix-hand" data-id="' + p.id + '">Discard down</button></div>' : "")
-    + '<div class="btn-row" style="margin-top:14px"><span class="faint" style="font-size:12px;align-self:center">Movement & actions can also be overridden below.</span>'
+    + '<div class="btn-row" style="margin-top:14px"><span class="faint" style="font-size:12px;align-self:center">'
+    + (CT.isOnline() && !isMyTurn ? "Waiting for " + CT.esc(p.name) + "…" : "Movement & actions can also be overridden below.") + '</span>'
     + '<div class="spacer"></div><button class="btn btn-secondary" data-act="end-turn"' + (CT.state.winner ? " disabled" : "") + '>End turn →</button></div>'
     + '</div>';
 }
@@ -168,8 +262,8 @@ function playerCard(p) {
 
   var meta = [];
   meta.push('<span class="tag">📍 ' + locName + '</span>');
-  meta.push('<span class="tag">🂠 ' + p.hiddenRoleIds.length + ' hidden</span>');
-  meta.push('<span class="tag">🃏 ' + p.actionCardIds.length + ' cards</span>');
+  meta.push('<span class="tag">🂠 ' + (p.hiddenRoleCount != null ? p.hiddenRoleCount : p.hiddenRoleIds.length) + ' hidden</span>');
+  meta.push('<span class="tag">🃏 ' + (p.actionCardCount != null ? p.actionCardCount : p.actionCardIds.length) + ' cards</span>');
   if (p.wounded) meta.push('<span class="tag wax">Wounded</span>');
   if (p.seriousDuelUsed) meta.push('<span class="tag">Duel used</span>');
   if (extra.length) meta.push('<span class="tag gold">Shown: ' + CT.esc(extra.join(", ")) + '</span>');
@@ -180,25 +274,26 @@ function playerCard(p) {
     + '<span class="dot" style="background:' + tokenColor(i) + ';width:18px;height:18px;border-radius:999px;display:inline-grid;place-items:center;color:#fff;font-size:10px;font-weight:800">' + initials(p.name) + '</span>'
     + CT.esc(p.name) + (p.isBot ? ' <span class="tag">BOT</span>' : '') + '</div>'
     + '<div class="prole">' + (role ? CT.esc(role.name) : "—") + '</div></div>'
-    + '<button class="btn btn-ghost btn-sm" data-act="view-private" data-id="' + p.id + '">View private</button></div>'
+    + '<button class="btn btn-ghost btn-sm" data-act="view-private" data-id="' + p.id + '">'
+    + (CT.isOnline() && p.id !== CT.myId() ? "—" : "View private") + '</button></div>'
     + '<div class="pstats">'
     + pstat("Gold", p.gold, "gold", p.id, "gold")
     + pstat("Rep", p.rep, "rep", p.id, "rep")
     + '<div class="pstat"><div class="k">Status</div><div class="v" style="font-size:14px">' + (p.status === "active" ? "Active" : "Out") + '</div>'
-    + (CT.testMode ? '<div class="stepper"><button class="btn btn-ghost btn-sm" data-act="toggle-elim" data-id="' + p.id + '">' + (p.status === "active" ? "Eliminate" : "Restore") + '</button></div>' : "") + '</div>'
+    + (CT.testMode && CT.isHost() ? '<div class="stepper"><button class="btn btn-ghost btn-sm" data-act="toggle-elim" data-id="' + p.id + '">' + (p.status === "active" ? "Eliminate" : "Restore") + '</button></div>' : "") + '</div>'
     + '</div>'
     + '<div class="pmeta">' + meta.join("") + '</div>'
-    + '<div class="row" style="margin-top:10px;gap:8px">'
+    + ((!CT.isOnline() || CT.isHost()) ? '<div class="row" style="margin-top:10px;gap:8px">'
     + '<label class="field" style="margin:0;flex:1"><span class="lbl" style="font-size:11px">Move to</span>'
     + '<select data-act="move-player" data-id="' + p.id + '">' + moveOpts + '</select></label>'
-    + (CT.testMode ? '<button class="btn btn-danger btn-sm" data-act="lose-role" data-id="' + p.id + '" style="align-self:end"'
+    + (CT.testMode && CT.isHost() ? '<button class="btn btn-danger btn-sm" data-act="lose-role" data-id="' + p.id + '" style="align-self:end"'
         + (p.status !== "active" || CT.state.winner ? " disabled" : "") + '>Lose a role</button>' : "")
-    + '</div>'
+    + '</div>' : "")
     + '</div>';
 }
 function pstat(label, value, kind, pid, key) {
   return '<div class="pstat"><div class="k">' + label + '</div><div class="v">' + value + '</div>'
-    + (CT.testMode ? '<div class="stepper"><button class="step" data-act="adj" data-id="' + pid + '" data-key="' + key + '" data-d="-1">−</button>'
+    + (CT.testMode && CT.isHost() ? '<div class="stepper"><button class="step" data-act="adj" data-id="' + pid + '" data-key="' + key + '" data-d="-1">−</button>'
         + '<button class="step" data-act="adj" data-id="' + pid + '" data-key="' + key + '" data-d="1">+</button></div>' : "")
     + '</div>';
 }
@@ -439,41 +534,75 @@ CT.handleAction = function (act, el, ev) {
   if (CT.setup.active && CT.setup.handle && setupActs[act]) { CT.setup.handle(act, el); return; }
   if (act.indexOf("h-") === 0) { CT.helpers.handle(act, el); return; }
   switch (act) {
+    case "create-room":
+      CT.net.createRoom(5);
+      break;
+    case "copy-invite": CT.net.copyInvite(); break;
+    case "lobby-count":
+      if (CT.isHost()) CT.net.send({ type: "setPlayerCount", playerCount: +el.dataset.n });
+      break;
+    case "deal-setup":
+      if (CT.isHost()) CT.net.send({ type: "dealSetup" });
+      break;
+    case "reveal-setup": CT.ui.setupRevealed = true; CT.render(); break;
+    case "pick-public":
+      CT.net.send({ type: "pickPublicRole", roleId: el.dataset.id });
+      CT.ui.setupRevealed = false;
+      break;
+    case "begin-online":
+      if (CT.isHost()) CT.net.send({ type: "beginGame", firstMode: "random", firstPlayerIndex: 0 });
+      break;
     case "start-setup": CT.setup.begin(); break;
     case "toggle-test": CT.setTestMode(!CT.testMode); break;
     case "new-game":
       if (confirm("Start a new game? The current game is saved in your export but will be cleared.")) { CT.resetGame(); CT.setup.begin(); }
       break;
-    case "end-turn": CT.endTurn(); CT.render(); break;
+    case "end-turn":
+      if (CT.netAction({ type: "endTurn" })) break;
+      CT.endTurn(); CT.render(); break;
     case "bot-turn": { var bp = CT.activePlayer(); if (bp) CT.bot.takeTurn(bp.id); CT.render(); break; }
     case "bot-auto": CT.bot.autoRun(); CT.render(); break;
     case "adj": {
       var d = +el.dataset.d;
+      if (CT.netAction({ type: el.dataset.key === "gold" ? "adjustGold" : "adjustRep", playerId: el.dataset.id, delta: d, reason: "manual" })) break;
       if (el.dataset.key === "gold") CT.adjustGold(el.dataset.id, d, "manual");
       else CT.adjustRep(el.dataset.id, d, "manual");
       CT.render(); break;
     }
-    case "corr": CT.adjustCorruption(+el.dataset.d, "manual adjustment"); CT.render(); break;
-    case "elim": CT.setInnocentElims(CT.state.innocentElims + (+el.dataset.d), "manual adjustment"); CT.render(); break;
+    case "corr":
+      if (CT.netAction({ type: "adjustCorruption", delta: +el.dataset.d, reason: "manual adjustment" })) break;
+      CT.adjustCorruption(+el.dataset.d, "manual adjustment"); CT.render(); break;
+    case "elim":
+      if (CT.netAction({ type: "adjustInnocents", delta: +el.dataset.d, reason: "manual adjustment" })) break;
+      CT.setInnocentElims(CT.state.innocentElims + (+el.dataset.d), "manual adjustment"); CT.render(); break;
     case "toggle-elim": {
       var p = CT.playerById(el.dataset.id);
       p.status = p.status === "active" ? "eliminated" : "active";
       CT.log(p.name + " was " + (p.status === "eliminated" ? "eliminated" : "restored") + " (manual).");
       CT.save(); CT.render(); break;
     }
-    case "win": CT.declareWinner(el.dataset.side, "manual"); CT.render(); break;
+    case "win":
+      if (CT.netAction({ type: "declareWinner", side: el.dataset.side })) break;
+      CT.declareWinner(el.dataset.side, "manual"); CT.render(); break;
     case "add-note": {
       var inp = document.getElementById("note-input");
-      if (inp && inp.value.trim()) { CT.log(inp.value.trim(), "note"); CT.render(); }
+      if (inp && inp.value.trim()) {
+        if (CT.netAction({ type: "addNote", text: inp.value.trim() })) break;
+        CT.log(inp.value.trim(), "note"); CT.render();
+      }
       break;
     }
     case "board-move": {
       var apr = CT.activePlayer();
-      if (apr) CT.movePlayer(apr.id, el.dataset.id, false);
+      if (!apr) break;
+      if (CT.netAction({ type: "move", locationId: el.dataset.id })) break;
+      CT.movePlayer(apr.id, el.dataset.id, false);
       CT.render(); break;
     }
     case "loc-action": {
       var ap2 = CT.activePlayer();
+      if (!ap2) break;
+      if (CT.netAction({ type: "locAction", actionId: el.dataset.id })) break;
       var r = CT.doLocationAction(ap2.id, el.dataset.id);
       if (r && r.keepOne) CT.ui.keepOne = { playerId: ap2.id, deck: r.keepOne.deck, cards: r.keepOne.cards };
       else if (r && !r.ok && r.msg) alert(r.msg);
@@ -482,11 +611,15 @@ CT.handleAction = function (act, el, ev) {
     case "keep-card": {
       var k = CT.ui.keepOne;
       var drop = k.cards.filter(function (id) { return id !== el.dataset.keep; })[0];
+      if (CT.netAction({ type: "resolveKeepOne", deck: k.deck, keepId: el.dataset.keep, dropId: drop })) {
+        CT.ui.keepOne = null; break;
+      }
       CT.resolveKeepOne(k.playerId, k.deck, el.dataset.keep, drop);
       CT.ui.keepOne = null; CT.render(); break;
     }
     case "fix-hand": CT.ui.handFixFor = el.dataset.id; CT.render(); break;
     case "do-discard-hand": {
+      if (CT.netAction({ type: "discardCard", cardId: el.dataset.id, reason: "hand limit" })) break;
       CT.discardCard(CT.ui.handFixFor, el.dataset.id, "hand limit");
       if (!CT.overHandLimit(CT.playerById(CT.ui.handFixFor))) CT.ui.handFixFor = null;
       CT.render(); break;
@@ -495,12 +628,17 @@ CT.handleAction = function (act, el, ev) {
     case "lose-role": CT.ui.roleDiscardFor = el.dataset.id; CT.ui.roleDiscardRevealed = false; CT.ui.afterDiscard = null; CT.render(); break;
     case "reveal-lose-role": CT.ui.roleDiscardRevealed = true; CT.render(); break;
     case "confirm-lose-role":
+      if (CT.netAction({ type: "discardRole", playerId: CT.ui.roleDiscardFor, slot: el.dataset.slot, roleId: el.dataset.role })) {
+        CT.ui.roleDiscardFor = null; CT.ui.roleDiscardRevealed = false; CT.ui.afterDiscard = null; break;
+      }
       CT.applyRoleDiscard(CT.ui.roleDiscardFor, el.dataset.slot, el.dataset.role);
       CT.ui.roleDiscardFor = null; CT.ui.roleDiscardRevealed = false;
       if (CT.ui.afterDiscard) { var fn = CT.ui.afterDiscard; CT.ui.afterDiscard = null; fn(); } // vote/duel follow-up effects
       CT.render(); break;
     case "close-lose-role": CT.ui.roleDiscardFor = null; CT.ui.roleDiscardRevealed = false; CT.ui.afterDiscard = null; CT.render(); break;
-    case "view-private": CT.ui.privateFor = el.dataset.id; CT.ui.privateRevealed = false; CT.render(); break;
+    case "view-private":
+      if (CT.isOnline() && el.dataset.id !== CT.myId()) break;
+      CT.ui.privateFor = el.dataset.id; CT.ui.privateRevealed = CT.isOnline(); CT.render(); break;
     case "reveal-private-view": CT.ui.privateRevealed = true; CT.render(); break;
     case "close-private": CT.ui.privateFor = null; CT.ui.privateRevealed = false; CT.render(); break;
     case "export": doExport(); break;
@@ -518,9 +656,17 @@ CT.handleAction = function (act, el, ev) {
 CT.handleChange = function (act, el) {
   if (CT.setup.active && setupChangeActs[act]) { CT.setup.handle(act, el); return; }
   if (act.indexOf("h-") === 0) { CT.helpers.handle(act, el); return; } // helper selects & checkboxes
-  if (act === "move-player") { CT.movePlayer(el.dataset.id, el.value, true); CT.render(); }
+  if (act === "move-player") {
+    if (CT.netAction({ type: "movePlayer", playerId: el.dataset.id, locationId: el.value })) return;
+    CT.movePlayer(el.dataset.id, el.value, true); CT.render();
+  }
 };
 CT.handleInput = function (act, el) {
+  if (act === "lobby-name") {
+    CT.net.saveName(el.value);
+    CT.net.queueRename(el.value);
+    return;
+  }
   if (CT.setup.active && act === "name") { CT.setup.handle(act, el); return; }
   if (act.indexOf("h-") === 0) { CT.helpers.handle(act, el); } // silent text/number updates
 };
@@ -560,6 +706,7 @@ document.addEventListener("input", function (ev) {
 
 document.addEventListener("DOMContentLoaded", function () {
   try { CT.testMode = localStorage.getItem(CT.TESTMODE_KEY) === "1"; } catch (e) {}
-  CT.load(); // resume if present
+  if (CT.net) CT.net.init();
+  else CT.load();
   CT.render();
 });

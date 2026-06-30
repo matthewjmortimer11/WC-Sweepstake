@@ -1191,6 +1191,7 @@ from charades import router as charades_router  # noqa: E402
 from dial import router as dial_router  # noqa: E402
 from imposter import router as imposter_router  # noqa: E402
 from whoami import router as whoami_router  # noqa: E402
+from dethrone import router as dethrone_router  # noqa: E402
 
 # Qualification tracker — a Wheesht extension served from /qualification. Reuses
 # the existing fixture data layer (sync.fixture_cache); see qualification/.
@@ -1201,6 +1202,7 @@ app.include_router(dial_router)
 app.include_router(imposter_router)
 app.include_router(charades_router)
 app.include_router(whoami_router)
+app.include_router(dethrone_router)
 app.include_router(qualification_router)
 
 _GAMES_TEMPLATE = Path("templates/games.html")
@@ -3512,23 +3514,6 @@ async def tweaks_panel():
 @app.get("/app/{filename:path}")
 async def app_static(filename: str):
     path = _safe_static_path(_STATIC / "app", filename)
-    mt = _JS_TYPES.get(path.suffix, "application/octet-stream")
-    return FileResponse(path, media_type=mt)
-
-
-# The Cursed Throne — self-contained static playtest app served at /dethrone.
-@app.get("/dethrone", response_class=HTMLResponse)
-@app.get("/dethrone/", response_class=HTMLResponse)
-async def dethrone_index():
-    html = (_STATIC / "dethrone" / "index.html").read_text(encoding="utf-8")
-    # inject a <base> so the app's relative css/js paths resolve under /dethrone/
-    html = html.replace("<head>", '<head>\n  <base href="/dethrone/">', 1)
-    return HTMLResponse(content=html)
-
-
-@app.get("/dethrone/{filename:path}")
-async def dethrone_static(filename: str):
-    path = _safe_static_path(_STATIC / "dethrone", filename)
     mt = _JS_TYPES.get(path.suffix, "application/octet-stream")
     return FileResponse(path, media_type=mt)
 

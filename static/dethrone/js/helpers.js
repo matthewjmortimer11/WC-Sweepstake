@@ -144,7 +144,10 @@ CT.helpers.vDuel = function () {
 };
 
 /* ===================== Call Out (§28) ===================== */
-CT.helpers.openCallout = function () { CT.helpers.ui = { open: "callout", caller: "", target: "", role: "" }; CT.render(); };
+CT.helpers.openCallout = function () {
+  CT.helpers.ui = { open: "callout", caller: CT.myId() || "", target: "", role: "" };
+  CT.render();
+};
 CT.helpers.vCallout = function () {
   var u = CT.helpers.ui, ps = actives();
   var ready = u.caller && u.target && u.role && u.caller !== u.target;
@@ -310,9 +313,15 @@ CT.helpers.handle = function (act, el) {
     case "h-c-a": u.a = el.value; return CT.render();
     case "h-c-b": u.b = el.value; return CT.render();
     case "h-c-promise": u.promise = el.value; return; // silent
-    case "h-c-swear": CT.addContract(u.a, u.b, u.promise.trim()); u.open = null; return CT.render();
-    case "h-ct-fulfill": CT.resolveContract(el.dataset.id, "fulfilled"); return CT.render();
-    case "h-ct-break": CT.resolveContract(el.dataset.id, "broken", el.dataset.breaker); return CT.render();
+    case "h-c-swear":
+      if (CT.isOnline()) { CT.net.send({ type: "addContract", aId: u.a, bId: u.b, promise: u.promise.trim() }); u.open = null; return CT.render(); }
+      CT.addContract(u.a, u.b, u.promise.trim()); u.open = null; return CT.render();
+    case "h-ct-fulfill":
+      if (CT.isOnline()) { CT.net.send({ type: "resolveContract", contractId: el.dataset.id, status: "fulfilled" }); return CT.render(); }
+      CT.resolveContract(el.dataset.id, "fulfilled"); return CT.render();
+    case "h-ct-break":
+      if (CT.isOnline()) { CT.net.send({ type: "resolveContract", contractId: el.dataset.id, status: "broken", breakerId: el.dataset.breaker }); return CT.render(); }
+      CT.resolveContract(el.dataset.id, "broken", el.dataset.breaker); return CT.render();
 
     // royal claim
     case "h-open-royalclaim": return CT.helpers.openRoyalClaim();
@@ -327,14 +336,26 @@ CT.helpers.handle = function (act, el) {
     case "h-open-succclaim": return CT.helpers.openSuccClaim();
     case "h-sc-player": u.player = el.value; return CT.render();
     case "h-sc-role": u.role = el.dataset.r; return CT.render();
-    case "h-sc-add": CT.addSuccessionClaim(u.player, u.role); u.open = null; return CT.render();
+    case "h-sc-add":
+      if (CT.isOnline()) { CT.net.send({ type: "addSuccessionClaim", playerId: u.player, roleId: u.role }); u.open = null; return CT.render(); }
+      CT.addSuccessionClaim(u.player, u.role); u.open = null; return CT.render();
 
     // throne panel controls
-    case "h-throne-set": el.value ? CT.setThroneController(el.dataset.crown, el.value, "manual") : null; return CT.render();
-    case "h-throne-clear": CT.clearThroneController(el.dataset.crown); return CT.render();
-    case "h-succ-open": CT.openSuccession(); return CT.render();
-    case "h-succ-close": CT.closeSuccession(); return CT.render();
-    case "h-succ-resolve": CT.resolveSuccessionClaim(el.dataset.id); return CT.render();
+    case "h-throne-set":
+      if (CT.isOnline()) { if (el.value) CT.net.send({ type: "setThrone", crown: el.dataset.crown, playerId: el.value, reason: "manual" }); return CT.render(); }
+      el.value ? CT.setThroneController(el.dataset.crown, el.value, "manual") : null; return CT.render();
+    case "h-throne-clear":
+      if (CT.isOnline()) { CT.net.send({ type: "clearThrone", crown: el.dataset.crown }); return CT.render(); }
+      CT.clearThroneController(el.dataset.crown); return CT.render();
+    case "h-succ-open":
+      if (CT.isOnline()) { CT.net.send({ type: "openSuccession" }); return CT.render(); }
+      CT.openSuccession(); return CT.render();
+    case "h-succ-close":
+      if (CT.isOnline()) { CT.net.send({ type: "closeSuccession" }); return CT.render(); }
+      CT.closeSuccession(); return CT.render();
+    case "h-succ-resolve":
+      if (CT.isOnline()) { CT.net.send({ type: "resolveSuccession", claimId: el.dataset.id }); return CT.render(); }
+      CT.resolveSuccessionClaim(el.dataset.id); return CT.render();
     case "h-succ-remove": CT.removeSuccessionClaim(el.dataset.id); return CT.render();
   }
 };
@@ -396,6 +417,11 @@ CT.helpers.applyDuelConseq = function (c) {
 
 CT.helpers.applyCallout = function () {
   var u = CT.helpers.ui;
+  if (CT.isOnline()) {
+    CT.net.send({ type: "callOut", targetId: u.target, roleId: u.role });
+    CT.helpers.ui.open = null;
+    return;
+  }
   var caller = CT.playerById(u.caller), target = CT.playerById(u.target), role = CT.roleById(u.role);
   CT.log(caller.name + " calls out " + target.name + " as " + role.name + "!");
   CT.adjustCorruption(2, "Call Out");
@@ -412,7 +438,18 @@ CT.helpers.applyCallout = function () {
 };
 
 CT.helpers.applyTrade = function () {
-  var u = CT.helpers.ui, a = CT.playerById(u.a), b = CT.playerById(u.b);
+  var u = CT.helpers.ui;
+  if (CT.isOnline()) {
+    CT.net.send({
+      type: "trade", aId: u.a, bId: u.b,
+      goldAB: +u.goldAB || 0, goldBA: +u.goldBA || 0,
+      cardAB: u.cardAB !== "" ? +u.cardAB : "",
+      cardBA: u.cardBA !== "" ? +u.cardBA : "",
+    });
+    u.open = null;
+    return;
+  }
+  var a = CT.playerById(u.a), b = CT.playerById(u.b);
   var gAB = Math.min(+u.goldAB || 0, a.gold), gBA = Math.min(+u.goldBA || 0, b.gold);
   if (gAB) { a.gold -= gAB; b.gold += gAB; }
   if (gBA) { b.gold -= gBA; a.gold += gBA; }

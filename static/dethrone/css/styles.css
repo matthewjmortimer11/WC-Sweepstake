@@ -297,3 +297,7 @@ svg.map { width: 100%; height: auto; display: block; }
 .win-banner.loyal { background: var(--loyal); }
 .win-banner.cursed { background: var(--wax); }
 .win-banner h2 { color: var(--p-0); }
+
+.toast { position: fixed; left: 50%; bottom: max(16px, env(safe-area-inset-bottom)); transform: translateX(-50%);
+  background: var(--ink); border: 1px solid var(--p-4); color: var(--p-0); padding: 12px 18px;
+  border-radius: 12px; font-weight: 600; z-index: 60; box-shadow: var(--e3); max-width: min(92vw, 420px); text-align: center; }
