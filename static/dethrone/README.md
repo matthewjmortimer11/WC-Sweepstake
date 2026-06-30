@@ -74,6 +74,11 @@ open "index.html"          # macOS
 - **Installable PWA** — `manifest.webmanifest`, service worker, safe-area padding, 44px touch targets
 - **Reaction framework** — Stitched Lip (Rumour), Mourning Veil (Call Out), Blackmail/Kneel (passed vote), Veteran's Warning (duel declared); private prompt to play or decline
 
+### Phase 14 — Public role abilities & succession polish
+- **Public role abilities** — AtLocation powers from your shown role appear on your turn (Steal, Peek, Rumour/Eavesdrop, Suck Up, Counsel, Quiet Ambition, Tantrum, Name Drop, Stand Watch); online via `useRoleAbility`
+- **Royal role lost** — tracked when a King/Queen role is discarded (gates Quiet Ambition)
+- **Succession polish** — claimants must be at the Throne and hold the role; helper filters eligible players/roles; quick-claim from actions panel; succession banner in turn dock and throne panel
+
 ### Phase 4 — Throne & Succession
 A **Throne & Succession** panel tracks the crown and the line of succession.
 - **Throne control (§23)**: King / Queen / Successor controllers, set manually or via the **Claim helper** (claimant + crown; unchallenged → crowned, or challenged → "proof valid" crowns them and the challenger loses a role / "bluff" costs the claimant a role). Claim order is recorded.
@@ -132,7 +137,7 @@ Table talk and bluffing stay verbal. The app guides, tracks, and enforces mechan
 
 ## Next improvements
 
-Run `PLAYTEST.md` at a real table, log friction, then Phase 14 (top role abilities + succession polish).
+Run `PLAYTEST.md` at a real table, log friction, then plan the next phase (bot social depth, more reaction hooks, or polish).
 
 ```
 index.html        shell; loads the scripts in order

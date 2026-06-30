@@ -363,4 +363,40 @@ CT.REACTION_EFFECTS = {
   kneel: { trigger: "vote_pass", requiresRoyalThrone: true },
   veterans_warning: { trigger: "duel_declared" },
 };
+/* Public-role AtLocation abilities (Phase 14) — mechanical subset. */
+CT.ROLE_ABILITY_EFFECTS = {
+  thief_steal: { role: "thief", name: "Steal", goldTransfer: 1, needsTarget: true, sameLocation: true },
+  spy_peek: { role: "spy", name: "Peek", peekCard: true, needsTarget: true, sameLocation: true },
+  whisperer_eavesdrop: { role: "tavernwhisperer", name: "Eavesdrop", locations: ["tavern"], peekCard: true, needsTarget: true, sameLocation: true },
+  whisperer_rumour: { role: "tavernwhisperer", name: "Rumour", locations: ["tavern"], rumour: true, needsTarget: true, sameLocation: true },
+  favourite_suck_up: { role: "courtfavourite", name: "Suck Up", locations: ["throne"], repGain: 1, requiresRoyalThrone: true },
+  advisor_counsel: { role: "royaladvisor", name: "Counsel", locations: ["throne"], goldCost: 2, drawDeck: "Royal" },
+  secondborn_ambition: { role: "secondborn", name: "Quiet Ambition", locations: ["tavern", "market"], repGain: 1, requiresRoyalRoleLost: true },
+  tyrant_tantrum: { role: "tinytyrant", name: "Tantrum", repLoss: 1, needsTarget: true, sameLocation: true, oncePerRound: true },
+  cousin_name_drop: { role: "distantcousin", name: "Name Drop", locations: ["tavern", "market"], goldGain: 1 },
+  graveguard_watch: { role: "graveyardguard", name: "Stand Watch", locations: ["graveyard"], repLoss: 1, needsTarget: true, targetNotSelf: true },
+};
+CT.roleAbilitiesAvailable = function (p) {
+  if (!p || !p.publicRoleId || p.status !== "active" || !CT.state) return [];
+  var out = [];
+  Object.keys(CT.ROLE_ABILITY_EFFECTS).forEach(function (aid) {
+    var fx = CT.ROLE_ABILITY_EFFECTS[aid];
+    if (fx.role !== p.publicRoleId) return;
+    if (fx.locations && fx.locations.indexOf(p.location) === -1) return;
+    if (fx.oncePerRound && (p.abilitiesUsedThisRound || []).indexOf(aid) !== -1) return;
+    if (fx.requiresRoyalThrone) {
+      var t = CT.state.throne;
+      if (!t.kingControllerId && !t.queenControllerId) return;
+    }
+    if (fx.requiresRoyalRoleLost && !CT.state.royalRoleLost) return;
+    if ((fx.goldCost || 0) > p.gold) return;
+    out.push({ id: aid, name: fx.name, needsTarget: !!fx.needsTarget });
+  });
+  return out;
+};
+CT.playerSuccessionRoles = function (p) {
+  if (!p) return [];
+  var held = CT.allRoleIds(p);
+  return CT.SUCCESSION_ORDER.filter(function (rid) { return held.indexOf(rid) !== -1; });
+};
 CT.canAutoPlayCard = function (cardId) { return !!CT.AUTO_PLAY[cardId]; };

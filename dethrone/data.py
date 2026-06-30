@@ -261,6 +261,50 @@ REACTION_EFFECTS: dict[str, dict] = {
     "veterans_warning": {"trigger": "duel_declared", "action": "cancel_duel"},
 }
 
+# Public-role AtLocation abilities (Phase 14) — mechanical subset; others stay at the table.
+ROLE_ABILITY_EFFECTS: dict[str, dict] = {
+    "thief_steal": {
+        "role": "thief", "name": "Steal", "gold_transfer": 1,
+        "needs_target": True, "same_location": True,
+    },
+    "spy_peek": {
+        "role": "spy", "name": "Peek", "peek_card": True,
+        "needs_target": True, "same_location": True,
+    },
+    "whisperer_eavesdrop": {
+        "role": "tavernwhisperer", "name": "Eavesdrop", "locations": ["tavern"],
+        "peek_card": True, "needs_target": True, "same_location": True,
+    },
+    "whisperer_rumour": {
+        "role": "tavernwhisperer", "name": "Rumour", "locations": ["tavern"],
+        "rumour": True, "needs_target": True, "same_location": True,
+    },
+    "favourite_suck_up": {
+        "role": "courtfavourite", "name": "Suck Up", "locations": ["throne"],
+        "rep_gain": 1, "requires_royal_throne": True,
+    },
+    "advisor_counsel": {
+        "role": "royaladvisor", "name": "Counsel", "locations": ["throne"],
+        "gold_cost": 2, "draw_deck": "Royal",
+    },
+    "secondborn_ambition": {
+        "role": "secondborn", "name": "Quiet Ambition", "locations": ["tavern", "market"],
+        "rep_gain": 1, "requires_royal_role_lost": True,
+    },
+    "tyrant_tantrum": {
+        "role": "tinytyrant", "name": "Tantrum", "rep_loss": 1,
+        "needs_target": True, "same_location": True, "once_per_round": True,
+    },
+    "cousin_name_drop": {
+        "role": "distantcousin", "name": "Name Drop", "locations": ["tavern", "market"],
+        "gold_gain": 1,
+    },
+    "graveguard_watch": {
+        "role": "graveyardguard", "name": "Stand Watch", "locations": ["graveyard"],
+        "rep_loss": 1, "needs_target": True, "target_not_self": True,
+    },
+}
+
 # Role ids with standing exemption from royal / Tax Collector levies
 TAX_EXEMPT_ROLE_IDS = frozenset({"firstborn", "tinytyrant", "spy"})
 

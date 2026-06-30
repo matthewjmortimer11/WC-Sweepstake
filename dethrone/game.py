@@ -47,6 +47,7 @@ class PlayerState:
     wounded: bool = False
     serious_duel_used: bool = False
     moved_this_turn: bool = False
+    abilities_used_this_round: list[str] = field(default_factory=list)
     is_bot: bool = False
     # setup only — dealt roles before public pick
     dealt_role_ids: list[str] = field(default_factory=list)
@@ -114,6 +115,7 @@ class CursedThroneGame:
         self.pending_ui_action: dict[str, dict] = {}
         self.private_notes: dict[str, str] = {}
         self.tax_skip_remaining: dict[str, int] = {}
+        self.royal_role_lost: bool = False
         self.balance: dict[str, int] = dict(D.DEFAULT_BALANCE)
 
     def _rule(self, key: str) -> int:
@@ -277,6 +279,7 @@ class CursedThroneGame:
         self.corruption = 0
         self.innocent_elims = 0
         self.winner = None
+        self.royal_role_lost = False
         self.contracts = []
         self.throne = {
             "kingControllerId": None,
@@ -333,6 +336,7 @@ class CursedThroneGame:
         """Per-round hooks (Court Favourite tax skip, etc.)."""
         self.tax_skip_remaining = {}
         for p in self.players:
+            p.abilities_used_this_round = []
             if p.status == "active" and "courtfavourite" in self._all_role_ids(p):
                 self.tax_skip_remaining[p.id] = 1
 
@@ -1070,6 +1074,82 @@ class CursedThroneGame:
             return {"ok": True, "manual": True}
         return {"ok": True}
 
+    # ---- public role abilities (Phase 14) ----
+    def use_role_ability(self, actor_id: str, ability_id: str, target_id: Optional[str] = None) -> dict:
+        if self.status != STATUS_PLAY or self.winner:
+            raise MoveError("No active game.")
+        ap = self.active_player()
+        if not ap or ap.id != actor_id:
+            raise MoveError("Not your turn.")
+        fx = D.ROLE_ABILITY_EFFECTS.get(ability_id)
+        if not fx:
+            raise MoveError("Unknown ability.")
+        if ap.public_role_id != fx["role"]:
+            raise MoveError("Your public role does not grant that ability.")
+        locs = fx.get("locations")
+        if locs and ap.location not in locs:
+            raise MoveError("Wrong location for this ability.")
+        if fx.get("once_per_round") and ability_id in ap.abilities_used_this_round:
+            raise MoveError("Already used this round.")
+        if fx.get("requires_royal_throne"):
+            t = self.throne
+            if not t.get("kingControllerId") and not t.get("queenControllerId"):
+                raise MoveError("No royal controls the Throne.")
+        if fx.get("requires_royal_role_lost") and not self.royal_role_lost:
+            raise MoveError("No royal has lost a role yet.")
+        cost = int(fx.get("gold_cost", 0))
+        if ap.gold < cost:
+            raise MoveError("Not enough gold.")
+        target: Optional[PlayerState] = None
+        if fx.get("needs_target"):
+            if not target_id:
+                raise MoveError("Target required.")
+            target = self.player_by_id(target_id)
+            if not target or target.status != "active":
+                raise MoveError("Invalid target.")
+            if fx.get("same_location") and target.location != ap.location:
+                raise MoveError("Target must be at your location.")
+            if fx.get("target_not_self") and target.id == ap.id:
+                raise MoveError("Invalid target.")
+        if cost:
+            ap.gold -= cost
+        aname = fx.get("name", ability_id)
+        self._log(f"{ap.name} uses {aname} (public role ability).", "event")
+        if fx.get("gold_transfer") and target:
+            take = min(int(fx["gold_transfer"]), target.gold)
+            if take > 0:
+                target.gold -= take
+                ap.gold += take
+                self._log(f"{ap.name} steals {take} gold from {target.name}.")
+            else:
+                self._log(f"{target.name} has no gold to steal.", "note")
+        elif fx.get("peek_card") and target:
+            if target.action_card_ids:
+                pick = target.action_card_ids[random.randrange(len(target.action_card_ids))]
+                label = D.CARD_BY_ID.get(pick, {}).get("name", pick)
+                self._set_private_note(ap.id, f"{target.name}'s hand includes: {label}")
+            else:
+                self._set_private_note(ap.id, f"{target.name} has no action cards.")
+            self._log(f"{ap.name} peeked at {target.name}'s hand.", "note")
+        elif fx.get("rumour") and target:
+            if target.gold >= 1:
+                target.gold -= 1
+                ap.gold += 1
+                self._log(f"{target.name} paid 1 gold to {ap.name} to silence the Rumour.")
+            else:
+                self._maybe_offer_rep_loss(target.id, -1, aname)
+        elif fx.get("rep_gain"):
+            self.adjust_rep(ap.id, int(fx["rep_gain"]), aname)
+        elif fx.get("rep_loss") and target:
+            self._maybe_offer_rep_loss(target.id, -int(fx["rep_loss"]), aname)
+        elif fx.get("gold_gain"):
+            self.adjust_gold(ap.id, int(fx["gold_gain"]), aname)
+        elif fx.get("draw_deck"):
+            self.draw_card(ap.id, fx["draw_deck"])
+        if fx.get("once_per_round"):
+            ap.abilities_used_this_round.append(ability_id)
+        return {"ok": True}
+
     def resolve_keep_one(self, pid: str, deck: str, keep_id: str, drop_id: str) -> None:
         p = self.player_by_id(pid)
         if not p:
@@ -1118,6 +1198,9 @@ class CursedThroneGame:
             self.pending_role_discard.pop(pid, None)
             self.declare_winner("loyal", "The Cursed One was revealed")
             return
+
+        if role_id in ("king", "queen"):
+            self.royal_role_lost = True
 
         t = self.throne
         if role_id == "king" and t.get("kingControllerId") == pid:
@@ -1192,15 +1275,26 @@ class CursedThroneGame:
         self._log("Succession closed.", "system")
 
     def add_succession_claim(self, player_id: str, role_id: str) -> None:
+        succ = self.throne.get("succession", {})
+        if not succ.get("open"):
+            raise MoveError("Succession is not open.")
+        p = self.player_by_id(player_id)
+        if not p or p.status != "active":
+            raise MoveError("Invalid player.")
+        if p.location != "throne":
+            raise MoveError("Claimant must be at the Throne.")
         meta = D.SUCCESSION.get(role_id)
         if not meta:
             raise MoveError("Invalid succession role.")
-        p = self.player_by_id(player_id)
+        if role_id not in self._all_role_ids(p):
+            raise MoveError("You must hold that succession role.")
+        if any(c["playerId"] == player_id for c in succ.get("claims", [])):
+            raise MoveError("You already have a claim recorded.")
         claim = {"id": _uid("sc"), "playerId": player_id, "roleId": role_id,
                  "rank": meta["rank"], "startRound": self.round}
         self.throne["succession"]["claims"].append(claim)
         rname = D.ROLE_META.get(role_id, {}).get("name", role_id)
-        self._log(f"{p.name if p else '?'} claims the Throne as {rname}.", "event")
+        self._log(f"{p.name} claims the Throne as {rname}.", "event")
 
     def claim_rounds_left(self, claim: dict) -> int:
         window = D.SUCCESSION.get(claim["roleId"], {}).get("window", 0)
@@ -1781,6 +1875,7 @@ class CursedThroneGame:
             "wounded": p.wounded,
             "seriousDuelUsed": p.serious_duel_used,
             "movedThisTurn": p.moved_this_turn,
+            "abilitiesUsedThisRound": list(p.abilities_used_this_round),
             "isBot": p.is_bot,
         }
 
@@ -1806,6 +1901,7 @@ class CursedThroneGame:
             "corruption": self.corruption,
             "innocentElims": self.innocent_elims,
             "winner": self.winner,
+            "royalRoleLost": self.royal_role_lost,
             "throne": self._throne_public(),
             "contracts": [
                 {"id": c.id, "aId": c.a_id, "bId": c.b_id, "promise": c.promise, "status": c.status}
@@ -1852,6 +1948,8 @@ class CursedThroneGame:
                 "actionCardCount": p.get("actionCardCount", len(p["actionCardIds"])),
                 "wounded": p["wounded"],
                 "seriousDuelUsed": p["seriousDuelUsed"],
+                "movedThisTurn": p.get("movedThisTurn", False),
+                "abilitiesUsedThisRound": p.get("abilitiesUsedThisRound", []),
             })
         return {
             "version": 1,
@@ -1860,6 +1958,7 @@ class CursedThroneGame:
             "activePlayerIndex": v["activePlayerIndex"],
             "corruption": v["corruption"],
             "innocentElims": v["innocentElims"],
+            "royalRoleLost": v.get("royalRoleLost", False),
             "throne": v["throne"],
             "winner": v["winner"],
             "players": players,

@@ -456,17 +456,30 @@ CT.helpers.applyRoyalBluff = function () {
 };
 
 /* ===================== Succession claim (§24) ===================== */
-CT.helpers.openSuccClaim = function () { CT.helpers.ui = { open: "succclaim", player: "", role: "firstborn" }; CT.render(); };
+CT.helpers.openSuccClaim = function (playerId, roleId) {
+  var ap = CT.activePlayer();
+  var pid = playerId || (ap && ap.location === "throne" ? ap.id : "");
+  var roles = CT.playerSuccessionRoles(CT.playerById(pid));
+  CT.helpers.ui = { open: "succclaim", player: pid, role: roleId || (roles[0] || "firstborn") };
+  CT.render();
+};
 CT.helpers.vSuccClaim = function () {
-  var u = CT.helpers.ui, ps = actives();
-  var roleBtns = CT.SUCCESSION_ORDER.map(function (id) {
+  var u = CT.helpers.ui, ps = actives().filter(function (x) { return x.location === "throne"; });
+  var sel = CT.playerById(u.player);
+  var held = CT.playerSuccessionRoles(sel);
+  var roleBtns = CT.SUCCESSION_ORDER.filter(function (id) { return held.indexOf(id) !== -1; }).map(function (id) {
     return '<button aria-pressed="' + (u.role === id) + '" data-act="h-sc-role" data-r="' + id + '">' + CT.esc(CT.roleById(id).name) + "</button>";
   }).join("");
+  var throneNote = ps.length ? "" : '<p class="muted" style="font-size:13px">No active players at the Throne yet.</p>';
   return wrap('<div class="eyebrow">Helper</div><h2 style="margin:4px 0 2px">Add a succession claim</h2>'
-    + '<p class="muted" style="font-size:13px;margin:0 0 12px">' + CT.esc(CT.roleById(u.role).name) + ": " + CT.SUCCESSION[u.role].note + ". The window counts from the current round.</p>"
-    + field("Claimant", '<select data-act="h-sc-player">' + opt(ps, u.player, "— who —") + "</select>")
-    + '<div class="seg" style="flex-wrap:wrap;margin-bottom:12px">' + roleBtns + "</div>"
-    + '<hr class="rule"><div class="btn-row"><div class="spacer"></div><button class="btn btn-primary" data-act="h-sc-add"' + (u.player ? "" : " disabled") + '>Record claim</button></div>');
+    + '<p class="muted" style="font-size:13px;margin:0 0 12px">Claimant must be at the Throne and hold the succession role. '
+    + (u.role && CT.SUCCESSION[u.role] ? CT.esc(CT.SUCCESSION[u.role].note) + "." : "") + '</p>'
+    + throneNote
+    + field("Claimant (at Throne)", '<select data-act="h-sc-player">' + opt(ps, u.player, "— who —") + "</select>")
+    + (roleBtns ? '<div class="seg" style="flex-wrap:wrap;margin-bottom:12px">' + roleBtns + "</div>"
+      : '<p class="muted" style="font-size:13px">Selected player holds no succession roles.</p>')
+    + '<hr class="rule"><div class="btn-row"><div class="spacer"></div><button class="btn btn-primary" data-act="h-sc-add"'
+    + (u.player && held.indexOf(u.role) !== -1 ? "" : " disabled") + '>Record claim</button></div>');
 };
 
 /* ===================== handler ===================== */
@@ -607,7 +620,12 @@ CT.helpers.handle = function (act, el) {
 
     // succession
     case "h-open-succclaim": return CT.helpers.openSuccClaim();
-    case "h-sc-player": u.player = el.value; return CT.render();
+    case "h-open-succclaim-quick": return CT.helpers.openSuccClaim();
+    case "h-sc-player":
+      u.player = el.value;
+      var roles = CT.playerSuccessionRoles(CT.playerById(u.player));
+      if (roles.indexOf(u.role) === -1) u.role = roles[0] || u.role;
+      return CT.render();
     case "h-sc-role": u.role = el.dataset.r; return CT.render();
     case "h-sc-add":
       if (CT.isOnline()) { CT.net.send({ type: "addSuccessionClaim", playerId: u.player, roleId: u.role }); u.open = null; return CT.render(); }

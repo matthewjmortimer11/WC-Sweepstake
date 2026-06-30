@@ -77,12 +77,15 @@ CT.newGame = function (playersInput, undealtRoleIds, startingActionByPlayer, fir
         actionCardIds: (startingActionByPlayer && startingActionByPlayer[i]) ? startingActionByPlayer[i].slice() : [],
         wounded: false,
         seriousDuelUsed: false,
+        movedThisTurn: false,
+        abilitiesUsedThisRound: [],
       };
     }),
     decks: {},     // deckName -> [cardId] draw pile (shuffled)
     discards: {},  // deckName -> [cardId]
     contracts: [], // Blood Contracts (§25): {id, aId, bId, promise, status}
     taxSkipRemaining: {},
+    royalRoleLost: false,
     log: [],
   };
   CT.DECK_NAMES.forEach(function (name) {
@@ -118,6 +121,7 @@ CT.onNewRound = function () {
   if (!CT.state) return;
   CT.state.taxSkipRemaining = {};
   CT.state.players.forEach(function (p) {
+    p.abilitiesUsedThisRound = [];
     if (p.status === "active" && CT.allRoleIds(p).indexOf("courtfavourite") !== -1) {
       CT.state.taxSkipRemaining[p.id] = 1;
     }
@@ -382,6 +386,11 @@ CT.load = function () {
     if (!data || data.version !== CT.SAVE_VERSION) return null;
     if (!data.contracts) data.contracts = []; // backfill saves from before Phase 3
     if (data.throne && !data.throne.succession) { data.throne.successorId = null; data.throne.succession = { open: false, claims: [] }; } // pre-Phase-4
+    if (data.royalRoleLost == null) data.royalRoleLost = false;
+    if (data.players) data.players.forEach(function (p) {
+      if (!p.abilitiesUsedThisRound) p.abilitiesUsedThisRound = [];
+      if (p.movedThisTurn == null) p.movedThisTurn = false;
+    });
     CT.state = data;
     return CT.state;
   } catch (e) { return null; }
@@ -787,6 +796,75 @@ CT.doLocationAction = function (playerId, actId) {
   return { ok: true };
 };
 
+/* Use a public-role AtLocation ability (Phase 14). */
+CT.useRoleAbility = function (playerId, abilityId, opts) {
+  opts = opts || {};
+  var p = CT.playerById(playerId);
+  if (!p || p.status !== "active") return { ok: false, msg: "Invalid player." };
+  var fx = CT.ROLE_ABILITY_EFFECTS[abilityId];
+  if (!fx) return { ok: false, msg: "Unknown ability." };
+  if (p.publicRoleId !== fx.role) return { ok: false, msg: "Your public role does not grant that ability." };
+  if (fx.locations && fx.locations.indexOf(p.location) === -1) return { ok: false, msg: "Wrong location." };
+  if (fx.oncePerRound && (p.abilitiesUsedThisRound || []).indexOf(abilityId) !== -1) return { ok: false, msg: "Already used this round." };
+  if (fx.requiresRoyalThrone) {
+    var t = CT.state.throne;
+    if (!t.kingControllerId && !t.queenControllerId) return { ok: false, msg: "No royal controls the Throne." };
+  }
+  if (fx.requiresRoyalRoleLost && !CT.state.royalRoleLost) return { ok: false, msg: "No royal has lost a role yet." };
+  var cost = fx.goldCost || 0;
+  if (p.gold < cost) return { ok: false, msg: "Not enough gold." };
+  var target = null;
+  if (fx.needsTarget) {
+    target = CT.playerById(opts.targetId);
+    if (!target || target.status !== "active") return { ok: false, msg: "Invalid target." };
+    if (fx.sameLocation && target.location !== p.location) return { ok: false, msg: "Target must be at your location." };
+    if (fx.targetNotSelf && target.id === p.id) return { ok: false, msg: "Invalid target." };
+  }
+  if (cost) p.gold -= cost;
+  CT.log(p.name + " uses " + fx.name + " (public role ability).", "event");
+  if (fx.goldTransfer && target) {
+    var take = Math.min(fx.goldTransfer, target.gold);
+    if (take > 0) {
+      target.gold -= take;
+      p.gold += take;
+      CT.log(p.name + " steals " + take + " gold from " + target.name + ".");
+    } else {
+      CT.log(target.name + " has no gold to steal.", "note");
+    }
+  } else if (fx.peekCard && target) {
+    if (target.actionCardIds.length) {
+      var pick = target.actionCardIds[Math.floor(Math.random() * target.actionCardIds.length)];
+      CT.ui.privateNote = target.name + "'s hand includes: " + CT.cardById(pick).name;
+    } else {
+      CT.ui.privateNote = target.name + " has no action cards.";
+    }
+    CT.log(p.name + " peeked at " + target.name + "'s hand.", "note");
+  } else if (fx.rumour && target) {
+    if (target.gold >= 1) {
+      target.gold -= 1;
+      p.gold += 1;
+      CT.log(target.name + " paid 1 gold to " + p.name + " to silence the Rumour.");
+    } else {
+      CT.adjustRep(target.id, -1, fx.name);
+    }
+  } else if (fx.repGain) {
+    CT.adjustRep(playerId, fx.repGain, fx.name);
+  } else if (fx.repLoss && target) {
+    CT.adjustRep(target.id, -fx.repLoss, fx.name);
+  } else if (fx.goldGain) {
+    p.gold += fx.goldGain;
+    CT.log(p.name + " gains " + fx.goldGain + " gold (" + fx.name + ").");
+  } else if (fx.drawDeck) {
+    CT.drawCard(playerId, fx.drawDeck);
+  }
+  if (fx.oncePerRound) {
+    if (!p.abilitiesUsedThisRound) p.abilitiesUsedThisRound = [];
+    p.abilitiesUsedThisRound.push(abilityId);
+  }
+  CT.save();
+  return { ok: true };
+};
+
 /* resolve a Haggle keep-1 choice */
 CT.resolveKeepOne = function (playerId, deck, keepId, dropId) {
   var p = CT.playerById(playerId); if (!p) return;
@@ -818,6 +896,8 @@ CT.applyRoleDiscard = function (playerId, slot, roleId) {
 
   // Cursed One revealed/discarded -> loyal players win (§9, §20)
   if (roleId === "cursedone") { CT.declareWinner("loyal", "The Cursed One was revealed"); CT.save(); return; }
+
+  if (roleId === "king" || roleId === "queen") CT.state.royalRoleLost = true;
 
   // Royal removal (§23): a discarded King/Queen loses any Throne control they held
   if (roleId === "king" && CT.state.throne.kingControllerId === playerId) {
@@ -927,6 +1007,12 @@ CT.closeSuccession = function () {
 CT.addSuccessionClaim = function (playerId, roleId) {
   var meta = CT.SUCCESSION[roleId]; if (!meta) return;
   var p = CT.playerById(playerId);
+  if (!p || p.status !== "active") return;
+  if (!CT.state.throne.succession.open) { CT.log("Succession is not open.", "note"); return; }
+  if (p.location !== "throne") { CT.log((p.name || "?") + " must be at the Throne to claim.", "note"); return; }
+  if (CT.allRoleIds(p).indexOf(roleId) === -1) { CT.log("Claimant must hold that succession role.", "note"); return; }
+  var claims = CT.state.throne.succession.claims || [];
+  if (claims.some(function (c) { return c.playerId === playerId; })) { CT.log("That player already has a claim.", "note"); return; }
   CT.state.throne.succession.claims.push({
     id: CT.util.uid("sc"), playerId: playerId, roleId: roleId,
     rank: meta.rank, startRound: CT.state.round,

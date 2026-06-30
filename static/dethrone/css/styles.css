@@ -346,6 +346,9 @@ svg.map { width: 100%; height: auto; display: block; }
 .turn-dock .chip.warn { background: var(--wax-soft); border-color: #d9a59c; color: var(--wax); }
 .turn-dock .btn { min-height: 44px; }
 
+.role-ability-row .btn-secondary { border-color: var(--ink-soft); }
+.role-ability-row .act-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
+
 @media (max-width: 919px) {
   .app { padding-left: max(var(--s4), env(safe-area-inset-left)); padding-right: max(var(--s4), env(safe-area-inset-right)); }
   .btn, .step { min-height: 44px; }

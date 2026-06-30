@@ -79,6 +79,9 @@ function renderTurnDock() {
   var moved = !!ap.movedThisTurn;
   var chips = '<span class="chip' + (moved ? " ok" : "") + '">' + (moved ? "✓ Moved" : "— Move") + '</span>'
     + '<span class="chip' + (over ? " warn" : " ok") + '">🃏 ' + ap.actionCardIds.length + "/" + limit + "</span>";
+  if (CT.state.throne.succession && CT.state.throne.succession.open) {
+    chips += '<span class="chip wax">♛ Succession</span>';
+  }
   dock.innerHTML = '<div class="turn-dock-inner">'
     + '<div class="turn-meta"><div class="turn-title">Your turn</div>'
     + '<div class="turn-sub">📍 ' + CT.esc(loc ? loc.name : ap.location) + "</div>"
@@ -383,6 +386,22 @@ function actionsPanel() {
       + '<div class="act-hint">' + CT.esc(a.hint) + (a.manual ? ' · manual' : '') + '</div>';
   }).join("");
 
+  var roleAbilities = CT.roleAbilitiesAvailable(p);
+  var roleBtns = roleAbilities.map(function (a) {
+    return '<button class="btn btn-secondary" data-act="role-ability" data-id="' + a.id + '"' + (disabled ? " disabled" : "") + '>'
+      + CT.esc(a.name) + ' <span style="opacity:.7;font-size:11px">public</span></button>';
+  }).join("");
+  var roleSection = roleBtns
+    ? '<div class="role-ability-row"><div class="eyebrow" style="margin:14px 0 8px">Public role</div><div class="act-grid">' + roleBtns + "</div></div>"
+    : "";
+
+  var succ = CT.state.throne.succession || { open: false };
+  var succBanner = "";
+  if (succ.open && p.location === "throne" && CT.playerSuccessionRoles(p).length) {
+    succBanner = '<div class="reminder">Succession is open — claim from the Throne. '
+      + '<button class="btn btn-gold btn-sm" data-act="h-open-succclaim-quick">Claim crown</button></div>';
+  }
+
   var body;
   if (disabled) {
     body = '<p class="muted">' + (CT.state.winner ? "The game is over." : "This player is eliminated.") + '</p>';
@@ -399,7 +418,9 @@ function actionsPanel() {
   return '<div class="panel"><div class="panel-head"><h2>' + CT.esc(p.name) + '’s turn'
     + (p.isBot ? ' <span class="tag">BOT</span>' : '') + '</h2>'
     + '<span class="tag gold">📍 ' + loc.name + '</span></div><hr class="rule">'
+    + succBanner
     + body
+    + roleSection
     + (over ? '<div class="reminder">Hand is over the limit of ' + CT.getRules().HAND_LIMIT + ' (' + p.actionCardIds.length + ' cards). '
         + '<button class="btn btn-secondary btn-sm" data-act="fix-hand" data-id="' + p.id + '">Discard down</button></div>' : "")
     + '<div class="btn-row" style="margin-top:14px"><span class="faint" style="font-size:12px;align-self:center">'
@@ -521,6 +542,7 @@ function throneSuccPanel() {
     succBody = '<div class="row" style="justify-content:space-between"><span class="muted" style="font-size:13px">No succession in progress.</span>'
       + '<button class="btn btn-secondary btn-sm" data-act="h-succ-open"' + off + '>Open succession</button></div>';
   } else {
+    succBody = '<p class="tag wax" style="margin:0 0 10px">Succession open — claimants must be at the Throne and hold a succession role.</p>';
     var claims = succ.claims.slice().sort(function (a, b) { return a.rank - b.rank; }).map(function (c) {
       var p = CT.playerById(c.playerId), left = CT.claimRoundsLeft(c);
       var status = left <= 0 ? '<span class="tag moss">matured</span>' : '<span class="tag">' + left + ' round' + (left === 1 ? "" : "s") + " left</span>";
@@ -595,6 +617,7 @@ function logPanel() {
 function overlays() {
   if (CT.ui.reactionOffer) return reactionView();
   if (CT.ui.finalRiteOffer) return finalRiteView();
+  if (CT.ui.roleAbility) return roleAbilityView();
   if (CT.ui.showGuide) return playtestGuideView();
   if (CT.ui.playCard) return playCardView();
   if (CT.ui.privateFor) return privateView();
@@ -757,6 +780,31 @@ function finalRiteView() {
     + '<button class="btn btn-ghost" data-act="decline-final-rite">End turn without Rite</button>'
     + '<button class="btn btn-danger" data-act="perform-final-rite">Perform Final Rite ✦</button>'
     + '</div></div></div>';
+}
+
+function roleAbilityView() {
+  var u = CT.ui.roleAbility;
+  if (!u) return "";
+  var p = CT.playerById(u.playerId);
+  var fx = CT.ROLE_ABILITY_EFFECTS[u.abilityId];
+  if (!p || !fx) { CT.ui.roleAbility = null; return ""; }
+  var targets = CT.state.players.filter(function (x) {
+    if (x.status !== "active" || x.id === p.id) return false;
+    if (fx.sameLocation && x.location !== p.location) return false;
+    if (fx.targetNotSelf && x.id === p.id) return false;
+    return true;
+  });
+  var opts = targets.map(function (x) {
+    return '<option value="' + x.id + '">' + CT.esc(x.name) + "</option>";
+  }).join("");
+  return '<div class="scrim"><div class="modal" style="max-width:420px">'
+    + '<div class="eyebrow">Public role · ' + CT.esc(CT.roleById(p.publicRoleId).name) + '</div>'
+    + '<h2 style="margin:6px 0 12px">' + CT.esc(fx.name) + "</h2>"
+    + '<label class="field" style="display:block;margin:12px 0"><span>Target</span>'
+    + '<select id="role-ability-target">' + opts + "</select></label>"
+    + '<div class="btn-row" style="margin-top:16px"><button class="btn btn-ghost" data-act="close-role-ability">Cancel</button>'
+    + '<div class="spacer"></div><button class="btn btn-primary" data-act="confirm-role-ability">Use ability</button></div>'
+    + "</div></div>";
 }
 
 function playtestGuideView() {
@@ -988,6 +1036,35 @@ CT.handleAction = function (act, el, ev) {
       if (!ap2) break;
       if (CT.netAction({ type: "locAction", actionId: el.dataset.id })) break;
       handleLocActionResult(CT.doLocationAction(ap2.id, el.dataset.id));
+      CT.render(); break;
+    }
+    case "role-ability": {
+      var ap3 = CT.activePlayer();
+      if (!ap3) break;
+      var aid = el.dataset.id;
+      var fx = CT.ROLE_ABILITY_EFFECTS[aid];
+      if (!fx) break;
+      if (fx.needsTarget) {
+        CT.ui.roleAbility = { playerId: ap3.id, abilityId: aid };
+        CT.render(); break;
+      }
+      if (CT.netAction({ type: "useRoleAbility", abilityId: aid })) break;
+      var res = CT.useRoleAbility(ap3.id, aid);
+      if (!res.ok && res.msg) alert(res.msg);
+      CT.render(); break;
+    }
+    case "close-role-ability": CT.ui.roleAbility = null; CT.render(); break;
+    case "confirm-role-ability": {
+      var u = CT.ui.roleAbility;
+      if (!u) break;
+      var ts = document.getElementById("role-ability-target");
+      var tid = ts ? ts.value : "";
+      if (CT.netAction({ type: "useRoleAbility", abilityId: u.abilityId, targetId: tid })) {
+        CT.ui.roleAbility = null; break;
+      }
+      var res2 = CT.useRoleAbility(u.playerId, u.abilityId, { targetId: tid });
+      if (!res2.ok && res2.msg) alert(res2.msg);
+      CT.ui.roleAbility = null;
       CT.render(); break;
     }
     case "keep-card": {

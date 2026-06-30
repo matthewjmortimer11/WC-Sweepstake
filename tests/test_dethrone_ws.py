@@ -737,6 +737,72 @@ def test_move_sets_moved_flag(client):
     assert ap.moved_this_turn is True
 
 
+def test_role_ability_steal(client):
+    code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
+    room, pids, g = _start_game(code)
+    active = g.active_player().id
+    ap = g.player_by_id(active)
+    victim = next(pid for pid in pids if pid != active)
+    vp = g.player_by_id(victim)
+    ap.public_role_id = "thief"
+    ap.location = vp.location = "market"
+    vp.gold = 3
+    before = ap.gold
+    g.use_role_ability(active, "thief_steal", victim)
+    assert ap.gold == before + 1
+    assert vp.gold == 2
+
+
+def test_role_ability_wrong_public_role(client):
+    from dethrone.game import MoveError
+    code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
+    room, pids, g = _start_game(code)
+    active = g.active_player().id
+    ap = g.player_by_id(active)
+    ap.public_role_id = "gateguard"
+    with pytest.raises(MoveError, match="public role"):
+        g.use_role_ability(active, "thief_steal", pids[1])
+
+
+def test_succession_claim_requires_throne(client):
+    from dethrone.game import MoveError
+    code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
+    room, pids, g = _start_game(code)
+    pid = pids[0]
+    p = g.player_by_id(pid)
+    p.location = "market"
+    p.public_role_id = "firstborn"
+    p.hidden_role_ids = ["thief", "wanderingknight"]
+    g.open_succession()
+    with pytest.raises(MoveError, match="Throne"):
+        g.add_succession_claim(pid, "firstborn")
+
+
+def test_succession_claim_requires_role(client):
+    from dethrone.game import MoveError
+    code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
+    room, pids, g = _start_game(code)
+    pid = pids[0]
+    p = g.player_by_id(pid)
+    p.location = "throne"
+    p.public_role_id = "gateguard"
+    p.hidden_role_ids = ["thief", "wanderingknight"]
+    g.open_succession()
+    with pytest.raises(MoveError, match="succession role"):
+        g.add_succession_claim(pid, "firstborn")
+
+
+def test_royal_role_lost_on_king_discard(client):
+    code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
+    room, pids, g = _start_game(code)
+    pid = pids[0]
+    p = g.player_by_id(pid)
+    p.public_role_id = "king"
+    p.hidden_role_ids = ["thief", "wanderingknight"]
+    g.apply_role_discard(pid, "public", "king")
+    assert g.royal_role_lost is True
+
+
 def D_ROLE_META_PUBLIC(role_id: str) -> bool:
     from dethrone.data import ROLE_META
     return ROLE_META.get(role_id, {}).get("canBePublic", True)

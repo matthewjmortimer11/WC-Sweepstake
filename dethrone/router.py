@@ -34,7 +34,7 @@ _DETHRONE_CSP = (
     "frame-ancestors 'none'"
 )
 
-_DETHRONE_ASSET_VERSION = "20260630-p13"
+_DETHRONE_ASSET_VERSION = "20260630-p14"
 
 _CREATE_BUCKETS: dict[str, list[float]] = {}
 _CREATE_LIMIT = 30
@@ -324,6 +324,14 @@ def _dispatch(room, player, mtype: str, msg: dict) -> bool:
         result = g.do_location_action(player.id, str(msg.get("actionId", "")))
         if result.get("keepOne"):
             return True
+        return True
+
+    if mtype == "useRoleAbility":
+        g.use_role_ability(
+            player.id,
+            str(msg.get("abilityId", "")),
+            str(msg.get("targetId", "")) or None,
+        )
         return True
 
     if mtype == "resolveKeepOne":
