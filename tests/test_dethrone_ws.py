@@ -954,6 +954,26 @@ def test_whisper_vote_requires_throne(client):
     assert "Throne" in str(exc.value)
 
 
+def test_study_companion_ally_peek(client):
+    code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
+    room, pids, g = _start_game(code)
+    active = g.active_player()
+    ally = next(p for p in g.players if p.id != active.id)
+    active.location = ally.location = "college"
+    active.action_card_ids = ["study_companion", "spare_coin_purse"]
+    g.decks["Knowledge"] = ["old_prophecy", "read_records"]
+    g.play_action_card(active.id, "study_companion", target_id=ally.id, rng=__import__("random").Random(0))
+    assert "study_companion" not in active.action_card_ids
+    assert len(active.action_card_ids) == 2  # kept spare_coin_purse + drew one
+    note = g.private_notes.get(ally.id, "")
+    assert "hand includes" in note
+    assert g.private_note_card_ids.get(ally.id) in ("spare_coin_purse", "old_prophecy")
+    ally_view = room.state_for(ally.id)["room"]["game"]
+    assert "hand includes" in ally_view.get("privateNote", "")
+    active_view = room.state_for(active.id)["room"]["game"]
+    assert not active_view.get("privateNote")
+
+
 def test_stitched_lip_offers_on_rumour(client):
     code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
     room, pids, g = _start_game(code)

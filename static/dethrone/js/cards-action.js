@@ -368,20 +368,34 @@ CT.MANUAL_CARD_HELPERS = {
   bribe: { helper: "h-open-vote", label: "Open vote helper" },
   hidden_witness: { helper: "h-open-vote", label: "Open vote helper" },
   crown_witness: { helper: "h-open-vote", label: "Open vote helper" },
+  royal_decree: { helper: "h-open-vote", label: "Open vote helper" },
+  sealed_warrant: { helper: "h-open-vote", label: "Open vote helper" },
+  banish_letter: { helper: "h-open-vote", label: "Open vote helper" },
+  emergency_council: { helper: "h-open-vote", label: "Open vote helper" },
+  trade_licence: { helper: "h-open-trade", label: "Open trade helper" },
+  call_out: { helper: "h-open-callout", label: "Open Call Out helper" },
+  arrest: { helper: "h-open-duel", label: "Open duel helper" },
+  tavern_brawl: { helper: "h-open-duel", label: "Open duel helper" },
   disarm_card: { helper: "h-open-duel", label: "Open duel helper" },
   challenged_again: { helper: "h-open-duel", label: "Open duel helper" },
   blood_contract: { helper: "h-open-contract", label: "Open blood contract" },
 };
 
 CT.privateNoteBannerHtml = function (player) {
-  if (!CT.ui || !CT.ui.privateNote) return "";
-  var cardId = CT.ui.privateNoteCardId;
+  if (!player) return "";
+  var note = CT.getPrivateNoteFor ? CT.getPrivateNoteFor(player.id) : null;
+  if (!note || !note.text) {
+    if (!CT.ui || !CT.ui.privateNote) return "";
+    note = { text: CT.ui.privateNote, cardId: CT.ui.privateNoteCardId };
+  }
+  if (!note.text) return "";
+  var cardId = note.cardId;
   var stub = cardId
     ? CT.actionCardStubHtml(cardId, player, { compact: false, showEffect: false, interactive: false })
     : "";
   return '<div class="private-note-banner hand-tab-panel__note" role="status">'
     + (stub ? '<div class="private-note-banner__card">' + stub + "</div>" : "")
-    + '<p class="private-note-banner__text">' + CT.esc(CT.ui.privateNote) + "</p>"
+    + '<p class="private-note-banner__text">' + CT.esc(note.text) + "</p>"
     + '<button type="button" class="btn btn-ghost btn-sm" data-act="clear-private-note">Dismiss</button>'
     + "</div>";
 };

@@ -38,7 +38,7 @@ _DETHRONE_CSP = (
     "frame-ancestors 'none'"
 )
 
-_DETHRONE_ASSET_VERSION = "20260701-p35"
+_DETHRONE_ASSET_VERSION = "20260701-p36"
 
 _CREATE_BUCKETS: dict[str, list[float]] = {}
 _CREATE_LIMIT = 30

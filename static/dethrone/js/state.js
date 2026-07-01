@@ -48,6 +48,41 @@ CT.setPrivateNote = function (msg, cardId) {
   CT.ui.privateNoteCardId = cardId || null;
 };
 
+/** Set a private note for a specific player (e.g. Study Companion ally peek). */
+CT.setPrivateNoteFor = function (playerId, msg, cardId) {
+  CT.ui = CT.ui || {};
+  if (!CT.ui.privateNotesByPlayer) CT.ui.privateNotesByPlayer = {};
+  if (msg) {
+    CT.ui.privateNotesByPlayer[playerId] = { text: msg, cardId: cardId || null };
+  } else {
+    delete CT.ui.privateNotesByPlayer[playerId];
+  }
+  var me = CT.myId && CT.myId();
+  if (!CT.isOnline() || me === playerId) {
+    CT.setPrivateNote(msg, cardId);
+  }
+};
+
+CT.getPrivateNoteFor = function (playerId) {
+  if (CT.ui && CT.ui.privateNotesByPlayer && CT.ui.privateNotesByPlayer[playerId]) {
+    return CT.ui.privateNotesByPlayer[playerId];
+  }
+  var me = CT.myId && CT.myId();
+  if (me === playerId && CT.ui && CT.ui.privateNote) {
+    return { text: CT.ui.privateNote, cardId: CT.ui.privateNoteCardId || null };
+  }
+  return null;
+};
+
+CT.clearPrivateNoteFor = function (playerId) {
+  CT.setPrivateNoteFor(playerId, null, null);
+  var me = CT.myId && CT.myId();
+  if (me === playerId) {
+    CT.ui.privateNote = null;
+    CT.ui.privateNoteCardId = null;
+  }
+};
+
 /* ---- create a fresh game from finished setup data ----
  * playersInput: [{ name, dealtRoleIds:[3], publicRoleId, hiddenRoleIds:[2] }]
  * undealtRoleIds: roles not dealt (used for extra-shown roles later)
@@ -658,7 +693,24 @@ CT.playActionCard = function (playerId, cardId, opts) {
     CT.drawCard(playerId, "Market", cname);
     if (target && target.location === p.location) CT.drawCard(target.id, "Market", cname);
   }
-  if (cardId === "study_companion") CT.drawCard(playerId, "Knowledge", cname);
+  if (cardId === "study_companion") {
+    CT.drawCard(playerId, "Knowledge", cname);
+    if (target && target.location === p.location) {
+      var handPick = p.actionCardIds.filter(function (id) { return id !== cardId; });
+      if (!handPick.length) {
+        CT.setPrivateNoteFor(target.id, p.name + " has no action cards.");
+      } else {
+        var scPick = handPick[Math.floor(Math.random() * handPick.length)];
+        var scCard = CT.cardById(scPick);
+        CT.setPrivateNoteFor(
+          target.id,
+          p.name + "'s hand includes: " + (scCard ? scCard.name : scPick),
+          scPick,
+        );
+      }
+      CT.log(target.name + " looked at " + p.name + "'s hand (Study Companion).", "note");
+    }
+  }
   if (cardId === "guild_seal") {
     if (!s.taxSkipRemaining) s.taxSkipRemaining = {};
     s.taxSkipRemaining[playerId] = (s.taxSkipRemaining[playerId] || 0) + 1;

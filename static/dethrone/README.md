@@ -20,7 +20,7 @@ Offline file open still works:
 open "index.html"          # macOS
 ```
 
-## What is implemented (Phases 1–25)
+## What is implemented (Phases 1–26)
 
 ### Phase 5 — playtest tooling & full card set
 - **Board art** — illustrated V3b kingdom poster (`cards/map/kingdom-background-v3b.jpg`) with curved gold/cursed roads, labelled site plaques, player tokens and per-location vignettes (see `board.js`, `cards-map.js`)
@@ -133,6 +133,11 @@ open "index.html"          # macOS
 - **Crown Witness** — only playable in the vote tally when you are at the Throne (+2 weight)
 - **Whisper Vote** — Royal Advisor role power at the Throne (+1 weight); shown with role portrait in vote helper
 - **Online sync** — `formalVote` includes `roleVotePowers`; server validates location and role ownership
+
+### Phase 26 — Study Companion & Parley shortcuts
+- **Study Companion** — ally at your location gets a private hand peek (with card art), not an extra draw
+- **Per-player notes** — ally peeks sync online; local pass-and-play stores notes per player
+- **Parley shortcuts** — manual card focus opens Vote / Duel / Trade / Call Out helpers for starter cards
 
 ### Phase 4 — Throne & Succession
 A **Throne & Succession** panel tracks the crown and the line of succession.

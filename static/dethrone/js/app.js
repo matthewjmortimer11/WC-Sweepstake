@@ -1234,10 +1234,15 @@ CT.handleAction = function (act, el, ev) {
       CT.ui.playTab = "hand";
       CT.render(); break;
     }
-    case "clear-private-note":
-      CT.ui.privateNote = null;
-      CT.ui.privateNoteCardId = null;
+    case "clear-private-note": {
+      var hp = CT.handPlayer && CT.handPlayer();
+      if (hp && CT.clearPrivateNoteFor) CT.clearPrivateNoteFor(hp.id);
+      else {
+        CT.ui.privateNote = null;
+        CT.ui.privateNoteCardId = null;
+      }
       CT.render(); break;
+    }
     case "create-room":
       CT.net.createRoom(5);
       break;

@@ -637,6 +637,8 @@ class CursedThroneGame:
             if discard_card_id not in p.action_card_ids:
                 raise MoveError("Card not in hand.")
         target = self.player_by_id(target_id) if target_id else None
+        if target_id and (not target or target.status != "active"):
+            raise MoveError("Invalid target.")
         if fx.get("needs_target") and (not target or target.status != "active"):
             raise MoveError("Invalid target.")
         if fx.get("at_location") and p.location != fx["at_location"]:
@@ -742,6 +744,22 @@ class CursedThroneGame:
             self.draw_card(pid, fx["draw"], cname)
         if fx.get("ally_draw") and target and target.location == p.location:
             self.draw_card(target.id, fx["ally_draw"], cname)
+        if fx.get("ally_peek_hand") and target and target.location == p.location:
+            hand_pick = [c for c in p.action_card_ids if c != card_id]
+            if hand_pick:
+                pick = hand_pick[rng.randrange(len(hand_pick))]
+                label = D.CARD_BY_ID.get(pick, {}).get("name", pick)
+                self._set_private_note(
+                    target.id,
+                    f"{p.name}'s hand includes: {label}",
+                    pick,
+                )
+            else:
+                self._set_private_note(target.id, f"{p.name} has no action cards.")
+            self._log(
+                f"{target.name} looked at {p.name}'s hand (Study Companion).",
+                "note",
+            )
         if fx.get("guild_seal_proactive"):
             self.tax_skip_remaining[pid] = self.tax_skip_remaining.get(pid, 0) + 1
             self._log(f"{p.name} plays Guild Seal — ignores the next tax this round.", "note")

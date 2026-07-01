@@ -209,7 +209,7 @@ CARD_AUTO_EFFECTS: dict[str, dict] = {
     "herald": {"rep": 1},
     "succession_edict": {"open_succession": True},
     "caravan_manifest": {"draw": "Market", "ally_draw": "Market", "optional_target": True, "same_location": True},
-    "study_companion": {"draw": "Knowledge"},
+    "study_companion": {"draw": "Knowledge", "ally_peek_hand": True, "optional_target": True, "same_location": True},
     # Phase 9 — risk & investigation
     "bone_dice": {"bone_dice": True, "corruption": 1},
     "old_prophecy": {"peek_deck_top": True, "needs_deck": True},

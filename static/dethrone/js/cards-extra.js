@@ -20,7 +20,7 @@
     { id: "hangover_cure", name: "Hangover Cure", deck: "Tavern", timing: "OnTurn", effect: "Remove Wounded or regain 1 Reputation if at 1–2.", requiresManualResolution: false },
     { id: "sow_doubt", name: "Sow Doubt", deck: "Tavern", timing: "OnTurn", effect: "Choose a player. They lose 1 Reputation unless they reveal a public role.", requiresManualResolution: true },
     // Knowledge (+8)
-    { id: "study_companion", name: "Study Companion", deck: "Knowledge", timing: "OnTurn", effect: "Draw 1 Knowledge card; an ally at your location may look at your hand.", requiresManualResolution: true },
+    { id: "study_companion", name: "Study Companion", deck: "Knowledge", timing: "OnTurn", effect: "Draw 1 Knowledge card; an ally at your location may look at your hand.", requiresManualResolution: false },
     { id: "sealed_warrant", name: "Sealed Warrant", deck: "Knowledge", timing: "Vote", effect: "Start a Banish vote without seconder against a player with Rep ≤2.", requiresManualResolution: true },
     { id: "witness_statement", name: "Witness Statement", deck: "Knowledge", timing: "OnTurn", effect: "Ask one player: did they visit the Graveyard last round? They must answer truthfully.", requiresManualResolution: true },
     { id: "old_prophecy", name: "Old Prophecy", deck: "Knowledge", timing: "OnTurn", effect: "Peek at the top card of any deck.", requiresManualResolution: true },
