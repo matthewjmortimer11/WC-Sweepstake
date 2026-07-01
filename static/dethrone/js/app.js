@@ -4,7 +4,8 @@ window.CT = window.CT || {};
 CT.ui = { privateFor: null, privateRevealed: false, rolesRevealed: false, showImport: false, showGuide: false,
   roleDiscardFor: null, roleDiscardRevealed: false, handFixFor: null, keepOne: null, playCard: null,
   logFilter: "all", privateNote: null, finalRiteOffer: null, reactionOffer: null, reactionMove: null,
-  falseTrailOffer: null, sanctuaryOffer: null,
+  falseTrailOffer: null, sanctuaryOffer: null, protectOffer: null,
+  defendCrownOffer: null, recklessChargeOffer: null,
   playTab: "play" };
 
 /* Play vs Test mode — Test reveals referee & per-player override tools (§32, §35).
@@ -880,6 +881,9 @@ function overlays() {
   if (CT.ui.actionCardFocus) return CT.actionCardFocusModalHtml(CT.ui.actionCardFocus, CT.handPlayer && CT.handPlayer());
   if (CT.ui.falseTrailOffer) return falseTrailView();
   if (CT.ui.sanctuaryOffer && CT.ui.sanctuaryOffer.queenId === CT.myId()) return sanctuaryView();
+  if (CT.ui.protectOffer && CT.ui.protectOffer.guardId === CT.myId()) return protectView();
+  if (CT.ui.defendCrownOffer && CT.ui.defendCrownOffer.knightId === CT.myId()) return defendCrownView();
+  if (CT.ui.recklessChargeOffer && CT.ui.recklessChargeOffer.attackerId === CT.myId()) return recklessChargeView();
   if (CT.ui.reactionOffer) return reactionView();
   if (CT.ui.finalRiteOffer) return finalRiteView();
   if (CT.ui.roleAbility) return roleAbilityView();
@@ -1037,6 +1041,68 @@ function falseTrailView() {
     + '<div class="btn-row" style="justify-content:center;margin-top:20px;flex-wrap:wrap;gap:10px">'
     + '<button class="btn btn-ghost" data-act="decline-false-trail">Take the hit</button>'
     + '<button class="btn btn-gold" data-act="accept-false-trail"' + (targets.length ? "" : " disabled") + ">Redirect</button>"
+    + "</div></div></div>";
+}
+
+function protectView() {
+  var offer = CT.ui.protectOffer;
+  if (!offer) return "";
+  var guard = CT.playerById(offer.guardId || CT.myId());
+  var victim = CT.playerById(offer.victimId);
+  if (!guard) { CT.ui.protectOffer = null; return ""; }
+  var detail = offer.eventKind === "drive_out"
+    ? "being Driven Out"
+    : "losing 1 Reputation" + (offer.reason ? " (" + CT.esc(offer.reason) + ")" : "");
+  return '<div class="scrim"><div class="modal modal--reaction cover" style="max-width:520px">'
+    + '<div class="seal-big" style="background:var(--gold-soft);color:var(--wax)">🛡</div>'
+    + '<h1 style="margin:8px 0">Protect</h1>'
+    + '<p class="muted" style="font-size:15px">'
+    + CT.esc(victim ? victim.name : "A player") + " is about to suffer " + detail
+    + '. Intervene once this round?</p>'
+    + '<div class="btn-row" style="justify-content:center;margin-top:20px;flex-wrap:wrap;gap:10px">'
+    + '<button class="btn btn-ghost" data-act="decline-protect">Let it happen</button>'
+    + '<button class="btn btn-gold" data-act="accept-protect">Protect them</button>'
+    + "</div></div></div>";
+}
+
+function defendCrownView() {
+  var offer = CT.ui.defendCrownOffer;
+  if (!offer) return "";
+  var knight = CT.playerById(offer.knightId || CT.myId());
+  var victim = CT.playerById(offer.victimId);
+  if (!knight) { CT.ui.defendCrownOffer = null; return ""; }
+  var conseq = offer.consequence === "drive" ? "Drive Out" : "Shame";
+  return '<div class="scrim"><div class="modal modal--reaction cover" style="max-width:520px">'
+    + '<div class="seal-big" style="background:var(--gold-soft);color:var(--wax)">⚔</div>'
+    + '<h1 style="margin:8px 0">Defend the Crown</h1>'
+    + '<p class="muted" style="font-size:15px">'
+    + CT.esc(victim ? victim.name : "A royal") + " faces duel consequence <strong>" + conseq
+    + "</strong>. Shield them once this round?</p>"
+    + '<div class="btn-row" style="justify-content:center;margin-top:20px;flex-wrap:wrap;gap:10px">'
+    + '<button class="btn btn-ghost" data-act="decline-defend-crown">Let it happen</button>'
+    + '<button class="btn btn-gold" data-act="accept-defend-crown">Defend the Crown</button>'
+    + "</div></div></div>";
+}
+
+function recklessChargeView() {
+  var offer = CT.ui.recklessChargeOffer;
+  if (!offer) return "";
+  var att = CT.playerById(offer.attackerId || CT.myId());
+  if (!att) { CT.ui.recklessChargeOffer = null; return ""; }
+  var opponents = (offer.opponentIds || []).map(function (id) { return CT.playerById(id); }).filter(Boolean);
+  var opts = opponents.map(function (x) {
+    return '<option value="' + x.id + '">' + CT.esc(x.name) + "</option>";
+  }).join("");
+  return '<div class="scrim"><div class="modal modal--reaction cover" style="max-width:520px">'
+    + '<div class="seal-big" style="background:var(--gold-soft);color:var(--wax)">⚔</div>'
+    + '<h1 style="margin:8px 0">Reckless Charge</h1>'
+    + '<p class="muted" style="font-size:15px">You moved into a location with another player. Start a duel immediately — if you lose, you also lose 1 Reputation.</p>'
+    + '<label class="field"><span class="field-label">Duel</span>'
+    + '<select id="reckless-charge-target"' + (opponents.length ? "" : " disabled") + ">"
+    + opts + "</select></label>"
+    + '<div class="btn-row" style="justify-content:center;margin-top:20px;flex-wrap:wrap;gap:10px">'
+    + '<button class="btn btn-ghost" data-act="decline-reckless-charge">Hold back</button>'
+    + '<button class="btn btn-gold" data-act="accept-reckless-charge"' + (opponents.length ? "" : " disabled") + ">Charge!</button>"
     + "</div></div></div>";
 }
 
@@ -1388,6 +1454,47 @@ CT.handleAction = function (act, el, ev) {
         CT.ui.sanctuaryOffer = null; break;
       }
       CT.declineSanctuary();
+      CT.render(); break;
+    case "accept-protect":
+      if (CT.netAction({ type: "resolveProtect" })) {
+        CT.ui.protectOffer = null; break;
+      }
+      CT.resolveProtect(true);
+      CT.render(); break;
+    case "decline-protect":
+      if (CT.netAction({ type: "declineProtect" })) {
+        CT.ui.protectOffer = null; break;
+      }
+      CT.declineProtect();
+      CT.render(); break;
+    case "accept-defend-crown":
+      if (CT.netAction({ type: "resolveDefendCrown" })) {
+        CT.ui.defendCrownOffer = null; break;
+      }
+      CT.resolveDefendCrown(true);
+      CT.render(); break;
+    case "decline-defend-crown":
+      if (CT.netAction({ type: "declineDefendCrown" })) {
+        CT.ui.defendCrownOffer = null; break;
+      }
+      CT.declineDefendCrown();
+      CT.render(); break;
+    case "accept-reckless-charge": {
+      var rcTarget = document.getElementById("reckless-charge-target");
+      var rcId = rcTarget ? rcTarget.value : "";
+      if (CT.netAction({ type: "resolveRecklessCharge", targetId: rcId })) {
+        CT.ui.recklessChargeOffer = null; break;
+      }
+      CT.resolveRecklessCharge(true, rcId);
+      CT.ui.recklessChargeOffer = null;
+      CT.render(); break;
+    }
+    case "decline-reckless-charge":
+      if (CT.netAction({ type: "declineRecklessCharge" })) {
+        CT.ui.recklessChargeOffer = null; break;
+      }
+      CT.declineRecklessCharge();
+      CT.ui.recklessChargeOffer = null;
       CT.render(); break;
     case "bot-turn": {
       var bp = CT.activePlayer();

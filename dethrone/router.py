@@ -38,7 +38,7 @@ _DETHRONE_CSP = (
     "frame-ancestors 'none'"
 )
 
-_DETHRONE_ASSET_VERSION = "20260701-p38"
+_DETHRONE_ASSET_VERSION = "20260701-p39"
 
 _CREATE_BUCKETS: dict[str, list[float]] = {}
 _CREATE_LIMIT = 30
@@ -393,6 +393,34 @@ def _dispatch(room, player, mtype: str, msg: dict) -> bool:
         g.resolve_sanctuary(player.id, accept=False)
         return True
 
+    if mtype == "resolveProtect":
+        g.resolve_protect(player.id, accept=True)
+        return True
+
+    if mtype == "declineProtect":
+        g.resolve_protect(player.id, accept=False)
+        return True
+
+    if mtype == "resolveDefendCrown":
+        g.resolve_defend_crown(player.id, accept=True)
+        return True
+
+    if mtype == "declineDefendCrown":
+        g.resolve_defend_crown(player.id, accept=False)
+        return True
+
+    if mtype == "resolveRecklessCharge":
+        g.resolve_reckless_charge(
+            player.id,
+            accept=True,
+            target_id=str(msg.get("targetId", "")) or None,
+        )
+        return True
+
+    if mtype == "declineRecklessCharge":
+        g.resolve_reckless_charge(player.id, accept=False)
+        return True
+
     if mtype == "reactionMove":
         g.reaction_move(player.id, str(msg.get("locationId", "")))
         return True
@@ -521,6 +549,7 @@ def _dispatch(room, player, mtype: str, msg: dict) -> bool:
             room.rng,
             att_card_ids=list(msg.get("attCardIds") or []),
             def_card_ids=list(msg.get("defCardIds") or []),
+            reckless_charge=bool(msg.get("recklessCharge")),
         )
         return True
 

@@ -260,6 +260,24 @@ def _prepare_rep_victim(p, g=None):
     p.action_card_ids = []
 
 
+def _strip_royal_guards(g, keep_id=None):
+    for p in g.players:
+        if keep_id and p.id == keep_id:
+            continue
+        if p.public_role_id == "royalguard":
+            p.public_role_id = "gateguard"
+        p.hidden_role_ids = [r for r in p.hidden_role_ids if r != "royalguard"]
+
+
+def _strip_royal_knights(g, keep_id=None):
+    for p in g.players:
+        if keep_id and p.id == keep_id:
+            continue
+        if p.public_role_id == "royalknight":
+            p.public_role_id = "gateguard"
+        p.hidden_role_ids = [r for r in p.hidden_role_ids if r != "royalknight"]
+
+
 def test_challenge_sets_pending_discard(client):
     code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
     room, pids, g = _start_game(code)
@@ -818,6 +836,7 @@ def test_duel_card_bonuses(client):
     code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
     room, pids, g = _start_game(code)
     _strip_queens(g)
+    _strip_royal_guards(g)
     att, defn = pids[0], pids[1]
     ap = g.player_by_id(att)
     dp = g.player_by_id(defn)
@@ -1004,6 +1023,7 @@ def test_stitched_lip_offers_on_rumour(client):
     code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
     room, pids, g = _start_game(code)
     _strip_queens(g)
+    _strip_royal_guards(g)
     active = g.active_player().id
     victim = next(pid for pid in pids if pid != active)
     vp = g.player_by_id(victim)
@@ -1021,6 +1041,7 @@ def test_stitched_lip_cancels_rumour(client):
     code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
     room, pids, g = _start_game(code)
     _strip_queens(g)
+    _strip_royal_guards(g)
     active = g.active_player().id
     victim = next(pid for pid in pids if pid != active)
     vp = g.player_by_id(victim)
@@ -1118,6 +1139,7 @@ def test_quick_escape_cancels_rep_loss(client):
     code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
     room, pids, g = _start_game(code)
     _strip_queens(g)
+    _strip_royal_guards(g)
     active = g.active_player().id
     ap = g.player_by_id(active)
     _set_non_exempt_roles(ap, g)
@@ -1133,6 +1155,7 @@ def test_drunken_alibi_at_tavern(client):
     code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
     room, pids, g = _start_game(code)
     _strip_queens(g)
+    _strip_royal_guards(g)
     victim = pids[1]
     vp = g.player_by_id(victim)
     vp.location = "tavern"
@@ -1302,6 +1325,7 @@ def test_false_trail_redirects_rep(client):
     code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
     room, pids, g = _start_game(code)
     _strip_queens(g)
+    _strip_royal_guards(g)
     _strip_spies(g)
     spy_id, victim_id = pids[0], pids[1]
     spy = g.player_by_id(spy_id)
@@ -1324,6 +1348,7 @@ def test_false_trail_before_reaction(client):
     code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
     room, pids, g = _start_game(code)
     _strip_queens(g)
+    _strip_royal_guards(g)
     _strip_spies(g)
     spy_id = pids[0]
     other_id = pids[1]
@@ -1365,6 +1390,7 @@ def test_sanctuary_blocks_rep_loss(client):
     code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
     room, pids, g = _start_game(code)
     _strip_queens(g)
+    _strip_royal_guards(g)
     _strip_spies(g)
     victim_id, queen_id = pids[0], pids[1]
     victim = g.player_by_id(victim_id)
@@ -1384,6 +1410,7 @@ def test_sanctuary_before_reaction(client):
     code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
     room, pids, g = _start_game(code)
     _strip_queens(g)
+    _strip_royal_guards(g)
     _strip_spies(g)
     victim_id, queen_id = pids[0], pids[1]
     victim = g.player_by_id(victim_id)
@@ -1424,6 +1451,7 @@ def test_false_trail_via_websocket(client):
     code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
     room, pids, g = _start_game(code)
     _strip_queens(g)
+    _strip_royal_guards(g)
     _strip_spies(g)
     spy_id = pids[0]
     victim_id = pids[1]
@@ -1507,6 +1535,195 @@ def test_sanctuary_via_websocket(client):
         ws.receive_json()
     assert victim.rep == before
     assert "sanctuary" in queen.abilities_used_this_round
+
+
+def test_protect_blocks_rep_loss(client):
+    code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
+    room, pids, g = _start_game(code)
+    _strip_queens(g)
+    _strip_royal_guards(g)
+    _strip_spies(g)
+    victim_id, guard_id = pids[0], pids[1]
+    victim = g.player_by_id(victim_id)
+    guard = g.player_by_id(guard_id)
+    _strip_royal_guards(g, keep_id=guard_id)
+    _prepare_rep_victim(victim, g)
+    guard.hidden_role_ids = ["royalguard", "thief"]
+    guard.public_role_id = "gateguard"
+    before = victim.rep
+    assert g._maybe_offer_rep_loss(victim_id, -1, "Test", trigger="rep_loss")
+    assert g.pending_ui_action.get(guard_id, {}).get("kind") == "protect"
+    g.resolve_protect(guard_id, accept=True)
+    assert victim.rep == before
+    assert "protect" in guard.abilities_used_this_round
+
+
+def test_protect_before_reaction(client):
+    code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
+    room, pids, g = _start_game(code)
+    _strip_queens(g)
+    _strip_royal_guards(g)
+    _strip_spies(g)
+    victim_id, guard_id = pids[0], pids[1]
+    victim = g.player_by_id(victim_id)
+    guard = g.player_by_id(guard_id)
+    _strip_royal_guards(g, keep_id=guard_id)
+    _prepare_rep_victim(victim, g)
+    victim.action_card_ids = ["quick_escape"]
+    guard.hidden_role_ids = ["royalguard", "thief"]
+    guard.public_role_id = "gateguard"
+    assert g._maybe_offer_rep_loss(victim_id, -1, "Test", trigger="rep_loss")
+    assert g.pending_ui_action.get(guard_id, {}).get("kind") == "protect"
+    g.resolve_protect(guard_id, accept=False)
+    assert g.pending_ui_action.get(victim_id, {}).get("kind") == "reaction"
+
+
+def test_protect_blocks_drive_out(client):
+    import random
+    code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
+    room, pids, g = _start_game(code)
+    victim_id, guard_id = pids[0], pids[1]
+    victim = g.player_by_id(victim_id)
+    guard = g.player_by_id(guard_id)
+    _strip_royal_knights(g)
+    _strip_royal_guards(g, keep_id=guard_id)
+    victim.location = "barracks"
+    guard.hidden_role_ids = ["royalguard", "thief"]
+    guard.public_role_id = "gateguard"
+    start_loc = victim.location
+    g.duel_apply_consequence(
+        pids[2], victim_id, 5, 0, False, "drive", random.Random(0),
+    )
+    assert g.pending_ui_action.get(guard_id, {}).get("kind") == "protect"
+    g.resolve_protect(guard_id, accept=True)
+    assert victim.location == start_loc
+    assert "protect" in guard.abilities_used_this_round
+
+
+def test_defend_crown_blocks_shame(client):
+    import random
+    code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
+    room, pids, g = _start_game(code)
+    _strip_queens(g)
+    _strip_royal_guards(g)
+    _strip_spies(g)
+    royal_id, knight_id = pids[0], pids[1]
+    royal = g.player_by_id(royal_id)
+    knight = g.player_by_id(knight_id)
+    _strip_royal_knights(g, keep_id=knight_id)
+    _prepare_rep_victim(royal, g)
+    royal.hidden_role_ids = ["thief", "wanderingknight"]
+    royal.public_role_id = "gateguard"
+    g.set_throne_controller("king", royal_id, "test")
+    knight.location = "barracks"
+    royal.location = "barracks"
+    knight.hidden_role_ids = ["royalknight", "thief"]
+    knight.public_role_id = "gateguard"
+    before = royal.rep
+    g.duel_apply_consequence(
+        pids[2], royal_id, 5, 0, False, "shame", random.Random(0),
+    )
+    assert g.pending_ui_action.get(knight_id, {}).get("kind") == "defend_crown"
+    g.resolve_defend_crown(knight_id, accept=True)
+    assert royal.rep == before
+    assert "defend_crown" in knight.abilities_used_this_round
+
+
+def test_reckless_charge_offers_after_move(client):
+    code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
+    room, pids, g = _start_game(code)
+    pid = g.active_player().id
+    knight = g.player_by_id(pid)
+    other = g.player_by_id(next(x for x in pids if x != pid))
+    knight.hidden_role_ids = ["youngknight", "thief"]
+    knight.public_role_id = "gateguard"
+    dest = g.legal_moves(knight)[0]
+    other.location = dest
+    g.move_player(pid, dest)
+    assert g.pending_ui_action.get(pid, {}).get("kind") == "reckless_charge"
+    assert other.id in g.pending_ui_action[pid]["opponentIds"]
+
+
+def test_reckless_charge_penalty_on_loss(client):
+    import random
+    code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
+    room, pids, g = _start_game(code)
+    _strip_queens(g)
+    _strip_royal_guards(g)
+    _strip_spies(g)
+    _strip_royal_guards(g)
+    att_id, def_id = pids[0], pids[1]
+    att = g.player_by_id(att_id)
+    deff = g.player_by_id(def_id)
+    _prepare_rep_victim(att, g)
+    _prepare_rep_victim(deff, g)
+    att.location = deff.location = "barracks"
+    before = att.rep
+    g.duel_apply_consequence(
+        att_id, def_id, 0, 5, False, "disarm", random.Random(0), reckless_charge=True,
+    )
+    assert att.rep == before - 1
+
+
+def test_reckless_charge_via_websocket(client):
+    code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
+    room, pids, g = _start_game(code)
+    pid = g.active_player().id
+    knight = g.player_by_id(pid)
+    other = g.player_by_id(next(x for x in pids if x != pid))
+    knight.hidden_role_ids = ["youngknight", "thief"]
+    knight.public_role_id = "gateguard"
+    dest = g.legal_moves(knight)[0]
+    other.location = dest
+    g.pending_ui_action[pid] = {
+        "kind": "reckless_charge",
+        "attackerId": pid,
+        "opponentIds": [other.id],
+    }
+
+    with client.websocket_connect(f"/dethrone/ws/{code}?pid={pid}&name=Knight") as ws:
+        ws.receive_json()
+        state = ws.receive_json()
+        assert state["room"]["game"]["pendingUiAction"]["kind"] == "reckless_charge"
+        ws.send_json({"type": "resolveRecklessCharge", "targetId": other.id})
+        state = ws.receive_json()
+        assert state["room"]["game"]["pendingUiAction"]["kind"] == "duel"
+        assert state["room"]["game"]["pendingUiAction"]["recklessCharge"] is True
+
+
+def test_protect_via_websocket(client):
+    code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
+    room, pids, g = _start_game(code)
+    victim_id, guard_id = pids[0], pids[1]
+    victim = g.player_by_id(victim_id)
+    guard = g.player_by_id(guard_id)
+    _strip_queens(g)
+    _strip_royal_guards(g)
+    _strip_spies(g)
+    _strip_royal_guards(g, keep_id=guard_id)
+    _prepare_rep_victim(victim, g)
+    guard.hidden_role_ids = ["royalguard", "thief"]
+    guard.public_role_id = "gateguard"
+    before = victim.rep
+    g.pending_ui_action[guard_id] = {
+        "kind": "protect",
+        "guardId": guard_id,
+        "victimId": victim_id,
+        "eventKind": "rep_loss",
+        "delta": -1,
+        "reason": "Test",
+        "trigger": "rep_loss",
+        "remainingGuardIds": [],
+    }
+
+    with client.websocket_connect(f"/dethrone/ws/{code}?pid={guard_id}&name=Guard") as ws:
+        ws.receive_json()
+        state = ws.receive_json()
+        assert state["room"]["game"]["pendingUiAction"]["kind"] == "protect"
+        ws.send_json({"type": "resolveProtect"})
+        ws.receive_json()
+    assert victim.rep == before
+    assert "protect" in guard.abilities_used_this_round
 
 
 def D_ROLE_META_PUBLIC(role_id: str) -> bool:

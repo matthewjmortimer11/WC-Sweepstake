@@ -25,6 +25,25 @@ CT.bot.resolvePending = function (playerId) {
     }
     return true;
   }
+  if (CT.ui.protectOffer && CT.ui.protectOffer.guardId === playerId) {
+    if (Math.random() < 0.7) CT.resolveProtect(true);
+    else CT.declineProtect();
+    return true;
+  }
+  if (CT.ui.defendCrownOffer && CT.ui.defendCrownOffer.knightId === playerId) {
+    if (Math.random() < 0.75) CT.resolveDefendCrown(true);
+    else CT.declineDefendCrown();
+    return true;
+  }
+  if (CT.ui.recklessChargeOffer && CT.ui.recklessChargeOffer.attackerId === playerId) {
+    var opps = CT.ui.recklessChargeOffer.opponentIds || [];
+    if (opps.length && Math.random() < 0.65) {
+      CT.resolveRecklessCharge(true, opps[Math.floor(Math.random() * opps.length)]);
+    } else {
+      CT.declineRecklessCharge();
+    }
+    return true;
+  }
   if (CT.ui.reactionOffer && CT.ui.reactionOffer.playerId === playerId) {
     var cards = CT.ui.reactionOffer.cards || [];
     if (cards.length && Math.random() < 0.75) CT.resolveReaction(cards[Math.floor(Math.random() * cards.length)]);

@@ -307,9 +307,8 @@ CT._applyDuelConsequenceOnly = function (resume) {
     if (loserCards.indexOf("shield") !== -1) CT.log(loser.name + "'s Shield ignored Shame.", "note");
     else CT._maybeOfferRepLoss(loser.id, -1, "Shame");
   } else if (resume.consequence === "drive") {
-    var moves = CT.legalMoves(loser);
-    if (moves.length) CT.movePlayer(loser.id, moves[0], true);
-    CT.log(loser.name + " was Driven Out.", "event");
+    if (CT._offerProtect(loser.id, "drive_out")) { /* offered */ }
+    else CT._driveOutPlayer(loser.id);
   }
 };
 
@@ -441,10 +440,226 @@ CT.declineSanctuary = function () {
   CT.resolveSanctuary(false);
 };
 
-CT._finishRepLoss = function (targetId, delta, reason, trigger, skipSanctuary) {
+CT._isRoyalOrThrone = function (p) {
+  if (!p) return false;
+  var roles = CT.allRoleIds(p);
+  if (roles.indexOf("king") !== -1 || roles.indexOf("queen") !== -1) return true;
+  var t = CT.state.throne;
+  return p.id === t.kingControllerId || p.id === t.queenControllerId || p.id === t.successorId;
+};
+
+CT._nextProtectGuards = function () {
+  return CT.state.players.filter(function (p) {
+    if (p.status !== "active") return false;
+    if (CT.allRoleIds(p).indexOf("royalguard") === -1) return false;
+    if ((p.abilitiesUsedThisRound || []).indexOf("protect") !== -1) return false;
+    return true;
+  });
+};
+
+CT._offerProtect = function (victimId, eventKind, delta, reason, trigger) {
+  var guards = CT._nextProtectGuards();
+  if (!guards.length) return false;
+  var guard = guards[0];
+  CT.ui.protectOffer = {
+    guardId: guard.id,
+    victimId: victimId,
+    eventKind: eventKind,
+    delta: delta,
+    reason: reason,
+    trigger: trigger || "rep_loss",
+    remainingGuardIds: guards.slice(1).map(function (g) { return g.id; }),
+  };
+  if (guard.isBot && CT.bot && CT.bot.resolvePending) CT.bot.resolvePending(guard.id);
+  return true;
+};
+
+CT.resolveProtect = function (accept) {
+  var offer = CT.ui.protectOffer;
+  if (!offer) return;
+  var guard = CT.playerById(offer.guardId);
+  var victim = CT.playerById(offer.victimId);
+  if (!guard) return;
+  if (accept) {
+    if (!guard.abilitiesUsedThisRound) guard.abilitiesUsedThisRound = [];
+    guard.abilitiesUsedThisRound.push("protect");
+    CT.log(guard.name + " uses Protect — " + (victim ? victim.name : "a player") + " is spared.", "event");
+    CT.ui.protectOffer = null;
+    CT.save();
+    return;
+  }
+  CT.log(guard.name + " declines Protect.", "note");
+  var remaining = (offer.remainingGuardIds || []).slice();
+  while (remaining.length) {
+    var nextId = remaining.shift();
+    var nextGuard = CT.playerById(nextId);
+    if (!nextGuard || nextGuard.status !== "active") continue;
+    if (CT.allRoleIds(nextGuard).indexOf("royalguard") === -1) continue;
+    if ((nextGuard.abilitiesUsedThisRound || []).indexOf("protect") !== -1) continue;
+    CT.ui.protectOffer = {
+      guardId: nextGuard.id,
+      victimId: offer.victimId,
+      eventKind: offer.eventKind,
+      delta: offer.delta,
+      reason: offer.reason,
+      trigger: offer.trigger,
+      remainingGuardIds: remaining,
+    };
+    if (nextGuard.isBot && CT.bot && CT.bot.resolvePending) CT.bot.resolvePending(nextGuard.id);
+    CT.save();
+    return;
+  }
+  CT.ui.protectOffer = null;
+  if (offer.eventKind === "rep_loss") {
+    CT._finishRepLoss(offer.victimId, offer.delta, offer.reason, offer.trigger, true, true);
+  } else if (offer.eventKind === "drive_out") {
+    CT._driveOutPlayer(offer.victimId);
+  }
+};
+
+CT.declineProtect = function () { CT.resolveProtect(false); };
+
+CT._nextDefendCrownKnights = function () {
+  return CT.state.players.filter(function (p) {
+    if (p.status !== "active") return false;
+    if (CT.allRoleIds(p).indexOf("royalknight") === -1) return false;
+    if (p.location !== "throne" && p.location !== "barracks") return false;
+    if ((p.abilitiesUsedThisRound || []).indexOf("defend_crown") !== -1) return false;
+    return true;
+  });
+};
+
+CT._offerDefendCrown = function (victimId, consequence, loserCards) {
+  var victim = CT.playerById(victimId);
+  if (!victim || !CT._isRoyalOrThrone(victim)) return false;
+  var knights = CT._nextDefendCrownKnights();
+  if (!knights.length) return false;
+  var knight = knights[0];
+  CT.ui.defendCrownOffer = {
+    knightId: knight.id,
+    victimId: victimId,
+    consequence: consequence,
+    loserCards: loserCards || [],
+    remainingKnightIds: knights.slice(1).map(function (k) { return k.id; }),
+  };
+  if (knight.isBot && CT.bot && CT.bot.resolvePending) CT.bot.resolvePending(knight.id);
+  return true;
+};
+
+CT.resolveDefendCrown = function (accept) {
+  var offer = CT.ui.defendCrownOffer;
+  if (!offer) return;
+  var knight = CT.playerById(offer.knightId);
+  var victim = CT.playerById(offer.victimId);
+  if (!knight) return;
+  if (accept) {
+    if (!knight.abilitiesUsedThisRound) knight.abilitiesUsedThisRound = [];
+    knight.abilitiesUsedThisRound.push("defend_crown");
+    CT.log(knight.name + " uses Defend the Crown — " + (victim ? victim.name : "a royal") + " is protected.", "event");
+    CT.ui.defendCrownOffer = null;
+    CT.save();
+    return;
+  }
+  CT.log(knight.name + " declines Defend the Crown.", "note");
+  var remaining = (offer.remainingKnightIds || []).slice();
+  while (remaining.length) {
+    var nextId = remaining.shift();
+    var nextKnight = CT.playerById(nextId);
+    if (!nextKnight || nextKnight.status !== "active") continue;
+    if (CT.allRoleIds(nextKnight).indexOf("royalknight") === -1) continue;
+    if (nextKnight.location !== "throne" && nextKnight.location !== "barracks") continue;
+    if ((nextKnight.abilitiesUsedThisRound || []).indexOf("defend_crown") !== -1) continue;
+    CT.ui.defendCrownOffer = {
+      knightId: nextKnight.id,
+      victimId: offer.victimId,
+      consequence: offer.consequence,
+      loserCards: offer.loserCards,
+      remainingKnightIds: remaining,
+    };
+    if (nextKnight.isBot && CT.bot && CT.bot.resolvePending) CT.bot.resolvePending(nextKnight.id);
+    CT.save();
+    return;
+  }
+  CT.ui.defendCrownOffer = null;
+  CT._continueDuelConsequence(offer.victimId, offer.consequence, offer.loserCards);
+};
+
+CT.declineDefendCrown = function () { CT.resolveDefendCrown(false); };
+
+CT._continueDuelConsequence = function (loserId, consequence, loserCards) {
+  var loser = CT.playerById(loserId);
+  if (!loser) return;
+  if (consequence === "shame") {
+    if ((loserCards || []).indexOf("shield") !== -1) CT.log(loser.name + "'s Shield ignored Shame.", "note");
+    else if (CT._isRoyalOrThrone(loser) && CT._offerReaction(loser.id, "duel_consequence", {
+      effect: "duel_consequence", consequence: "shame", loserId: loser.id, loserCards: loserCards,
+    })) { /* offered */ }
+    else CT._maybeOfferRepLoss(loser.id, -1, "Shame");
+  } else if (consequence === "drive") {
+    if (CT._isRoyalOrThrone(loser) && CT._offerReaction(loser.id, "duel_consequence", {
+      effect: "duel_consequence", consequence: "drive", loserId: loser.id, loserCards: loserCards,
+    })) { /* offered */ }
+    else if (CT._offerProtect(loser.id, "drive_out")) { /* offered */ }
+    else CT._driveOutPlayer(loser.id);
+  }
+};
+
+CT._driveOutPlayer = function (loserId) {
+  var loser = CT.playerById(loserId);
+  if (!loser) return;
+  var moves = CT.legalMoves(loser);
+  if (moves.length) CT.movePlayer(loser.id, moves[0], true);
+  CT.log(loser.name + " was Driven Out.", "event");
+};
+
+CT._maybeOfferRecklessCharge = function (playerId) {
+  var p = CT.playerById(playerId);
+  if (!p || p.status !== "active") return false;
+  if (CT.allRoleIds(p).indexOf("youngknight") === -1) return false;
+  var opponents = CT.state.players.filter(function (x) {
+    return x.status === "active" && x.id !== playerId && x.location === p.location;
+  });
+  if (!opponents.length) return false;
+  CT.ui.recklessChargeOffer = {
+    attackerId: playerId,
+    opponentIds: opponents.map(function (o) { return o.id; }),
+  };
+  if (p.isBot && CT.bot && CT.bot.resolvePending) CT.bot.resolvePending(playerId);
+  return true;
+};
+
+CT.resolveRecklessCharge = function (accept, targetId) {
+  var offer = CT.ui.recklessChargeOffer;
+  if (!offer) return;
+  var attacker = CT.playerById(offer.attackerId);
+  if (!attacker) return;
+  CT.ui.recklessChargeOffer = null;
+  if (!accept) {
+    CT.log(attacker.name + " holds back from Reckless Charge.", "note");
+    CT.save();
+    return;
+  }
+  var defender = CT.playerById(targetId);
+  if (!defender || (offer.opponentIds || []).indexOf(targetId) === -1) return;
+  CT.log(attacker.name + " charges into " + defender.name + " — duel!", "event");
+  if (CT.helpers) {
+    CT.helpers.ui = {
+      open: "duel", att: offer.attackerId, def: targetId, serious: false, override: false,
+      attBonus: 0, defBonus: 0, attDuelCards: [], defDuelCards: [], phase: "setup",
+      recklessCharge: true,
+    };
+    CT._offerReaction(targetId, "duel_declared", { effect: "cancel_duel", attackerId: offer.attackerId });
+  }
+  CT.save();
+};
+
+CT.declineRecklessCharge = function () { CT.resolveRecklessCharge(false); };
+
+CT._finishRepLoss = function (targetId, delta, reason, trigger, skipSanctuary, skipProtect) {
   var tr = trigger || "rep_loss";
   if (delta >= 0) { CT.adjustRep(targetId, delta, reason); return false; }
   if (!skipSanctuary && CT._offerSanctuary(targetId, delta, reason, tr)) return true;
+  if (!skipProtect && CT._offerProtect(targetId, "rep_loss", delta, reason, tr)) return true;
   if (CT._offerReaction(targetId, tr, { effect: "rep_adjust", targetId: targetId, delta: delta, reason: reason })) return true;
   CT.adjustRep(targetId, delta, reason);
   return false;
@@ -571,6 +786,7 @@ CT.movePlayer = function (playerId, locationId, manual) {
     p.movedThisTurn = p.movesUsedThisTurn >= limit;
   }
   CT.log(p.name + " moved " + (from ? from.name : "?") + " → " + to.name + (manual ? " (manual)" : "") + ".");
+  if (!manual) CT._maybeOfferRecklessCharge(playerId);
   CT.save();
 };
 

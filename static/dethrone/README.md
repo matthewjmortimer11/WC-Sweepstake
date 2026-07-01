@@ -149,6 +149,12 @@ open "index.html"          # macOS
 - **Sanctuary** — Queen may cancel one Reputation loss per round for another player (hidden or public); offered after False Trail, before reaction cards
 - **Online sync** — `resolveSanctuary` / `declineSanctuary`; board highlights clear when moves are exhausted
 
+### Phase 29 — Reckless Charge, Protect & Defend the Crown
+- **Reckless Charge** — Young Knight may duel immediately after moving into a location with another player; losing the duel costs an extra −1 Reputation
+- **Protect** — Royal Guard may cancel one Reputation loss or Drive Out per round for another player (hidden or public); offered after Sanctuary, before reaction cards
+- **Defend the Crown** — Royal Knight at Throne or Barracks may shield a royal from duel Shame or Drive Out once per round; offered before Royal Guard Detail reaction cards
+- **Online sync** — `resolveRecklessCharge` / `declineRecklessCharge`, `resolveProtect` / `declineProtect`, `resolveDefendCrown` / `declineDefendCrown`; duel consequences accept `recklessCharge`
+
 ### Phase 4 — Throne & Succession
 A **Throne & Succession** panel tracks the crown and the line of succession.
 - **Throne control (§23)**: King / Queen / Successor controllers, set manually or via the **Claim helper** (claimant + crown; unchallenged → crowned, or challenged → "proof valid" crowns them and the challenger loses a role / "bluff" costs the claimant a role). Claim order is recorded.

@@ -118,6 +118,29 @@ CT.net.applyState = function (msg) {
           trigger: pui.trigger,
           remainingQueenIds: pui.remainingQueenIds || [],
         };
+      } else if (pui.kind === "protect") {
+        CT.ui.protectOffer = {
+          guardId: CT.myId(),
+          victimId: pui.victimId,
+          eventKind: pui.eventKind,
+          delta: pui.delta,
+          reason: pui.reason,
+          trigger: pui.trigger,
+          remainingGuardIds: pui.remainingGuardIds || [],
+        };
+      } else if (pui.kind === "defend_crown") {
+        CT.ui.defendCrownOffer = {
+          knightId: CT.myId(),
+          victimId: pui.victimId,
+          consequence: pui.consequence,
+          loserCards: pui.loserCards || [],
+          remainingKnightIds: pui.remainingKnightIds || [],
+        };
+      } else if (pui.kind === "reckless_charge") {
+        CT.ui.recklessChargeOffer = {
+          attackerId: CT.myId(),
+          opponentIds: pui.opponentIds || [],
+        };
       } else if (pui.kind === "reaction_move") {
         CT.ui.reactionMove = { playerId: CT.myId(), maxSteps: pui.maxSteps || 1 };
       } else if (CT.helpers && !CT.helpers.ui.open) {
@@ -132,11 +155,14 @@ CT.net.applyState = function (msg) {
     } else if (CT.ui.finalRiteOffer === CT.myId()) {
       CT.ui.finalRiteOffer = null;
     }
-    if (!cs.pendingUiAction || (cs.pendingUiAction.kind !== "reaction" && cs.pendingUiAction.kind !== "reaction_move" && cs.pendingUiAction.kind !== "false_trail" && cs.pendingUiAction.kind !== "sanctuary")) {
+    if (!cs.pendingUiAction || (cs.pendingUiAction.kind !== "reaction" && cs.pendingUiAction.kind !== "reaction_move" && cs.pendingUiAction.kind !== "false_trail" && cs.pendingUiAction.kind !== "sanctuary" && cs.pendingUiAction.kind !== "protect" && cs.pendingUiAction.kind !== "defend_crown" && cs.pendingUiAction.kind !== "reckless_charge")) {
       if (CT.ui.reactionOffer && CT.ui.reactionOffer.playerId === CT.myId()) CT.ui.reactionOffer = null;
       if (CT.ui.reactionMove && CT.ui.reactionMove.playerId === CT.myId()) CT.ui.reactionMove = null;
       if (CT.ui.falseTrailOffer && CT.ui.falseTrailOffer.playerId === CT.myId()) CT.ui.falseTrailOffer = null;
       if (CT.ui.sanctuaryOffer && CT.ui.sanctuaryOffer.queenId === CT.myId()) CT.ui.sanctuaryOffer = null;
+      if (CT.ui.protectOffer && CT.ui.protectOffer.guardId === CT.myId()) CT.ui.protectOffer = null;
+      if (CT.ui.defendCrownOffer && CT.ui.defendCrownOffer.knightId === CT.myId()) CT.ui.defendCrownOffer = null;
+      if (CT.ui.recklessChargeOffer && CT.ui.recklessChargeOffer.attackerId === CT.myId()) CT.ui.recklessChargeOffer = null;
     }
     if (cs.privateNote != null && CT.myId()) {
       if (typeof CT.setPrivateNote === "function") {

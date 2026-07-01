@@ -361,6 +361,8 @@ class CursedThroneGame:
                 ap.moves_used_this_turn = int(ap.moves_used_this_turn) + 1
                 ap.moved_this_turn = ap.moves_used_this_turn >= self._move_limit(ap)
         self._log(f"{p.name} moved {from_name} → {to_name}" + (" (manual)" if manual else "") + ".")
+        if not manual:
+            self._maybe_offer_reckless_charge(pid)
 
     def _all_role_ids(self, p: PlayerState) -> set[str]:
         roles: set[str] = set()
@@ -1694,6 +1696,298 @@ class CursedThroneGame:
             return
         self._finish_rep_loss(victim_id, delta, reason, trigger=trigger, skip_sanctuary=True)
 
+    def _next_protect_guards(self) -> list[PlayerState]:
+        guards: list[PlayerState] = []
+        for p in self.players:
+            if p.status != "active":
+                continue
+            if "royalguard" not in self._all_role_ids(p):
+                continue
+            if "protect" in p.abilities_used_this_round:
+                continue
+            guards.append(p)
+        return guards
+
+    def _offer_protect(
+        self,
+        victim_id: str,
+        event_kind: str,
+        *,
+        delta: int = 0,
+        reason: str = "",
+        trigger: str = "rep_loss",
+    ) -> bool:
+        guards = self._next_protect_guards()
+        if not guards:
+            return False
+        victim = self.player_by_id(victim_id)
+        if not victim:
+            return False
+        guard = guards[0]
+        pending: dict = {
+            "kind": "protect",
+            "guardId": guard.id,
+            "victimId": victim_id,
+            "eventKind": event_kind,
+            "remainingGuardIds": [g.id for g in guards[1:]],
+        }
+        if event_kind == "rep_loss":
+            pending["delta"] = delta
+            pending["reason"] = reason
+            pending["trigger"] = trigger
+        self.pending_ui_action[guard.id] = pending
+        if guard.is_bot:
+            self._bot_resolve_pending(guard.id, random.Random())
+        return True
+
+    def resolve_protect(self, pid: str, *, accept: bool) -> None:
+        pending = self.pending_ui_action.get(pid)
+        if not pending or pending.get("kind") != "protect":
+            raise MoveError("No Protect pending.")
+        guard = self.player_by_id(pid)
+        if not guard:
+            raise MoveError("Unknown player.")
+        victim_id = str(pending.get("victimId", ""))
+        event_kind = str(pending.get("eventKind", ""))
+        remaining = list(pending.get("remainingGuardIds") or [])
+        self.pending_ui_action.pop(pid, None)
+        victim = self.player_by_id(victim_id)
+        vname = victim.name if victim else "a player"
+        if accept:
+            guard.abilities_used_this_round.append("protect")
+            self._log(f"{guard.name} uses Protect — {vname} is spared.", "event")
+            return
+        self._log(f"{guard.name} declines Protect.", "note")
+        while remaining:
+            next_id = remaining.pop(0)
+            next_guard = self.player_by_id(next_id)
+            if (
+                not next_guard
+                or next_guard.status != "active"
+                or "royalguard" not in self._all_role_ids(next_guard)
+                or "protect" in next_guard.abilities_used_this_round
+            ):
+                continue
+            next_pending: dict = {
+                "kind": "protect",
+                "guardId": next_guard.id,
+                "victimId": victim_id,
+                "eventKind": event_kind,
+                "remainingGuardIds": remaining,
+            }
+            if event_kind == "rep_loss":
+                next_pending["delta"] = int(pending.get("delta", 0))
+                next_pending["reason"] = str(pending.get("reason", ""))
+                next_pending["trigger"] = str(pending.get("trigger", "rep_loss"))
+            self.pending_ui_action[next_guard.id] = next_pending
+            if next_guard.is_bot:
+                self._bot_resolve_pending(next_guard.id, random.Random())
+            return
+        if event_kind == "rep_loss":
+            self._finish_rep_loss(
+                victim_id,
+                int(pending.get("delta", 0)),
+                str(pending.get("reason", "")),
+                trigger=str(pending.get("trigger", "rep_loss")),
+                skip_sanctuary=True,
+                skip_protect=True,
+            )
+        elif event_kind == "drive_out":
+            self._drive_out_player(victim_id)
+
+    def _next_defend_crown_knights(self) -> list[PlayerState]:
+        knights: list[PlayerState] = []
+        for p in self.players:
+            if p.status != "active":
+                continue
+            if "royalknight" not in self._all_role_ids(p):
+                continue
+            if p.location not in ("throne", "barracks"):
+                continue
+            if "defend_crown" in p.abilities_used_this_round:
+                continue
+            knights.append(p)
+        return knights
+
+    def _offer_defend_crown(
+        self,
+        victim_id: str,
+        consequence: str,
+        loser_cards: list[str],
+    ) -> bool:
+        victim = self.player_by_id(victim_id)
+        if not victim or not self._is_royal_or_throne(victim):
+            return False
+        knights = self._next_defend_crown_knights()
+        if not knights:
+            return False
+        knight = knights[0]
+        self.pending_ui_action[knight.id] = {
+            "kind": "defend_crown",
+            "knightId": knight.id,
+            "victimId": victim_id,
+            "consequence": consequence,
+            "loserCards": list(loser_cards),
+            "remainingKnightIds": [k.id for k in knights[1:]],
+        }
+        if knight.is_bot:
+            self._bot_resolve_pending(knight.id, random.Random())
+        return True
+
+    def resolve_defend_crown(self, pid: str, *, accept: bool) -> None:
+        pending = self.pending_ui_action.get(pid)
+        if not pending or pending.get("kind") != "defend_crown":
+            raise MoveError("No Defend the Crown pending.")
+        knight = self.player_by_id(pid)
+        if not knight:
+            raise MoveError("Unknown player.")
+        victim_id = str(pending.get("victimId", ""))
+        consequence = str(pending.get("consequence", ""))
+        loser_cards = list(pending.get("loserCards") or [])
+        remaining = list(pending.get("remainingKnightIds") or [])
+        self.pending_ui_action.pop(pid, None)
+        victim = self.player_by_id(victim_id)
+        vname = victim.name if victim else "a royal"
+        if accept:
+            knight.abilities_used_this_round.append("defend_crown")
+            self._log(f"{knight.name} uses Defend the Crown — {vname} is protected.", "event")
+            return
+        self._log(f"{knight.name} declines Defend the Crown.", "note")
+        while remaining:
+            next_id = remaining.pop(0)
+            next_knight = self.player_by_id(next_id)
+            if (
+                not next_knight
+                or next_knight.status != "active"
+                or "royalknight" not in self._all_role_ids(next_knight)
+                or next_knight.location not in ("throne", "barracks")
+                or "defend_crown" in next_knight.abilities_used_this_round
+            ):
+                continue
+            self.pending_ui_action[next_knight.id] = {
+                "kind": "defend_crown",
+                "knightId": next_knight.id,
+                "victimId": victim_id,
+                "consequence": consequence,
+                "loserCards": loser_cards,
+                "remainingKnightIds": remaining,
+            }
+            if next_knight.is_bot:
+                self._bot_resolve_pending(next_knight.id, random.Random())
+            return
+        self._continue_duel_consequence(victim_id, consequence, loser_cards)
+
+    def _continue_duel_consequence(
+        self,
+        loser_id: str,
+        consequence: str,
+        loser_cards: list[str],
+    ) -> None:
+        loser = self.player_by_id(loser_id)
+        if not loser:
+            return
+        if consequence == "shame":
+            if "shield" in loser_cards:
+                self._log(f"{loser.name}'s Shield ignored Shame.", "note")
+            elif self._is_royal_or_throne(loser) and self._offer_reaction(
+                loser.id,
+                "duel_consequence",
+                {
+                    "effect": "duel_consequence",
+                    "consequence": "shame",
+                    "loserId": loser.id,
+                    "loserCards": loser_cards,
+                },
+            ):
+                return
+            else:
+                self._maybe_offer_rep_loss(loser.id, -1, "Shame")
+        elif consequence == "drive":
+            if self._is_royal_or_throne(loser) and self._offer_reaction(
+                loser.id,
+                "duel_consequence",
+                {
+                    "effect": "duel_consequence",
+                    "consequence": "drive",
+                    "loserId": loser.id,
+                    "loserCards": loser_cards,
+                },
+            ):
+                return
+            if self._offer_protect(loser.id, "drive_out"):
+                return
+            self._drive_out_player(loser.id)
+
+    def _drive_out_player(self, loser_id: str) -> None:
+        loser = self.player_by_id(loser_id)
+        if not loser:
+            return
+        moves = self.legal_moves(loser)
+        dest = moves[0] if moves else loser.location
+        if dest != loser.location:
+            self.move_player(loser.id, dest, manual=True)
+        self._log(f"{loser.name} was Driven Out.", "event")
+
+    def _maybe_offer_reckless_charge(self, pid: str) -> bool:
+        p = self.player_by_id(pid)
+        if not p or p.status != "active":
+            return False
+        if "youngknight" not in self._all_role_ids(p):
+            return False
+        opponents = [
+            x
+            for x in self.players
+            if x.status == "active" and x.id != pid and x.location == p.location
+        ]
+        if not opponents:
+            return False
+        self.pending_ui_action[pid] = {
+            "kind": "reckless_charge",
+            "attackerId": pid,
+            "opponentIds": [o.id for o in opponents],
+        }
+        if p.is_bot:
+            self._bot_resolve_pending(pid, random.Random())
+        return True
+
+    def resolve_reckless_charge(
+        self,
+        pid: str,
+        *,
+        accept: bool,
+        target_id: Optional[str] = None,
+    ) -> None:
+        pending = self.pending_ui_action.get(pid)
+        if not pending or pending.get("kind") != "reckless_charge":
+            raise MoveError("No Reckless Charge pending.")
+        opponents = list(pending.get("opponentIds") or [])
+        self.pending_ui_action.pop(pid, None)
+        attacker = self.player_by_id(pid)
+        if not attacker:
+            raise MoveError("Unknown player.")
+        if not accept:
+            self._log(f"{attacker.name} holds back from Reckless Charge.", "note")
+            return
+        if not target_id:
+            raise MoveError("Duel target required.")
+        defender = self.player_by_id(target_id)
+        if not defender or defender.status != "active":
+            raise MoveError("Invalid target.")
+        if target_id not in opponents:
+            raise MoveError("Target must be at your location.")
+        self._log(f"{attacker.name} charges into {defender.name} — duel!", "event")
+        self.pending_ui_action[pid] = {
+            "kind": "duel",
+            "attackerId": pid,
+            "defenderId": target_id,
+            "recklessCharge": True,
+        }
+        self._offer_reaction(
+            target_id,
+            "duel_declared",
+            {"effect": "cancel_duel", "attackerId": pid},
+        )
+
     def _finish_rep_loss(
         self,
         target_id: str,
@@ -1702,11 +1996,20 @@ class CursedThroneGame:
         *,
         trigger: str = "rep_loss",
         skip_sanctuary: bool = False,
+        skip_protect: bool = False,
     ) -> bool:
         if delta >= 0:
             self.adjust_rep(target_id, delta, reason)
             return False
         if not skip_sanctuary and self._offer_sanctuary(target_id, delta, reason, trigger=trigger):
+            return True
+        if not skip_protect and self._offer_protect(
+            target_id,
+            "rep_loss",
+            delta=delta,
+            reason=reason,
+            trigger=trigger,
+        ):
             return True
         if self._offer_reaction(
             target_id,
@@ -2032,6 +2335,7 @@ class CursedThroneGame:
         *,
         att_card_ids: Optional[list[str]] = None,
         def_card_ids: Optional[list[str]] = None,
+        reckless_charge: bool = False,
     ) -> None:
         if self.status != STATUS_PLAY or self.winner:
             raise MoveError("No active game.")
@@ -2071,6 +2375,8 @@ class CursedThroneGame:
         elif consequence == "shame":
             if "shield" in loser_cards:
                 self._log(f"{loser.name}'s Shield ignored Shame.", "note")
+            elif self._offer_defend_crown(loser.id, "shame", loser_cards):
+                return
             elif self._is_royal_or_throne(loser) and self._offer_reaction(
                 loser.id,
                 "duel_consequence",
@@ -2091,6 +2397,8 @@ class CursedThroneGame:
                 loser.wounded = True
                 self._log(f"{loser.name} is Wounded — no hidden powers next turn.")
         elif consequence == "drive":
+            if self._offer_defend_crown(loser.id, "drive", loser_cards):
+                return
             if self._is_royal_or_throne(loser) and self._offer_reaction(
                 loser.id,
                 "duel_consequence",
@@ -2102,11 +2410,9 @@ class CursedThroneGame:
                 },
             ):
                 return
-            moves = self.legal_moves(loser)
-            dest = moves[0] if moves else loser.location
-            if dest != loser.location:
-                self.move_player(loser.id, dest, manual=True)
-            self._log(f"{loser.name} was Driven Out.", "event")
+            if self._offer_protect(loser.id, "drive_out"):
+                return
+            self._drive_out_player(loser.id)
         elif consequence == "search":
             self._log(
                 f"{winner.name} searches {loser.name} — resolve privately "
@@ -2116,6 +2422,8 @@ class CursedThroneGame:
         if attacker_wins and "cursed_blade" in winner_cards:
             self.adjust_corruption(1, "Cursed Blade")
             self._maybe_offer_rep_loss(loser.id, -1, "Cursed Blade")
+        if reckless_charge and loser.id == attacker_id:
+            self._maybe_offer_rep_loss(attacker_id, -1, "Reckless Charge")
 
     def _apply_duel_consequence_only(self, resume: dict) -> None:
         consequence = resume.get("consequence")
@@ -2129,11 +2437,9 @@ class CursedThroneGame:
             else:
                 self._maybe_offer_rep_loss(loser.id, -1, "Shame")
         elif consequence == "drive":
-            moves = self.legal_moves(loser)
-            dest = moves[0] if moves else loser.location
-            if dest != loser.location:
-                self.move_player(loser.id, dest, manual=True)
-            self._log(f"{loser.name} was Driven Out.", "event")
+            if self._offer_protect(loser.id, "drive_out"):
+                return
+            self._drive_out_player(loser.id)
 
     def royal_claim_unchallenged(self, claimant_id: str, crown: str) -> None:
         self.set_throne_controller(crown, claimant_id, "claim")
@@ -2265,6 +2571,29 @@ class CursedThroneGame:
                     )
                     return True
             self.resolve_false_trail(player_id, accept=False)
+            return True
+        if pending and pending.get("kind") == "protect":
+            if rng.random() < 0.7:
+                self.resolve_protect(player_id, accept=True)
+            else:
+                self.resolve_protect(player_id, accept=False)
+            return True
+        if pending and pending.get("kind") == "defend_crown":
+            if rng.random() < 0.75:
+                self.resolve_defend_crown(player_id, accept=True)
+            else:
+                self.resolve_defend_crown(player_id, accept=False)
+            return True
+        if pending and pending.get("kind") == "reckless_charge":
+            opponents = list(pending.get("opponentIds") or [])
+            if opponents and rng.random() < 0.65:
+                self.resolve_reckless_charge(
+                    player_id,
+                    accept=True,
+                    target_id=rng.choice(opponents),
+                )
+            else:
+                self.resolve_reckless_charge(player_id, accept=False)
             return True
         if pending and pending.get("kind") == "reaction":
             cards = pending.get("cards") or []
