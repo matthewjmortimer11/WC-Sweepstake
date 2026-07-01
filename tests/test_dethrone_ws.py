@@ -134,6 +134,7 @@ def test_dethrone_v3b_board_asset(client):
         Path("static/dethrone/cards/action/manifest.json").read_text(encoding="utf-8")
     )
     assert action_manifest.get("count") == 76 or len(action_manifest["cards"]) == 76
+    assert "stylised" in action_manifest.get("template", "").lower() or "per-card" in action_manifest.get("template", "").lower()
     for card_id, fname in action_manifest["cards"].items():
         assert fname.endswith(".jpg"), fname
         r = client.get(f"/dethrone/cards/action/{fname}?v={_DETHRONE_ASSET_VERSION}")

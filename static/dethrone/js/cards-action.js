@@ -1,7 +1,7 @@
 /* The Cursed Throne — action card stubs (V3b deck chrome + full-deck vignettes). */
 window.CT = window.CT || {};
 
-CT.ACTION_CARD_VERSION = window.__DETHRONE_CARD_V || "20260630-p30";
+CT.ACTION_CARD_VERSION = window.__DETHRONE_CARD_V || "20260630-p31";
 
 CT.actionCardUrl = function (cardId, opts) {
   opts = opts || {};

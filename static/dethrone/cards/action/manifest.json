@@ -1,6 +1,6 @@
 {
-  "template": "V3b action vignettes (full 76-card deck)",
-  "pixels": "360x200",
+  "template": "V3b stylised action vignettes (per-card motifs)",
+  "pixels": "400x224",
   "count": 76,
   "palette": {
     "cream": "#F4ECD6",
