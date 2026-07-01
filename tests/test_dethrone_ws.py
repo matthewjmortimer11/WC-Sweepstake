@@ -1376,6 +1376,57 @@ def test_sanctuary_before_reaction(client):
     assert g.pending_ui_action.get(victim_id, {}).get("kind") == "reaction"
 
 
+def test_stride_via_websocket(client):
+    code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
+    room, pids, g = _start_game(code)
+    active = g.active_player().id
+    ap = g.player_by_id(active)
+    ap.hidden_role_ids = ["wanderingknight", "thief"]
+    ap.public_role_id = "gateguard"
+
+    with client.websocket_connect(f"/dethrone/ws/{code}?pid={active}&name=Active") as ws:
+        ws.receive_json()
+        state = ws.receive_json()
+        moves = state["room"]["game"]["legalMoves"]
+        assert moves
+        ws.send_json({"type": "move", "locationId": moves[0]})
+        state = ws.receive_json()
+        assert state["type"] == "state"
+        assert state["room"]["game"]["legalMoves"], "stride should allow a second move"
+        ws.send_json({"type": "move", "locationId": state["room"]["game"]["legalMoves"][0]})
+        state = ws.receive_json()
+        assert state["room"]["game"]["legalMoves"] == []
+
+
+def test_false_trail_via_websocket(client):
+    code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
+    room, pids, g = _start_game(code)
+    spy_id = pids[0]
+    victim_id = pids[1]
+    spy = g.player_by_id(spy_id)
+    victim = g.player_by_id(victim_id)
+    spy.location = victim.location = "market"
+    spy.hidden_role_ids = ["spy", "thief"]
+    spy.public_role_id = "gateguard"
+    g.pending_ui_action[spy_id] = {
+        "kind": "false_trail",
+        "playerId": spy_id,
+        "delta": -1,
+        "reason": "Test",
+        "trigger": "rep_loss",
+    }
+    before_victim = victim.rep
+
+    with client.websocket_connect(f"/dethrone/ws/{code}?pid={spy_id}&name=Spy") as ws:
+        ws.receive_json()
+        state = ws.receive_json()
+        assert state["room"]["game"]["pendingUiAction"]["kind"] == "false_trail"
+        ws.send_json({"type": "resolveFalseTrail", "targetId": victim_id})
+        ws.receive_json()
+    assert victim.rep == before_victim - 1
+    assert spy.rep == 3
+
+
 def D_ROLE_META_PUBLIC(role_id: str) -> bool:
     from dethrone.data import ROLE_META
     return ROLE_META.get(role_id, {}).get("canBePublic", True)

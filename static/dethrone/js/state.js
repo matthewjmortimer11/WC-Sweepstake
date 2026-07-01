@@ -557,15 +557,18 @@ CT.movePlayer = function (playerId, locationId, manual) {
   var p = CT.playerById(playerId); if (!p) return;
   var from = CT.locationById(p.location), to = CT.locationById(locationId);
   if (!to || p.location === locationId) return;
+  if (!manual) {
+    var ap = CT.activePlayer();
+    if (!ap || ap.id !== playerId) return;
+    if (!CT.canBoardMove(p)) return;
+    if (CT.legalMoves(p).indexOf(locationId) === -1) return;
+  }
   p.prevLocation = p.location;
   p.location = locationId;
   if (!manual) {
-    var ap = CT.activePlayer();
-    if (ap && ap.id === playerId) {
-      if (!CT.canBoardMove(p)) return;
-      p.movesUsedThisTurn = (p.movesUsedThisTurn || 0) + 1;
-      p.movedThisTurn = p.movesUsedThisTurn >= CT.moveLimit(p);
-    }
+    p.movesUsedThisTurn = (p.movesUsedThisTurn || 0) + 1;
+    var limit = (p.moveLimitThisTurn > 0) ? p.moveLimitThisTurn : CT.moveLimit(p);
+    p.movedThisTurn = p.movesUsedThisTurn >= limit;
   }
   CT.log(p.name + " moved " + (from ? from.name : "?") + " → " + to.name + (manual ? " (manual)" : "") + ".");
   CT.save();
@@ -641,12 +644,26 @@ CT.moveLimit = function (player) {
 };
 
 CT.canBoardMove = function (player) {
-  return (player.movesUsedThisTurn || 0) < CT.moveLimit(player);
+  if (!player) return false;
+  var used = player.movesUsedThisTurn || 0;
+  if (CT.isOnline && CT.isOnline() && player.id === CT.myId() && player.moveLimitThisTurn > 0) {
+    return used < player.moveLimitThisTurn;
+  }
+  return used < CT.moveLimit(player);
 };
 
 CT.legalMovesForTurn = function (player) {
   if (!player || !CT.canBoardMove(player)) return [];
   return CT.legalMoves(player);
+};
+
+/* Authoritative highlights for the active player (online uses server legalMoves). */
+CT.legalMovesForActive = function (player) {
+  if (!player || player.status !== "active" || !CT.state || CT.state.winner) return [];
+  if (CT.isOnline && CT.isOnline() && player.id === CT.myId() && CT.state.legalMoves) {
+    return CT.state.legalMoves.slice();
+  }
+  return CT.legalMovesForTurn(player);
 };
 
 /* legal normal moves = directly connected locations (§7). Special movement stays manual. */

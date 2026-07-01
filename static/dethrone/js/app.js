@@ -121,10 +121,10 @@ function renderTurnDock() {
   var loc = CT.locationById(ap.location);
   var limit = CT.getRules().HAND_LIMIT;
   var over = CT.overHandLimit(ap);
-  var moved = (ap.movesUsedThisTurn || 0) >= CT.moveLimit(ap);
-  var moveChip = ap.movesUsedThisTurn
-    ? (ap.movesUsedThisTurn + "/" + CT.moveLimit(ap) + " moves")
-    : "— Move";
+  var limit = (ap.moveLimitThisTurn > 0) ? ap.moveLimitThisTurn : CT.moveLimit(ap);
+  var used = ap.movesUsedThisTurn || 0;
+  var moved = used >= limit;
+  var moveChip = used ? (used + "/" + limit + " moves") : "— Move";
   var chips = '<span class="chip' + (moved ? " ok" : "") + '">' + (moved ? "✓ " + moveChip : moveChip) + '</span>'
     + '<span class="chip' + (over ? " warn" : " ok") + '">🃏 ' + ap.actionCardIds.length + "/" + limit + "</span>";
   if (CT.state.throne.succession && CT.state.throne.succession.open) {
@@ -1444,7 +1444,9 @@ CT.handleAction = function (act, el, ev) {
         }
       }
       var apr = CT.activePlayer();
-      if (!apr) break;
+      if (!apr || apr.id !== CT.myId()) break;
+      var boardMoves = CT.legalMovesForActive(apr);
+      if (boardMoves.indexOf(el.dataset.id) === -1) break;
       if (CT.netAction({ type: "move", locationId: el.dataset.id })) break;
       CT.movePlayer(apr.id, el.dataset.id, false);
       CT.render(); break;
