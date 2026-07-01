@@ -278,7 +278,7 @@ CT.bribeOfferRowHtml = function (player, ps, u) {
     + '<button type="button" class="btn btn-sm btn-primary" data-act="h-v-bribe-offer" data-briber="' + player.id
     + '" data-side="yes">Offer 1g → Yes</button>'
     + '<button type="button" class="btn btn-sm btn-danger" data-act="h-v-bribe-offer" data-briber="' + player.id
-    + '" data-side="no">Offer 1g → No</button>"
+    + '" data-side="no">Offer 1g → No</button>'
     + "</div></div>";
 };
 
