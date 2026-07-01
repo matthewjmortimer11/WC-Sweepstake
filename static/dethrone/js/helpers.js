@@ -28,7 +28,12 @@ function wrap(inner, maxw) {
     + '<div class="btn-row" style="justify-content:flex-end;margin-bottom:-8px"><button class="btn btn-ghost btn-sm" data-act="h-close">✕ Close</button></div>'
     + inner + "</div></div>";
 }
-function roleBonus(p, key) { var r = p && p.publicRoleId ? CT.roleById(p.publicRoleId) : null; return (r && r[key]) || 0; }
+function roleBonus(p, key) {
+  var r = p && p.publicRoleId ? CT.roleById(p.publicRoleId) : null;
+  var val = (r && r[key]) || 0;
+  if (key === "duelBonusDefence" && p && p.publicRoleId === "royalguard" && p.location === "throne") val = 2;
+  return val;
+}
 
 function duelCardsInHand(player) {
   if (!player || !CT.DUEL_CARD_VALUES) return [];
@@ -941,6 +946,7 @@ CT.helpers.applyDuelConseq = function (c) {
       if (isRoyalOrThrone(loser) && CT._offerReaction(loser.id, "duel_consequence", {
         effect: "duel_consequence", consequence: "drive", loserId: loser.id, loserCards: loserCards,
       })) { break; }
+      if (CT._holdGroundBlocksDrive && CT._holdGroundBlocksDrive(loser, aT, dT)) { break; }
       if (CT._offerProtect && CT._offerProtect(loser.id, "drive_out")) { break; }
       CT._driveOutPlayer(loser.id);
       break;

@@ -132,6 +132,8 @@ CT.newGame = function (playersInput, undealtRoleIds, startingActionByPlayer, fir
     contracts: [], // Blood Contracts (§25): {id, aId, bId, promise, status}
     taxSkipRemaining: {},
     royalRoleLost: false,
+    routeBlocks: [],
+    graveyardWatch: [],
     log: [],
   };
   CT.DECK_NAMES.forEach(function (name) {
@@ -260,6 +262,7 @@ CT.advanceTurn = function () {
   }
   var wrapped = idx <= start;
   s.activePlayerIndex = idx;
+  CT._expireGuardEffectsFor(s.players[idx].id);
   if (wrapped) {
     s.round += 1;
     CT.onNewRound();
@@ -588,12 +591,84 @@ CT.resolveDefendCrown = function (accept) {
     return;
   }
   CT.ui.defendCrownOffer = null;
-  CT._continueDuelConsequence(offer.victimId, offer.consequence, offer.loserCards);
+  CT._continueDuelConsequence(offer.victimId, offer.consequence, offer.loserCards, offer.duelTotals);
 };
 
 CT.declineDefendCrown = function () { CT.resolveDefendCrown(false); };
 
-CT._continueDuelConsequence = function (loserId, consequence, loserCards) {
+CT._holdGroundBlocksDrive = function (loser, attackerTotal, defenderTotal) {
+  if (!loser || !CT.rolePowerActive(loser, "gateguard")) return false;
+  var margin = Math.abs(attackerTotal - defenderTotal);
+  if (margin >= 3) return false;
+  CT.log(loser.name + " holds ground — cannot be Driven Out (duel won by only " + margin + ").", "event");
+  return true;
+};
+
+CT._nextStandWatchGuards = function (arrivalId) {
+  return CT.state.players.filter(function (p) {
+    if (p.status !== "active" || p.id === arrivalId) return false;
+    if (p.location !== "graveyard") return false;
+    if (!CT.rolePowerActive(p, "graveyardguard")) return false;
+    if ((p.abilitiesUsedThisRound || []).indexOf("stand_watch_arrival") !== -1) return false;
+    return true;
+  });
+};
+
+CT._maybeOfferStandWatch = function (arrivalId) {
+  var arrival = CT.playerById(arrivalId);
+  if (!arrival || arrival.location !== "graveyard") return false;
+  var guards = CT._nextStandWatchGuards(arrivalId);
+  if (!guards.length) return false;
+  var guard = guards[0];
+  CT.ui.standWatchOffer = {
+    guardId: guard.id,
+    arrivalId: arrivalId,
+    remainingGuardIds: guards.slice(1).map(function (g) { return g.id; }),
+  };
+  if (guard.isBot && CT.bot && CT.bot.resolvePending) CT.bot.resolvePending(guard.id);
+  return true;
+};
+
+CT.resolveStandWatch = function (accept) {
+  var offer = CT.ui.standWatchOffer;
+  if (!offer) return;
+  var guard = CT.playerById(offer.guardId);
+  var arrival = CT.playerById(offer.arrivalId);
+  if (!guard || !arrival) { CT.ui.standWatchOffer = null; return; }
+  if (accept) {
+    if (!guard.abilitiesUsedThisRound) guard.abilitiesUsedThisRound = [];
+    guard.abilitiesUsedThisRound.push("stand_watch_arrival");
+    CT.log(guard.name + " stands watch — " + arrival.name + " loses 1 Reputation.", "event");
+    CT.ui.standWatchOffer = null;
+    CT._maybeOfferRepLoss(offer.arrivalId, -1, "Stand Watch", "stand_watch");
+    CT.save();
+    return;
+  }
+  CT.log(guard.name + " lets " + arrival.name + " pass the Graveyard gate.", "note");
+  var remaining = (offer.remainingGuardIds || []).slice();
+  while (remaining.length) {
+    var nextId = remaining.shift();
+    var nextGuard = CT.playerById(nextId);
+    if (!nextGuard || nextGuard.status !== "active") continue;
+    if (!CT.rolePowerActive(nextGuard, "graveyardguard")) continue;
+    if (nextGuard.location !== "graveyard") continue;
+    if ((nextGuard.abilitiesUsedThisRound || []).indexOf("stand_watch_arrival") !== -1) continue;
+    CT.ui.standWatchOffer = {
+      guardId: nextGuard.id,
+      arrivalId: offer.arrivalId,
+      remainingGuardIds: remaining,
+    };
+    if (nextGuard.isBot && CT.bot && CT.bot.resolvePending) CT.bot.resolvePending(nextGuard.id);
+    CT.save();
+    return;
+  }
+  CT.ui.standWatchOffer = null;
+  CT.save();
+};
+
+CT.declineStandWatch = function () { CT.resolveStandWatch(false); };
+
+CT._continueDuelConsequence = function (loserId, consequence, loserCards, duelTotals) {
   var loser = CT.playerById(loserId);
   if (!loser) return;
   if (consequence === "shame") {
@@ -606,6 +681,7 @@ CT._continueDuelConsequence = function (loserId, consequence, loserCards) {
     if (CT._isRoyalOrThrone(loser) && CT._offerReaction(loser.id, "duel_consequence", {
       effect: "duel_consequence", consequence: "drive", loserId: loser.id, loserCards: loserCards,
     })) { /* offered */ }
+    else if (duelTotals && CT._holdGroundBlocksDrive(loser, duelTotals.aTotal, duelTotals.dTotal)) { /* blocked */ }
     else if (CT._offerProtect(loser.id, "drive_out")) { /* offered */ }
     else CT._driveOutPlayer(loser.id);
   }
@@ -800,6 +876,7 @@ CT.movePlayer = function (playerId, locationId, manual) {
     p.movedThisTurn = p.movesUsedThisTurn >= limit;
   }
   CT.log(p.name + " moved " + (from ? from.name : "?") + " → " + to.name + (manual ? " (manual)" : "") + ".");
+  if (locationId === "graveyard") CT._maybeOfferStandWatch(playerId);
   if (!manual) CT._maybeOfferRecklessCharge(playerId);
   CT.save();
 };
@@ -888,6 +965,7 @@ CT.pendingBlocksEndTurn = function (playerId) {
   if (CT.ui.sanctuaryOffer && CT.ui.sanctuaryOffer.queenId === playerId) return true;
   if (CT.ui.protectOffer && CT.ui.protectOffer.guardId === playerId) return true;
   if (CT.ui.defendCrownOffer && CT.ui.defendCrownOffer.knightId === playerId) return true;
+  if (CT.ui.standWatchOffer && CT.ui.standWatchOffer.guardId === playerId) return true;
   if (CT.ui.reactionOffer && CT.ui.reactionOffer.playerId === playerId) return true;
   if (CT.ui.reactionMove && CT.ui.reactionMove.playerId === playerId) return true;
   if (CT.ui.finalRiteOffer === playerId) return true;
@@ -920,12 +998,38 @@ CT.legalMovesForActive = function (player) {
 };
 
 /* legal normal moves = directly connected locations (§7). Special movement stays manual. */
+CT._routeBlocked = function (player, dest) {
+  var loc = player.location;
+  var blocks = CT.state.routeBlocks || [];
+  for (var i = 0; i < blocks.length; i++) {
+    var b = blocks[i];
+    if (b.targetId !== player.id) continue;
+    if ((loc === b.locA && dest === b.locB) || (loc === b.locB && dest === b.locA)) return true;
+  }
+  return false;
+};
+
+CT._graveyardWatchExtra = function (playerId) {
+  var watch = CT.state.graveyardWatch || [];
+  var n = 0;
+  for (var i = 0; i < watch.length; i++) {
+    if (watch[i].targetId === playerId) n += 1;
+  }
+  return n;
+};
+
+CT._expireGuardEffectsFor = function (guardId) {
+  if (!CT.state) return;
+  CT.state.routeBlocks = (CT.state.routeBlocks || []).filter(function (b) { return b.guardId !== guardId; });
+  CT.state.graveyardWatch = (CT.state.graveyardWatch || []).filter(function (w) { return w.guardId !== guardId; });
+};
+
 CT.legalMoves = function (player) {
   var moves = (CT.CONNECTIONS[player.location] || []).slice();
   if (player.location === "college" && CT.rolePowerActive(player, "collegeadvisor")) {
     if (moves.indexOf("scrolls") === -1) moves.push("scrolls");
   }
-  return moves;
+  return moves.filter(function (m) { return !CT._routeBlocked(player, m); });
 };
 
 /* ensure a deck draw pile has cards (reshuffle if needed) without drawing. */
@@ -1308,10 +1412,12 @@ CT.doLocationAction = function (playerId, actId) {
   var p = CT.playerById(playerId); if (!p) return { ok: false };
   var def = CT.actionDef(p.location, actId);
   if (!def) return { ok: false };
-  if (p.gold < (def.cost || 0)) return { ok: false, msg: "Not enough gold." };
+  var watchExtra = actId === "buy_grave" ? CT._graveyardWatchExtra(playerId) : 0;
+  var totalCost = (def.cost || 0) + watchExtra;
+  if (p.gold < totalCost) return { ok: false, msg: "Not enough gold." };
 
   // pay cost up front (logged generically)
-  if (def.cost) { p.gold -= def.cost; }
+  if (totalCost) { p.gold -= totalCost; }
 
   switch (actId) {
     case "petition":
@@ -1326,7 +1432,11 @@ CT.doLocationAction = function (playerId, actId) {
       CT._maybeOfferRepLoss(playerId, -1, "Scavenge");
       break;
     case "buy_grave":
-      CT.log(p.name + " paid " + def.cost + " gold for a Graveyard card.");
+      if (watchExtra) {
+        CT.log(p.name + " paid " + totalCost + " gold for a Graveyard card (+" + watchExtra + " from Watch the Dead).");
+      } else {
+        CT.log(p.name + " paid " + totalCost + " gold for a Graveyard card.");
+      }
       CT.adjustCorruption(1, "bought a Graveyard card");
       CT.drawCard(playerId, "Graveyard");
       break;
@@ -1396,6 +1506,12 @@ CT.useRoleAbility = function (playerId, abilityId, opts) {
     if (fx.sameLocation && target.location !== p.location) return { ok: false, msg: "Target must be at your location." };
     if (fx.targetNotSelf && target.id === p.id) return { ok: false, msg: "Invalid target." };
   }
+  if (fx.needsPath) {
+    var pathTo = opts.pathTo;
+    if (!pathTo) return { ok: false, msg: "Path required." };
+    var baseMoves = CT.CONNECTIONS[p.location] || [];
+    if (baseMoves.indexOf(pathTo) === -1) return { ok: false, msg: "Invalid path." };
+  }
   if (cost) p.gold -= cost;
   CT.log(p.name + " uses " + fx.name + " (public role ability).", "event");
   if (fx.goldTransfer && target) {
@@ -1432,6 +1548,26 @@ CT.useRoleAbility = function (playerId, abilityId, opts) {
     CT.log(p.name + " gains " + fx.goldGain + " gold (" + fx.name + ").");
   } else if (fx.drawDeck) {
     CT.drawCard(playerId, fx.drawDeck);
+  } else if (fx.blockRoute && target && opts.pathTo) {
+    if ((CT.state.routeBlocks || []).some(function (b) { return b.guardId === p.id; })) {
+      return { ok: false, msg: "You already have an active route block." };
+    }
+    var toName = CT.locationById(opts.pathTo).name;
+    if (!CT.state.routeBlocks) CT.state.routeBlocks = [];
+    CT.state.routeBlocks.push({
+      guardId: p.id,
+      locA: p.location,
+      locB: opts.pathTo,
+      targetId: target.id,
+    });
+    CT.log(p.name + " blocks the path to " + toName + " for " + target.name + " (until " + p.name + "'s next turn).");
+  } else if (fx.graveyardWatch && target) {
+    if ((CT.state.graveyardWatch || []).some(function (w) { return w.guardId === p.id; })) {
+      return { ok: false, msg: "You already have an active Watch the Dead." };
+    }
+    if (!CT.state.graveyardWatch) CT.state.graveyardWatch = [];
+    CT.state.graveyardWatch.push({ guardId: p.id, targetId: target.id });
+    CT.log(p.name + " watches " + target.name + " — +1 gold on Graveyard buys until " + p.name + "'s next turn.");
   }
   if (fx.oncePerRound) {
     if (!p.abilitiesUsedThisRound) p.abilitiesUsedThisRound = [];

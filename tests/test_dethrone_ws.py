@@ -1890,6 +1890,133 @@ def test_inactive_player_cannot_resolve_duel(client):
         assert "active player" in err["message"].lower()
 
 
+def test_block_route_blocks_target(client):
+    code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
+    room, pids, g = _start_game(code)
+    guard_id = g.active_player().id
+    guard = g.player_by_id(guard_id)
+    victim_id = next(pid for pid in pids if pid != guard_id)
+    victim = g.player_by_id(victim_id)
+    guard.public_role_id = "gateguard"
+    guard.location = victim.location = "market"
+    path_to = "tavern"
+    assert path_to in g.legal_moves(victim)
+    g.use_role_ability(guard_id, "gate_block_route", victim_id, path_to=path_to)
+    assert path_to not in g.legal_moves(victim)
+    other = [m for m in g.legal_moves(victim) if m != path_to]
+    if other:
+        assert other[0] in g.legal_moves(victim)
+
+
+def test_block_route_expires_when_guard_turn_returns(client):
+    code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
+    room, pids, g = _start_game(code)
+    guard_id = g.active_player().id
+    guard = g.player_by_id(guard_id)
+    victim_id = next(pid for pid in pids if pid != guard_id)
+    victim = g.player_by_id(victim_id)
+    guard.public_role_id = "gateguard"
+    guard.location = victim.location = "market"
+    g.use_role_ability(guard_id, "gate_block_route", victim_id, path_to="tavern")
+    assert "tavern" not in g.legal_moves(victim)
+    # Pass turn through all other players until guard acts again.
+    for _ in range(len(g.players)):
+        g.end_turn(g.active_player().id)
+        if g.active_player().id == guard_id:
+            break
+    assert "tavern" in g.legal_moves(victim)
+
+
+def test_guard_the_throne_duel_bonus(client):
+    code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
+    room, pids, g = _start_game(code)
+    pid = g.active_player().id
+    p = g.player_by_id(pid)
+    p.public_role_id = "royalguard"
+    p.location = "throne"
+    assert g._role_bonus(p, "duelBonusDefence") == 2
+    p.location = "market"
+    assert g._role_bonus(p, "duelBonusDefence") == 1
+
+
+def test_watch_the_dead_graveyard_buy_surcharge(client):
+    code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
+    room, pids, g = _start_game(code)
+    guard_id = g.active_player().id
+    guard = g.player_by_id(guard_id)
+    victim_id = next(pid for pid in pids if pid != guard_id)
+    victim = g.player_by_id(victim_id)
+    guard.public_role_id = "graveyardguard"
+    guard.location = "graveyard"
+    victim.location = "graveyard"
+    victim.gold = 6
+    g.use_role_ability(guard_id, "grave_watch_dead", victim_id)
+    g.active_player_index = g.player_ids.index(victim_id)
+    before = victim.gold
+    g.do_location_action(victim_id, "buy_grave")
+    assert victim.gold == before - 5
+
+
+def test_hold_ground_blocks_drive_out(client):
+    import random
+    code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
+    room, pids, g = _start_game(code)
+    att_id = g.active_player().id
+    def_id = next(pid for pid in pids if pid != att_id)
+    att = g.player_by_id(att_id)
+    defender = g.player_by_id(def_id)
+    att.location = defender.location = "barracks"
+    defender.hidden_role_ids = ["gateguard", "thief", "wanderingknight"]
+    defender.public_role_id = "thief"
+    before_loc = defender.location
+    _strip_royal_guards(g)
+    _strip_royal_knights(g)
+    g.duel_apply_consequence(
+        att_id, def_id, 2, 0, False, "drive", random.Random(0),
+    )
+    assert defender.location == before_loc
+
+
+def test_hold_ground_allows_drive_by_three(client):
+    import random
+    code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
+    room, pids, g = _start_game(code)
+    att_id = g.active_player().id
+    def_id = next(pid for pid in pids if pid != att_id)
+    att = g.player_by_id(att_id)
+    defender = g.player_by_id(def_id)
+    att.location = defender.location = "barracks"
+    defender.hidden_role_ids = ["gateguard", "thief", "wanderingknight"]
+    defender.public_role_id = "thief"
+    _strip_royal_guards(g)
+    _strip_royal_knights(g)
+    g.duel_apply_consequence(
+        att_id, def_id, 3, 0, False, "drive", random.Random(0),
+    )
+    assert defender.location != "barracks"
+
+
+def test_stand_watch_on_graveyard_arrival(client):
+    code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
+    room, pids, g = _start_game(code)
+    guard_id = g.active_player().id
+    guard = g.player_by_id(guard_id)
+    arrival_id = next(pid for pid in pids if pid != guard_id)
+    arrival = g.player_by_id(arrival_id)
+    guard.public_role_id = "graveyardguard"
+    guard.location = "graveyard"
+    arrival.location = "barracks"
+    _prepare_rep_victim(arrival, g)
+    _strip_queens(g)
+    _strip_spies(g)
+    _strip_royal_guards(g)
+    before_rep = arrival.rep
+    g.move_player(arrival_id, "graveyard", manual=True)
+    assert g.pending_ui_action.get(guard_id, {}).get("kind") == "stand_watch"
+    g.resolve_stand_watch(guard_id, accept=True)
+    assert arrival.rep == before_rep - 1
+
+
 def D_ROLE_META_PUBLIC(role_id: str) -> bool:
     from dethrone.data import ROLE_META
     return ROLE_META.get(role_id, {}).get("canBePublic", True)

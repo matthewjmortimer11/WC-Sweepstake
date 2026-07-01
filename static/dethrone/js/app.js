@@ -5,7 +5,7 @@ CT.ui = { privateFor: null, privateRevealed: false, rolesRevealed: false, showIm
   roleDiscardFor: null, roleDiscardRevealed: false, handFixFor: null, keepOne: null, playCard: null,
   logFilter: "all", privateNote: null, finalRiteOffer: null, reactionOffer: null, reactionMove: null,
   falseTrailOffer: null, sanctuaryOffer: null, protectOffer: null,
-  defendCrownOffer: null, recklessChargeOffer: null,
+  defendCrownOffer: null, recklessChargeOffer: null, standWatchOffer: null,
   playTab: "play" };
 
 /* Play vs Test mode — Test reveals referee & per-player override tools (§32, §35).
@@ -889,6 +889,7 @@ function overlays() {
   if (CT.ui.sanctuaryOffer && CT.ui.sanctuaryOffer.queenId === CT.myId()) return sanctuaryView();
   if (CT.ui.protectOffer && CT.ui.protectOffer.guardId === CT.myId()) return protectView();
   if (CT.ui.defendCrownOffer && CT.ui.defendCrownOffer.knightId === CT.myId()) return defendCrownView();
+  if (CT.ui.standWatchOffer && CT.ui.standWatchOffer.guardId === CT.myId()) return standWatchView();
   if (CT.ui.recklessChargeOffer && CT.ui.recklessChargeOffer.attackerId === CT.myId()) return recklessChargeView();
   if (CT.ui.reactionOffer) return reactionView();
   if (CT.ui.finalRiteOffer) return finalRiteView();
@@ -1090,6 +1091,23 @@ function defendCrownView() {
     + "</div></div></div>";
 }
 
+function standWatchView() {
+  var offer = CT.ui.standWatchOffer;
+  if (!offer) return "";
+  var guard = CT.playerById(offer.guardId || CT.myId());
+  var arrival = CT.playerById(offer.arrivalId);
+  if (!guard) { CT.ui.standWatchOffer = null; return ""; }
+  return '<div class="scrim"><div class="modal modal--reaction cover" style="max-width:520px">'
+    + '<div class="seal-big" style="background:var(--wax-soft);color:var(--wax)">☠</div>'
+    + '<h1 style="margin:8px 0">Stand Watch</h1>'
+    + '<p class="muted" style="font-size:15px">'
+    + CT.esc(arrival ? arrival.name : "Someone") + " just arrived at the Graveyard. Force them to lose 1 Reputation?</p>"
+    + '<div class="btn-row" style="justify-content:center;margin-top:20px;flex-wrap:wrap;gap:10px">'
+    + '<button class="btn btn-ghost" data-act="decline-stand-watch">Let them pass</button>'
+    + '<button class="btn btn-gold" data-act="accept-stand-watch">Stand Watch</button>'
+    + "</div></div></div>";
+}
+
 function recklessChargeView() {
   var offer = CT.ui.recklessChargeOffer;
   if (!offer) return "";
@@ -1158,19 +1176,31 @@ function roleAbilityView() {
   var fx = CT.ROLE_ABILITY_EFFECTS[u.abilityId];
   if (!p || !fx) { CT.ui.roleAbility = null; return ""; }
   var targets = CT.state.players.filter(function (x) {
-    if (x.status !== "active" || x.id === p.id) return false;
-    if (fx.sameLocation && x.location !== p.location) return false;
+    if (x.status !== "active") return false;
     if (fx.targetNotSelf && x.id === p.id) return false;
+    if (fx.sameLocation && x.location !== p.location) return false;
     return true;
   });
-  var opts = targets.map(function (x) {
-    return '<option value="' + x.id + '">' + CT.esc(x.name) + "</option>";
-  }).join("");
+  var targetHtml = "";
+  if (fx.needsTarget) {
+    var opts = targets.map(function (x) {
+      return '<option value="' + x.id + '">' + CT.esc(x.name) + "</option>";
+    }).join("");
+    targetHtml = '<label class="field" style="display:block;margin:12px 0"><span>Target</span>'
+      + '<select id="role-ability-target">' + opts + "</select></label>";
+  }
+  var pathHtml = "";
+  if (fx.needsPath) {
+    var paths = (CT.CONNECTIONS[p.location] || []).map(function (lid) {
+      return '<option value="' + lid + '">' + CT.esc(CT.locationById(lid).name) + "</option>";
+    }).join("");
+    pathHtml = '<label class="field" style="display:block;margin:12px 0"><span>Block path to</span>'
+      + '<select id="role-ability-path">' + paths + "</select></label>";
+  }
   return '<div class="scrim"><div class="modal" style="max-width:420px">'
     + '<div class="eyebrow">Public role · ' + CT.esc(CT.roleById(p.publicRoleId).name) + '</div>'
     + '<h2 style="margin:6px 0 12px">' + CT.esc(fx.name) + "</h2>"
-    + '<label class="field" style="display:block;margin:12px 0"><span>Target</span>'
-    + '<select id="role-ability-target">' + opts + "</select></label>"
+    + pathHtml + targetHtml
     + '<div class="btn-row" style="margin-top:16px"><button class="btn btn-ghost" data-act="close-role-ability">Cancel</button>'
     + '<div class="spacer"></div><button class="btn btn-primary" data-act="confirm-role-ability">Use ability</button></div>'
     + "</div></div>";
@@ -1485,6 +1515,18 @@ CT.handleAction = function (act, el, ev) {
       }
       CT.declineDefendCrown();
       CT.render(); break;
+    case "accept-stand-watch":
+      if (CT.netAction({ type: "resolveStandWatch" })) {
+        CT.ui.standWatchOffer = null; break;
+      }
+      CT.resolveStandWatch(true);
+      CT.render(); break;
+    case "decline-stand-watch":
+      if (CT.netAction({ type: "declineStandWatch" })) {
+        CT.ui.standWatchOffer = null; break;
+      }
+      CT.declineStandWatch();
+      CT.render(); break;
     case "accept-reckless-charge": {
       var rcTarget = document.getElementById("reckless-charge-target");
       var rcId = rcTarget ? rcTarget.value : "";
@@ -1577,7 +1619,7 @@ CT.handleAction = function (act, el, ev) {
       var aid = el.dataset.id;
       var fx = CT.ROLE_ABILITY_EFFECTS[aid];
       if (!fx) break;
-      if (fx.needsTarget) {
+      if (fx.needsTarget || fx.needsPath) {
         CT.ui.roleAbility = { playerId: ap3.id, abilityId: aid };
         CT.render(); break;
       }
@@ -1590,12 +1632,18 @@ CT.handleAction = function (act, el, ev) {
     case "confirm-role-ability": {
       var u = CT.ui.roleAbility;
       if (!u) break;
+      var fx2 = CT.ROLE_ABILITY_EFFECTS[u.abilityId];
       var ts = document.getElementById("role-ability-target");
       var tid = ts ? ts.value : "";
-      if (CT.netAction({ type: "useRoleAbility", abilityId: u.abilityId, targetId: tid })) {
+      var ps = document.getElementById("role-ability-path");
+      var pathTo = ps ? ps.value : null;
+      var payload = { type: "useRoleAbility", abilityId: u.abilityId };
+      if (fx2 && fx2.needsTarget) payload.targetId = tid;
+      if (fx2 && fx2.needsPath) payload.pathTo = pathTo;
+      if (CT.netAction(payload)) {
         CT.ui.roleAbility = null; break;
       }
-      var res2 = CT.useRoleAbility(u.playerId, u.abilityId, { targetId: tid });
+      var res2 = CT.useRoleAbility(u.playerId, u.abilityId, { targetId: tid, pathTo: pathTo });
       if (!res2.ok && res2.msg) alert(res2.msg);
       CT.ui.roleAbility = null;
       CT.render(); break;
