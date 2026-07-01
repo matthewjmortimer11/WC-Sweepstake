@@ -793,12 +793,23 @@ CT.helpers.applyVote = function () {
   if (CT.isOnline()) {
     CT.net.send({
       type: "formalVote", vtype: u.vtype, targetId: u.target,
+      proposerId: u.proposer, seconder: !!u.seconder, decree: !!u.decree,
       votes: u.votes, bonusYes: u.bonusYes, bonusNo: u.bonusNo,
       emergency: !!u.emergency, voteCards: u.voteCards || [], bribes: resolvedBribes,
       roleVotePowers: u.roleVotePowers || [],
     });
     u.open = null;
     return CT.render();
+  }
+  var prop = CT.playerById(u.proposer);
+  var target = CT.playerById(u.target);
+  if (!prop || !target) { alert("Choose proposer and target."); return; }
+  if (u.vtype === "accuse") {
+    if (prop.rep < 2) { alert("Accuser needs Reputation 2+."); return; }
+    if (!u.decree && !u.seconder) { alert("Accusation needs a seconder (unless Decree)."); return; }
+  } else {
+    if (target.rep > 2) { alert("Banish targets must have Rep ≤2."); return; }
+    if (!u.decree && target.rep > 0 && !u.seconder) { alert("Banish needs a seconder (unless Rep 0 or Decree)."); return; }
   }
   var yes = 0, no = 0;
   if (u.emergency) {
@@ -831,7 +842,6 @@ CT.helpers.applyVote = function () {
     }
   });
   var pass = yes > no;
-  var target = CT.playerById(u.target);
   if (u.vtype === "accuse") {
     CT.log("Accusation vote against " + target.name + ": " + (pass ? "PASSES" : "fails") + " (" + yes + "–" + no + ").");
     if (pass) {
@@ -857,8 +867,9 @@ CT.helpers.applyFlee = function () {
     u.open = null;
     return;
   }
-  CT.log(def.name + " plays Flee — the duel is cancelled. Move up to 2 spaces (manual).", "event");
+  CT.log(def.name + " plays Flee — the duel is cancelled. Move up to 2 spaces.", "event");
   CT.adjustRep(u.def, -1, "Flee");
+  CT.ui.reactionMove = { playerId: u.def, maxSteps: 2 };
   u.open = null; CT.render();
 };
 

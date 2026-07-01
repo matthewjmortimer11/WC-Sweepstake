@@ -20,7 +20,7 @@ Offline file open still works:
 open "index.html"          # macOS
 ```
 
-## What is implemented (Phases 1–28)
+## What is implemented (Phases 1–29)
 
 ### Phase 5 — playtest tooling & full card set
 - **Board art** — illustrated V3b kingdom poster (`cards/map/kingdom-background-v3b.jpg`) with curved gold/cursed roads, labelled site plaques, player tokens and per-location vignettes (see `board.js`, `cards-map.js`)
@@ -155,6 +155,13 @@ open "index.html"          # macOS
 - **Defend the Crown** — Royal Knight at Throne or Barracks may shield a royal from duel Shame or Drive Out once per round; offered before Royal Guard Detail reaction cards
 - **Online sync** — `resolveRecklessCharge` / `declineRecklessCharge`, `resolveProtect` / `declineProtect`, `resolveDefendCrown` / `declineDefendCrown`; duel consequences accept `recklessCharge`
 
+### Core play hardening (in-person online)
+- **Formal vote legality** — server enforces proposer Rep, seconder/Decree, and banish Rep caps (`proposerId`, `seconder`, `decree` on `formalVote`)
+- **Wounded** — hidden-role powers suppressed on your next turn; clears when you end that turn
+- **Flee** — duel helper Flee opens a 2-space reaction move online (same as the Flee card)
+- **Pending prompts** — cannot end turn while Reckless Charge, reactions, intercepts, or open helpers are unresolved
+- **Royal Decree** — server opens vote pending after Royal Command Decree
+
 ### Phase 4 — Throne & Succession
 A **Throne & Succession** panel tracks the crown and the line of succession.
 - **Throne control (§23)**: King / Queen / Successor controllers, set manually or via the **Claim helper** (claimant + crown; unchallenged → crowned, or challenged → "proof valid" crowns them and the challenger loses a role / "bluff" costs the claimant a role). Claim order is recorded.
@@ -208,8 +215,9 @@ Table talk and bluffing stay verbal. The app guides, tracks, and enforces mechan
 ## Known limitations / not yet built
 
 - Bots still skip nuanced table talk — they now duel, trade, and claim succession when sensible, but won't bluff or negotiate.
-- Action cards that need table judgement (Call Out helper, Blood Contract, Vote/Duel timing cards) stay manual — auto-play covers the mechanical subset in `CT.AUTO_PLAY` / `CARD_AUTO_EFFECTS` (expanded through Phase 18).
+- Action cards that need table judgement (Call Out helper, Blood Contract, Duel Search consequence) stay manual — auto-play covers the mechanical subset in `CT.AUTO_PLAY` / `CARD_AUTO_EFFECTS` (expanded through Phase 18).
 - Reaction cards can be played proactively from hand when listed in `CT.AUTO_PLAY` (e.g. Guild Seal); others still fire when targeted.
+- Vote/duel/trade helpers are typically run from one device at the table (referee phone); state commits sync to all players.
 
 ## Next improvements
 

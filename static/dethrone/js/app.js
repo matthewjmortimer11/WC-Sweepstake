@@ -879,7 +879,7 @@ function logPanel() {
 /* ============ overlays (private view, import) ============ */
 function overlays() {
   if (CT.ui.actionCardFocus) return CT.actionCardFocusModalHtml(CT.ui.actionCardFocus, CT.handPlayer && CT.handPlayer());
-  if (CT.ui.falseTrailOffer) return falseTrailView();
+  if (CT.ui.falseTrailOffer && CT.ui.falseTrailOffer.playerId === CT.myId()) return falseTrailView();
   if (CT.ui.sanctuaryOffer && CT.ui.sanctuaryOffer.queenId === CT.myId()) return sanctuaryView();
   if (CT.ui.protectOffer && CT.ui.protectOffer.guardId === CT.myId()) return protectView();
   if (CT.ui.defendCrownOffer && CT.ui.defendCrownOffer.knightId === CT.myId()) return defendCrownView();

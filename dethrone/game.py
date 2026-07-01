@@ -320,14 +320,14 @@ class CursedThroneGame:
 
     # ---- movement & turns ----
     def _move_limit(self, player: PlayerState) -> int:
-        return 2 if "wanderingknight" in self._all_role_ids(player) else 1
+        return 2 if self._role_power_active(player, "wanderingknight") else 1
 
     def _can_board_move(self, player: PlayerState) -> bool:
         return int(player.moves_used_this_turn) < self._move_limit(player)
 
     def legal_moves(self, player: PlayerState) -> list[str]:
         moves = list(D.CONNECTIONS.get(player.location, []))
-        if player.location == "college" and "collegeadvisor" in self._all_role_ids(player):
+        if player.location == "college" and self._role_power_active(player, "collegeadvisor"):
             if "scrolls" not in moves:
                 moves.append("scrolls")
         return moves
@@ -371,6 +371,42 @@ class CursedThroneGame:
         roles.update(p.hidden_role_ids)
         roles.update(p.extra_shown_role_ids)
         return roles
+
+    def _role_power_active(self, p: PlayerState, role_id: str) -> bool:
+        """Hidden-role powers are suppressed while Wounded (public / shown roles still work)."""
+        if role_id not in self._all_role_ids(p):
+            return False
+        if role_id == p.public_role_id:
+            return True
+        if role_id in p.extra_shown_role_ids:
+            return True
+        if role_id in p.hidden_role_ids:
+            return not p.wounded
+        return False
+
+    def _pending_blocks_end_turn(self, pid: str) -> bool:
+        pending = self.pending_ui_action.get(pid)
+        if not pending:
+            return False
+        kind = pending.get("kind")
+        blocking = {
+            "reckless_charge",
+            "false_trail",
+            "sanctuary",
+            "protect",
+            "defend_crown",
+            "reaction",
+            "reaction_move",
+            "final_rite",
+            "duel",
+            "vote",
+            "trade",
+            "callout",
+            "contract",
+            "royal_command",
+            "deep_research",
+        }
+        return kind in blocking
 
     def _on_new_round(self) -> None:
         """Per-round hooks (Court Favourite tax skip, etc.)."""
@@ -461,9 +497,14 @@ class CursedThroneGame:
                 f"Discard down to {limit} action cards before ending your turn "
                 f"({len(ap.action_card_ids)} in hand)."
             )
+        if self._pending_blocks_end_turn(actor_id):
+            raise MoveError("Resolve the pending prompt before ending your turn.")
         if self._can_final_rite(ap):
             self.pending_ui_action[ap.id] = {"kind": "final_rite", "playerId": ap.id}
             return
+        if ap.wounded:
+            ap.wounded = False
+            self._log(f"{ap.name} recovers from being Wounded.", "note")
         self._advance_turn()
 
     def perform_final_rite(self, pid: str) -> None:
@@ -1031,6 +1072,15 @@ class CursedThroneGame:
                 f"{ap.name} issued a Royal Decree — formal vote may proceed without a seconder.",
                 "event",
             )
+            self.pending_ui_action[pid] = {
+                "kind": "vote",
+                "proposerId": pid,
+                "voteType": "accuse",
+                "targetId": "",
+                "decree": True,
+                "emergency": False,
+            }
+            return
         else:
             raise MoveError("Unknown Royal Command choice.")
         self.pending_ui_action.pop(pid, None)
@@ -1599,7 +1649,7 @@ class CursedThroneGame:
     def _can_offer_false_trail(self, player: PlayerState) -> bool:
         if player.status != "active":
             return False
-        if "spy" not in self._all_role_ids(player):
+        if not self._role_power_active(player, "spy"):
             return False
         if player.location not in ("tavern", "market"):
             return False
@@ -1615,7 +1665,7 @@ class CursedThroneGame:
         for p in self.players:
             if p.status != "active":
                 continue
-            if "queen" not in self._all_role_ids(p):
+            if not self._role_power_active(p, "queen"):
                 continue
             if "sanctuary" in p.abilities_used_this_round:
                 continue
@@ -1678,7 +1728,7 @@ class CursedThroneGame:
             if (
                 not next_queen
                 or next_queen.status != "active"
-                or "queen" not in self._all_role_ids(next_queen)
+                or not self._role_power_active(next_queen, "queen")
                 or "sanctuary" in next_queen.abilities_used_this_round
             ):
                 continue
@@ -1701,7 +1751,7 @@ class CursedThroneGame:
         for p in self.players:
             if p.status != "active":
                 continue
-            if "royalguard" not in self._all_role_ids(p):
+            if not self._role_power_active(p, "royalguard"):
                 continue
             if "protect" in p.abilities_used_this_round:
                 continue
@@ -1764,7 +1814,7 @@ class CursedThroneGame:
             if (
                 not next_guard
                 or next_guard.status != "active"
-                or "royalguard" not in self._all_role_ids(next_guard)
+                or not self._role_power_active(next_guard, "royalguard")
                 or "protect" in next_guard.abilities_used_this_round
             ):
                 continue
@@ -1800,7 +1850,7 @@ class CursedThroneGame:
         for p in self.players:
             if p.status != "active":
                 continue
-            if "royalknight" not in self._all_role_ids(p):
+            if not self._role_power_active(p, "royalknight"):
                 continue
             if p.location not in ("throne", "barracks"):
                 continue
@@ -1859,7 +1909,7 @@ class CursedThroneGame:
             if (
                 not next_knight
                 or next_knight.status != "active"
-                or "royalknight" not in self._all_role_ids(next_knight)
+                or not self._role_power_active(next_knight, "royalknight")
                 or next_knight.location not in ("throne", "barracks")
                 or "defend_crown" in next_knight.abilities_used_this_round
             ):
@@ -1932,7 +1982,7 @@ class CursedThroneGame:
         p = self.player_by_id(pid)
         if not p or p.status != "active":
             return False
-        if "youngknight" not in self._all_role_ids(p):
+        if not self._role_power_active(p, "youngknight"):
             return False
         opponents = [
             x
@@ -2181,6 +2231,36 @@ class CursedThroneGame:
                 self._log(f"{target.name} refused {briber.name}'s bribe.", "note")
             self.discard_card(briber_id, D.VOTE_BRIBE_CARD, "vote")
 
+    def _validate_formal_vote(
+        self,
+        vtype: str,
+        target_id: str,
+        proposer_id: str,
+        *,
+        seconder: bool = False,
+        decree: bool = False,
+        max_rep: Optional[int] = None,
+    ) -> None:
+        proposer = self.player_by_id(proposer_id)
+        if not proposer or proposer.status != "active":
+            raise MoveError("Invalid proposer.")
+        target = self.player_by_id(target_id)
+        if not target or target.status != "active":
+            raise MoveError("Invalid target.")
+        if proposer_id == target_id:
+            raise MoveError("Cannot vote against yourself.")
+        if vtype == "accuse":
+            if proposer.rep < 2:
+                raise MoveError("Accuser needs Reputation 2+.")
+            if not decree and not seconder:
+                raise MoveError("Accusation needs a seconder (unless Decree).")
+        else:
+            cap = 2 if max_rep is None else int(max_rep)
+            if target.rep > cap:
+                raise MoveError(f"Banish target must have Reputation ≤{cap}.")
+            if not decree and target.rep > 0 and not seconder:
+                raise MoveError("Banish needs a seconder (unless Rep 0 or Decree).")
+
     def apply_formal_vote(
         self,
         vtype: str,
@@ -2189,6 +2269,10 @@ class CursedThroneGame:
         bonus_yes: int = 0,
         bonus_no: int = 0,
         *,
+        proposer_id: str = "",
+        seconder: bool = False,
+        decree: bool = False,
+        max_rep: Optional[int] = None,
         emergency: bool = False,
         vote_cards: Optional[list[dict]] = None,
         bribes: Optional[list[dict]] = None,
@@ -2196,6 +2280,16 @@ class CursedThroneGame:
     ) -> None:
         if self.status != STATUS_PLAY or self.winner:
             raise MoveError("No active game.")
+        if not proposer_id:
+            raise MoveError("Proposer required.")
+        self._validate_formal_vote(
+            vtype,
+            target_id,
+            proposer_id,
+            seconder=seconder,
+            decree=decree,
+            max_rep=max_rep,
+        )
         target = self.player_by_id(target_id)
         if not target:
             raise MoveError("Unknown target.")
@@ -2317,11 +2411,20 @@ class CursedThroneGame:
         att_cards = list(att_card_ids or [])
         if "iron_gauntlet" in att_cards:
             raise MoveError("Iron Gauntlet — defender cannot flee.")
+        for att_pid, pending in list(self.pending_ui_action.items()):
+            if pending.get("kind") == "duel" and pending.get("defenderId") == defender_id:
+                self.pending_ui_action.pop(att_pid, None)
+                break
         self._log(
-            f"{defender.name} plays Flee — the duel is cancelled. Move up to 2 spaces (manual).",
+            f"{defender.name} plays Flee — the duel is cancelled. Move up to 2 spaces.",
             "event",
         )
         self.adjust_rep(defender_id, -1, "Flee")
+        self.pending_ui_action[defender_id] = {
+            "kind": "reaction_move",
+            "playerId": defender_id,
+            "maxSteps": 2,
+        }
 
     def duel_apply_consequence(
         self,

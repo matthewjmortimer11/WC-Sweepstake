@@ -278,6 +278,13 @@ def _strip_royal_knights(g, keep_id=None):
         p.hidden_role_ids = [r for r in p.hidden_role_ids if r != "royalknight"]
 
 
+def _vote_opts(proposer_id, *, seconder=True, decree=False, max_rep=None):
+    opts = {"proposer_id": proposer_id, "seconder": seconder, "decree": decree}
+    if max_rep is not None:
+        opts["max_rep"] = max_rep
+    return opts
+
+
 def test_challenge_sets_pending_discard(client):
     code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
     room, pids, g = _start_game(code)
@@ -294,7 +301,7 @@ def test_formal_vote_accuse(client):
     target = pids[2]
     g.player_by_id(target).action_card_ids = []
     votes = {pid: "yes" for pid in pids}
-    g.apply_formal_vote("accuse", target, votes)
+    g.apply_formal_vote("accuse", target, votes, **_vote_opts(pids[0]))
     assert target in g.pending_role_discard
 
 
@@ -859,6 +866,7 @@ def test_vote_card_hidden_witness(client):
     votes = {pid: "yes" for pid in pids}
     g.apply_formal_vote(
         "accuse", target, votes, vote_cards=[{"playerId": voter, "cardId": "hidden_witness", "side": "yes"}],
+        **_vote_opts(pids[0]),
     )
     assert "hidden_witness" not in vp.action_card_ids
 
@@ -885,6 +893,7 @@ def test_bribe_accepted_transfers_gold_and_sets_vote(client):
             "side": "yes",
             "accepted": True,
         }],
+        **_vote_opts(pids[0]),
     )
     assert briber.gold == 2
     assert g.player_by_id(voter_id).gold == 3
@@ -914,6 +923,7 @@ def test_bribe_refused_discards_without_gold(client):
             "side": "yes",
             "accepted": False,
         }],
+        **_vote_opts(pids[0]),
     )
     assert briber.gold == 3
     assert voter.gold == 2
@@ -936,6 +946,7 @@ def test_crown_witness_requires_throne(client):
             target,
             votes,
             vote_cards=[{"playerId": voter, "cardId": "crown_witness", "side": "yes"}],
+            **_vote_opts(pids[0]),
         )
     assert "Throne" in str(exc.value)
 
@@ -956,6 +967,7 @@ def test_crown_witness_at_throne(client):
         target,
         votes,
         vote_cards=[{"playerId": voter, "cardId": "crown_witness", "side": "yes"}],
+        **_vote_opts(pids[0]),
     )
     assert "crown_witness" not in vp.action_card_ids
     assert target in g.pending_role_discard
@@ -976,6 +988,7 @@ def test_whisper_vote_at_throne(client):
         target,
         votes,
         role_vote_powers=[{"playerId": advisor, "roleId": "royaladvisor", "side": "yes"}],
+        **_vote_opts(pids[0]),
     )
     assert target in g.pending_role_discard
 
@@ -995,6 +1008,7 @@ def test_whisper_vote_requires_throne(client):
             target,
             votes,
             role_vote_powers=[{"playerId": advisor, "roleId": "royaladvisor", "side": "yes"}],
+            **_vote_opts(pids[0]),
         )
     assert "Throne" in str(exc.value)
 
@@ -1490,6 +1504,10 @@ def test_multi_turn_online_smoke(client):
         pub = next(r for r in p.dealt_role_ids if D_ROLE_META_PUBLIC(r))
         g.pick_public_role(p.id, pub)
     manager.begin_game(room, "random", 0)
+    for p in g.players:
+        p.hidden_role_ids = [r for r in p.hidden_role_ids if r != "youngknight"]
+        if p.public_role_id == "youngknight":
+            p.public_role_id = "gateguard"
 
     for _ in range(4):
         active = g.active_player().id
@@ -1587,6 +1605,8 @@ def test_protect_blocks_drive_out(client):
     guard = g.player_by_id(guard_id)
     _strip_royal_knights(g)
     _strip_royal_guards(g, keep_id=guard_id)
+    _strip_queens(g)
+    _prepare_rep_victim(victim, g)
     victim.location = "barracks"
     guard.hidden_role_ids = ["royalguard", "thief"]
     guard.public_role_id = "gateguard"
@@ -1724,6 +1744,81 @@ def test_protect_via_websocket(client):
         ws.receive_json()
     assert victim.rep == before
     assert "protect" in guard.abilities_used_this_round
+
+
+def test_vote_accuse_without_seconder_fails(client):
+    from dethrone.game import MoveError
+    code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
+    room, pids, g = _start_game(code)
+    target = pids[2]
+    votes = {pid: "yes" for pid in pids}
+    with pytest.raises(MoveError, match="seconder"):
+        g.apply_formal_vote(
+            "accuse", target, votes,
+            proposer_id=pids[0], seconder=False, decree=False,
+        )
+
+
+def test_duel_flee_grants_reaction_move(client):
+    code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
+    room, pids, g = _start_game(code)
+    att, deff = pids[0], pids[1]
+    g.pending_ui_action[att] = {"kind": "duel", "attackerId": att, "defenderId": deff}
+    g.duel_flee(deff)
+    assert att not in g.pending_ui_action
+    assert g.pending_ui_action.get(deff, {}).get("kind") == "reaction_move"
+    assert g.pending_ui_action[deff]["maxSteps"] == 2
+
+
+def test_wounded_blocks_hidden_stride(client):
+    code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
+    room, pids, g = _start_game(code)
+    pid = g.active_player().id
+    p = g.player_by_id(pid)
+    p.public_role_id = "gateguard"
+    p.hidden_role_ids = ["wanderingknight", "thief"]
+    p.wounded = True
+    assert g._move_limit(p) == 1
+
+
+def test_end_turn_blocked_by_reckless_charge(client):
+    from dethrone.game import MoveError
+    code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
+    room, pids, g = _start_game(code)
+    pid = g.active_player().id
+    g.pending_ui_action[pid] = {
+        "kind": "reckless_charge",
+        "attackerId": pid,
+        "opponentIds": [pids[1]],
+    }
+    with pytest.raises(MoveError, match="pending prompt"):
+        g.end_turn(pid)
+
+
+def test_formal_vote_via_websocket(client):
+    code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
+    room, pids, g = _start_game(code)
+    target = pids[2]
+    g.player_by_id(target).action_card_ids = []
+    proposer = pids[0]
+    votes = {pid: "yes" for pid in pids}
+
+    with client.websocket_connect(f"/dethrone/ws/{code}?pid={proposer}&name=Prop") as ws:
+        ws.receive_json()
+        ws.receive_json()
+        ws.send_json({
+            "type": "formalVote",
+            "vtype": "accuse",
+            "targetId": target,
+            "proposerId": proposer,
+            "seconder": True,
+            "decree": False,
+            "votes": votes,
+            "bonusYes": 0,
+            "bonusNo": 0,
+        })
+        ws.receive_json()
+    assert target in g.pending_role_discard
 
 
 def D_ROLE_META_PUBLIC(role_id: str) -> bool:

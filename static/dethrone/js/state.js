@@ -365,7 +365,7 @@ CT.declineReaction = function () {
 
 CT._canOfferFalseTrail = function (player) {
   if (!player || player.status !== "active") return false;
-  if (CT.allRoleIds(player).indexOf("spy") === -1) return false;
+  if (!CT.rolePowerActive(player, "spy")) return false;
   if (player.location !== "tavern" && player.location !== "market") return false;
   if ((player.abilitiesUsedThisGame || []).indexOf("false_trail") !== -1) return false;
   return CT.state.players.some(function (x) {
@@ -376,7 +376,7 @@ CT._canOfferFalseTrail = function (player) {
 CT._nextSanctuaryQueens = function () {
   return CT.state.players.filter(function (p) {
     if (p.status !== "active") return false;
-    if (CT.allRoleIds(p).indexOf("queen") === -1) return false;
+    if (!CT.rolePowerActive(p, "queen")) return false;
     if ((p.abilitiesUsedThisRound || []).indexOf("sanctuary") !== -1) return false;
     return true;
   });
@@ -418,7 +418,7 @@ CT.resolveSanctuary = function (accept) {
     var nextId = remaining.shift();
     var nextQueen = CT.playerById(nextId);
     if (!nextQueen || nextQueen.status !== "active") continue;
-    if (CT.allRoleIds(nextQueen).indexOf("queen") === -1) continue;
+    if (!CT.rolePowerActive(nextQueen, "queen")) continue;
     if ((nextQueen.abilitiesUsedThisRound || []).indexOf("sanctuary") !== -1) continue;
     CT.ui.sanctuaryOffer = {
       queenId: nextQueen.id,
@@ -451,7 +451,7 @@ CT._isRoyalOrThrone = function (p) {
 CT._nextProtectGuards = function () {
   return CT.state.players.filter(function (p) {
     if (p.status !== "active") return false;
-    if (CT.allRoleIds(p).indexOf("royalguard") === -1) return false;
+    if (!CT.rolePowerActive(p, "royalguard")) return false;
     if ((p.abilitiesUsedThisRound || []).indexOf("protect") !== -1) return false;
     return true;
   });
@@ -494,7 +494,7 @@ CT.resolveProtect = function (accept) {
     var nextId = remaining.shift();
     var nextGuard = CT.playerById(nextId);
     if (!nextGuard || nextGuard.status !== "active") continue;
-    if (CT.allRoleIds(nextGuard).indexOf("royalguard") === -1) continue;
+    if (!CT.rolePowerActive(nextGuard, "royalguard")) continue;
     if ((nextGuard.abilitiesUsedThisRound || []).indexOf("protect") !== -1) continue;
     CT.ui.protectOffer = {
       guardId: nextGuard.id,
@@ -522,7 +522,7 @@ CT.declineProtect = function () { CT.resolveProtect(false); };
 CT._nextDefendCrownKnights = function () {
   return CT.state.players.filter(function (p) {
     if (p.status !== "active") return false;
-    if (CT.allRoleIds(p).indexOf("royalknight") === -1) return false;
+    if (!CT.rolePowerActive(p, "royalknight")) return false;
     if (p.location !== "throne" && p.location !== "barracks") return false;
     if ((p.abilitiesUsedThisRound || []).indexOf("defend_crown") !== -1) return false;
     return true;
@@ -566,7 +566,7 @@ CT.resolveDefendCrown = function (accept) {
     var nextId = remaining.shift();
     var nextKnight = CT.playerById(nextId);
     if (!nextKnight || nextKnight.status !== "active") continue;
-    if (CT.allRoleIds(nextKnight).indexOf("royalknight") === -1) continue;
+    if (!CT.rolePowerActive(nextKnight, "royalknight")) continue;
     if (nextKnight.location !== "throne" && nextKnight.location !== "barracks") continue;
     if ((nextKnight.abilitiesUsedThisRound || []).indexOf("defend_crown") !== -1) continue;
     CT.ui.defendCrownOffer = {
@@ -615,7 +615,7 @@ CT._driveOutPlayer = function (loserId) {
 CT._maybeOfferRecklessCharge = function (playerId) {
   var p = CT.playerById(playerId);
   if (!p || p.status !== "active") return false;
-  if (CT.allRoleIds(p).indexOf("youngknight") === -1) return false;
+  if (!CT.rolePowerActive(p, "youngknight")) return false;
   var opponents = CT.state.players.filter(function (x) {
     return x.status === "active" && x.id !== playerId && x.location === p.location;
   });
@@ -714,9 +714,16 @@ CT.endTurn = function () {
   if (ap && CT.overHandLimit(ap)) {
     return { ok: false, msg: "Discard down to " + CT.getRules().HAND_LIMIT + " cards before ending your turn." };
   }
+  if (ap && CT.pendingBlocksEndTurn(ap.id)) {
+    return { ok: false, msg: "Resolve the pending prompt before ending your turn." };
+  }
   if (ap && CT.canFinalRite(ap)) {
     CT.ui.finalRiteOffer = ap.id;
     return { ok: false, offerFinalRite: true };
+  }
+  if (ap && ap.wounded) {
+    ap.wounded = false;
+    CT.log(ap.name + " recovers from being Wounded.", "note");
   }
   return CT.advanceTurn();
 };
@@ -855,8 +862,30 @@ CT.archivePeek = function (playerId, mode, deckName) {
 
 /* ===================== Phase 2: core play ===================== */
 
+CT.rolePowerActive = function (player, roleId) {
+  if (!player) return false;
+  if (CT.allRoleIds(player).indexOf(roleId) === -1) return false;
+  if (player.publicRoleId === roleId) return true;
+  if ((player.extraShownRoleIds || []).indexOf(roleId) !== -1) return true;
+  if ((player.hiddenRoleIds || []).indexOf(roleId) !== -1) return !player.wounded;
+  return false;
+};
+
 CT.moveLimit = function (player) {
-  return CT.allRoleIds(player).indexOf("wanderingknight") !== -1 ? 2 : 1;
+  return CT.rolePowerActive(player, "wanderingknight") ? 2 : 1;
+};
+
+CT.pendingBlocksEndTurn = function (playerId) {
+  if (CT.ui.recklessChargeOffer && CT.ui.recklessChargeOffer.attackerId === playerId) return true;
+  if (CT.ui.falseTrailOffer && CT.ui.falseTrailOffer.playerId === playerId) return true;
+  if (CT.ui.sanctuaryOffer && CT.ui.sanctuaryOffer.queenId === playerId) return true;
+  if (CT.ui.protectOffer && CT.ui.protectOffer.guardId === playerId) return true;
+  if (CT.ui.defendCrownOffer && CT.ui.defendCrownOffer.knightId === playerId) return true;
+  if (CT.ui.reactionOffer && CT.ui.reactionOffer.playerId === playerId) return true;
+  if (CT.ui.reactionMove && CT.ui.reactionMove.playerId === playerId) return true;
+  if (CT.ui.finalRiteOffer === playerId) return true;
+  if (CT.helpers && CT.helpers.ui.open) return true;
+  return false;
 };
 
 CT.canBoardMove = function (player) {
@@ -886,7 +915,7 @@ CT.legalMovesForActive = function (player) {
 /* legal normal moves = directly connected locations (§7). Special movement stays manual. */
 CT.legalMoves = function (player) {
   var moves = (CT.CONNECTIONS[player.location] || []).slice();
-  if (player.location === "college" && CT.allRoleIds(player).indexOf("collegeadvisor") !== -1) {
+  if (player.location === "college" && CT.rolePowerActive(player, "collegeadvisor")) {
     if (moves.indexOf("scrolls") === -1) moves.push("scrolls");
   }
   return moves;

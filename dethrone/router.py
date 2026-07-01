@@ -38,7 +38,7 @@ _DETHRONE_CSP = (
     "frame-ancestors 'none'"
 )
 
-_DETHRONE_ASSET_VERSION = "20260701-p39"
+_DETHRONE_ASSET_VERSION = "20260701-p40"
 
 _CREATE_BUCKETS: dict[str, list[float]] = {}
 _CREATE_LIMIT = 30
@@ -524,6 +524,10 @@ def _dispatch(room, player, mtype: str, msg: dict) -> bool:
             dict(msg.get("votes") or {}),
             int(msg.get("bonusYes", 0)),
             int(msg.get("bonusNo", 0)),
+            proposer_id=str(msg.get("proposerId", "")),
+            seconder=bool(msg.get("seconder")),
+            decree=bool(msg.get("decree")),
+            max_rep=int(msg["maxRep"]) if msg.get("maxRep") not in (None, "") else None,
             emergency=bool(msg.get("emergency")),
             vote_cards=list(msg.get("voteCards") or []),
             bribes=list(msg.get("bribes") or []),
