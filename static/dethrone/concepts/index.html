@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dethrone UI concepts — V3b</title>
+  <style>
+    :root {
+      --cream: #f4ecd6; --ink: #2a2014; --ink2: #5b4c38; --gold: #a8842c;
+      --serif: "Iowan Old Style", Palatino, Georgia, serif;
+      --sans: system-ui, sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; font-family: var(--sans); color: var(--ink);
+      background: radial-gradient(120% 80% at 50% -10%, rgba(199,154,58,.12), transparent 60%), var(--cream);
+      padding: 24px 16px 48px;
+    }
+    h1 { font-family: var(--serif); font-size: 28px; margin: 0 0 8px; }
+    .sub { color: var(--ink2); font-size: 14px; max-width: 52ch; margin-bottom: 28px; line-height: 1.5; }
+    .grid { display: grid; gap: 16px; max-width: 720px; }
+    a.card {
+      display: block; text-decoration: none; color: inherit;
+      background: #fbf6e9; border: 1px solid #cdb98c; border-radius: 12px;
+      padding: 18px 20px; box-shadow: 0 2px 8px rgba(42,32,20,.08);
+      transition: transform .12s, box-shadow .15s;
+    }
+    a.card:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(42,32,20,.12); }
+    a.card h2 { font-family: var(--serif); font-size: 20px; margin: 0 0 6px; color: var(--gold); }
+    a.card p { margin: 0; font-size: 14px; color: var(--ink2); line-height: 1.45; }
+    .tag {
+      display: inline-block; margin-top: 10px; font-size: 10px; font-weight: 700;
+      letter-spacing: .12em; text-transform: uppercase; color: #897a63;
+    }
+    .live { margin-top: 32px; padding-top: 20px; border-top: 1px solid #d8c6a0; font-size: 13px; color: var(--ink2); }
+    .live a { color: var(--gold); }
+  </style>
+</head>
+<body>
+  <h1>Dethrone UI concepts</h1>
+  <p class="sub">Three directions for the play screen after the V3b map. Static mockups only — not wired to game logic. Pick one (or mix) before we implement Phase 20 polish.</p>
+  <div class="grid">
+    <a class="card" href="concept-a-kingdom-stack.html">
+      <h2>A — Kingdom stack</h2>
+      <p>One portrait “kingdom card”: map on top, active location’s action bar as a coloured footer strip, court as slim player stubs along the bottom.</p>
+      <span class="tag">Best for mobile · single scroll</span>
+    </a>
+    <a class="card" href="concept-b-map-court-inset.html">
+      <h2>B — Map + court inset</h2>
+      <p>Map stays hero. Court slides in as a role-card gallery on desktop (right rail) or a bottom sheet on phone — tap a player to peek their public role art.</p>
+      <span class="tag">Best for 5–6 players · role art forward</span>
+    </a>
+    <a class="card" href="concept-c-mobile-tabs.html">
+      <h2>C — Play / Court / Log tabs</h2>
+      <p>Mobile-first tab bar: full-screen map on Play, card-grid Court on second tab, chronicle on third. Desktop keeps side-by-side layout.</p>
+      <span class="tag">Best for small screens · least clutter</span>
+    </a>
+  </div>
+  <p class="live">Live game (V3b map only): <a href="../">/dethrone</a></p>
+</body>
+</html>

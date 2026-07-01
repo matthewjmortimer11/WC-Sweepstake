@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Concept A — Kingdom stack</title>
+  <style>
+    :root {
+      --cream: #f4ecd6; --cream-hi: #fbf6e9; --ink: #2a2014; --ink2: #5b4c38;
+      --gold: #a8842c; --gold-b: #c79a3a; --royal: #8c2f23; --moss: #5a6e3a;
+      --knight: #4a5568; --guard: #5b4c38; --cursed: #6b2420;
+      --serif: "Iowan Old Style", Palatino, Georgia, serif;
+      --sans: system-ui, sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; min-height: 100vh; font-family: var(--sans); color: var(--ink);
+      background: #e8dfc8; display: grid; place-items: center; padding: 16px;
+    }
+    .banner {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 9;
+      background: var(--ink); color: var(--cream); font-size: 12px;
+      padding: 8px 14px; display: flex; justify-content: space-between; align-items: center;
+    }
+    .banner a { color: var(--gold-b); }
+    .phone {
+      width: min(390px, 100%); margin-top: 36px;
+      background: var(--cream); border-radius: 20px; overflow: hidden;
+      box-shadow: 0 12px 40px rgba(42,32,20,.22); border: 2px solid var(--gold);
+    }
+  </style>
+</head>
+<body>
+  <div class="banner">
+    <strong>Concept A — Kingdom stack</strong>
+    <a href="index.html">All concepts</a>
+  </div>
+
+  <div class="phone">
+    <!-- Kingdom card shell -->
+    <div style="background:var(--cream);padding:12px 12px 0">
+      <div style="border:2px solid var(--gold);border-radius:12px;overflow:hidden;background:var(--cream-hi)">
+        <!-- Header -->
+        <div style="padding:10px 14px 6px;border-bottom:1px solid #d8c6a0">
+          <div style="font-family:var(--serif);font-size:18px;font-weight:600">The Kingdom</div>
+          <div style="font-size:9px;letter-spacing:.2em;color:var(--gold);margin-top:2px">YOUR TURN · MATTHEW</div>
+        </div>
+
+        <!-- Mini map (simplified V3b) -->
+        <svg viewBox="0 0 360 320" style="width:100%;display:block;background:var(--cream)">
+          <rect width="360" height="320" fill="#f4ecd6"/>
+          <!-- routes -->
+          <g stroke="#a8842c" stroke-width="1.5" opacity=".65" fill="none">
+            <line x1="180" y1="52" x2="180" y2="92"/><line x1="180" y1="92" x2="180" y2="132"/>
+            <line x1="54" y1="168" x2="126" y2="168"/><line x1="126" y1="168" x2="180" y2="132"/>
+            <line x1="126" y1="168" x2="180" y2="168"/><line x1="180" y1="168" x2="234" y2="168"/>
+            <line x1="234" y1="168" x2="306" y2="168"/>
+            <line x1="54" y1="168" x2="180" y2="248"/><line x1="306" y1="168" x2="180" y2="248"/>
+          </g>
+          <!-- nodes -->
+          <g font-family="var(--serif)" font-size="7" font-weight="600" fill="#fbf6e9" text-anchor="middle">
+            <g transform="translate(180,44)"><rect x="-28" y="-18" width="56" height="36" rx="5" fill="#fbf6e9" stroke="#a8842c"/><rect x="-28" y="4" width="56" height="14" fill="#2a2014"/><text y="14">SCROLLS</text></g>
+            <g transform="translate(180,112)"><rect x="-28" y="-18" width="56" height="36" rx="5" fill="#fbf6e9" stroke="#a8842c"/><rect x="-28" y="4" width="56" height="14" fill="#2a2014"/><text y="14">COLLEGE</text></g>
+            <g transform="translate(54,168)"><rect x="-28" y="-18" width="56" height="36" rx="5" fill="#fbf6e9" stroke="#a8842c"/><rect x="-28" y="4" width="56" height="14" fill="#5b4c38"/><text y="14">TAVERN</text></g>
+            <g transform="translate(126,168)"><rect x="-28" y="-18" width="56" height="36" rx="5" fill="#fbf6e9" stroke="#c79a3a" stroke-width="2" stroke-dasharray="4 3"/><rect x="-28" y="4" width="56" height="14" fill="#5b4c38"/><text y="14">MARKET</text></g>
+            <g transform="translate(180,168)"><rect x="-32" y="-22" width="64" height="44" rx="6" fill="#fbf6e9" stroke="#a8842c" stroke-width="2"/><rect x="-32" y="6" width="64" height="16" fill="#8c2f23"/><text y="17" font-size="8">THRONE</text></g>
+            <g transform="translate(234,168)"><rect x="-28" y="-18" width="56" height="36" rx="5" fill="#fbf6e9" stroke="#a8842c"/><rect x="-28" y="4" width="56" height="14" fill="#4a5568"/><text y="14">BARRACKS</text></g>
+            <g transform="translate(180,256)"><rect x="-28" y="-18" width="56" height="36" rx="5" fill="#fbf6e9" stroke="#6b2420"/><rect x="-28" y="4" width="56" height="14" fill="#6b2420"/><text y="14">GRAVEYARD</text></g>
+          </g>
+          <!-- token on market -->
+          <circle cx="126" cy="148" r="7" fill="#8c2f23" stroke="#2a2014"/><text x="126" y="151" text-anchor="middle" font-size="8" fill="#fbf6e9" font-weight="700">M</text>
+        </svg>
+
+        <!-- Active location footer = actions -->
+        <div style="background:var(--guard);color:var(--cream-hi);padding:10px 14px">
+          <div style="font-family:var(--serif);font-size:13px;font-weight:600;letter-spacing:.08em">MARKET · ACTIONS</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px">
+            <button style="min-height:44px;border:1px solid #d8c6a0;border-radius:7px;background:var(--cream-hi);color:var(--ink);font-weight:600;font-size:13px">Buy favour</button>
+            <button style="min-height:44px;border:1px solid #d8c6a0;border-radius:7px;background:var(--cream-hi);color:var(--ink);font-weight:600;font-size:13px">Spread rumour</button>
+            <button style="min-height:44px;border:1px solid var(--gold);border-radius:7px;background:var(--gold);color:var(--ink);font-weight:700;font-size:13px;grid-column:span 2">End turn</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Court stubs -->
+    <div style="padding:12px 14px 16px;background:var(--cream)">
+      <div style="font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink2);margin-bottom:8px">The court</div>
+      <div style="display:flex;gap:8px;overflow-x:auto;padding-bottom:4px">
+        <div style="flex:0 0 72px;text-align:center">
+          <div style="height:96px;border-radius:8px;border:2px solid var(--gold-b);background:linear-gradient(180deg,#fdf7e3,#e8dfc8);box-shadow:0 2px 6px rgba(42,32,20,.12)"></div>
+          <div style="font-size:11px;font-weight:700;margin-top:4px">You</div>
+          <div style="font-size:10px;color:var(--ink2)">Rep 3</div>
+        </div>
+        <div style="flex:0 0 72px;text-align:center;opacity:.9">
+          <div style="height:96px;border-radius:8px;border:1px solid #cdb98c;background:#ece0c0"></div>
+          <div style="font-size:11px;margin-top:4px">Alex</div>
+          <div style="font-size:10px;color:var(--ink2)">Rep 2</div>
+        </div>
+        <div style="flex:0 0 72px;text-align:center;opacity:.9">
+          <div style="height:96px;border-radius:8px;border:1px solid #cdb98c;background:#ece0c0"></div>
+          <div style="font-size:11px;margin-top:4px">Sam</div>
+          <div style="font-size:10px;color:var(--ink2)">Rep 1</div>
+        </div>
+        <div style="flex:0 0 72px;text-align:center;opacity:.9">
+          <div style="height:96px;border-radius:8px;border:1px solid #cdb98c;background:#ece0c0"></div>
+          <div style="font-size:11px;margin-top:4px">Jo</div>
+          <div style="font-size:10px;color:var(--ink2)">Rep 4</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Turn dock -->
+    <div style="display:flex;gap:8px;padding:10px 12px;background:var(--ink);color:var(--cream)">
+      <div style="flex:1;font-size:13px"><strong>Market</strong><br><span style="opacity:.8;font-size:12px">Tap glowing site to move</span></div>
+      <button style="min-height:44px;padding:0 16px;border:0;border-radius:7px;background:var(--gold);font-weight:700;color:var(--ink)">End turn</button>
+    </div>
+  </div>
+</body>
+</html>
