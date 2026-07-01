@@ -1,7 +1,7 @@
 /* The Cursed Throne — action card stubs (V3b deck chrome + full-deck vignettes). */
 window.CT = window.CT || {};
 
-CT.ACTION_CARD_VERSION = window.__DETHRONE_CARD_V || "20260630-p31";
+CT.ACTION_CARD_VERSION = window.__DETHRONE_CARD_V || "20260630-p32";
 
 CT.actionCardUrl = function (cardId, opts) {
   opts = opts || {};
@@ -337,4 +337,74 @@ CT.hiddenRolePowersHtml = function (player) {
   }).join("");
   if (!blocks) return "";
   return '<div class="role-powers"><h3 class="role-powers__title">Hidden role powers</h3>' + blocks + "</div>";
+};
+
+/* Parley shortcuts for manual-timing cards (Phase 22). */
+CT.MANUAL_CARD_HELPERS = {
+  bribe: { helper: "h-open-vote", label: "Open vote helper" },
+  hidden_witness: { helper: "h-open-vote", label: "Open vote helper" },
+  crown_witness: { helper: "h-open-vote", label: "Open vote helper" },
+  disarm_card: { helper: "h-open-duel", label: "Open duel helper" },
+  challenged_again: { helper: "h-open-duel", label: "Open duel helper" },
+  blood_contract: { helper: "h-open-contract", label: "Open blood contract" },
+};
+
+CT.privateNoteBannerHtml = function (player) {
+  if (!CT.ui || !CT.ui.privateNote) return "";
+  var cardId = CT.ui.privateNoteCardId;
+  var stub = cardId
+    ? CT.actionCardStubHtml(cardId, player, { compact: false, showEffect: false, interactive: false })
+    : "";
+  return '<div class="private-note-banner hand-tab-panel__note" role="status">'
+    + (stub ? '<div class="private-note-banner__card">' + stub + "</div>" : "")
+    + '<p class="private-note-banner__text">' + CT.esc(CT.ui.privateNote) + "</p>"
+    + '<button type="button" class="btn btn-ghost btn-sm" data-act="clear-private-note">Dismiss</button>'
+    + "</div>";
+};
+
+CT.reactionCardPickerHtml = function (player, cardIds) {
+  if (!cardIds || !cardIds.length) return "";
+  return '<div class="reaction-card-picker">' + cardIds.map(function (id) {
+    return '<button type="button" class="reaction-card-pick" data-act="play-reaction" data-id="' + id + '">'
+      + CT.actionCardStubHtml(id, player, { compact: true, showBadge: false, interactive: false })
+      + "</button>";
+  }).join("") + "</div>";
+};
+
+CT.fenceCardPickerHtml = function (player, excludeId, selectedId) {
+  if (!player) return "";
+  var ids = (player.actionCardIds || []).filter(function (id) { return id !== excludeId; });
+  if (!ids.length) return '<p class="muted">No other cards to sell.</p>';
+  return '<div class="fence-card-picker">' + ids.map(function (id) {
+    var on = selectedId === id;
+    return '<button type="button" class="fence-card-pick' + (on ? " fence-card-pick--on" : "") + '"'
+      + ' data-act="play-fence-pick" data-id="' + id + '">'
+      + CT.actionCardStubHtml(id, player, { compact: true, showBadge: false, interactive: false, selected: on })
+      + "</button>";
+  }).join("") + "</div>";
+};
+
+CT.actionCardFocusModalHtml = function (cardId, player) {
+  if (!cardId || !player) return "";
+  var state = CT.actionCardPlayState(cardId, player);
+  var stub = CT.actionCardStubHtml(cardId, player, { compact: false, showEffect: true, interactive: false });
+  var helper = CT.MANUAL_CARD_HELPERS[cardId];
+  var helperBtn = helper
+    ? '<button type="button" class="btn btn-primary" data-act="manual-card-helper" data-helper="' + helper.helper + '">'
+      + CT.esc(helper.label) + "</button>"
+    : "";
+  var hint;
+  if (state.playable) hint = "This card is playable — use the Play button on the card.";
+  else if (state.kind === "reaction") hint = "Play when a reaction prompt targets you.";
+  else if (state.kind === "duel") hint = "Add this card from your hand during a duel.";
+  else if (state.kind === "vote") hint = "Play during a formal vote tally.";
+  else if (state.kind === "wait") hint = "Wait for your turn to play this card.";
+  else if (state.kind === "manual") hint = "Resolve with table talk — use a Parley helper if one applies.";
+  else hint = "Read the effect and resolve at the table.";
+  return '<div class="scrim"><div class="modal modal--action-card">'
+    + '<div class="action-card-focus">' + stub
+    + '<p class="action-card-focus__hint">' + CT.esc(hint) + "</p>"
+    + '<div class="btn-row" style="margin-top:14px">' + helperBtn
+    + '<button type="button" class="btn btn-ghost" data-act="close-action-focus">Close</button>'
+    + "</div></div></div></div>";
 };

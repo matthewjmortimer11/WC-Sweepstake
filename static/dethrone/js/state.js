@@ -41,6 +41,13 @@ CT.log = function (text, kind) {
   CT.save();
 };
 
+/* Private investigation / peek banner (never leaks to other clients). */
+CT.setPrivateNote = function (msg, cardId) {
+  CT.ui = CT.ui || {};
+  CT.ui.privateNote = msg;
+  CT.ui.privateNoteCardId = cardId || null;
+};
+
 /* ---- create a fresh game from finished setup data ----
  * playersInput: [{ name, dealtRoleIds:[3], publicRoleId, hiddenRoleIds:[2] }]
  * undealtRoleIds: roles not dealt (used for extra-shown roles later)
@@ -658,33 +665,33 @@ CT.playActionCard = function (playerId, cardId, opts) {
     CT.log(p.name + " plays Guild Seal — ignores the next tax this round.", "note");
   }
   if (cardId === "whisper_network" && target) {
-    if (!target.hiddenRoleIds.length) CT.ui.privateNote = target.name + " has no hidden roles.";
+    if (!target.hiddenRoleIds.length) CT.setPrivateNote(target.name + " has no hidden roles.");
     else {
       var hid = CT.roleById(target.hiddenRoleIds[0]);
-      CT.ui.privateNote = target.name + "'s hidden role: " + (hid ? hid.name : target.hiddenRoleIds[0]);
+      CT.setPrivateNote(target.name + "'s hidden role: " + (hid ? hid.name : target.hiddenRoleIds[0]));
     }
     CT.log(p.name + " used Whisper Network on " + target.name + ".", "note");
   }
   if (cardId === "witness_statement" && target) {
     var atGrave = target.locationLastRound === "graveyard";
-    CT.ui.privateNote = target.name + (atGrave ? " was" : " was not") + " at the Graveyard last round.";
+    CT.setPrivateNote(target.name + (atGrave ? " was" : " was not") + " at the Graveyard last round.");
     CT.log(p.name + " took a witness statement from " + target.name + ".", "note");
   }
   if (cardId === "alibi_check" && target && opts.locationId) {
     var alibiLoc = CT.locationById(opts.locationId);
     var wasThere = target.locationLastRound === opts.locationId;
-    CT.ui.privateNote = target.name + (wasThere ? " was" : " was not") + " at " + (alibiLoc ? alibiLoc.name : opts.locationId) + " last round.";
+    CT.setPrivateNote(target.name + (wasThere ? " was" : " was not") + " at " + (alibiLoc ? alibiLoc.name : opts.locationId) + " last round.");
     CT.log(p.name + " ran an alibi check on " + target.name + ".", "note");
   }
   if (cardId === "trace_steps" && target) {
     if (target.prevLocation) {
       var prevLoc = CT.locationById(target.prevLocation);
-      CT.ui.privateNote = target.name + " last moved from " + (prevLoc ? prevLoc.name : target.prevLocation) + ".";
-    } else CT.ui.privateNote = "No recorded move for " + target.name + " yet.";
+      CT.setPrivateNote(target.name + " last moved from " + (prevLoc ? prevLoc.name : target.prevLocation) + ".");
+    } else CT.setPrivateNote("No recorded move for " + target.name + " yet.");
     CT.log(p.name + " traced " + target.name + "'s steps.", "note");
   }
   if (cardId === "secret_ledger" && target) {
-    CT.ui.privateNote = target.name + " has " + target.gold + " gold. (They may lie once per game.)";
+    CT.setPrivateNote(target.name + " has " + target.gold + " gold. (They may lie once per game.)");
     CT.log(p.name + " inspected " + target.name + "'s ledger.", "note");
   }
   if (cardId === "bone_dice") {
@@ -696,14 +703,14 @@ CT.playActionCard = function (playerId, cardId, opts) {
     var peekPile = CT._ensureDrawPile(opts.deckName);
     var topId = peekPile.length ? peekPile[0] : null;
     var topCard = topId ? CT.cardById(topId) : null;
-    CT.ui.privateNote = "Top of " + opts.deckName + " deck: " + (topCard ? topCard.name : topId || "nothing");
+    CT.setPrivateNote("Top of " + opts.deckName + " deck: " + (topCard ? topCard.name : topId || "nothing"), topId);
     CT.log(p.name + " consulted the " + opts.deckName + " deck.", "note");
   }
   if (cardId === "read_records" && opts.deckName) {
     var disc = CT.state.discards[opts.deckName] || [];
     var discTop = disc.length ? disc[disc.length - 1] : null;
     var discCard = discTop ? CT.cardById(discTop) : null;
-    CT.ui.privateNote = "Top of " + opts.deckName + " discard: " + (discCard ? discCard.name : discTop || "empty");
+    CT.setPrivateNote("Top of " + opts.deckName + " discard: " + (discCard ? discCard.name : discTop || "empty"), discTop);
     CT.log(p.name + " read the " + opts.deckName + " discard pile.", "note");
   }
   if (cardId === "wraith_whisper") {
@@ -711,8 +718,8 @@ CT.playActionCard = function (playerId, cardId, opts) {
     if (gdisc.length) {
       var pick = gdisc[Math.floor(Math.random() * gdisc.length)];
       var pickCard = CT.cardById(pick);
-      CT.ui.privateNote = "Graveyard discard (random): " + (pickCard ? pickCard.name : pick);
-    } else CT.ui.privateNote = "Graveyard discard pile is empty.";
+      CT.setPrivateNote("Graveyard discard (random): " + (pickCard ? pickCard.name : pick), pick);
+    } else CT.setPrivateNote("Graveyard discard pile is empty.");
     CT.log(p.name + " listened to the Graveyard whispers.", "note");
   }
   if (cardId === "grave_pact") {
@@ -790,21 +797,21 @@ CT.applyDeepResearch = function (playerId, mode, opts) {
     var pile = CT._ensureDrawPile(opts.deckName);
     var topId = pile.length ? pile[0] : null;
     var topCard = topId ? CT.cardById(topId) : null;
-    CT.ui.privateNote = "Top of " + opts.deckName + " deck: " + (topCard ? topCard.name : topId || "nothing");
+    CT.setPrivateNote("Top of " + opts.deckName + " deck: " + (topCard ? topCard.name : topId || "nothing"), topId);
     CT.log(p.name + " surveyed the " + opts.deckName + " archives (Deep Research).", "note");
   } else if (mode === "discard_top" && opts.deckName) {
     var disc = CT.state.discards[opts.deckName] || [];
     var discTop = disc.length ? disc[disc.length - 1] : null;
     var discCard = discTop ? CT.cardById(discTop) : null;
-    CT.ui.privateNote = "Top of " + opts.deckName + " discard: " + (discCard ? discCard.name : discTop || "empty");
+    CT.setPrivateNote("Top of " + opts.deckName + " discard: " + (discCard ? discCard.name : discTop || "empty"), discTop);
     CT.log(p.name + " read the " + opts.deckName + " ledgers (Deep Research).", "note");
   } else if (mode === "discard_random" && opts.deckName) {
     var pile2 = CT.state.discards[opts.deckName] || [];
     if (pile2.length) {
       var pick = pile2[Math.floor(Math.random() * pile2.length)];
       var pickCard = CT.cardById(pick);
-      CT.ui.privateNote = opts.deckName + " discard (random): " + (pickCard ? pickCard.name : pick);
-    } else CT.ui.privateNote = opts.deckName + " discard pile is empty.";
+      CT.setPrivateNote(opts.deckName + " discard (random): " + (pickCard ? pickCard.name : pick), pick);
+    } else CT.setPrivateNote(opts.deckName + " discard pile is empty.");
     CT.log(p.name + " cross-referenced the " + opts.deckName + " records (Deep Research).", "note");
   } else if (mode === "witness" && opts.targetId) {
     var target = CT.playerById(opts.targetId);
@@ -812,11 +819,11 @@ CT.applyDeepResearch = function (playerId, mode, opts) {
       return { ok: false, msg: "Witness must be at the Scrolls." };
     }
     if (!target.actionCardIds.length) {
-      CT.ui.privateNote = target.name + " carries no action cards.";
+      CT.setPrivateNote(target.name + " carries no action cards.");
     } else {
       var cardId = target.actionCardIds[Math.floor(Math.random() * target.actionCardIds.length)];
       var card = CT.cardById(cardId);
-      CT.ui.privateNote = target.name + "'s hand includes: " + (card ? card.name : cardId);
+      CT.setPrivateNote(target.name + "'s hand includes: " + (card ? card.name : cardId), cardId);
     }
     CT.log(p.name + " interviewed " + target.name + " at the Scrolls (Deep Research).", "note");
   } else {
@@ -934,9 +941,9 @@ CT.useRoleAbility = function (playerId, abilityId, opts) {
   } else if (fx.peekCard && target) {
     if (target.actionCardIds.length) {
       var pick = target.actionCardIds[Math.floor(Math.random() * target.actionCardIds.length)];
-      CT.ui.privateNote = target.name + "'s hand includes: " + CT.cardById(pick).name;
+      CT.setPrivateNote(target.name + "'s hand includes: " + CT.cardById(pick).name, pick);
     } else {
-      CT.ui.privateNote = target.name + " has no action cards.";
+      CT.setPrivateNote(target.name + " has no action cards.");
     }
     CT.log(p.name + " peeked at " + target.name + "'s hand.", "note");
   } else if (fx.rumour && target) {

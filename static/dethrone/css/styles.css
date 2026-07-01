@@ -965,6 +965,35 @@ svg.map-v3b--layered { background: #1c140c; }
 }
 .role-powers li { margin-bottom: 4px; }
 
+/* Phase 22 — action card play UX */
+.private-note-banner {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 12px;
+}
+.private-note-banner__card { width: 140px; flex-shrink: 0; }
+.private-note-banner__card .action-stub--full { width: 100%; }
+.private-note-banner__text { flex: 1; min-width: 0; margin: 0; font-size: 13px; color: var(--ink); }
+
+.reaction-card-picker, .fence-card-picker {
+  display: flex; flex-wrap: wrap; gap: 10px; margin-top: 8px;
+}
+.reaction-card-pick, .fence-card-pick {
+  padding: 0; border: 0; background: none; cursor: pointer;
+}
+.reaction-card-pick:hover .action-stub__frame,
+.fence-card-pick:hover .action-stub__frame { transform: translateY(-2px); }
+.fence-card-pick--on .action-stub__frame {
+  border-color: var(--gold-bright);
+  box-shadow: 0 0 0 2px rgba(232,212,154,.5), var(--e2);
+}
+
+.modal--play-card .play-card-hero,
+.modal--action-card .action-card-focus { max-width: 280px; margin: 0 auto 12px; }
+.play-card-hero__effect { text-align: center; }
+.action-card-focus__hint {
+  font-size: 13px; color: var(--ink-soft); text-align: center; margin: 10px 0 0;
+}
+.modal--reaction .reaction-card-picker { justify-content: center; }
+
 @media (min-width: 920px) {
   .hand-tab-panel .hand-grid {
     display: grid;

@@ -100,7 +100,9 @@ def test_dethrone_v3b_board_asset(client):
     assert "actionCardArtHtml" in action_js
     assert "handStripHtml" in action_js
     assert "duelCardPickerHtml" in action_js
-    assert "notifyCardDraw" in action_js
+    assert "reactionCardPickerHtml" in action_js
+    assert "privateNoteBannerHtml" in action_js
+    assert "setPrivateNote" in Path("static/dethrone/js/state.js").read_text(encoding="utf-8")
     app_js = Path("static/dethrone/js/app.js").read_text(encoding="utf-8")
     assert "handTabPanel" in app_js
     assert "deckArchivesHtml" in action_js

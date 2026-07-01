@@ -20,7 +20,7 @@ Offline file open still works:
 open "index.html"          # macOS
 ```
 
-## What is implemented (Phases 1–2)
+## What is implemented (Phases 1–22)
 
 ### Phase 5 — playtest tooling & full card set
 - **Board art** — illustrated V3b kingdom poster (`cards/map/kingdom-background-v3b.jpg`) with curved gold/cursed roads, labelled site plaques, player tokens and per-location vignettes (see `board.js`, `cards-map.js`)
@@ -107,6 +107,17 @@ open "index.html"          # macOS
 - **Setup & private flows** — role picks, hidden roles, and lose-a-role screens show card art; cover screens show card backs
 - **The Court** — public-role thumbnail beside each player’s shown role name
 - **Client helpers** — `js/cards-roles.js` (`CT.roleCardUrl`, `CT.roleCardImg`, `CT.roleCardPickHtml`)
+
+### Phase 20–21 — V3b play UI & kingdom board
+- **Dark V3b layout** — Play / Hand / Court / Log tabs, illustrated kingdom panel, location footer with vignette art
+- **Hand strip** — compact action stubs below the map on mobile; full grid on Hand tab
+- **Parley on mobile** — Challenge, Duel, Vote, Trade, Call out in the location footer
+
+### Phase 22 — Action card art & play UX
+- **Stylised vignettes** — all 76 action cards (`cards/action/`, `scripts/generate_action_card_art.py`)
+- **Play & reaction modals** — card art in play prompts, Fence sell picker, and reaction offers
+- **Peek previews** — archives / investigation notes show the peeked card with art
+- **Manual card focus** — tap a non-playable card for effect + Parley shortcut where applicable
 
 ### Phase 4 — Throne & Succession
 A **Throne & Succession** panel tracks the crown and the line of succession.

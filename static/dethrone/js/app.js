@@ -483,10 +483,7 @@ function handTabPanel() {
   var limit = CT.getRules().HAND_LIMIT;
   var over = CT.overHandLimit(p);
   var isMyTurn = !CT.isOnline() || p.id === CT.myId();
-  var note = CT.ui.privateNote
-    ? '<div class="private-note-banner hand-tab-panel__note">' + CT.esc(CT.ui.privateNote)
-      + ' <button type="button" class="btn btn-ghost btn-sm" data-act="clear-private-note">Dismiss</button></div>'
-    : "";
+  var note = CT.privateNoteBannerHtml ? CT.privateNoteBannerHtml(p) : "";
   var archives = CT.deckArchivesHtml ? CT.deckArchivesHtml(p) : "";
   var powers = (CT.ui.rolesRevealed && CT.hiddenRolePowersHtml) ? CT.hiddenRolePowersHtml(p) : "";
   return '<div class="v3b-panel hand-tab-panel">'
@@ -876,6 +873,7 @@ function logPanel() {
 
 /* ============ overlays (private view, import) ============ */
 function overlays() {
+  if (CT.ui.actionCardFocus) return CT.actionCardFocusModalHtml(CT.ui.actionCardFocus, CT.handPlayer && CT.handPlayer());
   if (CT.ui.reactionOffer) return reactionView();
   if (CT.ui.finalRiteOffer) return finalRiteView();
   if (CT.ui.roleAbility) return roleAbilityView();
@@ -981,7 +979,9 @@ function privateView() {
   var cardsBody = CT.handGridHtml ? CT.handGridHtml(p, { showPlay: false }) : '<p class="muted">No action cards.</p>';
   return '<div class="scrim"><div class="modal modal--roles" style="max-width:min(96vw,720px)">'
     + '<div class="eyebrow">Private · ' + CT.esc(p.name) + '</div>'
-    + (CT.ui.privateNote ? '<div class="private-note-banner">' + CT.esc(CT.ui.privateNote) + '</div>' : '')
+    + (CT.ui.privateNote && CT.privateNoteBannerHtml
+      ? CT.privateNoteBannerHtml(p)
+      : (CT.ui.privateNote ? '<div class="private-note-banner">' + CT.esc(CT.ui.privateNote) + "</div>" : ""))
     + '<h2 style="margin:6px 0 12px">Hidden roles</h2><div class="role-card-grid">' + hidden + '</div>'
     + '<h2 style="margin:18px 0 12px">Action cards</h2>' + cardsBody
     + '<div class="btn-row" style="margin-top:20px"><div class="spacer"></div>'
@@ -994,13 +994,15 @@ function reactionView() {
   if (!offer) return "";
   var p = CT.playerById(offer.playerId || CT.myId());
   if (!p) { CT.ui.reactionOffer = null; return ""; }
-  var cards = (offer.cards || []).map(function (id) {
-    var c = CT.cardById(id);
-    return '<button class="btn btn-gold" data-act="play-reaction" data-id="' + id + '">Play '
-      + CT.esc(c ? c.name : id) + "</button>";
-  }).join("");
+  var cards = CT.reactionCardPickerHtml
+    ? CT.reactionCardPickerHtml(p, offer.cards || [])
+    : (offer.cards || []).map(function (id) {
+      var c = CT.cardById(id);
+      return '<button class="btn btn-gold" data-act="play-reaction" data-id="' + id + '">Play '
+        + CT.esc(c ? c.name : id) + "</button>";
+    }).join("");
   var labels = { rumour: "Rumour", callout: "Call Out", vote_pass: "Formal vote", duel_declared: "Duel", rep_loss: "Reputation loss", duel_consequence: "Duel consequence" };
-  return '<div class="scrim"><div class="modal cover" style="max-width:480px">'
+  return '<div class="scrim"><div class="modal modal--reaction cover" style="max-width:520px">'
     + '<div class="seal-big" style="background:var(--gold-soft);color:var(--wax)">⚡</div>'
     + '<h1 style="margin:8px 0">Reaction?</h1>'
     + '<p class="muted" style="font-size:15px">A ' + CT.esc(labels[offer.trigger] || "game") + ' effect targets you. '
@@ -1148,16 +1150,15 @@ function playCardView() {
     body += '<p class="muted" style="font-size:13px">Must be at ' + CT.esc(CT.locationById(fx.atLocation).name) + ".</p>";
   }
   if (fx.needsDiscardCard) {
-    var sellOpts = p.actionCardIds.filter(function (id) { return id !== u.cardId; }).map(function (id) {
-      var sc = CT.cardById(id);
-      return '<option value="' + id + '">' + CT.esc(sc ? sc.name : id) + "</option>";
-    }).join("");
-    body += '<label class="field" style="display:block;margin:12px 0"><span>Card to sell</span>'
-      + '<select id="play-discard" style="width:100%">' + sellOpts + "</select></label>";
+    var fencePick = (u.fenceDiscardId) || (p.actionCardIds.filter(function (id) { return id !== u.cardId; })[0]);
+    body += '<div class="field" style="margin:12px 0"><span class="eyebrow">Card to sell</span>'
+      + (CT.fenceCardPickerHtml ? CT.fenceCardPickerHtml(p, u.cardId, fencePick) : "")
+      + '<input type="hidden" id="play-discard" value="' + CT.esc(fencePick || "") + '"></div>';
   }
-  return '<div class="scrim"><div class="modal" style="max-width:480px">'
-    + '<h2 style="margin-bottom:4px">Play ' + CT.esc(c.name) + '</h2>'
-    + '<p class="muted" style="font-size:14px;margin:0 0 8px">' + CT.esc(c.effect) + '</p>'
+  var hero = CT.actionCardStubHtml(u.cardId, p, { compact: false, showEffect: false, interactive: false });
+  return '<div class="scrim"><div class="modal modal--play-card" style="max-width:520px">'
+    + '<div class="play-card-hero">' + hero + "</div>"
+    + '<p class="muted play-card-hero__effect" style="font-size:14px;margin:0 0 8px">' + CT.esc(c.effect) + "</p>"
     + body
     + '<div class="btn-row" style="margin-top:16px"><button class="btn btn-ghost" data-act="close-play-card">Cancel</button>'
     + '<div class="spacer"></div><button class="btn btn-primary" data-act="confirm-play-card" data-id="' + u.cardId + '">Play</button>'
@@ -1193,9 +1194,35 @@ CT.handleAction = function (act, el, ev) {
       CT.ui.rolesRevealed = true; CT.render(); break;
     case "hide-roles":
       CT.ui.rolesRevealed = false; CT.render(); break;
-    case "hand-card-focus":
+    case "hand-card-focus": {
+      var hp = CT.handPlayer && CT.handPlayer();
+      var cid = el.dataset.id;
+      if (hp && cid && CT.actionCardFocusModalHtml) {
+        var st = CT.actionCardPlayState(cid, hp);
+        if (!st.playable) {
+          CT.ui.actionCardFocus = cid;
+          CT.render();
+          break;
+        }
+      }
       CT.ui.playTab = "hand";
-      CT.render(); break;
+      CT.render();
+      break;
+    }
+    case "close-action-focus":
+      CT.ui.actionCardFocus = null;
+      CT.render();
+      break;
+    case "manual-card-helper":
+      CT.ui.actionCardFocus = null;
+      if (CT.helpers && CT.helpers.handle) CT.helpers.handle(el.dataset.helper, el);
+      break;
+    case "play-fence-pick":
+      if (CT.ui.playCard) {
+        CT.ui.playCard.fenceDiscardId = el.dataset.id;
+        CT.render();
+      }
+      break;
     case "archive-peek": {
       var pid = handPlayPlayerId();
       if (!pid) break;
@@ -1208,7 +1235,9 @@ CT.handleAction = function (act, el, ev) {
       CT.render(); break;
     }
     case "clear-private-note":
-      CT.ui.privateNote = null; CT.render(); break;
+      CT.ui.privateNote = null;
+      CT.ui.privateNoteCardId = null;
+      CT.render(); break;
     case "create-room":
       CT.net.createRoom(5);
       break;
@@ -1429,9 +1458,12 @@ CT.handleAction = function (act, el, ev) {
       CT.render(); break;
     }
     case "play-card-prompt":
-      CT.ui.playCard = { playerId: handPlayPlayerId(), cardId: el.dataset.id };
+      CT.ui.playCard = { playerId: handPlayPlayerId(), cardId: el.dataset.id, fenceDiscardId: null };
       CT.render(); break;
-    case "close-play-card": CT.ui.playCard = null; CT.render(); break;
+    case "close-play-card":
+      CT.ui.playCard = null;
+      CT.render();
+      break;
     case "confirm-play-card": {
       var u = CT.ui.playCard;
       if (!u) break;
