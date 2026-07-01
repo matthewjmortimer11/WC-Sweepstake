@@ -1158,19 +1158,31 @@ function roleAbilityView() {
   var fx = CT.ROLE_ABILITY_EFFECTS[u.abilityId];
   if (!p || !fx) { CT.ui.roleAbility = null; return ""; }
   var targets = CT.state.players.filter(function (x) {
-    if (x.status !== "active" || x.id === p.id) return false;
-    if (fx.sameLocation && x.location !== p.location) return false;
+    if (x.status !== "active") return false;
     if (fx.targetNotSelf && x.id === p.id) return false;
+    if (fx.sameLocation && x.location !== p.location) return false;
     return true;
   });
-  var opts = targets.map(function (x) {
-    return '<option value="' + x.id + '">' + CT.esc(x.name) + "</option>";
-  }).join("");
+  var targetHtml = "";
+  if (fx.needsTarget) {
+    var opts = targets.map(function (x) {
+      return '<option value="' + x.id + '">' + CT.esc(x.name) + "</option>";
+    }).join("");
+    targetHtml = '<label class="field" style="display:block;margin:12px 0"><span>Target</span>'
+      + '<select id="role-ability-target">' + opts + "</select></label>";
+  }
+  var pathHtml = "";
+  if (fx.needsPath) {
+    var paths = (CT.CONNECTIONS[p.location] || []).map(function (lid) {
+      return '<option value="' + lid + '">' + CT.esc(CT.locationById(lid).name) + "</option>";
+    }).join("");
+    pathHtml = '<label class="field" style="display:block;margin:12px 0"><span>Block path to</span>'
+      + '<select id="role-ability-path">' + paths + "</select></label>";
+  }
   return '<div class="scrim"><div class="modal" style="max-width:420px">'
     + '<div class="eyebrow">Public role · ' + CT.esc(CT.roleById(p.publicRoleId).name) + '</div>'
     + '<h2 style="margin:6px 0 12px">' + CT.esc(fx.name) + "</h2>"
-    + '<label class="field" style="display:block;margin:12px 0"><span>Target</span>'
-    + '<select id="role-ability-target">' + opts + "</select></label>"
+    + pathHtml + targetHtml
     + '<div class="btn-row" style="margin-top:16px"><button class="btn btn-ghost" data-act="close-role-ability">Cancel</button>'
     + '<div class="spacer"></div><button class="btn btn-primary" data-act="confirm-role-ability">Use ability</button></div>'
     + "</div></div>";
@@ -1577,7 +1589,7 @@ CT.handleAction = function (act, el, ev) {
       var aid = el.dataset.id;
       var fx = CT.ROLE_ABILITY_EFFECTS[aid];
       if (!fx) break;
-      if (fx.needsTarget) {
+      if (fx.needsTarget || fx.needsPath) {
         CT.ui.roleAbility = { playerId: ap3.id, abilityId: aid };
         CT.render(); break;
       }
@@ -1590,12 +1602,18 @@ CT.handleAction = function (act, el, ev) {
     case "confirm-role-ability": {
       var u = CT.ui.roleAbility;
       if (!u) break;
+      var fx2 = CT.ROLE_ABILITY_EFFECTS[u.abilityId];
       var ts = document.getElementById("role-ability-target");
       var tid = ts ? ts.value : "";
-      if (CT.netAction({ type: "useRoleAbility", abilityId: u.abilityId, targetId: tid })) {
+      var ps = document.getElementById("role-ability-path");
+      var pathTo = ps ? ps.value : null;
+      var payload = { type: "useRoleAbility", abilityId: u.abilityId };
+      if (fx2 && fx2.needsTarget) payload.targetId = tid;
+      if (fx2 && fx2.needsPath) payload.pathTo = pathTo;
+      if (CT.netAction(payload)) {
         CT.ui.roleAbility = null; break;
       }
-      var res2 = CT.useRoleAbility(u.playerId, u.abilityId, { targetId: tid });
+      var res2 = CT.useRoleAbility(u.playerId, u.abilityId, { targetId: tid, pathTo: pathTo });
       if (!res2.ok && res2.msg) alert(res2.msg);
       CT.ui.roleAbility = null;
       CT.render(); break;

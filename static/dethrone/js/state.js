@@ -132,6 +132,8 @@ CT.newGame = function (playersInput, undealtRoleIds, startingActionByPlayer, fir
     contracts: [], // Blood Contracts (§25): {id, aId, bId, promise, status}
     taxSkipRemaining: {},
     royalRoleLost: false,
+    routeBlocks: [],
+    graveyardWatch: [],
     log: [],
   };
   CT.DECK_NAMES.forEach(function (name) {
@@ -260,6 +262,7 @@ CT.advanceTurn = function () {
   }
   var wrapped = idx <= start;
   s.activePlayerIndex = idx;
+  CT._expireGuardEffectsFor(s.players[idx].id);
   if (wrapped) {
     s.round += 1;
     CT.onNewRound();
@@ -920,12 +923,38 @@ CT.legalMovesForActive = function (player) {
 };
 
 /* legal normal moves = directly connected locations (§7). Special movement stays manual. */
+CT._routeBlocked = function (player, dest) {
+  var loc = player.location;
+  var blocks = CT.state.routeBlocks || [];
+  for (var i = 0; i < blocks.length; i++) {
+    var b = blocks[i];
+    if (b.targetId !== player.id) continue;
+    if ((loc === b.locA && dest === b.locB) || (loc === b.locB && dest === b.locA)) return true;
+  }
+  return false;
+};
+
+CT._graveyardWatchExtra = function (playerId) {
+  var watch = CT.state.graveyardWatch || [];
+  var n = 0;
+  for (var i = 0; i < watch.length; i++) {
+    if (watch[i].targetId === playerId) n += 1;
+  }
+  return n;
+};
+
+CT._expireGuardEffectsFor = function (guardId) {
+  if (!CT.state) return;
+  CT.state.routeBlocks = (CT.state.routeBlocks || []).filter(function (b) { return b.guardId !== guardId; });
+  CT.state.graveyardWatch = (CT.state.graveyardWatch || []).filter(function (w) { return w.guardId !== guardId; });
+};
+
 CT.legalMoves = function (player) {
   var moves = (CT.CONNECTIONS[player.location] || []).slice();
   if (player.location === "college" && CT.rolePowerActive(player, "collegeadvisor")) {
     if (moves.indexOf("scrolls") === -1) moves.push("scrolls");
   }
-  return moves;
+  return moves.filter(function (m) { return !CT._routeBlocked(player, m); });
 };
 
 /* ensure a deck draw pile has cards (reshuffle if needed) without drawing. */
@@ -1308,10 +1337,12 @@ CT.doLocationAction = function (playerId, actId) {
   var p = CT.playerById(playerId); if (!p) return { ok: false };
   var def = CT.actionDef(p.location, actId);
   if (!def) return { ok: false };
-  if (p.gold < (def.cost || 0)) return { ok: false, msg: "Not enough gold." };
+  var watchExtra = actId === "buy_grave" ? CT._graveyardWatchExtra(playerId) : 0;
+  var totalCost = (def.cost || 0) + watchExtra;
+  if (p.gold < totalCost) return { ok: false, msg: "Not enough gold." };
 
   // pay cost up front (logged generically)
-  if (def.cost) { p.gold -= def.cost; }
+  if (totalCost) { p.gold -= totalCost; }
 
   switch (actId) {
     case "petition":
@@ -1326,7 +1357,11 @@ CT.doLocationAction = function (playerId, actId) {
       CT._maybeOfferRepLoss(playerId, -1, "Scavenge");
       break;
     case "buy_grave":
-      CT.log(p.name + " paid " + def.cost + " gold for a Graveyard card.");
+      if (watchExtra) {
+        CT.log(p.name + " paid " + totalCost + " gold for a Graveyard card (+" + watchExtra + " from Watch the Dead).");
+      } else {
+        CT.log(p.name + " paid " + totalCost + " gold for a Graveyard card.");
+      }
       CT.adjustCorruption(1, "bought a Graveyard card");
       CT.drawCard(playerId, "Graveyard");
       break;
@@ -1396,6 +1431,12 @@ CT.useRoleAbility = function (playerId, abilityId, opts) {
     if (fx.sameLocation && target.location !== p.location) return { ok: false, msg: "Target must be at your location." };
     if (fx.targetNotSelf && target.id === p.id) return { ok: false, msg: "Invalid target." };
   }
+  if (fx.needsPath) {
+    var pathTo = opts.pathTo;
+    if (!pathTo) return { ok: false, msg: "Path required." };
+    var baseMoves = CT.CONNECTIONS[p.location] || [];
+    if (baseMoves.indexOf(pathTo) === -1) return { ok: false, msg: "Invalid path." };
+  }
   if (cost) p.gold -= cost;
   CT.log(p.name + " uses " + fx.name + " (public role ability).", "event");
   if (fx.goldTransfer && target) {
@@ -1432,6 +1473,26 @@ CT.useRoleAbility = function (playerId, abilityId, opts) {
     CT.log(p.name + " gains " + fx.goldGain + " gold (" + fx.name + ").");
   } else if (fx.drawDeck) {
     CT.drawCard(playerId, fx.drawDeck);
+  } else if (fx.blockRoute && target && opts.pathTo) {
+    if ((CT.state.routeBlocks || []).some(function (b) { return b.guardId === p.id; })) {
+      return { ok: false, msg: "You already have an active route block." };
+    }
+    var toName = CT.locationById(opts.pathTo).name;
+    if (!CT.state.routeBlocks) CT.state.routeBlocks = [];
+    CT.state.routeBlocks.push({
+      guardId: p.id,
+      locA: p.location,
+      locB: opts.pathTo,
+      targetId: target.id,
+    });
+    CT.log(p.name + " blocks the path to " + toName + " for " + target.name + " (until " + p.name + "'s next turn).");
+  } else if (fx.graveyardWatch && target) {
+    if ((CT.state.graveyardWatch || []).some(function (w) { return w.guardId === p.id; })) {
+      return { ok: false, msg: "You already have an active Watch the Dead." };
+    }
+    if (!CT.state.graveyardWatch) CT.state.graveyardWatch = [];
+    CT.state.graveyardWatch.push({ guardId: p.id, targetId: target.id });
+    CT.log(p.name + " watches " + target.name + " — +1 gold on Graveyard buys until " + p.name + "'s next turn.");
   }
   if (fx.oncePerRound) {
     if (!p.abilitiesUsedThisRound) p.abilitiesUsedThisRound = [];

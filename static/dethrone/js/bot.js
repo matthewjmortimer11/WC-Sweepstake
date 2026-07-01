@@ -110,13 +110,21 @@ CT.bot.tryPlayCard = function (p) {
   var abilities = CT.roleAbilitiesAvailable(p);
   if (abilities.length) {
     var ab = abilities[Math.floor(Math.random() * abilities.length)];
+    var fx = CT.ROLE_ABILITY_EFFECTS[ab.id];
     var opts = {};
     if (ab.needsTarget) {
       var others = CT.state.players.filter(function (x) {
-        return x.status === "active" && x.id !== p.id && x.location === p.location;
+        if (x.status !== "active" || x.id === p.id) return false;
+        if (fx && fx.sameLocation && x.location !== p.location) return false;
+        return true;
       });
       if (!others.length) return false;
       opts.targetId = others[Math.floor(Math.random() * others.length)].id;
+    }
+    if (ab.needsPath) {
+      var paths = CT.CONNECTIONS[p.location] || [];
+      if (!paths.length) return false;
+      opts.pathTo = paths[Math.floor(Math.random() * paths.length)];
     }
     var res = CT.useRoleAbility(p.id, ab.id, opts);
     return res && res.ok;
