@@ -146,7 +146,7 @@ CT.MAP_ROUTES = CT.mapRoutes();
 
   CT.boardMapSVG = function () {
     var ap = CT.activePlayer();
-    var legal = (ap && ap.status === "active" && !CT.state.winner) ? CT.legalMoves(ap) : [];
+    var legal = (ap && ap.status === "active" && !CT.state.winner) ? CT.legalMovesForTurn(ap) : [];
     var here = ap ? ap.location : null;
     var bgUrl = CT.mapBackgroundUrl ? CT.mapBackgroundUrl() : "";
 

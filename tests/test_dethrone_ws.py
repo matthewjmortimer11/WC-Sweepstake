@@ -240,6 +240,13 @@ def _set_non_exempt_roles(p, g=None):
         g.tax_skip_remaining.pop(p.id, None)
 
 
+def _strip_queens(g):
+    for p in g.players:
+        if p.public_role_id == "queen":
+            p.public_role_id = "gateguard"
+        p.hidden_role_ids = [r for r in p.hidden_role_ids if r != "queen"]
+
+
 def test_challenge_sets_pending_discard(client):
     code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
     room, pids, g = _start_game(code)
@@ -796,9 +803,11 @@ def test_royal_decree_opens_vote(client):
 def test_duel_card_bonuses(client):
     code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
     room, pids, g = _start_game(code)
+    _strip_queens(g)
     att, defn = pids[0], pids[1]
     ap = g.player_by_id(att)
     dp = g.player_by_id(defn)
+    _set_non_exempt_roles(dp, g)
     ap.action_card_ids = ["hidden_knife"]
     dp.action_card_ids = []
     ap.location = dp.location = "tavern"
@@ -977,6 +986,7 @@ def test_study_companion_ally_peek(client):
 def test_stitched_lip_offers_on_rumour(client):
     code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
     room, pids, g = _start_game(code)
+    _strip_queens(g)
     active = g.active_player().id
     victim = next(pid for pid in pids if pid != active)
     vp = g.player_by_id(victim)
@@ -993,6 +1003,7 @@ def test_stitched_lip_offers_on_rumour(client):
 def test_stitched_lip_cancels_rumour(client):
     code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
     room, pids, g = _start_game(code)
+    _strip_queens(g)
     active = g.active_player().id
     victim = next(pid for pid in pids if pid != active)
     vp = g.player_by_id(victim)
@@ -1013,6 +1024,8 @@ def test_move_sets_moved_flag(client):
     room, pids, g = _start_game(code)
     active = g.active_player().id
     ap = g.player_by_id(active)
+    ap.public_role_id = "gateguard"
+    ap.hidden_role_ids = ["thief", "royalguard"]
     dest = g.legal_moves(ap)[0]
     g.move_player(active, dest)
     assert ap.moved_this_turn is True
@@ -1087,6 +1100,7 @@ def test_royal_role_lost_on_king_discard(client):
 def test_quick_escape_cancels_rep_loss(client):
     code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
     room, pids, g = _start_game(code)
+    _strip_queens(g)
     active = g.active_player().id
     ap = g.player_by_id(active)
     _set_non_exempt_roles(ap, g)
@@ -1101,6 +1115,7 @@ def test_quick_escape_cancels_rep_loss(client):
 def test_drunken_alibi_at_tavern(client):
     code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
     room, pids, g = _start_game(code)
+    _strip_queens(g)
     victim = pids[1]
     vp = g.player_by_id(victim)
     vp.location = "tavern"
@@ -1269,6 +1284,7 @@ def test_scholar_college_to_scrolls(client):
 def test_false_trail_redirects_rep(client):
     code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
     room, pids, g = _start_game(code)
+    _strip_queens(g)
     spy_id, victim_id = pids[0], pids[1]
     spy = g.player_by_id(spy_id)
     victim = g.player_by_id(victim_id)
@@ -1288,6 +1304,7 @@ def test_false_trail_redirects_rep(client):
 def test_false_trail_before_reaction(client):
     code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
     room, pids, g = _start_game(code)
+    _strip_queens(g)
     spy_id = pids[0]
     other_id = pids[1]
     spy = g.player_by_id(spy_id)
@@ -1302,6 +1319,61 @@ def test_false_trail_before_reaction(client):
     assert g.pending_ui_action.get(spy_id, {}).get("kind") == "reaction"
     g.resolve_reaction(spy_id, "drunken_alibi")
     assert spy.rep == 3
+
+
+def test_stride_two_moves(client):
+    from dethrone.game import MoveError
+    code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
+    room, pids, g = _start_game(code)
+    pid = g.active_player().id
+    p = g.player_by_id(pid)
+    p.hidden_role_ids = ["wanderingknight", "thief"]
+    p.public_role_id = "gateguard"
+    dest1 = g.legal_moves(p)[0]
+    g.move_player(pid, dest1)
+    assert p.moves_used_this_turn == 1
+    assert p.moved_this_turn is False
+    dest2 = g.legal_moves(p)[0]
+    g.move_player(pid, dest2)
+    assert p.moves_used_this_turn == 2
+    assert p.moved_this_turn is True
+    with pytest.raises(MoveError, match="already moved"):
+        g.move_player(pid, g.legal_moves(p)[0])
+
+
+def test_sanctuary_blocks_rep_loss(client):
+    code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
+    room, pids, g = _start_game(code)
+    _strip_queens(g)
+    victim_id, queen_id = pids[0], pids[1]
+    victim = g.player_by_id(victim_id)
+    queen = g.player_by_id(queen_id)
+    _set_non_exempt_roles(victim, g)
+    queen.hidden_role_ids = ["queen", "thief"]
+    queen.public_role_id = "gateguard"
+    before = victim.rep
+    assert g._maybe_offer_rep_loss(victim_id, -1, "Test", trigger="rep_loss")
+    assert g.pending_ui_action.get(queen_id, {}).get("kind") == "sanctuary"
+    g.resolve_sanctuary(queen_id, accept=True)
+    assert victim.rep == before
+    assert "sanctuary" in queen.abilities_used_this_round
+
+
+def test_sanctuary_before_reaction(client):
+    code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
+    room, pids, g = _start_game(code)
+    _strip_queens(g)
+    victim_id, queen_id = pids[0], pids[1]
+    victim = g.player_by_id(victim_id)
+    queen = g.player_by_id(queen_id)
+    _set_non_exempt_roles(victim, g)
+    queen.hidden_role_ids = ["queen", "thief"]
+    queen.public_role_id = "gateguard"
+    victim.action_card_ids = ["quick_escape"]
+    assert g._maybe_offer_rep_loss(victim_id, -1, "Test", trigger="rep_loss")
+    assert g.pending_ui_action.get(queen_id, {}).get("kind") == "sanctuary"
+    g.resolve_sanctuary(queen_id, accept=False)
+    assert g.pending_ui_action.get(victim_id, {}).get("kind") == "reaction"
 
 
 def D_ROLE_META_PUBLIC(role_id: str) -> bool:

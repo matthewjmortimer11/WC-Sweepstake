@@ -9,6 +9,11 @@ CT.bot.isCursed = function (p) { return p.hiddenRoleIds.indexOf("cursedone") > -
 CT.bot.resolvePending = function (playerId) {
   var p = CT.playerById(playerId);
   if (!p || !p.isBot) return false;
+  if (CT.ui.sanctuaryOffer && CT.ui.sanctuaryOffer.queenId === playerId) {
+    if (Math.random() < 0.75) CT.resolveSanctuary(true);
+    else CT.declineSanctuary();
+    return true;
+  }
   if (CT.ui.falseTrailOffer && CT.ui.falseTrailOffer.playerId === playerId) {
     var others = CT.state.players.filter(function (x) {
       return x.status === "active" && x.id !== playerId && x.location === p.location;
@@ -222,7 +227,7 @@ CT.bot.takeTurn = function (playerId) {
   if (!p || !p.isBot || p.status !== "active") return;
   CT.bot.resolvePending(playerId);
 
-  var moves = CT.legalMoves(p);
+  var moves = CT.legalMovesForTurn(p);
   if (moves.length && Math.random() < 0.85) {
     var cursed = CT.bot.isCursed(p);
     var dest;
@@ -232,6 +237,13 @@ CT.bot.takeTurn = function (playerId) {
       dest = cursed ? (CT.bot.stepToward(p.location, "graveyard") || moves[0]) : moves[Math.floor(Math.random() * moves.length)];
     }
     if (dest) CT.movePlayer(p.id, dest, false);
+    if (CT.canBoardMove(p)) {
+      moves = CT.legalMovesForTurn(p);
+      if (moves.length && Math.random() < 0.55) {
+        dest = moves[Math.floor(Math.random() * moves.length)];
+        if (dest) CT.movePlayer(p.id, dest, false);
+      }
+    }
   }
 
   if (!CT.bot.isCursed(p) && CT.bot.trySocial(p)) { /* social */ }

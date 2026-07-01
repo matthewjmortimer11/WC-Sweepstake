@@ -47,6 +47,7 @@ class PlayerState:
     wounded: bool = False
     serious_duel_used: bool = False
     moved_this_turn: bool = False
+    moves_used_this_turn: int = 0
     prev_location: Optional[str] = None
     location_last_round: str = D.START_LOCATION
     abilities_used_this_round: list[str] = field(default_factory=list)
@@ -318,6 +319,12 @@ class CursedThroneGame:
             self._log(f"First to act: {ap.name}.", "system")
 
     # ---- movement & turns ----
+    def _move_limit(self, player: PlayerState) -> int:
+        return 2 if "wanderingknight" in self._all_role_ids(player) else 1
+
+    def _can_board_move(self, player: PlayerState) -> bool:
+        return int(player.moves_used_this_turn) < self._move_limit(player)
+
     def legal_moves(self, player: PlayerState) -> list[str]:
         moves = list(D.CONNECTIONS.get(player.location, []))
         if player.location == "college" and "collegeadvisor" in self._all_role_ids(player):
@@ -336,6 +343,8 @@ class CursedThroneGame:
             mover = actor_id or pid
             if not ap or ap.id != mover or mover != pid:
                 raise MoveError("Not your turn.")
+            if not self._can_board_move(p):
+                raise MoveError("You have already moved this turn.")
             if location_id not in self.legal_moves(p):
                 raise MoveError("That location is not reachable.")
         if location_id not in {loc["id"] for loc in D.LOCATIONS}:
@@ -349,7 +358,8 @@ class CursedThroneGame:
         if not manual:
             ap = self.active_player()
             if ap and ap.id == pid:
-                ap.moved_this_turn = True
+                ap.moves_used_this_turn = int(ap.moves_used_this_turn) + 1
+                ap.moved_this_turn = ap.moves_used_this_turn >= self._move_limit(ap)
         self._log(f"{p.name} moved {from_name} → {to_name}" + (" (manual)" if manual else "") + ".")
 
     def _all_role_ids(self, p: PlayerState) -> set[str]:
@@ -434,6 +444,7 @@ class CursedThroneGame:
             self._log(f"Round {self.round} started.", "system")
         for p in self.players:
             p.moved_this_turn = False
+            p.moves_used_this_turn = 0
         self._log(f"Turn passes to {self.players[idx].name}.")
 
     def end_turn(self, actor_id: str) -> None:
@@ -1597,6 +1608,92 @@ class CursedThroneGame:
             for x in self.players
         )
 
+    def _next_sanctuary_queens(self) -> list[PlayerState]:
+        queens: list[PlayerState] = []
+        for p in self.players:
+            if p.status != "active":
+                continue
+            if "queen" not in self._all_role_ids(p):
+                continue
+            if "sanctuary" in p.abilities_used_this_round:
+                continue
+            queens.append(p)
+        return queens
+
+    def _offer_sanctuary(
+        self,
+        victim_id: str,
+        delta: int,
+        reason: str,
+        *,
+        trigger: str = "rep_loss",
+    ) -> bool:
+        if delta >= 0:
+            return False
+        queens = self._next_sanctuary_queens()
+        if not queens:
+            return False
+        queen = queens[0]
+        victim = self.player_by_id(victim_id)
+        if not victim:
+            return False
+        self.pending_ui_action[queen.id] = {
+            "kind": "sanctuary",
+            "queenId": queen.id,
+            "victimId": victim_id,
+            "delta": delta,
+            "reason": reason,
+            "trigger": trigger,
+            "remainingQueenIds": [q.id for q in queens[1:]],
+        }
+        if queen.is_bot:
+            self._bot_resolve_pending(queen.id, random.Random())
+        return True
+
+    def resolve_sanctuary(self, pid: str, *, accept: bool) -> None:
+        pending = self.pending_ui_action.get(pid)
+        if not pending or pending.get("kind") != "sanctuary":
+            raise MoveError("No Sanctuary pending.")
+        queen = self.player_by_id(pid)
+        if not queen:
+            raise MoveError("Unknown player.")
+        victim_id = str(pending.get("victimId", ""))
+        delta = int(pending.get("delta", 0))
+        reason = str(pending.get("reason", ""))
+        trigger = str(pending.get("trigger", "rep_loss"))
+        remaining = list(pending.get("remainingQueenIds") or [])
+        self.pending_ui_action.pop(pid, None)
+        victim = self.player_by_id(victim_id)
+        if accept:
+            queen.abilities_used_this_round.append("sanctuary")
+            vname = victim.name if victim else "a player"
+            self._log(f"{queen.name} uses Sanctuary — {vname} avoids the reputation loss.", "event")
+            return
+        self._log(f"{queen.name} declines Sanctuary.", "note")
+        while remaining:
+            next_id = remaining.pop(0)
+            next_queen = self.player_by_id(next_id)
+            if (
+                not next_queen
+                or next_queen.status != "active"
+                or "queen" not in self._all_role_ids(next_queen)
+                or "sanctuary" in next_queen.abilities_used_this_round
+            ):
+                continue
+            self.pending_ui_action[next_queen.id] = {
+                "kind": "sanctuary",
+                "queenId": next_queen.id,
+                "victimId": victim_id,
+                "delta": delta,
+                "reason": reason,
+                "trigger": trigger,
+                "remainingQueenIds": remaining,
+            }
+            if next_queen.is_bot:
+                self._bot_resolve_pending(next_queen.id, random.Random())
+            return
+        self._finish_rep_loss(victim_id, delta, reason, trigger=trigger, skip_sanctuary=True)
+
     def _finish_rep_loss(
         self,
         target_id: str,
@@ -1604,10 +1701,13 @@ class CursedThroneGame:
         reason: str,
         *,
         trigger: str = "rep_loss",
+        skip_sanctuary: bool = False,
     ) -> bool:
         if delta >= 0:
             self.adjust_rep(target_id, delta, reason)
             return False
+        if not skip_sanctuary and self._offer_sanctuary(target_id, delta, reason, trigger=trigger):
+            return True
         if self._offer_reaction(
             target_id,
             trigger,
@@ -2106,6 +2206,16 @@ class CursedThroneGame:
                 dest = self._bot_step_toward(p.location, "graveyard") if cursed else rng.choice(moves)
             if dest:
                 self.move_player(p.id, dest, manual=False, actor_id=p.id)
+                if self._can_board_move(p):
+                    moves2 = self.legal_moves(p)
+                    if moves2 and rng.random() < 0.55:
+                        dest2 = (
+                            self._bot_step_toward(p.location, "throne")
+                            if not cursed and self.throne.get("succession", {}).get("open")
+                            else rng.choice(moves2)
+                        )
+                        if dest2:
+                            self.move_player(p.id, dest2, manual=False, actor_id=p.id)
         if not cursed and self._bot_try_social(p, rng):
             pass
         elif self._bot_try_succession(p, rng):
@@ -2134,6 +2244,12 @@ class CursedThroneGame:
     def _bot_resolve_pending(self, player_id: str, rng: random.Random) -> bool:
         """Auto-resolve reaction prompts and reaction moves for bots."""
         pending = self.pending_ui_action.get(player_id)
+        if pending and pending.get("kind") == "sanctuary":
+            if rng.random() < 0.75:
+                self.resolve_sanctuary(player_id, accept=True)
+            else:
+                self.resolve_sanctuary(player_id, accept=False)
+            return True
         if pending and pending.get("kind") == "false_trail":
             p = self.player_by_id(player_id)
             if p and rng.random() < 0.75:
@@ -2466,6 +2582,8 @@ class CursedThroneGame:
             "wounded": p.wounded,
             "seriousDuelUsed": p.serious_duel_used,
             "movedThisTurn": p.moved_this_turn,
+            "movesUsedThisTurn": int(p.moves_used_this_turn),
+            "moveLimitThisTurn": self._move_limit(p) if is_self else 0,
             "abilitiesUsedThisRound": list(p.abilities_used_this_round),
             "abilitiesUsedThisGame": list(p.abilities_used_this_game) if is_self else [],
             "isBot": p.is_bot,
@@ -2501,7 +2619,11 @@ class CursedThroneGame:
             ],
             "log": self._log_public(),
             "players": [self._player_public(p, pid) for p in self.players],
-            "legalMoves": self.legal_moves(me) if me and self.status == STATUS_PLAY else [],
+            "legalMoves": (
+                self.legal_moves(me)
+                if me and self.status == STATUS_PLAY and self._can_board_move(me)
+                else []
+            ),
             "pendingKeepOne": self.pending_keep_one.get(pid),
             "pendingRoleDiscard": self.pending_role_discard.get(pid),
             "pendingUiAction": self.pending_ui_action.get(pid),
@@ -2542,6 +2664,8 @@ class CursedThroneGame:
                 "wounded": p["wounded"],
                 "seriousDuelUsed": p["seriousDuelUsed"],
                 "movedThisTurn": p.get("movedThisTurn", False),
+                "movesUsedThisTurn": p.get("movesUsedThisTurn", 0),
+                "moveLimitThisTurn": p.get("moveLimitThisTurn", 1),
                 "abilitiesUsedThisRound": p.get("abilitiesUsedThisRound", []),
                 "abilitiesUsedThisGame": p.get("abilitiesUsedThisGame", []),
             })

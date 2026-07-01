@@ -88,6 +88,7 @@ CT.net.applyState = function (msg) {
     if (cs.players) {
       cs.players.forEach(function (p) {
         if (!p.abilitiesUsedThisGame) p.abilitiesUsedThisGame = [];
+        if (p.movesUsedThisTurn == null) p.movesUsedThisTurn = p.movedThisTurn ? 1 : 0;
       });
     }
     if (cs.pendingKeepOne && CT.myId()) {
@@ -108,6 +109,15 @@ CT.net.applyState = function (msg) {
           reason: pui.reason,
           trigger: pui.trigger,
         };
+      } else if (pui.kind === "sanctuary") {
+        CT.ui.sanctuaryOffer = {
+          queenId: CT.myId(),
+          victimId: pui.victimId,
+          delta: pui.delta,
+          reason: pui.reason,
+          trigger: pui.trigger,
+          remainingQueenIds: pui.remainingQueenIds || [],
+        };
       } else if (pui.kind === "reaction_move") {
         CT.ui.reactionMove = { playerId: CT.myId(), maxSteps: pui.maxSteps || 1 };
       } else if (CT.helpers && !CT.helpers.ui.open) {
@@ -122,10 +132,11 @@ CT.net.applyState = function (msg) {
     } else if (CT.ui.finalRiteOffer === CT.myId()) {
       CT.ui.finalRiteOffer = null;
     }
-    if (!cs.pendingUiAction || (cs.pendingUiAction.kind !== "reaction" && cs.pendingUiAction.kind !== "reaction_move" && cs.pendingUiAction.kind !== "false_trail")) {
+    if (!cs.pendingUiAction || (cs.pendingUiAction.kind !== "reaction" && cs.pendingUiAction.kind !== "reaction_move" && cs.pendingUiAction.kind !== "false_trail" && cs.pendingUiAction.kind !== "sanctuary")) {
       if (CT.ui.reactionOffer && CT.ui.reactionOffer.playerId === CT.myId()) CT.ui.reactionOffer = null;
       if (CT.ui.reactionMove && CT.ui.reactionMove.playerId === CT.myId()) CT.ui.reactionMove = null;
       if (CT.ui.falseTrailOffer && CT.ui.falseTrailOffer.playerId === CT.myId()) CT.ui.falseTrailOffer = null;
+      if (CT.ui.sanctuaryOffer && CT.ui.sanctuaryOffer.queenId === CT.myId()) CT.ui.sanctuaryOffer = null;
     }
     if (cs.privateNote != null && CT.myId()) {
       if (typeof CT.setPrivateNote === "function") {

@@ -20,7 +20,7 @@ Offline file open still works:
 open "index.html"          # macOS
 ```
 
-## What is implemented (Phases 1–26)
+## What is implemented (Phases 1–28)
 
 ### Phase 5 — playtest tooling & full card set
 - **Board art** — illustrated V3b kingdom poster (`cards/map/kingdom-background-v3b.jpg`) with curved gold/cursed roads, labelled site plaques, player tokens and per-location vignettes (see `board.js`, `cards-map.js`)
@@ -143,6 +143,11 @@ open "index.html"          # macOS
 - **Scholar** — College Advisor unlocks College → Scrolls movement (hidden or public role); others use Market or Route Pass
 - **False Trail** — Spy at Tavern/Market may redirect one Reputation loss per game to another player at your location (hidden or public)
 - **Order** — False Trail is offered before reaction cards (Drunken Alibi, Quick Escape, etc.); online sync via `resolveFalseTrail` / `declineFalseTrail`
+
+### Phase 28 — Stride & Sanctuary
+- **Stride** — Wandering Knight may move twice per turn (hidden or public); turn dock shows move count (e.g. 1/2)
+- **Sanctuary** — Queen may cancel one Reputation loss per round for another player (hidden or public); offered after False Trail, before reaction cards
+- **Online sync** — `resolveSanctuary` / `declineSanctuary`; board highlights clear when moves are exhausted
 
 ### Phase 4 — Throne & Succession
 A **Throne & Succession** panel tracks the crown and the line of succession.

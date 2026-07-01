@@ -4,7 +4,7 @@ window.CT = window.CT || {};
 CT.ui = { privateFor: null, privateRevealed: false, rolesRevealed: false, showImport: false, showGuide: false,
   roleDiscardFor: null, roleDiscardRevealed: false, handFixFor: null, keepOne: null, playCard: null,
   logFilter: "all", privateNote: null, finalRiteOffer: null, reactionOffer: null, reactionMove: null,
-  falseTrailOffer: null,
+  falseTrailOffer: null, sanctuaryOffer: null,
   playTab: "play" };
 
 /* Play vs Test mode — Test reveals referee & per-player override tools (§32, §35).
@@ -121,8 +121,11 @@ function renderTurnDock() {
   var loc = CT.locationById(ap.location);
   var limit = CT.getRules().HAND_LIMIT;
   var over = CT.overHandLimit(ap);
-  var moved = !!ap.movedThisTurn;
-  var chips = '<span class="chip' + (moved ? " ok" : "") + '">' + (moved ? "✓ Moved" : "— Move") + '</span>'
+  var moved = (ap.movesUsedThisTurn || 0) >= CT.moveLimit(ap);
+  var moveChip = ap.movesUsedThisTurn
+    ? (ap.movesUsedThisTurn + "/" + CT.moveLimit(ap) + " moves")
+    : "— Move";
+  var chips = '<span class="chip' + (moved ? " ok" : "") + '">' + (moved ? "✓ " + moveChip : moveChip) + '</span>'
     + '<span class="chip' + (over ? " warn" : " ok") + '">🃏 ' + ap.actionCardIds.length + "/" + limit + "</span>";
   if (CT.state.throne.succession && CT.state.throne.succession.open) {
     chips += '<span class="chip wax">♛ Succession</span>';
@@ -876,6 +879,7 @@ function logPanel() {
 function overlays() {
   if (CT.ui.actionCardFocus) return CT.actionCardFocusModalHtml(CT.ui.actionCardFocus, CT.handPlayer && CT.handPlayer());
   if (CT.ui.falseTrailOffer) return falseTrailView();
+  if (CT.ui.sanctuaryOffer && CT.ui.sanctuaryOffer.queenId === CT.myId()) return sanctuaryView();
   if (CT.ui.reactionOffer) return reactionView();
   if (CT.ui.finalRiteOffer) return finalRiteView();
   if (CT.ui.roleAbility) return roleAbilityView();
@@ -989,6 +993,24 @@ function privateView() {
     + '<div class="btn-row" style="margin-top:20px"><div class="spacer"></div>'
     + '<button class="btn btn-primary" data-act="close-private">Hide & return to table</button></div>'
     + '</div></div>';
+}
+
+function sanctuaryView() {
+  var offer = CT.ui.sanctuaryOffer;
+  if (!offer) return "";
+  var queen = CT.playerById(offer.queenId || CT.myId());
+  var victim = CT.playerById(offer.victimId);
+  if (!queen) { CT.ui.sanctuaryOffer = null; return ""; }
+  return '<div class="scrim"><div class="modal modal--reaction cover" style="max-width:520px">'
+    + '<div class="seal-big" style="background:var(--gold-soft);color:var(--wax)">👑</div>'
+    + '<h1 style="margin:8px 0">Sanctuary</h1>'
+    + '<p class="muted" style="font-size:15px">'
+    + CT.esc(victim ? victim.name : "A player") + " is about to lose 1 Reputation"
+    + (offer.reason ? " (" + CT.esc(offer.reason) + ")" : "") + '. Shield them once this round?</p>'
+    + '<div class="btn-row" style="justify-content:center;margin-top:20px;flex-wrap:wrap;gap:10px">'
+    + '<button class="btn btn-ghost" data-act="decline-sanctuary">Let it happen</button>'
+    + '<button class="btn btn-gold" data-act="accept-sanctuary">Grant Sanctuary</button>'
+    + "</div></div></div>";
 }
 
 function falseTrailView() {
@@ -1354,6 +1376,18 @@ CT.handleAction = function (act, el, ev) {
       }
       CT.declineFalseTrail();
       CT.ui.falseTrailOffer = null;
+      CT.render(); break;
+    case "accept-sanctuary":
+      if (CT.netAction({ type: "resolveSanctuary" })) {
+        CT.ui.sanctuaryOffer = null; break;
+      }
+      CT.resolveSanctuary(true);
+      CT.render(); break;
+    case "decline-sanctuary":
+      if (CT.netAction({ type: "declineSanctuary" })) {
+        CT.ui.sanctuaryOffer = null; break;
+      }
+      CT.declineSanctuary();
       CT.render(); break;
     case "bot-turn": {
       var bp = CT.activePlayer();

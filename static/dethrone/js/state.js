@@ -120,6 +120,7 @@ CT.newGame = function (playersInput, undealtRoleIds, startingActionByPlayer, fir
         wounded: false,
         seriousDuelUsed: false,
         movedThisTurn: false,
+        movesUsedThisTurn: 0,
         prevLocation: null,
         locationLastRound: C.START_LOCATION,
         abilitiesUsedThisRound: [],
@@ -257,7 +258,10 @@ CT.advanceTurn = function () {
     CT.onNewRound();
     CT.log("Round " + s.round + " started.", "system");
   }
-  s.players.forEach(function (pl) { pl.movedThisTurn = false; });
+  s.players.forEach(function (pl) {
+    pl.movedThisTurn = false;
+    pl.movesUsedThisTurn = 0;
+  });
   CT.log("Turn passes to " + s.players[idx].name + ".");
   CT.save();
   return { ok: true };
@@ -370,9 +374,77 @@ CT._canOfferFalseTrail = function (player) {
   });
 };
 
-CT._finishRepLoss = function (targetId, delta, reason, trigger) {
+CT._nextSanctuaryQueens = function () {
+  return CT.state.players.filter(function (p) {
+    if (p.status !== "active") return false;
+    if (CT.allRoleIds(p).indexOf("queen") === -1) return false;
+    if ((p.abilitiesUsedThisRound || []).indexOf("sanctuary") !== -1) return false;
+    return true;
+  });
+};
+
+CT._offerSanctuary = function (victimId, delta, reason, trigger) {
+  var queens = CT._nextSanctuaryQueens();
+  if (!queens.length || delta >= 0) return false;
+  var queen = queens[0];
+  CT.ui.sanctuaryOffer = {
+    queenId: queen.id,
+    victimId: victimId,
+    delta: delta,
+    reason: reason,
+    trigger: trigger || "rep_loss",
+    remainingQueenIds: queens.slice(1).map(function (q) { return q.id; }),
+  };
+  if (queen.isBot && CT.bot && CT.bot.resolvePending) CT.bot.resolvePending(queen.id);
+  return true;
+};
+
+CT.resolveSanctuary = function (accept) {
+  var offer = CT.ui.sanctuaryOffer;
+  if (!offer) return;
+  var queen = CT.playerById(offer.queenId);
+  var victim = CT.playerById(offer.victimId);
+  if (!queen) return;
+  if (accept) {
+    if (!queen.abilitiesUsedThisRound) queen.abilitiesUsedThisRound = [];
+    queen.abilitiesUsedThisRound.push("sanctuary");
+    CT.log(queen.name + " uses Sanctuary — " + (victim ? victim.name : "a player") + " avoids the reputation loss.", "event");
+    CT.ui.sanctuaryOffer = null;
+    CT.save();
+    return;
+  }
+  CT.log(queen.name + " declines Sanctuary.", "note");
+  var remaining = (offer.remainingQueenIds || []).slice();
+  while (remaining.length) {
+    var nextId = remaining.shift();
+    var nextQueen = CT.playerById(nextId);
+    if (!nextQueen || nextQueen.status !== "active") continue;
+    if (CT.allRoleIds(nextQueen).indexOf("queen") === -1) continue;
+    if ((nextQueen.abilitiesUsedThisRound || []).indexOf("sanctuary") !== -1) continue;
+    CT.ui.sanctuaryOffer = {
+      queenId: nextQueen.id,
+      victimId: offer.victimId,
+      delta: offer.delta,
+      reason: offer.reason,
+      trigger: offer.trigger,
+      remainingQueenIds: remaining,
+    };
+    if (nextQueen.isBot && CT.bot && CT.bot.resolvePending) CT.bot.resolvePending(nextQueen.id);
+    CT.save();
+    return;
+  }
+  CT.ui.sanctuaryOffer = null;
+  CT._finishRepLoss(offer.victimId, offer.delta, offer.reason, offer.trigger, true);
+};
+
+CT.declineSanctuary = function () {
+  CT.resolveSanctuary(false);
+};
+
+CT._finishRepLoss = function (targetId, delta, reason, trigger, skipSanctuary) {
   var tr = trigger || "rep_loss";
   if (delta >= 0) { CT.adjustRep(targetId, delta, reason); return false; }
+  if (!skipSanctuary && CT._offerSanctuary(targetId, delta, reason, tr)) return true;
   if (CT._offerReaction(targetId, tr, { effect: "rep_adjust", targetId: targetId, delta: delta, reason: reason })) return true;
   CT.adjustRep(targetId, delta, reason);
   return false;
@@ -489,7 +561,11 @@ CT.movePlayer = function (playerId, locationId, manual) {
   p.location = locationId;
   if (!manual) {
     var ap = CT.activePlayer();
-    if (ap && ap.id === playerId) p.movedThisTurn = true;
+    if (ap && ap.id === playerId) {
+      if (!CT.canBoardMove(p)) return;
+      p.movesUsedThisTurn = (p.movesUsedThisTurn || 0) + 1;
+      p.movedThisTurn = p.movesUsedThisTurn >= CT.moveLimit(p);
+    }
   }
   CT.log(p.name + " moved " + (from ? from.name : "?") + " → " + to.name + (manual ? " (manual)" : "") + ".");
   CT.save();
@@ -523,6 +599,7 @@ CT.load = function () {
     if (data.players) data.players.forEach(function (p) {
       if (!p.abilitiesUsedThisRound) p.abilitiesUsedThisRound = [];
       if (p.movedThisTurn == null) p.movedThisTurn = false;
+      if (p.movesUsedThisTurn == null) p.movesUsedThisTurn = p.movedThisTurn ? 1 : 0;
       if (p.prevLocation == null) p.prevLocation = null;
       if (!p.locationLastRound) p.locationLastRound = p.location || "market";
     });
@@ -558,6 +635,19 @@ CT.archivePeek = function (playerId, mode, deckName) {
 };
 
 /* ===================== Phase 2: core play ===================== */
+
+CT.moveLimit = function (player) {
+  return CT.allRoleIds(player).indexOf("wanderingknight") !== -1 ? 2 : 1;
+};
+
+CT.canBoardMove = function (player) {
+  return (player.movesUsedThisTurn || 0) < CT.moveLimit(player);
+};
+
+CT.legalMovesForTurn = function (player) {
+  if (!player || !CT.canBoardMove(player)) return [];
+  return CT.legalMoves(player);
+};
 
 /* legal normal moves = directly connected locations (§7). Special movement stays manual. */
 CT.legalMoves = function (player) {
