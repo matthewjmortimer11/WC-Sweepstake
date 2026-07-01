@@ -38,7 +38,7 @@ _DETHRONE_CSP = (
     "frame-ancestors 'none'"
 )
 
-_DETHRONE_ASSET_VERSION = "20260701-p40"
+_DETHRONE_ASSET_VERSION = "20260701-p41"
 
 _CREATE_BUCKETS: dict[str, list[float]] = {}
 _CREATE_LIMIT = 30
@@ -518,6 +518,10 @@ def _dispatch(room, player, mtype: str, msg: dict) -> bool:
         return True
 
     if mtype == "formalVote":
+        ap = g._require_active_turn(player.id)
+        proposer_id = str(msg.get("proposerId", ""))
+        if proposer_id != ap.id:
+            raise MoveError("Proposer must be the active player.")
         g.apply_formal_vote(
             str(msg.get("vtype", "accuse")),
             str(msg.get("targetId", "")),
@@ -543,6 +547,10 @@ def _dispatch(room, player, mtype: str, msg: dict) -> bool:
         return True
 
     if mtype == "duelConsequence":
+        ap = g._require_active_turn(player.id)
+        attacker_id = str(msg.get("attackerId", ""))
+        if attacker_id != ap.id:
+            raise MoveError("Only the attacking active player may resolve this duel.")
         g.duel_apply_consequence(
             str(msg.get("attackerId", "")),
             str(msg.get("defenderId", "")),
@@ -595,6 +603,10 @@ def _dispatch(room, player, mtype: str, msg: dict) -> bool:
         return True
 
     if mtype == "trade":
+        ap = g._require_active_turn(player.id)
+        a_id = str(msg.get("aId", ""))
+        if a_id != ap.id:
+            raise MoveError("Trade must be initiated by the active player.")
         g.apply_trade(
             str(msg.get("aId", "")),
             str(msg.get("bId", "")),

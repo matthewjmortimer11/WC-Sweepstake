@@ -679,14 +679,18 @@ function playersPanel() { return courtPanel(false); }
 function parleyPanelCompact() {
   if (CT.isSpectator()) return "";
   var off = CT.state.winner ? " disabled" : "";
+  var myTurn = CT.isMyActiveTurn && CT.isMyActiveTurn();
   function b(act, label) {
     return '<button type="button" class="btn btn-parley" data-act="' + act + '"' + off + ">" + label + "</button>";
   }
+  var parleyBtns = (myTurn || !CT.isOnline())
+    ? b("h-open-vote", "Vote") + b("h-open-duel", "Duel") + b("h-open-trade", "Trade")
+    : "";
   return '<div class="v3b-panel v3b-panel--parley">'
     + '<div class="v3b-panel__head"><h2>Parley</h2><span class="faint" style="font-size:11px">Helpers</span></div>'
     + '<div class="parley-row">'
-    + b("h-open-challenge", "Challenge") + b("h-open-vote", "Vote") + b("h-open-duel", "Duel")
-    + b("h-open-callout", "Call out") + b("h-open-trade", "Trade") + b("h-open-contract", "Pact")
+    + b("h-open-challenge", "Challenge") + parleyBtns
+    + b("h-open-callout", "Call out") + b("h-open-contract", "Pact")
     + "</div></div>";
 }
 
@@ -742,15 +746,17 @@ function pstat(label, value, kind, pid, key) {
 /* ---- Phase 3: social helper launchers ---- */
 function parleyPanel() {
   var off = CT.state.winner ? " disabled" : "";
+  var myTurn = CT.isMyActiveTurn && CT.isMyActiveTurn();
   function b(act, label, cls) { return '<button class="btn ' + (cls || "btn-secondary") + '" data-act="' + act + '"' + off + '>' + label + '</button>'; }
+  var socialBtns = (myTurn || !CT.isOnline())
+    ? b("h-open-vote", "Formal Vote") + b("h-open-duel", "Duel") + b("h-open-trade", "Trade")
+    : "";
   return '<div class="panel"><div class="panel-head"><h2>Parley &amp; Conflict</h2>'
     + '<span class="faint" style="font-size:12px">Helpers — they guide &amp; log</span></div><hr class="rule">'
     + '<div class="act-grid" style="grid-template-columns:1fr 1fr 1fr">'
     + b("h-open-challenge", "Challenge")
-    + b("h-open-vote", "Formal Vote")
-    + b("h-open-duel", "Duel")
+    + socialBtns
     + b("h-open-callout", "Call Out", "btn-danger")
-    + b("h-open-trade", "Trade")
     + b("h-open-contract", "Blood Contract")
     + '</div></div>';
 }

@@ -1798,9 +1798,9 @@ def test_end_turn_blocked_by_reckless_charge(client):
 def test_formal_vote_via_websocket(client):
     code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
     room, pids, g = _start_game(code)
-    target = pids[2]
+    proposer = g.active_player().id
+    target = next(pid for pid in pids if pid != proposer)
     g.player_by_id(target).action_card_ids = []
-    proposer = pids[0]
     votes = {pid: "yes" for pid in pids}
 
     with client.websocket_connect(f"/dethrone/ws/{code}?pid={proposer}&name=Prop") as ws:
@@ -1819,6 +1819,75 @@ def test_formal_vote_via_websocket(client):
         })
         ws.receive_json()
     assert target in g.pending_role_discard
+
+
+def test_inactive_player_cannot_formal_vote(client):
+    code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
+    room, pids, g = _start_game(code)
+    active = g.active_player().id
+    other = next(pid for pid in pids if pid != active)
+    target = next(pid for pid in pids if pid not in (active, other))
+    votes = {pid: "yes" for pid in pids}
+    with client.websocket_connect(f"/dethrone/ws/{code}?pid={other}&name=Other") as ws:
+        ws.receive_json()
+        ws.receive_json()
+        ws.send_json({
+            "type": "formalVote",
+            "vtype": "accuse",
+            "targetId": target,
+            "proposerId": other,
+            "seconder": True,
+            "decree": False,
+            "votes": votes,
+        })
+        err = ws.receive_json()
+        assert err["type"] == "error"
+        assert "active player" in err["message"].lower()
+
+
+def test_inactive_player_cannot_trade(client):
+    code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
+    room, pids, g = _start_game(code)
+    active = g.active_player().id
+    other = next(pid for pid in pids if pid != active)
+    partner = next(pid for pid in pids if pid not in (active, other))
+    with client.websocket_connect(f"/dethrone/ws/{code}?pid={other}&name=Other") as ws:
+        ws.receive_json()
+        ws.receive_json()
+        ws.send_json({
+            "type": "trade",
+            "aId": other,
+            "bId": partner,
+            "goldAB": 1,
+            "goldBA": 0,
+        })
+        err = ws.receive_json()
+        assert err["type"] == "error"
+        assert "active player" in err["message"].lower()
+
+
+def test_inactive_player_cannot_resolve_duel(client):
+    import random
+    code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
+    room, pids, g = _start_game(code)
+    active = g.active_player().id
+    other = next(pid for pid in pids if pid != active)
+    defender = next(pid for pid in pids if pid not in (active, other))
+    with client.websocket_connect(f"/dethrone/ws/{code}?pid={other}&name=Other") as ws:
+        ws.receive_json()
+        ws.receive_json()
+        ws.send_json({
+            "type": "duelConsequence",
+            "attackerId": other,
+            "defenderId": defender,
+            "attBonus": 0,
+            "defBonus": 0,
+            "serious": False,
+            "consequence": "shame",
+        })
+        err = ws.receive_json()
+        assert err["type"] == "error"
+        assert "active player" in err["message"].lower()
 
 
 def D_ROLE_META_PUBLIC(role_id: str) -> bool:

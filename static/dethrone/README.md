@@ -218,6 +218,7 @@ Table talk and bluffing stay verbal. The app guides, tracks, and enforces mechan
 - Action cards that need table judgement (Call Out helper, Blood Contract, Duel Search consequence) stay manual — auto-play covers the mechanical subset in `CT.AUTO_PLAY` / `CARD_AUTO_EFFECTS` (expanded through Phase 18).
 - Reaction cards can be played proactively from hand when listed in `CT.AUTO_PLAY` (e.g. Guild Seal); others still fire when targeted.
 - Vote/duel/trade helpers are typically run from one device at the table (referee phone); state commits sync to all players.
+- **Duel, vote, and trade** may only be started and applied by the **active player** on their turn (server-enforced online).
 
 ## Next improvements
 

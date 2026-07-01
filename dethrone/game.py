@@ -408,6 +408,12 @@ class CursedThroneGame:
         }
         return kind in blocking
 
+    def _require_active_turn(self, actor_id: str) -> PlayerState:
+        ap = self.active_player()
+        if not ap or ap.id != actor_id or ap.status != "active":
+            raise MoveError("Only the active player may do that on their turn.")
+        return ap
+
     def _on_new_round(self) -> None:
         """Per-round hooks (Court Favourite tax skip, etc.)."""
         for p in self.players:

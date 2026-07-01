@@ -149,6 +149,13 @@ CT.newGame = function (playersInput, undealtRoleIds, startingActionByPlayer, fir
 CT.activePlayer = function () {
   return CT.state ? CT.state.players[CT.state.activePlayerIndex] : null;
 };
+
+CT.isMyActiveTurn = function () {
+  if (!CT.state || CT.state.phase !== "play" || CT.state.winner) return false;
+  var ap = CT.activePlayer();
+  if (!ap || ap.status !== "active") return false;
+  return !CT.isOnline() || ap.id === CT.myId();
+};
 CT.playerById = function (id) {
   return CT.state ? CT.state.players.find(function (p) { return p.id === id; }) : null;
 };

@@ -156,6 +156,7 @@ CT.helpers.vChallenge = function () {
 
 /* ===================== Formal vote (§21) ===================== */
 CT.helpers.openVote = function () {
+  if (!CT.helpers._requireActiveParley()) return;
   CT.helpers.ui = {
     open: "vote", vtype: "accuse", proposer: "", target: "", seconder: false,
     decree: false, emergency: false, phase: "setup", votes: {}, bonusYes: 0, bonusNo: 0, voteCards: [],
@@ -164,6 +165,7 @@ CT.helpers.openVote = function () {
   CT.render();
 };
 CT.helpers.openVoteFromPending = function (pui) {
+  if (CT.isMyActiveTurn && !CT.isMyActiveTurn()) return;
   CT.helpers.ui = {
     open: "vote", vtype: pui.voteType || "accuse", proposer: pui.proposerId || "",
     target: pui.targetId || "", seconder: false, decree: !!pui.decree, emergency: !!pui.emergency,
@@ -173,6 +175,7 @@ CT.helpers.openVoteFromPending = function (pui) {
   CT.render();
 };
 CT.helpers.openTradeFromPending = function (pui) {
+  if (CT.isMyActiveTurn && !CT.isMyActiveTurn()) return;
   CT.helpers.ui = { open: "trade", a: pui.playerId || "", b: "", goldAB: 0, goldBA: 0, cardAB: "", cardBA: "" };
   if (CT.isOnline()) CT.net.send({ type: "clearPendingUi" });
   CT.render();
@@ -260,7 +263,14 @@ CT.helpers.vVote = function () {
 };
 
 /* ===================== Duel (§22) ===================== */
+CT.helpers._requireActiveParley = function () {
+  if (CT.isMyActiveTurn && CT.isMyActiveTurn()) return true;
+  alert("Only the active player may start a duel, vote, or trade on their turn.");
+  return false;
+};
+
 CT.helpers.openDuel = function () {
+  if (!CT.helpers._requireActiveParley()) return;
   CT.helpers.ui = {
     open: "duel", att: "", def: "", serious: false, override: false,
     attBonus: 0, defBonus: 0, attDuelCards: [], defDuelCards: [], phase: "setup",
@@ -268,6 +278,7 @@ CT.helpers.openDuel = function () {
   CT.render();
 };
 CT.helpers.openDuelFromPending = function (ui) {
+  if (CT.isMyActiveTurn && !CT.isMyActiveTurn()) return;
   CT.helpers.ui = {
     open: "duel", att: ui.attackerId, def: ui.defenderId || "",
     serious: !!ui.serious, override: false, attBonus: 0, defBonus: 0,
@@ -460,7 +471,11 @@ CT.helpers.vCallout = function () {
 };
 
 /* ===================== Trade — Market immediate (§25) ===================== */
-CT.helpers.openTrade = function () { CT.helpers.ui = { open: "trade", a: "", b: "", goldAB: 0, goldBA: 0, cardAB: "", cardBA: "" }; CT.render(); };
+CT.helpers.openTrade = function () {
+  if (!CT.helpers._requireActiveParley()) return;
+  CT.helpers.ui = { open: "trade", a: "", b: "", goldAB: 0, goldBA: 0, cardAB: "", cardBA: "" };
+  CT.render();
+};
 function handOpts(p, sel) {
   if (!p) return '<option value="">—</option>';
   return '<option value="">— no card —</option>' + p.actionCardIds.map(function (id, i) {
@@ -782,6 +797,7 @@ CT.helpers.handle = function (act, el) {
 
 /* ---------- apply functions ---------- */
 CT.helpers.applyVote = function () {
+  if (!CT.helpers._requireActiveParley()) return;
   var u = CT.helpers.ui, ps = actives();
   if ((u.bribes || []).some(function (b) { return b.status === "pending"; })) {
     alert("Resolve pending bribes before applying the vote.");
@@ -874,6 +890,7 @@ CT.helpers.applyFlee = function () {
 };
 
 CT.helpers.applyDuelConseq = function (c) {
+  if (!CT.helpers._requireActiveParley()) return;
   var u = CT.helpers.ui;
   if (CT.isOnline()) {
     CT.net.send({
@@ -960,6 +977,7 @@ CT.helpers.applyCallout = function () {
 };
 
 CT.helpers.applyTrade = function () {
+  if (!CT.helpers._requireActiveParley()) return;
   var u = CT.helpers.ui;
   if (CT.isOnline()) {
     CT.net.send({

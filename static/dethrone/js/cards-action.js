@@ -427,10 +427,12 @@ CT.actionCardFocusModalHtml = function (cardId, player) {
   var state = CT.actionCardPlayState(cardId, player);
   var stub = CT.actionCardStubHtml(cardId, player, { compact: false, showEffect: true, interactive: false });
   var helper = CT.MANUAL_CARD_HELPERS[cardId];
-  var helperBtn = helper
+  var parleyHelper = helper && (helper.helper === "h-open-vote" || helper.helper === "h-open-duel" || helper.helper === "h-open-trade");
+  var canOpenHelper = helper && (!parleyHelper || (CT.isMyActiveTurn && CT.isMyActiveTurn()));
+  var helperBtn = canOpenHelper
     ? '<button type="button" class="btn btn-primary" data-act="manual-card-helper" data-helper="' + helper.helper + '">'
       + CT.esc(helper.label) + "</button>"
-    : "";
+    : (parleyHelper ? '<p class="action-card-focus__hint muted">Only the active player can open this on their turn.</p>' : "");
   var hint;
   if (state.playable) hint = "This card is playable — use the Play button on the card.";
   else if (state.kind === "reaction") hint = "Play when a reaction prompt targets you.";
