@@ -837,3 +837,48 @@ svg.map-v3b--layered { background: #1c140c; }
 }
 .action-row__play { white-space: nowrap; }
 
+.action-stub--pulse .action-stub__frame {
+  animation: handpulse 1.2s ease-in-out 2;
+  border-color: var(--gold-bright);
+}
+.action-stub--duel .action-stub__frame { border-color: rgba(74,85,104,.85); }
+.action-stub--vote .action-stub__frame { border-color: rgba(140,47,35,.75); }
+@keyframes handpulse {
+  0%,100% { box-shadow: 0 0 0 0 rgba(199,154,58,.5), var(--e2); }
+  50% { box-shadow: 0 0 0 6px rgba(199,154,58,.15), 0 0 18px rgba(199,154,58,.45); }
+}
+
+.loc-footer__parley {
+  margin-top: 14px; padding-top: 12px;
+  border-top: 1px solid rgba(255,255,255,.12);
+}
+.loc-footer__parley-row {
+  display: flex; flex-wrap: wrap; gap: 8px;
+}
+.btn-loc--parley {
+  flex: 1 1 calc(50% - 8px); min-width: 0; font-size: 12px; padding: 8px 10px;
+}
+
+.helper-hand-empty { font-size: 12px; color: var(--ink-soft); margin: 4px 0; }
+.helper-hand-picker {
+  display: flex; flex-wrap: wrap; gap: 10px;
+}
+.helper-hand-pick {
+  position: relative; display: flex; flex-direction: column; align-items: center;
+  gap: 4px; cursor: pointer; margin: 0;
+}
+.helper-hand-pick input { position: absolute; opacity: 0; pointer-events: none; }
+.helper-hand-pick--on .action-stub__frame {
+  border-color: var(--gold-bright);
+  box-shadow: 0 0 0 2px rgba(232,212,154,.5), var(--e2);
+}
+.helper-hand-pick__val {
+  font-size: 11px; font-weight: 800; color: var(--gold);
+  background: rgba(168,132,44,.12); padding: 2px 8px; border-radius: 999px;
+}
+.helper-vote-card {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  padding: 8px 0; border-bottom: 1px solid var(--line);
+}
+.helper-vote-card__btns { display: flex; gap: 8px; flex-wrap: wrap; }
+

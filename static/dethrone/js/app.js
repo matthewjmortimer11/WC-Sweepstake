@@ -523,7 +523,7 @@ function kingdomPanel() {
   var handStrip = "";
   if (!CT.isSpectator() && CT.handStripHtml) {
     var hp = CT.handPlayer();
-    if (hp) handStrip = CT.handStripHtml(hp);
+    if (hp) handStrip = CT.handStripHtml(hp, { pulseCardId: CT.ui.handPulseCard || null });
   }
   return '<div class="v3b-kingdom">'
     + '<div class="v3b-kingdom__card">'
@@ -538,6 +538,23 @@ function kingdomPanel() {
     + '<div class="loc-footer__label">' + locLabel + " · " + (CT.isSpectator() ? "watching" : "actions") + "</div>"
     + actionsPanelBody()
     + "</footer></div></div>";
+}
+
+function parleyFooterRow(disabled) {
+  if (CT.isSpectator() || CT.state.winner) return "";
+  var ap = CT.activePlayer();
+  if (!ap) return "";
+  var isMyTurn = !CT.isOnline() || ap.id === CT.myId();
+  if (!isMyTurn) return "";
+  function b(act, label) {
+    return '<button type="button" class="btn btn-loc btn-loc--cream btn-loc--parley" data-act="' + act + '"'
+      + (disabled ? " disabled" : "") + ">" + label + "</button>";
+  }
+  return '<div class="loc-footer__parley"><div class="eyebrow eyebrow--light">Parley</div>'
+    + '<div class="loc-footer__parley-row">'
+    + b("h-open-duel", "⚔ Duel") + b("h-open-vote", "⚖ Vote") + b("h-open-trade", "⇄ Trade")
+    + b("h-open-callout", "Call out")
+    + "</div></div>";
 }
 
 function actionsPanelBody() {
@@ -600,7 +617,7 @@ function actionsPanelBody() {
     + '<button class="btn btn-loc btn-loc--cream" data-act="end-turn"'
     + (CT.state.winner || blockEnd ? " disabled" : "") + ">End turn</button></div>";
 
-  return succBanner + body + roleSection
+  return succBanner + body + roleSection + parleyFooterRow(disabled)
     + (over && !CT.isSpectator() ? '<div class="loc-footer__warn">Hand over limit (' + p.actionCardIds.length + "). "
         + '<button class="btn btn-loc btn-loc--gold btn-sm" data-act="fix-hand" data-id="' + p.id + '">Discard</button></div>' : "")
     + endRow;

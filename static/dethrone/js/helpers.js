@@ -40,6 +40,7 @@ function duelCardBonus(cardIds) {
   return n;
 }
 function duelCardPicker(player, selected, side) {
+  if (CT.duelCardPickerHtml) return CT.duelCardPickerHtml(player, selected, side);
   var cards = duelCardsInHand(player);
   if (!cards.length) return '<p class="faint" style="font-size:12px;margin:4px 0">No duel cards in hand.</p>';
   return cards.map(function (id) {
@@ -159,6 +160,7 @@ CT.helpers.vVote = function () {
   var voteCardBtns = ps.map(function (p) {
     return voteCardsInHand(p).map(function (cid) {
       var used = (u.voteCards || []).some(function (vc) { return vc.playerId === p.id && vc.cardId === cid; });
+      if (CT.voteCardRowHtml) return CT.voteCardRowHtml(p, cid, used);
       if (used) return "";
       var c = CT.cardById(cid);
       return '<div class="vote-row" style="font-size:13px"><span>' + CT.esc(p.name) + ": " + CT.esc(c ? c.name : cid) + "</span>"

@@ -483,6 +483,7 @@ CT.drawCard = function (playerId, deckName, reason) {
   p.actionCardIds.push(id);
   CT.log(p.name + " drew a " + deckName + " card" + (reason ? " (" + reason + ")" : "") + ".");
   CT.save();
+  if (typeof CT.notifyCardDraw === "function") CT.notifyCardDraw(playerId, id);
   return id;
 };
 
@@ -959,6 +960,7 @@ CT.resolveKeepOne = function (playerId, deck, keepId, dropId) {
   CT.state.discards[deck].push(dropId);
   CT.log(p.name + " kept one card and discarded the other.");
   CT.save();
+  if (typeof CT.notifyCardDraw === "function") CT.notifyCardDraw(playerId, keepId);
 };
 
 /* ---- role-card loss (§20). The central, careful flow. ----

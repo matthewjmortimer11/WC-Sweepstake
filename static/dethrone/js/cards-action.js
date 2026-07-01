@@ -46,11 +46,22 @@ CT.actionCardPlayState = function (cardId, player) {
   var ap = CT.activePlayer && CT.activePlayer();
   var onTurn = ap && ap.id === player.id && player.status === "active" && !CT.state.winner;
 
+  if (CT.DUEL_CARD_VALUES && CT.DUEL_CARD_VALUES[cardId]) {
+    return { playable: false, badge: "+" + CT.DUEL_CARD_VALUES[cardId] + " duel", mode: "", kind: "duel" };
+  }
+  if (CT.VOTE_CARD_BONUSES && CT.VOTE_CARD_BONUSES[cardId]) {
+    return { playable: false, badge: "+" + CT.VOTE_CARD_BONUSES[cardId] + " vote", mode: "", kind: "vote" };
+  }
+
   if (onTurn) {
     var fx = CT.AUTO_PLAY && CT.AUTO_PLAY[cardId];
     if (fx) {
       if (fx.atLocation && player.location !== fx.atLocation) {
-        return { playable: false, badge: "Here only", mode: "", kind: "location" };
+        var need = CT.locationById && CT.locationById(fx.atLocation);
+        return { playable: false, badge: need ? "At " + need.name : "Wrong site", mode: "", kind: "location" };
+      }
+      if (cardId === "bought_round" && player.gold < 1) {
+        return { playable: false, badge: "Need 1g", mode: "", kind: "gold" };
       }
       var mode = (fx.needsTarget || fx.needsLocation || fx.needsDeck || fx.needsDiscardCard || fx.optionalTarget)
         ? "prompt" : "play";
@@ -87,6 +98,9 @@ CT.actionCardStubHtml = function (cardId, player, opts) {
   var cls = "action-stub" + (compact ? " action-stub--compact" : " action-stub--full");
   if (state.playable) cls += " action-stub--playable";
   if (opts.selected) cls += " action-stub--selected";
+  if (opts.pulse) cls += " action-stub--pulse";
+  if (state.kind === "duel") cls += " action-stub--duel";
+  if (state.kind === "vote") cls += " action-stub--vote";
 
   var badge = "";
   if (showBadge && state.badge) {
@@ -142,9 +156,15 @@ CT.handStripHtml = function (player, opts) {
   opts = opts || {};
   if (!player) return "";
   var limit = CT.getRules().HAND_LIMIT;
-  var ids = player.actionCardIds || [];
+  var ids = (player.actionCardIds || []).slice();
+  ids.sort(function (a, b) {
+    var pa = CT.actionCardPlayState(a, player).playable ? 0 : 1;
+    var pb = CT.actionCardPlayState(b, player).playable ? 0 : 1;
+    return pa - pb;
+  });
+  var pulseId = opts.pulseCardId;
   var cards = ids.map(function (id) {
-    return CT.actionCardStubHtml(id, player, { compact: true });
+    return CT.actionCardStubHtml(id, player, { compact: true, pulse: pulseId === id });
   }).join("");
 
   if (!cards) {
@@ -159,6 +179,59 @@ CT.handStripHtml = function (player, opts) {
     + "</div>"
     + '<div class="hand-strip__scroll" role="list">' + cards + "</div>"
     + "</div>";
+};
+
+/* Private toast when this device draws a card (never leaks to others). */
+CT.notifyCardDraw = function (playerId, cardId) {
+  if (!cardId) return;
+  var hp = CT.handPlayer && CT.handPlayer();
+  if (!hp || hp.id !== playerId) return;
+  var c = CT.cardById(cardId);
+  if (!c) return;
+  CT.ui = CT.ui || {};
+  CT.ui.handPulseCard = cardId;
+  if (typeof CT.showToast === "function") {
+    CT.showToast("Drew " + c.name);
+  }
+  if (typeof CT.render === "function") CT.render();
+  if (CT.ui._handPulseTimer) clearTimeout(CT.ui._handPulseTimer);
+  CT.ui._handPulseTimer = setTimeout(function () {
+    CT.ui.handPulseCard = null;
+    if (typeof CT.render === "function") CT.render();
+  }, 1600);
+};
+
+CT.duelCardPickerHtml = function (player, selected, side) {
+  if (!player || !CT.DUEL_CARD_VALUES) {
+    return '<p class="helper-hand-empty">No duel cards in hand.</p>';
+  }
+  var cards = player.actionCardIds.filter(function (id) { return CT.DUEL_CARD_VALUES[id]; });
+  if (!cards.length) return '<p class="helper-hand-empty">No duel cards in hand.</p>';
+  return '<div class="helper-hand-picker">' + cards.map(function (id) {
+    var on = (selected || []).indexOf(id) !== -1;
+    var val = CT.DUEL_CARD_VALUES[id];
+    var stub = CT.actionCardStubHtml(id, player, { compact: true, showBadge: false, interactive: false, selected: on });
+    return '<label class="helper-hand-pick' + (on ? " helper-hand-pick--on" : "") + '">'
+      + '<input type="checkbox" data-act="h-d-duelcard" data-side="' + side + '" data-id="' + id + '" style="width:auto"'
+      + (on ? " checked" : "") + ">"
+      + stub
+      + '<span class="helper-hand-pick__val">+' + val + "</span></label>";
+  }).join("") + "</div>";
+};
+
+CT.voteCardRowHtml = function (player, cardId, used) {
+  if (!player || !cardId || used) return "";
+  var c = CT.cardById(cardId);
+  var bonus = (CT.VOTE_CARD_BONUSES && CT.VOTE_CARD_BONUSES[cardId]) || 0;
+  var stub = CT.actionCardStubHtml(cardId, player, { compact: true, showBadge: false, interactive: false });
+  return '<div class="helper-vote-card">'
+    + stub
+    + '<div class="helper-vote-card__btns">'
+    + '<button type="button" class="btn btn-sm btn-primary" data-act="h-v-playcard" data-pid="' + player.id
+    + '" data-id="' + cardId + '" data-side="yes">+Yes (' + bonus + ")</button>"
+    + '<button type="button" class="btn btn-sm btn-danger" data-act="h-v-playcard" data-pid="' + player.id
+    + '" data-id="' + cardId + '" data-side="no">+No (' + bonus + ")</button>"
+    + "</div></div>";
 };
 
 CT.handGridHtml = function (player, opts) {

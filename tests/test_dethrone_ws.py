@@ -97,10 +97,11 @@ def test_dethrone_v3b_board_asset(client):
     action_js = Path("static/dethrone/js/cards-action.js").read_text(encoding="utf-8")
     assert "actionCardStubHtml" in action_js
     assert "handStripHtml" in action_js
-    assert "hand-strip" in action_js
+    assert "duelCardPickerHtml" in action_js
+    assert "notifyCardDraw" in action_js
     app_js = Path("static/dethrone/js/app.js").read_text(encoding="utf-8")
     assert "handTabPanel" in app_js
-    assert 'data-tab="hand"' in app_js
+    assert "parleyFooterRow" in app_js
 
     board = Path("static/dethrone/js/board.js").read_text(encoding="utf-8")
     assert "map-v3b--layered" in board
