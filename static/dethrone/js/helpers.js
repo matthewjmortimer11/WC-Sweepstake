@@ -52,7 +52,38 @@ function duelCardPicker(player, selected, side) {
 }
 function voteCardsInHand(player) {
   if (!player || !CT.VOTE_CARD_BONUSES) return [];
-  return player.actionCardIds.filter(function (id) { return CT.VOTE_CARD_BONUSES[id]; });
+  return player.actionCardIds.filter(function (id) {
+    if (!CT.VOTE_CARD_BONUSES[id]) return false;
+    var req = CT.VOTE_CARD_REQUIRES && CT.VOTE_CARD_REQUIRES[id];
+    if (req && req.location && player.location !== req.location) return false;
+    return true;
+  });
+}
+
+function roleVotePowersAvailable(player, u) {
+  if (!player || !CT.ROLE_VOTE_ABILITIES) return [];
+  var out = [];
+  CT.allRoleIds(player).forEach(function (rid) {
+    var fx = CT.ROLE_VOTE_ABILITIES[rid];
+    if (!fx) return;
+    if (fx.location && player.location !== fx.location) return;
+    if ((u.roleVotePowers || []).some(function (r) {
+      return r.playerId === player.id && r.roleId === rid;
+    })) return;
+    out.push({ roleId: rid, bonus: fx.bonus || 1, name: fx.name || rid });
+  });
+  return out;
+}
+
+function roleVotePowersHtml(ps, u) {
+  var rows = ps.map(function (p) {
+    return roleVotePowersAvailable(p, u).map(function (power) {
+      if (CT.roleVotePowerRowHtml) return CT.roleVotePowerRowHtml(p, power);
+      return "";
+    }).join("");
+  }).join("");
+  if (!rows) return "";
+  return '<h3 style="margin:14px 0 8px;font-size:15px">Role vote powers</h3><div class="stack" style="gap:6px">' + rows + "</div>";
 }
 
 function canOfferBribe(player, u) {
@@ -128,7 +159,7 @@ CT.helpers.openVote = function () {
   CT.helpers.ui = {
     open: "vote", vtype: "accuse", proposer: "", target: "", seconder: false,
     decree: false, emergency: false, phase: "setup", votes: {}, bonusYes: 0, bonusNo: 0, voteCards: [],
-    bribes: [],
+    bribes: [], roleVotePowers: [],
   };
   CT.render();
 };
@@ -136,7 +167,7 @@ CT.helpers.openVoteFromPending = function (pui) {
   CT.helpers.ui = {
     open: "vote", vtype: pui.voteType || "accuse", proposer: pui.proposerId || "",
     target: pui.targetId || "", seconder: false, decree: !!pui.decree, emergency: !!pui.emergency,
-    phase: "setup", votes: {}, bonusYes: 0, bonusNo: 0, voteCards: [], bribes: [],
+    phase: "setup", votes: {}, bonusYes: 0, bonusNo: 0, voteCards: [], bribes: [], roleVotePowers: [],
   };
   if (CT.isOnline()) CT.net.send({ type: "clearPendingUi" });
   CT.render();
@@ -193,6 +224,11 @@ CT.helpers.vVote = function () {
     var b = CT.VOTE_CARD_BONUSES[vc.cardId] || 0;
     if (vc.side === "yes") yes += b; else if (vc.side === "no") no += b;
   });
+  (u.roleVotePowers || []).forEach(function (rv) {
+    var fx = CT.ROLE_VOTE_ABILITIES && CT.ROLE_VOTE_ABILITIES[rv.roleId];
+    var b = (fx && fx.bonus) || 1;
+    if (rv.side === "yes") yes += b; else if (rv.side === "no") no += b;
+  });
   var pass = yes > no; // ties fail (§21)
   var voteCardBtns = ps.map(function (p) {
     return voteCardsInHand(p).map(function (cid) {
@@ -206,11 +242,13 @@ CT.helpers.vVote = function () {
     }).join("");
   }).join("");
   var bribeBtns = voteBribesHtml(ps, u);
+  var roleVoteBtns = roleVotePowersHtml(ps, u);
   return wrap('<div class="eyebrow">' + (u.vtype === "accuse" ? "Accuse Cursed" : "Banish Threat") + ' · target: ' + CT.esc((CT.playerById(u.target) || {}).name || "?") + '</div>'
     + '<h2 style="margin:4px 0 10px">Cast votes</h2>'
     + (u.emergency ? '<p class="tag wax" style="margin-bottom:8px">Emergency Council — players at Throne &amp; Market must vote</p>' : "")
     + '<div class="stack" style="gap:6px">' + rows + "</div>"
     + (voteCardBtns ? '<h3 style="margin:14px 0 8px;font-size:15px">Vote cards</h3><div class="stack" style="gap:6px">' + voteCardBtns + "</div>" : "")
+    + roleVoteBtns
     + bribeBtns
     + '<div class="row" style="gap:18px;margin-top:12px"><span class="muted" style="font-size:13px">Manual extra weight:</span>'
     + '<span>Yes <button class="step" data-act="h-v-bonus" data-side="yes" data-d="-1">−</button> ' + u.bonusYes + ' <button class="step" data-act="h-v-bonus" data-side="yes" data-d="1">+</button></span>'
@@ -248,7 +286,7 @@ CT.helpers.openRoyalCommandFromPending = function (ui) {
 CT.helpers.openVoteFromDecree = function (proposerId) {
   CT.helpers.ui = {
     open: "vote", vtype: "accuse", proposer: proposerId || "", target: "",
-    seconder: false, decree: true, phase: "setup", votes: {}, bonusYes: 0, bonusNo: 0, voteCards: [], bribes: [],
+    seconder: false, decree: true, phase: "setup", votes: {}, bonusYes: 0, bonusNo: 0, voteCards: [], bribes: [], roleVotePowers: [],
   };
   CT.render();
 };
@@ -578,6 +616,10 @@ CT.helpers.handle = function (act, el) {
       if (!u.voteCards) u.voteCards = [];
       u.voteCards.push({ playerId: el.dataset.pid, cardId: el.dataset.id, side: el.dataset.side });
       return CT.render();
+    case "h-v-rolevote":
+      if (!u.roleVotePowers) u.roleVotePowers = [];
+      u.roleVotePowers.push({ playerId: el.dataset.pid, roleId: el.dataset.role, side: el.dataset.side });
+      return CT.render();
     case "h-v-bribe-offer": {
       var briberId = el.dataset.briber, side = el.dataset.side;
       var sel = document.querySelector('select[data-act="h-v-bribe-target"][data-briber="' + briberId + '"]');
@@ -752,6 +794,7 @@ CT.helpers.applyVote = function () {
       type: "formalVote", vtype: u.vtype, targetId: u.target,
       votes: u.votes, bonusYes: u.bonusYes, bonusNo: u.bonusNo,
       emergency: !!u.emergency, voteCards: u.voteCards || [], bribes: resolvedBribes,
+      roleVotePowers: u.roleVotePowers || [],
     });
     u.open = null;
     return CT.render();
@@ -775,6 +818,15 @@ CT.helpers.applyVote = function () {
     if (pl && pl.actionCardIds.indexOf(vc.cardId) !== -1) {
       CT.discardCard(vc.playerId, vc.cardId, "vote");
       CT.log(pl.name + " played " + CT.cardById(vc.cardId).name + " (+" + bonus + " " + vc.side + ").", "note");
+    }
+  });
+  (u.roleVotePowers || []).forEach(function (rv) {
+    var pl = CT.playerById(rv.playerId);
+    var fx = CT.ROLE_VOTE_ABILITIES && CT.ROLE_VOTE_ABILITIES[rv.roleId];
+    var bonus = (fx && fx.bonus) || 1;
+    if (rv.side === "yes") yes += bonus; else if (rv.side === "no") no += bonus;
+    if (pl) {
+      CT.log(pl.name + " used " + ((fx && fx.name) || rv.roleId) + " (+" + bonus + " " + rv.side + ").", "note");
     }
   });
   var pass = yes > no;

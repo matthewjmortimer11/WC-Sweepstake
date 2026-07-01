@@ -70,6 +70,11 @@ CT.actionCardPlayState = function (cardId, player) {
     return { playable: false, badge: "+" + CT.DUEL_CARD_VALUES[cardId] + " duel", mode: "", kind: "duel" };
   }
   if (CT.VOTE_CARD_BONUSES && CT.VOTE_CARD_BONUSES[cardId]) {
+    var vreq = CT.VOTE_CARD_REQUIRES && CT.VOTE_CARD_REQUIRES[cardId];
+    if (vreq && vreq.location && player.location !== vreq.location) {
+      var vloc = CT.locationById && CT.locationById(vreq.location);
+      return { playable: false, badge: vloc ? "At " + vloc.name : "Wrong site", mode: "", kind: "vote" };
+    }
     return { playable: false, badge: "+" + CT.VOTE_CARD_BONUSES[cardId] + " vote", mode: "", kind: "vote" };
   }
 

@@ -71,3 +71,19 @@ CT.roleCardPickHtml = function (roleId, bodyHtml, opts) {
     + (bodyHtml ? '<div class="role-card-actions">' + bodyHtml + "</div>" : "")
     + "</div>";
 };
+
+/** Role vote power row in the formal vote tally (e.g. Royal Advisor Whisper Vote at Throne). */
+CT.roleVotePowerRowHtml = function (player, power) {
+  if (!player || !power) return "";
+  var bonus = power.bonus || 1;
+  return '<div class="helper-vote-card helper-vote-card--role">'
+    + CT.roleCardImg(power.roleId, { size: "thumb" })
+    + '<div class="helper-vote-card__meta"><span class="helper-vote-card__who">' + CT.esc(player.name) + "</span>"
+    + '<span class="muted" style="font-size:12px">' + CT.esc(power.name || power.roleId) + " · Throne</span></div>"
+    + '<div class="helper-vote-card__btns">'
+    + '<button type="button" class="btn btn-sm btn-primary" data-act="h-v-rolevote" data-pid="' + player.id
+    + '" data-role="' + power.roleId + '" data-side="yes">+Yes (' + bonus + ")</button>"
+    + '<button type="button" class="btn btn-sm btn-danger" data-act="h-v-rolevote" data-pid="' + player.id
+    + '" data-role="' + power.roleId + '" data-side="no">+No (' + bonus + ")</button>"
+    + "</div></div>";
+};

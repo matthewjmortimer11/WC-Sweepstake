@@ -1690,6 +1690,7 @@ class CursedThroneGame:
         emergency: bool = False,
         vote_cards: Optional[list[dict]] = None,
         bribes: Optional[list[dict]] = None,
+        role_vote_powers: Optional[list[dict]] = None,
     ) -> None:
         if self.status != STATUS_PLAY or self.winner:
             raise MoveError("No active game.")
@@ -1711,6 +1712,14 @@ class CursedThroneGame:
             bonus = D.VOTE_CARD_BONUSES.get(cid)
             if bonus is None:
                 raise MoveError("Not a vote card.")
+            req = D.VOTE_CARD_REQUIRES.get(cid, {})
+            req_loc = req.get("location")
+            if req_loc and pl.location != req_loc:
+                loc_name = next(
+                    (l["name"] for l in D.LOCATIONS if l["id"] == req_loc),
+                    req_loc,
+                )
+                raise MoveError(f"Must be at {loc_name} to play this card.")
             if side == "yes":
                 yes += bonus
             elif side == "no":
@@ -1720,6 +1729,36 @@ class CursedThroneGame:
             cname = D.CARD_BY_ID.get(cid, {}).get("name", cid)
             self.discard_card(vpid, cid, "vote")
             self._log(f"{pl.name} played {cname} (+{bonus} {side}).", "note")
+        for rvp in role_vote_powers or []:
+            pid = str(rvp.get("playerId", ""))
+            role_id = str(rvp.get("roleId", ""))
+            side = rvp.get("side")
+            pl = self.player_by_id(pid)
+            if not pl or pl.status != "active":
+                raise MoveError("Invalid role vote player.")
+            fx = D.ROLE_VOTE_ABILITIES.get(role_id)
+            if not fx:
+                raise MoveError("Not a vote role power.")
+            if role_id not in self._all_role_ids(pl):
+                raise MoveError("Player does not hold that role.")
+            req_loc = fx.get("location")
+            if req_loc and pl.location != req_loc:
+                loc_name = next(
+                    (l["name"] for l in D.LOCATIONS if l["id"] == req_loc),
+                    req_loc,
+                )
+                raise MoveError(f"Must be at {loc_name} to use {fx.get('name', role_id)}.")
+            bonus = int(fx.get("bonus", 0))
+            if side == "yes":
+                yes += bonus
+            elif side == "no":
+                no += bonus
+            else:
+                raise MoveError("Role vote power needs yes or no side.")
+            self._log(
+                f"{pl.name} used {fx.get('name', role_id)} (+{bonus} {side}).",
+                "note",
+            )
         for p in self.players:
             if p.status != "active":
                 continue

@@ -369,6 +369,8 @@ CT.DUEL_CARD_VALUES = {
   loaded_dice: 1, second_blade: 2, parry: 2, iron_gauntlet: 1,
 };
 CT.VOTE_CARD_BONUSES = { hidden_witness: 1, crown_witness: 2 };
+CT.VOTE_CARD_REQUIRES = { crown_witness: { location: "throne" } };
+CT.ROLE_VOTE_ABILITIES = { royaladvisor: { bonus: 1, name: "Whisper Vote", location: "throne" } };
 CT.DECK_BUY_COST = { Market: 2, Tavern: 2, Knowledge: 2, Barracks: 2, Graveyard: 4, Royal: 2 };
 CT.REACTION_EFFECTS = {
   stitched_lip: { trigger: "rumour", costRep: 0 },

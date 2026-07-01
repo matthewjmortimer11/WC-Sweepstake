@@ -260,6 +260,16 @@ VOTE_CARD_BONUSES: dict[str, int] = {
     "crown_witness": 2,
 }
 
+# Location gates for vote-timing action cards (e.g. Crown Witness at Throne).
+VOTE_CARD_REQUIRES: dict[str, dict] = {
+    "crown_witness": {"location": "throne"},
+}
+
+# Hidden/public role vote powers during formal tally (e.g. Royal Advisor Whisper Vote).
+ROLE_VOTE_ABILITIES: dict[str, dict] = {
+    "royaladvisor": {"bonus": 1, "name": "Whisper Vote", "location": "throne"},
+}
+
 VOTE_BRIBE_CARD = "bribe"
 
 # Reaction cards — offered to the affected player before the effect resolves

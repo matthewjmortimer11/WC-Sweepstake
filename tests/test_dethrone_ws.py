@@ -879,6 +879,81 @@ def test_bribe_refused_discards_without_gold(client):
     assert target_id not in g.pending_role_discard
 
 
+def test_crown_witness_requires_throne(client):
+    code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
+    room, pids, g = _start_game(code)
+    target = pids[2]
+    voter = pids[1]
+    vp = g.player_by_id(voter)
+    vp.action_card_ids = ["crown_witness"]
+    vp.location = "market"
+    votes = {pid: "yes" for pid in pids}
+    with pytest.raises(Exception) as exc:
+        g.apply_formal_vote(
+            "accuse",
+            target,
+            votes,
+            vote_cards=[{"playerId": voter, "cardId": "crown_witness", "side": "yes"}],
+        )
+    assert "Throne" in str(exc.value)
+
+
+def test_crown_witness_at_throne(client):
+    code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
+    room, pids, g = _start_game(code)
+    target = pids[2]
+    voter = pids[1]
+    vp = g.player_by_id(voter)
+    vp.action_card_ids = ["crown_witness"]
+    vp.location = "throne"
+    votes = {pid: "yes" for pid in pids}
+    g.apply_formal_vote(
+        "accuse",
+        target,
+        votes,
+        vote_cards=[{"playerId": voter, "cardId": "crown_witness", "side": "yes"}],
+    )
+    assert "crown_witness" not in vp.action_card_ids
+    assert target in g.pending_role_discard
+
+
+def test_whisper_vote_at_throne(client):
+    code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
+    room, pids, g = _start_game(code)
+    target = pids[2]
+    advisor = pids[1]
+    ap = g.player_by_id(advisor)
+    ap.location = "throne"
+    ap.hidden_role_ids = ["royaladvisor", "thief"]
+    votes = {pid: "yes" for pid in pids}
+    g.apply_formal_vote(
+        "accuse",
+        target,
+        votes,
+        role_vote_powers=[{"playerId": advisor, "roleId": "royaladvisor", "side": "yes"}],
+    )
+    assert target in g.pending_role_discard
+
+
+def test_whisper_vote_requires_throne(client):
+    code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
+    room, pids, g = _start_game(code)
+    target = pids[2]
+    advisor = pids[1]
+    ap = g.player_by_id(advisor)
+    ap.location = "market"
+    ap.hidden_role_ids = ["royaladvisor", "thief"]
+    votes = {pid: "yes" for pid in pids}
+    with pytest.raises(Exception) as exc:
+        g.apply_formal_vote(
+            "accuse",
+            target,
+            votes,
+            role_vote_powers=[{"playerId": advisor, "roleId": "royaladvisor", "side": "yes"}],
+        )
+    assert "Throne" in str(exc.value)
+
+
 def test_stitched_lip_offers_on_rumour(client):
     code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
     room, pids, g = _start_game(code)
