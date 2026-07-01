@@ -450,6 +450,18 @@ CT.resetGame = function () {
   try { localStorage.removeItem(CT.STORAGE_KEY); } catch (e) {}
 };
 
+/* Quick archive peek from Hand tab (Scrolls, your turn, private note only). */
+CT.archivePeek = function (playerId, mode, deckName) {
+  if (!deckName || !CT.DECK_NAMES || CT.DECK_NAMES.indexOf(deckName) === -1) {
+    return { ok: false, msg: "Unknown deck." };
+  }
+  var ap = CT.activePlayer();
+  if (!ap || ap.id !== playerId) return { ok: false, msg: "Only on your turn." };
+  var p = CT.playerById(playerId);
+  if (!p || p.location !== "scrolls") return { ok: false, msg: "Must be at the Scrolls." };
+  return CT.applyDeepResearch(playerId, mode, { deckName: deckName });
+};
+
 /* ===================== Phase 2: core play ===================== */
 
 /* legal normal moves = directly connected locations (§7). Special movement stays manual. */

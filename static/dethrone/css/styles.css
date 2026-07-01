@@ -536,6 +536,15 @@ svg.map-v3b--layered { background: #1c140c; }
 }
 @media (max-width: 919px) {
   .play-tabs { display: flex; }
+  .v3b-panel--parley { display: none; }
+  .trackers--v3b {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+  }
+  .trackers--v3b .tracker { padding: 8px 10px; }
+  .trackers--v3b .tracker .v { font-size: 17px; }
+  .trackers--v3b .tracker--vial { grid-column: 1 / -1; }
   .app--v3b { padding-bottom: calc(120px + env(safe-area-inset-bottom)); }
   body:has(#play-tabs:not([hidden])) .turn-dock:not([hidden]) {
     bottom: calc(54px + env(safe-area-inset-bottom));
@@ -881,4 +890,59 @@ svg.map-v3b--layered { background: #1c140c; }
   padding: 8px 0; border-bottom: 1px solid var(--line);
 }
 .helper-vote-card__btns { display: flex; gap: 8px; flex-wrap: wrap; }
+
+.pact-chips {
+  display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: var(--s4);
+}
+.pact-chip {
+  font-size: 12px; font-weight: 700; padding: 6px 12px; border-radius: 999px;
+  background: rgba(140,47,35,.2); border: 1px solid rgba(140,47,35,.45);
+  color: #e3b9af;
+}
+
+.deck-archives {
+  margin-top: var(--s5); padding-top: var(--s4);
+  border-top: 1px solid var(--line);
+}
+.deck-archives__title {
+  font-family: var(--serif); font-size: 17px; margin: 0 0 6px; color: var(--ink);
+}
+.deck-archives__hint {
+  font-size: 12px; color: var(--ink-soft); margin: 0 0 10px;
+}
+.deck-archives__row {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px;
+  padding: 8px 0; border-bottom: 1px solid rgba(42,32,20,.08);
+  font-size: 13px;
+}
+.deck-archives__name { font-weight: 700; min-width: 88px; color: var(--ink); }
+.deck-archives__counts { color: var(--ink-soft); flex: 1; }
+.deck-archives__peek { display: flex; gap: 6px; }
+.deck-archives__peek .btn { min-height: 32px; font-size: 11px; padding: 4px 8px; }
+
+.hand-tab-panel__note { margin-bottom: 12px; }
+
+.role-powers {
+  margin-top: var(--s5); padding-top: var(--s4);
+  border-top: 1px solid var(--line);
+}
+.role-powers__title {
+  font-family: var(--serif); font-size: 17px; margin: 0 0 10px; color: var(--ink);
+}
+.role-powers__role {
+  font-weight: 700; font-size: 13px; margin-bottom: 4px; color: var(--ink);
+}
+.role-powers ul {
+  margin: 0 0 12px; padding-left: 18px; font-size: 12px; color: var(--ink-soft);
+}
+.role-powers li { margin-bottom: 4px; }
+
+@media (min-width: 920px) {
+  .hand-tab-panel .hand-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+  .pacts-panel--compact { display: none; }
+}
 

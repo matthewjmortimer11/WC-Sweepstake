@@ -258,3 +258,59 @@ CT.handGridHtml = function (player, opts) {
   if (!body) body = '<p class="muted">No action cards in hand.</p>';
   return body;
 };
+
+CT.countPlayableCards = function (player) {
+  if (!player || !player.actionCardIds) return 0;
+  return player.actionCardIds.filter(function (id) {
+    return CT.actionCardPlayState(id, player).playable;
+  }).length;
+};
+
+CT.deckArchivesHtml = function (player) {
+  if (!player || !CT.DECK_NAMES || !CT.state) return "";
+  var ap = CT.activePlayer && CT.activePlayer();
+  var onTurn = ap && ap.id === player.id && player.status === "active" && !CT.state.winner;
+  var atScrolls = player.location === "scrolls";
+  var canPeek = onTurn && atScrolls && !CT.isSpectator();
+
+  var rows = CT.DECK_NAMES.map(function (deck) {
+    var drawN = (CT.state.decks[deck] && CT.state.decks[deck].length) || 0;
+    var discN = (CT.state.discards[deck] && CT.state.discards[deck].length) || 0;
+    var peekBtns = canPeek
+      ? '<span class="deck-archives__peek">'
+        + '<button type="button" class="btn btn-ghost btn-sm" data-act="archive-peek" data-mode="deck_top" data-deck="' + deck + '">Draw</button>'
+        + '<button type="button" class="btn btn-ghost btn-sm" data-act="archive-peek" data-mode="discard_top" data-deck="' + deck + '">Discard</button>'
+        + "</span>"
+      : "";
+    return '<div class="deck-archives__row">'
+      + '<span class="deck-archives__name">' + CT.esc(deck) + "</span>"
+      + '<span class="deck-archives__counts">' + drawN + " draw · " + discN + " disc</span>"
+      + peekBtns
+      + "</div>";
+  }).join("");
+
+  var hint = canPeek
+    ? "At the Scrolls on your turn — peek is private to you."
+    : (atScrolls ? "Peek unlocks on your turn at the Scrolls." : "Visit the Scrolls on your turn to peek decks.");
+
+  return '<div class="deck-archives">'
+    + '<h3 class="deck-archives__title">Archives</h3>'
+    + '<p class="deck-archives__hint">' + hint + "</p>"
+    + rows
+    + "</div>";
+};
+
+CT.hiddenRolePowersHtml = function (player) {
+  if (!player || !player.hiddenRoleIds || !player.hiddenRoleIds.length) return "";
+  var blocks = player.hiddenRoleIds.map(function (rid) {
+    var role = CT.roleById(rid);
+    if (!role || !role.abilities || !role.abilities.length) return "";
+    var items = role.abilities.map(function (a) {
+      var where = a.location ? " @ " + a.location : "";
+      return "<li><strong>" + CT.esc(a.name) + "</strong>" + where + " — " + CT.esc(a.effect) + "</li>";
+    }).join("");
+    return '<div class="role-powers__block"><div class="role-powers__role">' + CT.esc(role.name) + "</div><ul>" + items + "</ul></div>";
+  }).join("");
+  if (!blocks) return "";
+  return '<div class="role-powers"><h3 class="role-powers__title">Hidden role powers</h3>' + blocks + "</div>";
+};

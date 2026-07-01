@@ -101,7 +101,8 @@ def test_dethrone_v3b_board_asset(client):
     assert "notifyCardDraw" in action_js
     app_js = Path("static/dethrone/js/app.js").read_text(encoding="utf-8")
     assert "handTabPanel" in app_js
-    assert "parleyFooterRow" in app_js
+    assert "deckArchivesHtml" in action_js
+    assert "pactChipBar" in app_js
 
     board = Path("static/dethrone/js/board.js").read_text(encoding="utf-8")
     assert "map-v3b--layered" in board

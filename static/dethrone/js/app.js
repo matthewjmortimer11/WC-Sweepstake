@@ -95,9 +95,12 @@ function renderPlayTabs() {
   }
   var tab = CT.ui.playTab || "play";
   var handOn = tab === "hand" ? " on" : "";
+  var hp = CT.handPlayer && CT.handPlayer();
+  var playable = hp && CT.countPlayableCards ? CT.countPlayableCards(hp) : 0;
+  var handLabel = "Hand" + (playable > 0 ? " · " + playable : "");
   nav.className = "play-tabs";
   nav.innerHTML = '<button type="button" class="play-tabs__btn' + (tab === "play" ? " on" : "") + '" data-act="play-tab" data-tab="play">Play</button>'
-    + '<button type="button" class="play-tabs__btn' + handOn + '" data-act="play-tab" data-tab="hand">Hand</button>'
+    + '<button type="button" class="play-tabs__btn' + handOn + '" data-act="play-tab" data-tab="hand">' + handLabel + "</button>"
     + '<button type="button" class="play-tabs__btn' + (tab === "court" ? " on" : "") + '" data-act="play-tab" data-tab="court">Court</button>'
     + '<button type="button" class="play-tabs__btn' + (tab === "log" ? " on" : "") + '" data-act="play-tab" data-tab="log">Log</button>';
   nav.hidden = false;
@@ -382,10 +385,27 @@ function onlineSetupScreen() {
 }
 
 /* ============ game screen ============ */
+function pactChipBar() {
+  if (CT.isSpectator() || !CT.state || CT.state.winner) return "";
+  var me = handPlayPlayerId();
+  if (!me) return "";
+  var mine = (CT.state.contracts || []).filter(function (c) {
+    return c.status === "active" && (c.aId === me || c.bId === me);
+  });
+  if (!mine.length) return "";
+  var chips = mine.map(function (c) {
+    var other = CT.playerById(c.aId === me ? c.bId : c.aId);
+    var label = other ? other.name : "?";
+    return '<span class="pact-chip" title="' + CT.esc(c.promise) + '">🩸 Pact with ' + CT.esc(label) + "</span>";
+  }).join("");
+  return '<div class="pact-chips" role="status">' + chips + "</div>";
+}
+
 function gameScreen() {
   return winBanner()
     + waitingBanner()
     + handLimitBanner()
+    + pactChipBar()
     + trackers()
     + handCoachHint()
     + '<div class="play-layout play-tab-' + (CT.ui.playTab || "play") + '">'
@@ -463,7 +483,14 @@ function handTabPanel() {
   var limit = CT.getRules().HAND_LIMIT;
   var over = CT.overHandLimit(p);
   var isMyTurn = !CT.isOnline() || p.id === CT.myId();
+  var note = CT.ui.privateNote
+    ? '<div class="private-note-banner hand-tab-panel__note">' + CT.esc(CT.ui.privateNote)
+      + ' <button type="button" class="btn btn-ghost btn-sm" data-act="clear-private-note">Dismiss</button></div>'
+    : "";
+  var archives = CT.deckArchivesHtml ? CT.deckArchivesHtml(p) : "";
+  var powers = (CT.ui.rolesRevealed && CT.hiddenRolePowersHtml) ? CT.hiddenRolePowersHtml(p) : "";
   return '<div class="v3b-panel hand-tab-panel">'
+    + note
     + '<header class="hand-tab-panel__head">'
     + '<div><h2 class="v3b-panel__title">Your hand</h2>'
     + '<p class="muted" style="margin:4px 0 0;font-size:13px">Glowing cards can be played on your turn.</p></div>'
@@ -475,7 +502,9 @@ function handTabPanel() {
         + '<button class="btn btn-gold btn-sm" data-act="fix-hand" data-id="' + p.id + '">Discard</button></div>'
       : "")
     + (CT.handGridHtml ? CT.handGridHtml(p) : "")
+    + archives
     + handRolesSection(p)
+    + powers
     + "</div>";
 }
 
@@ -1169,6 +1198,19 @@ CT.handleAction = function (act, el, ev) {
     case "hand-card-focus":
       CT.ui.playTab = "hand";
       CT.render(); break;
+    case "archive-peek": {
+      var pid = handPlayPlayerId();
+      if (!pid) break;
+      if (CT.isOnline() && CT.netAction({ type: "deepResearch", mode: el.dataset.mode, deckName: el.dataset.deck })) {
+        CT.ui.playTab = "hand"; break;
+      }
+      var pk = CT.archivePeek(pid, el.dataset.mode, el.dataset.deck);
+      if (pk && !pk.ok && pk.msg) CT.showToast(pk.msg);
+      CT.ui.playTab = "hand";
+      CT.render(); break;
+    }
+    case "clear-private-note":
+      CT.ui.privateNote = null; CT.render(); break;
     case "create-room":
       CT.net.createRoom(5);
       break;
