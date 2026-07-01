@@ -35,6 +35,11 @@ CT.bot.resolvePending = function (playerId) {
     else CT.declineDefendCrown();
     return true;
   }
+  if (CT.ui.standWatchOffer && CT.ui.standWatchOffer.guardId === playerId) {
+    if (Math.random() < 0.7) CT.resolveStandWatch(true);
+    else CT.declineStandWatch();
+    return true;
+  }
   if (CT.ui.recklessChargeOffer && CT.ui.recklessChargeOffer.attackerId === playerId) {
     var opps = CT.ui.recklessChargeOffer.opponentIds || [];
     if (opps.length && Math.random() < 0.65) {

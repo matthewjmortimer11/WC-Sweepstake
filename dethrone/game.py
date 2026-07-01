@@ -381,8 +381,98 @@ class CursedThroneGame:
                 ap.moves_used_this_turn = int(ap.moves_used_this_turn) + 1
                 ap.moved_this_turn = ap.moves_used_this_turn >= self._move_limit(ap)
         self._log(f"{p.name} moved {from_name} → {to_name}" + (" (manual)" if manual else "") + ".")
+        if location_id == "graveyard":
+            self._maybe_offer_stand_watch(pid)
         if not manual:
             self._maybe_offer_reckless_charge(pid)
+
+    def _hold_ground_blocks_drive(
+        self,
+        loser: PlayerState,
+        attacker_total: int,
+        defender_total: int,
+    ) -> bool:
+        if not self._role_power_active(loser, "gateguard"):
+            return False
+        margin = abs(attacker_total - defender_total)
+        if margin >= 3:
+            return False
+        self._log(
+            f"{loser.name} holds ground — cannot be Driven Out (duel won by only {margin}).",
+            "event",
+        )
+        return True
+
+    def _next_stand_watch_guards(self, arrival_id: str) -> list[PlayerState]:
+        out: list[PlayerState] = []
+        for p in self.players:
+            if p.status != "active" or p.id == arrival_id:
+                continue
+            if p.location != "graveyard":
+                continue
+            if not self._role_power_active(p, "graveyardguard"):
+                continue
+            if "stand_watch_arrival" in p.abilities_used_this_round:
+                continue
+            out.append(p)
+        return out
+
+    def _maybe_offer_stand_watch(self, arrival_id: str) -> bool:
+        arrival = self.player_by_id(arrival_id)
+        if not arrival or arrival.location != "graveyard":
+            return False
+        guards = self._next_stand_watch_guards(arrival_id)
+        if not guards:
+            return False
+        guard = guards[0]
+        self.pending_ui_action[guard.id] = {
+            "kind": "stand_watch",
+            "guardId": guard.id,
+            "arrivalId": arrival_id,
+            "guardIds": [g.id for g in guards],
+        }
+        if guard.is_bot:
+            self._bot_resolve_pending(guard.id, random.Random())
+        return True
+
+    def resolve_stand_watch(self, pid: str, *, accept: bool) -> None:
+        pending = self.pending_ui_action.get(pid)
+        if not pending or pending.get("kind") != "stand_watch":
+            raise MoveError("No Stand Watch pending.")
+        arrival_id = pending.get("arrivalId")
+        guard_ids = list(pending.get("guardIds") or [pid])
+        self.pending_ui_action.pop(pid, None)
+        guard = self.player_by_id(pid)
+        arrival = self.player_by_id(arrival_id) if arrival_id else None
+        if not guard or not arrival or arrival.status != "active":
+            raise MoveError("Invalid Stand Watch.")
+        if pid not in guard_ids:
+            raise MoveError("Not your Stand Watch to resolve.")
+        if accept:
+            guard.abilities_used_this_round.append("stand_watch_arrival")
+            self._log(f"{guard.name} stands watch — {arrival.name} loses 1 Reputation.", "event")
+            self._maybe_offer_rep_loss(arrival_id, -1, "Stand Watch", trigger="stand_watch")
+            return
+        self._log(f"{guard.name} lets {arrival.name} pass the Graveyard gate.", "note")
+        remaining = [gid for gid in guard_ids if gid != pid]
+        if remaining:
+            next_guard = self.player_by_id(remaining[0])
+            if (
+                next_guard
+                and next_guard.status == "active"
+                and self._role_power_active(next_guard, "graveyardguard")
+                and "stand_watch_arrival" not in next_guard.abilities_used_this_round
+            ):
+                self.pending_ui_action[next_guard.id] = {
+                    "kind": "stand_watch",
+                    "guardId": next_guard.id,
+                    "arrivalId": arrival_id,
+                    "guardIds": remaining,
+                }
+                if next_guard.is_bot:
+                    self._bot_resolve_pending(next_guard.id, random.Random())
+                return
+        # No guard intervened — arrival proceeds without rep loss from Stand Watch
 
     def _all_role_ids(self, p: PlayerState) -> set[str]:
         roles: set[str] = set()
@@ -415,6 +505,7 @@ class CursedThroneGame:
             "sanctuary",
             "protect",
             "defend_crown",
+            "stand_watch",
             "reaction",
             "reaction_move",
             "final_rite",
@@ -2585,6 +2676,8 @@ class CursedThroneGame:
                 },
             ):
                 return
+            if self._hold_ground_blocks_drive(loser, a_total, d_total):
+                return
             if self._offer_protect(loser.id, "drive_out"):
                 return
             self._drive_out_player(loser.id)
@@ -2758,6 +2851,12 @@ class CursedThroneGame:
                 self.resolve_defend_crown(player_id, accept=True)
             else:
                 self.resolve_defend_crown(player_id, accept=False)
+            return True
+        if pending and pending.get("kind") == "stand_watch":
+            if rng.random() < 0.7:
+                self.resolve_stand_watch(player_id, accept=True)
+            else:
+                self.resolve_stand_watch(player_id, accept=False)
             return True
         if pending and pending.get("kind") == "reckless_charge":
             opponents = list(pending.get("opponentIds") or [])

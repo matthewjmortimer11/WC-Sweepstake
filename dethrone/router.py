@@ -38,7 +38,7 @@ _DETHRONE_CSP = (
     "frame-ancestors 'none'"
 )
 
-_DETHRONE_ASSET_VERSION = "20260701-p42"
+_DETHRONE_ASSET_VERSION = "20260701-p43"
 
 _CREATE_BUCKETS: dict[str, list[float]] = {}
 _CREATE_LIMIT = 30
@@ -408,6 +408,14 @@ def _dispatch(room, player, mtype: str, msg: dict) -> bool:
 
     if mtype == "declineDefendCrown":
         g.resolve_defend_crown(player.id, accept=False)
+        return True
+
+    if mtype == "resolveStandWatch":
+        g.resolve_stand_watch(player.id, accept=True)
+        return True
+
+    if mtype == "declineStandWatch":
+        g.resolve_stand_watch(player.id, accept=False)
         return True
 
     if mtype == "resolveRecklessCharge":

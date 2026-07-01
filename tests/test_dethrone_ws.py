@@ -1957,6 +1957,66 @@ def test_watch_the_dead_graveyard_buy_surcharge(client):
     assert victim.gold == before - 5
 
 
+def test_hold_ground_blocks_drive_out(client):
+    import random
+    code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
+    room, pids, g = _start_game(code)
+    att_id = g.active_player().id
+    def_id = next(pid for pid in pids if pid != att_id)
+    att = g.player_by_id(att_id)
+    defender = g.player_by_id(def_id)
+    att.location = defender.location = "barracks"
+    defender.hidden_role_ids = ["gateguard", "thief", "wanderingknight"]
+    defender.public_role_id = "thief"
+    before_loc = defender.location
+    _strip_royal_guards(g)
+    _strip_royal_knights(g)
+    g.duel_apply_consequence(
+        att_id, def_id, 2, 0, False, "drive", random.Random(0),
+    )
+    assert defender.location == before_loc
+
+
+def test_hold_ground_allows_drive_by_three(client):
+    import random
+    code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
+    room, pids, g = _start_game(code)
+    att_id = g.active_player().id
+    def_id = next(pid for pid in pids if pid != att_id)
+    att = g.player_by_id(att_id)
+    defender = g.player_by_id(def_id)
+    att.location = defender.location = "barracks"
+    defender.hidden_role_ids = ["gateguard", "thief", "wanderingknight"]
+    defender.public_role_id = "thief"
+    _strip_royal_guards(g)
+    _strip_royal_knights(g)
+    g.duel_apply_consequence(
+        att_id, def_id, 3, 0, False, "drive", random.Random(0),
+    )
+    assert defender.location != "barracks"
+
+
+def test_stand_watch_on_graveyard_arrival(client):
+    code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
+    room, pids, g = _start_game(code)
+    guard_id = g.active_player().id
+    guard = g.player_by_id(guard_id)
+    arrival_id = next(pid for pid in pids if pid != guard_id)
+    arrival = g.player_by_id(arrival_id)
+    guard.public_role_id = "graveyardguard"
+    guard.location = "graveyard"
+    arrival.location = "barracks"
+    _prepare_rep_victim(arrival, g)
+    _strip_queens(g)
+    _strip_spies(g)
+    _strip_royal_guards(g)
+    before_rep = arrival.rep
+    g.move_player(arrival_id, "graveyard", manual=True)
+    assert g.pending_ui_action.get(guard_id, {}).get("kind") == "stand_watch"
+    g.resolve_stand_watch(guard_id, accept=True)
+    assert arrival.rep == before_rep - 1
+
+
 def D_ROLE_META_PUBLIC(role_id: str) -> bool:
     from dethrone.data import ROLE_META
     return ROLE_META.get(role_id, {}).get("canBePublic", True)

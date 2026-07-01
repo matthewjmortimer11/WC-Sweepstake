@@ -5,7 +5,7 @@ CT.ui = { privateFor: null, privateRevealed: false, rolesRevealed: false, showIm
   roleDiscardFor: null, roleDiscardRevealed: false, handFixFor: null, keepOne: null, playCard: null,
   logFilter: "all", privateNote: null, finalRiteOffer: null, reactionOffer: null, reactionMove: null,
   falseTrailOffer: null, sanctuaryOffer: null, protectOffer: null,
-  defendCrownOffer: null, recklessChargeOffer: null,
+  defendCrownOffer: null, recklessChargeOffer: null, standWatchOffer: null,
   playTab: "play" };
 
 /* Play vs Test mode — Test reveals referee & per-player override tools (§32, §35).
@@ -889,6 +889,7 @@ function overlays() {
   if (CT.ui.sanctuaryOffer && CT.ui.sanctuaryOffer.queenId === CT.myId()) return sanctuaryView();
   if (CT.ui.protectOffer && CT.ui.protectOffer.guardId === CT.myId()) return protectView();
   if (CT.ui.defendCrownOffer && CT.ui.defendCrownOffer.knightId === CT.myId()) return defendCrownView();
+  if (CT.ui.standWatchOffer && CT.ui.standWatchOffer.guardId === CT.myId()) return standWatchView();
   if (CT.ui.recklessChargeOffer && CT.ui.recklessChargeOffer.attackerId === CT.myId()) return recklessChargeView();
   if (CT.ui.reactionOffer) return reactionView();
   if (CT.ui.finalRiteOffer) return finalRiteView();
@@ -1087,6 +1088,23 @@ function defendCrownView() {
     + '<div class="btn-row" style="justify-content:center;margin-top:20px;flex-wrap:wrap;gap:10px">'
     + '<button class="btn btn-ghost" data-act="decline-defend-crown">Let it happen</button>'
     + '<button class="btn btn-gold" data-act="accept-defend-crown">Defend the Crown</button>'
+    + "</div></div></div>";
+}
+
+function standWatchView() {
+  var offer = CT.ui.standWatchOffer;
+  if (!offer) return "";
+  var guard = CT.playerById(offer.guardId || CT.myId());
+  var arrival = CT.playerById(offer.arrivalId);
+  if (!guard) { CT.ui.standWatchOffer = null; return ""; }
+  return '<div class="scrim"><div class="modal modal--reaction cover" style="max-width:520px">'
+    + '<div class="seal-big" style="background:var(--wax-soft);color:var(--wax)">☠</div>'
+    + '<h1 style="margin:8px 0">Stand Watch</h1>'
+    + '<p class="muted" style="font-size:15px">'
+    + CT.esc(arrival ? arrival.name : "Someone") + " just arrived at the Graveyard. Force them to lose 1 Reputation?</p>"
+    + '<div class="btn-row" style="justify-content:center;margin-top:20px;flex-wrap:wrap;gap:10px">'
+    + '<button class="btn btn-ghost" data-act="decline-stand-watch">Let them pass</button>'
+    + '<button class="btn btn-gold" data-act="accept-stand-watch">Stand Watch</button>'
     + "</div></div></div>";
 }
 
@@ -1496,6 +1514,18 @@ CT.handleAction = function (act, el, ev) {
         CT.ui.defendCrownOffer = null; break;
       }
       CT.declineDefendCrown();
+      CT.render(); break;
+    case "accept-stand-watch":
+      if (CT.netAction({ type: "resolveStandWatch" })) {
+        CT.ui.standWatchOffer = null; break;
+      }
+      CT.resolveStandWatch(true);
+      CT.render(); break;
+    case "decline-stand-watch":
+      if (CT.netAction({ type: "declineStandWatch" })) {
+        CT.ui.standWatchOffer = null; break;
+      }
+      CT.declineStandWatch();
       CT.render(); break;
     case "accept-reckless-charge": {
       var rcTarget = document.getElementById("reckless-charge-target");

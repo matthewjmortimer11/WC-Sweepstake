@@ -136,6 +136,12 @@ CT.net.applyState = function (msg) {
           loserCards: pui.loserCards || [],
           remainingKnightIds: pui.remainingKnightIds || [],
         };
+      } else if (pui.kind === "stand_watch") {
+        CT.ui.standWatchOffer = {
+          guardId: CT.myId(),
+          arrivalId: pui.arrivalId,
+          remainingGuardIds: pui.guardIds || [],
+        };
       } else if (pui.kind === "reckless_charge") {
         CT.ui.recklessChargeOffer = {
           attackerId: CT.myId(),
@@ -155,13 +161,14 @@ CT.net.applyState = function (msg) {
     } else if (CT.ui.finalRiteOffer === CT.myId()) {
       CT.ui.finalRiteOffer = null;
     }
-    if (!cs.pendingUiAction || (cs.pendingUiAction.kind !== "reaction" && cs.pendingUiAction.kind !== "reaction_move" && cs.pendingUiAction.kind !== "false_trail" && cs.pendingUiAction.kind !== "sanctuary" && cs.pendingUiAction.kind !== "protect" && cs.pendingUiAction.kind !== "defend_crown" && cs.pendingUiAction.kind !== "reckless_charge")) {
+    if (!cs.pendingUiAction || (cs.pendingUiAction.kind !== "reaction" && cs.pendingUiAction.kind !== "reaction_move" && cs.pendingUiAction.kind !== "false_trail" && cs.pendingUiAction.kind !== "sanctuary" && cs.pendingUiAction.kind !== "protect" && cs.pendingUiAction.kind !== "defend_crown" && cs.pendingUiAction.kind !== "stand_watch" && cs.pendingUiAction.kind !== "reckless_charge")) {
       if (CT.ui.reactionOffer && CT.ui.reactionOffer.playerId === CT.myId()) CT.ui.reactionOffer = null;
       if (CT.ui.reactionMove && CT.ui.reactionMove.playerId === CT.myId()) CT.ui.reactionMove = null;
       if (CT.ui.falseTrailOffer && CT.ui.falseTrailOffer.playerId === CT.myId()) CT.ui.falseTrailOffer = null;
       if (CT.ui.sanctuaryOffer && CT.ui.sanctuaryOffer.queenId === CT.myId()) CT.ui.sanctuaryOffer = null;
       if (CT.ui.protectOffer && CT.ui.protectOffer.guardId === CT.myId()) CT.ui.protectOffer = null;
       if (CT.ui.defendCrownOffer && CT.ui.defendCrownOffer.knightId === CT.myId()) CT.ui.defendCrownOffer = null;
+      if (CT.ui.standWatchOffer && CT.ui.standWatchOffer.guardId === CT.myId()) CT.ui.standWatchOffer = null;
       if (CT.ui.recklessChargeOffer && CT.ui.recklessChargeOffer.attackerId === CT.myId()) CT.ui.recklessChargeOffer = null;
     }
     if (cs.privateNote != null && CT.myId()) {

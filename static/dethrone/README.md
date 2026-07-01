@@ -20,7 +20,7 @@ Offline file open still works:
 open "index.html"          # macOS
 ```
 
-## What is implemented (Phases 1–30)
+## What is implemented (Phases 1–31)
 
 ### Phase 5 — playtest tooling & full card set
 - **Board art** — illustrated V3b kingdom poster (`cards/map/kingdom-background-v3b.jpg`) with curved gold/cursed roads, labelled site plaques, player tokens and per-location vignettes (see `board.js`, `cards-map.js`)
@@ -163,9 +163,10 @@ open "index.html"          # macOS
 - **Watch the Dead** — Graveyard Guard at Barracks/Graveyard marks a player; they pay +1 gold on Graveyard deck buys until the guard's next turn
 - **Online sync** — `useRoleAbility` accepts `pathTo` for Block Route; server filters `legalMoves` for blocked edges
 
-### Planned — Phase 31 (Hold Ground & Stand Watch)
-- **Hold Ground** — Gate Guard cannot be Driven Out unless the opponent wins the duel by 3+
-- **Stand Watch (arrival)** — Graveyard Guard at Graveyard may force an arriving player to lose 1 Reputation when someone moves in
+### Phase 31 — Hold Ground & Stand Watch
+- **Hold Ground** — Gate Guard (hidden or public) cannot be Driven Out from a duel unless the opponent wins by 3+
+- **Stand Watch (arrival)** — Graveyard Guard at the Graveyard is prompted when someone moves in; may force −1 Reputation (once per round per guard)
+- **Online sync** — `resolveStandWatch` / `declineStandWatch`; Hold Ground checked in duel Drive Out resolution
 
 ### Planned — Phase 32 (Dirty Blow & Slip Away)
 - **Dirty Blow** — Black Knight at Tavern/Barracks/Graveyard: if you win a duel, choose two consequences (you lose 1 Reputation)

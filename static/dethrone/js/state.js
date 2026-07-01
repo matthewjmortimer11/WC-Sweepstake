@@ -591,12 +591,84 @@ CT.resolveDefendCrown = function (accept) {
     return;
   }
   CT.ui.defendCrownOffer = null;
-  CT._continueDuelConsequence(offer.victimId, offer.consequence, offer.loserCards);
+  CT._continueDuelConsequence(offer.victimId, offer.consequence, offer.loserCards, offer.duelTotals);
 };
 
 CT.declineDefendCrown = function () { CT.resolveDefendCrown(false); };
 
-CT._continueDuelConsequence = function (loserId, consequence, loserCards) {
+CT._holdGroundBlocksDrive = function (loser, attackerTotal, defenderTotal) {
+  if (!loser || !CT.rolePowerActive(loser, "gateguard")) return false;
+  var margin = Math.abs(attackerTotal - defenderTotal);
+  if (margin >= 3) return false;
+  CT.log(loser.name + " holds ground — cannot be Driven Out (duel won by only " + margin + ").", "event");
+  return true;
+};
+
+CT._nextStandWatchGuards = function (arrivalId) {
+  return CT.state.players.filter(function (p) {
+    if (p.status !== "active" || p.id === arrivalId) return false;
+    if (p.location !== "graveyard") return false;
+    if (!CT.rolePowerActive(p, "graveyardguard")) return false;
+    if ((p.abilitiesUsedThisRound || []).indexOf("stand_watch_arrival") !== -1) return false;
+    return true;
+  });
+};
+
+CT._maybeOfferStandWatch = function (arrivalId) {
+  var arrival = CT.playerById(arrivalId);
+  if (!arrival || arrival.location !== "graveyard") return false;
+  var guards = CT._nextStandWatchGuards(arrivalId);
+  if (!guards.length) return false;
+  var guard = guards[0];
+  CT.ui.standWatchOffer = {
+    guardId: guard.id,
+    arrivalId: arrivalId,
+    remainingGuardIds: guards.slice(1).map(function (g) { return g.id; }),
+  };
+  if (guard.isBot && CT.bot && CT.bot.resolvePending) CT.bot.resolvePending(guard.id);
+  return true;
+};
+
+CT.resolveStandWatch = function (accept) {
+  var offer = CT.ui.standWatchOffer;
+  if (!offer) return;
+  var guard = CT.playerById(offer.guardId);
+  var arrival = CT.playerById(offer.arrivalId);
+  if (!guard || !arrival) { CT.ui.standWatchOffer = null; return; }
+  if (accept) {
+    if (!guard.abilitiesUsedThisRound) guard.abilitiesUsedThisRound = [];
+    guard.abilitiesUsedThisRound.push("stand_watch_arrival");
+    CT.log(guard.name + " stands watch — " + arrival.name + " loses 1 Reputation.", "event");
+    CT.ui.standWatchOffer = null;
+    CT._maybeOfferRepLoss(offer.arrivalId, -1, "Stand Watch", "stand_watch");
+    CT.save();
+    return;
+  }
+  CT.log(guard.name + " lets " + arrival.name + " pass the Graveyard gate.", "note");
+  var remaining = (offer.remainingGuardIds || []).slice();
+  while (remaining.length) {
+    var nextId = remaining.shift();
+    var nextGuard = CT.playerById(nextId);
+    if (!nextGuard || nextGuard.status !== "active") continue;
+    if (!CT.rolePowerActive(nextGuard, "graveyardguard")) continue;
+    if (nextGuard.location !== "graveyard") continue;
+    if ((nextGuard.abilitiesUsedThisRound || []).indexOf("stand_watch_arrival") !== -1) continue;
+    CT.ui.standWatchOffer = {
+      guardId: nextGuard.id,
+      arrivalId: offer.arrivalId,
+      remainingGuardIds: remaining,
+    };
+    if (nextGuard.isBot && CT.bot && CT.bot.resolvePending) CT.bot.resolvePending(nextGuard.id);
+    CT.save();
+    return;
+  }
+  CT.ui.standWatchOffer = null;
+  CT.save();
+};
+
+CT.declineStandWatch = function () { CT.resolveStandWatch(false); };
+
+CT._continueDuelConsequence = function (loserId, consequence, loserCards, duelTotals) {
   var loser = CT.playerById(loserId);
   if (!loser) return;
   if (consequence === "shame") {
@@ -609,6 +681,7 @@ CT._continueDuelConsequence = function (loserId, consequence, loserCards) {
     if (CT._isRoyalOrThrone(loser) && CT._offerReaction(loser.id, "duel_consequence", {
       effect: "duel_consequence", consequence: "drive", loserId: loser.id, loserCards: loserCards,
     })) { /* offered */ }
+    else if (duelTotals && CT._holdGroundBlocksDrive(loser, duelTotals.aTotal, duelTotals.dTotal)) { /* blocked */ }
     else if (CT._offerProtect(loser.id, "drive_out")) { /* offered */ }
     else CT._driveOutPlayer(loser.id);
   }
@@ -803,6 +876,7 @@ CT.movePlayer = function (playerId, locationId, manual) {
     p.movedThisTurn = p.movesUsedThisTurn >= limit;
   }
   CT.log(p.name + " moved " + (from ? from.name : "?") + " → " + to.name + (manual ? " (manual)" : "") + ".");
+  if (locationId === "graveyard") CT._maybeOfferStandWatch(playerId);
   if (!manual) CT._maybeOfferRecklessCharge(playerId);
   CT.save();
 };
@@ -891,6 +965,7 @@ CT.pendingBlocksEndTurn = function (playerId) {
   if (CT.ui.sanctuaryOffer && CT.ui.sanctuaryOffer.queenId === playerId) return true;
   if (CT.ui.protectOffer && CT.ui.protectOffer.guardId === playerId) return true;
   if (CT.ui.defendCrownOffer && CT.ui.defendCrownOffer.knightId === playerId) return true;
+  if (CT.ui.standWatchOffer && CT.ui.standWatchOffer.guardId === playerId) return true;
   if (CT.ui.reactionOffer && CT.ui.reactionOffer.playerId === playerId) return true;
   if (CT.ui.reactionMove && CT.ui.reactionMove.playerId === playerId) return true;
   if (CT.ui.finalRiteOffer === playerId) return true;

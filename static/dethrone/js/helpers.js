@@ -946,6 +946,7 @@ CT.helpers.applyDuelConseq = function (c) {
       if (isRoyalOrThrone(loser) && CT._offerReaction(loser.id, "duel_consequence", {
         effect: "duel_consequence", consequence: "drive", loserId: loser.id, loserCards: loserCards,
       })) { break; }
+      if (CT._holdGroundBlocksDrive && CT._holdGroundBlocksDrive(loser, aT, dT)) { break; }
       if (CT._offerProtect && CT._offerProtect(loser.id, "drive_out")) { break; }
       CT._driveOutPlayer(loser.id);
       break;
