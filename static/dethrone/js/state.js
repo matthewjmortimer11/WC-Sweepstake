@@ -660,8 +660,9 @@ CT.legalMovesForTurn = function (player) {
 /* Authoritative highlights for the active player (online uses server legalMoves). */
 CT.legalMovesForActive = function (player) {
   if (!player || player.status !== "active" || !CT.state || CT.state.winner) return [];
-  if (CT.isOnline && CT.isOnline() && player.id === CT.myId() && CT.state.legalMoves) {
-    return CT.state.legalMoves.slice();
+  if (CT.isOnline && CT.isOnline()) {
+    if (player.id !== CT.myId()) return [];
+    if (CT.state.legalMoves) return CT.state.legalMoves.slice();
   }
   return CT.legalMovesForTurn(player);
 };
