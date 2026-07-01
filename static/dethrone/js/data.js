@@ -396,6 +396,8 @@ CT.ROLE_ABILITY_EFFECTS = {
   tyrant_tantrum: { role: "tinytyrant", name: "Tantrum", repLoss: 1, needsTarget: true, sameLocation: true, oncePerRound: true },
   cousin_name_drop: { role: "distantcousin", name: "Name Drop", locations: ["tavern", "market"], goldGain: 1 },
   graveguard_watch: { role: "graveyardguard", name: "Stand Watch", locations: ["graveyard"], repLoss: 1, needsTarget: true, targetNotSelf: true },
+  gate_block_route: { role: "gateguard", name: "Block Route", needsTarget: true, needsPath: true, blockRoute: true },
+  grave_watch_dead: { role: "graveyardguard", name: "Watch the Dead", locations: ["barracks", "graveyard"], needsTarget: true, graveyardWatch: true },
 };
 CT.roleAbilitiesAvailable = function (p) {
   if (!p || !p.publicRoleId || p.status !== "active" || !CT.state) return [];
@@ -405,13 +407,15 @@ CT.roleAbilitiesAvailable = function (p) {
     if (fx.role !== p.publicRoleId) return;
     if (fx.locations && fx.locations.indexOf(p.location) === -1) return;
     if (fx.oncePerRound && (p.abilitiesUsedThisRound || []).indexOf(aid) !== -1) return;
+    if (fx.blockRoute && (CT.state.routeBlocks || []).some(function (b) { return b.guardId === p.id; })) return;
+    if (fx.graveyardWatch && (CT.state.graveyardWatch || []).some(function (w) { return w.guardId === p.id; })) return;
     if (fx.requiresRoyalThrone) {
       var t = CT.state.throne;
       if (!t.kingControllerId && !t.queenControllerId) return;
     }
     if (fx.requiresRoyalRoleLost && !CT.state.royalRoleLost) return;
     if ((fx.goldCost || 0) > p.gold) return;
-    out.push({ id: aid, name: fx.name, needsTarget: !!fx.needsTarget });
+    out.push({ id: aid, name: fx.name, needsTarget: !!fx.needsTarget, needsPath: !!fx.needsPath });
   });
   return out;
 };

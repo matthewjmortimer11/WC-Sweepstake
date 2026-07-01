@@ -28,7 +28,16 @@ function wrap(inner, maxw) {
     + '<div class="btn-row" style="justify-content:flex-end;margin-bottom:-8px"><button class="btn btn-ghost btn-sm" data-act="h-close">✕ Close</button></div>'
     + inner + "</div></div>";
 }
-function roleBonus(p, key) { var r = p && p.publicRoleId ? CT.roleById(p.publicRoleId) : null; return (r && r[key]) || 0; }
+function dirtyBlowActive(p) {
+  return p && CT.rolePowerActive && CT.rolePowerActive(p, "blackknight")
+    && ["tavern", "barracks", "graveyard"].indexOf(p.location) !== -1;
+}
+function roleBonus(p, key) {
+  var r = p && p.publicRoleId ? CT.roleById(p.publicRoleId) : null;
+  var val = (r && r[key]) || 0;
+  if (key === "duelBonusDefence" && p && p.publicRoleId === "royalguard" && p.location === "throne") val = 2;
+  return val;
+}
 
 function duelCardsInHand(player) {
   if (!player || !CT.DUEL_CARD_VALUES) return [];
@@ -441,6 +450,18 @@ CT.helpers.vDuel = function () {
   var dT = roleBonus(def, "duelBonusDefence") + (+u.defBonus || 0) + duelCardBonus(u.defDuelCards);
   var attackerWins = aT > dT; // tie -> defender (§22)
   var winner = attackerWins ? att : def, loser = attackerWins ? def : att;
+  var dirtyBlow = dirtyBlowActive(winner);
+  if (dirtyBlow && u.dirtyBlowFirst && !u.dirtyBlowReady) {
+    return wrap('<div class="eyebrow">Dirty Blow</div>'
+      + '<h2 style="margin:4px 0 8px">Second consequence</h2>'
+      + '<p class="muted" style="font-size:14px">First: <strong>' + CT.esc(u.dirtyBlowFirst) + '</strong>. Pick another consequence for '
+      + CT.esc(loser.name) + " (you lose 1 Reputation).</p>"
+      + '<hr class="rule"><div class="btn-row">' + ["Disarm|disarm", "Shame|shame", "Drive Out|drive", "Wound|wound", "Search (manual)|search"].map(function (s) {
+        var x = s.split("|");
+        return '<button class="btn btn-secondary btn-sm" data-act="h-d-conseq" data-c="' + x[1] + '">' + x[0] + "</button>";
+      }).join("") + "</div>"
+      + '<div class="btn-row" style="margin-top:12px"><button class="btn btn-ghost" data-act="h-d-back">← Back</button></div>');
+  }
   var conseqs = u.serious
     ? '<button class="btn btn-danger" data-act="h-d-conseq" data-c="serious">' + CT.esc(loser.name) + ' loses a role card</button>'
     : ["Disarm|disarm", "Shame|shame", "Drive Out|drive", "Wound|wound", "Search (manual)|search"].map(function (s) {
@@ -449,7 +470,8 @@ CT.helpers.vDuel = function () {
   return wrap('<div class="eyebrow">Duel result' + (u.serious ? " · Serious" : "") + '</div>'
     + '<h2 style="margin:4px 0 8px">' + CT.esc(att.name) + " " + aT + " vs " + dT + " " + CT.esc(def.name) + "</h2>"
     + '<p style="margin:0 0 4px"><strong style="color:var(--gold)">' + CT.esc(winner.name) + " wins.</strong> "
-    + (attackerWins ? "" : "(Defender wins ties.) ") + CT.esc(winner.name) + " chooses a consequence for " + CT.esc(loser.name) + ".</p>"
+    + (attackerWins ? "" : "(Defender wins ties.) ") + CT.esc(winner.name) + " chooses a consequence for " + CT.esc(loser.name) + "."
+    + (dirtyBlow ? " <span class=\"tag wax\">Dirty Blow — pick two</span>" : "") + "</p>"
     + '<hr class="rule"><div class="btn-row">' + conseqs + "</div>"
     + '<div class="btn-row" style="margin-top:12px"><button class="btn btn-ghost" data-act="h-d-back">← Back</button></div>');
 };
@@ -688,8 +710,8 @@ CT.helpers.handle = function (act, el) {
       if (ix === -1) u[key].push(cid); else u[key].splice(ix, 1);
       return CT.render();
     }
-    case "h-d-fight": u.phase = "resolve"; return CT.render();
-    case "h-d-back": u.phase = "setup"; return CT.render();
+    case "h-d-fight": u.phase = "resolve"; u.dirtyBlowFirst = null; return CT.render();
+    case "h-d-back": u.phase = "setup"; u.dirtyBlowFirst = null; return CT.render();
     case "h-d-flee": return CT.helpers.applyFlee();
     case "h-d-conseq": return CT.helpers.applyDuelConseq(el.dataset.c);
 
@@ -892,20 +914,38 @@ CT.helpers.applyFlee = function () {
 CT.helpers.applyDuelConseq = function (c) {
   if (!CT.helpers._requireActiveParley()) return;
   var u = CT.helpers.ui;
+  var att = CT.playerById(u.att), def = CT.playerById(u.def);
+  var attCards = u.attDuelCards || [], defCards = u.defDuelCards || [];
+  var aT = roleBonus(att, "duelBonusAttack") + (+u.attBonus || 0) + duelCardBonus(attCards);
+  var dT = roleBonus(def, "duelBonusDefence") + (+u.defBonus || 0) + duelCardBonus(defCards);
+  var winner = aT > dT ? att : def;
+  if (dirtyBlowActive(winner) && !u.dirtyBlowFirst) {
+    u.dirtyBlowFirst = c;
+    u.dirtyBlowReady = false;
+    CT.render();
+    return;
+  }
+  var first = c;
+  var second = null;
+  if (dirtyBlowActive(winner) && u.dirtyBlowFirst) {
+    first = u.dirtyBlowFirst;
+    second = c;
+    u.dirtyBlowFirst = null;
+    u.dirtyBlowReady = false;
+  }
   if (CT.isOnline()) {
     CT.net.send({
       type: "duelConsequence",
       attackerId: u.att, defenderId: u.def,
       attBonus: +u.attBonus || 0, defBonus: +u.defBonus || 0,
-      serious: !!u.serious, consequence: c,
-      attCardIds: u.attDuelCards || [], defCardIds: u.defDuelCards || [],
+      serious: !!u.serious, consequence: first,
+      secondConsequence: second,
+      attCardIds: attCards, defCardIds: defCards,
       recklessCharge: !!u.recklessCharge,
     });
     u.open = null;
     return;
   }
-  var att = CT.playerById(u.att), def = CT.playerById(u.def);
-  var attCards = u.attDuelCards || [], defCards = u.defDuelCards || [];
   attCards.forEach(function (cid) { if (att.actionCardIds.indexOf(cid) !== -1) CT.discardCard(att.id, cid, "duel"); });
   defCards.forEach(function (cid) { if (def.actionCardIds.indexOf(cid) !== -1) CT.discardCard(def.id, cid, "duel"); });
   var aT = roleBonus(att, "duelBonusAttack") + (+u.attBonus || 0) + duelCardBonus(attCards);
@@ -921,30 +961,40 @@ CT.helpers.applyDuelConseq = function (c) {
   }
   if (u.serious) att.seriousDuelUsed = true;
   if (attCards.indexOf("dirty_trick") !== -1 || defCards.indexOf("dirty_trick") !== -1) CT.adjustCorruption(1, "Dirty Trick");
-  switch (c) {
-    case "serious": CT.ui.roleDiscardFor = loser.id; CT.ui.roleDiscardRevealed = false; break;
-    case "disarm": CT.disarmRandom(loser.id, winnerCards.indexOf("disarm_card") !== -1 ? 3 : 2); break;
-    case "shame":
-      if (loserCards.indexOf("shield") !== -1) CT.log(loser.name + "'s Shield ignored Shame.", "note");
-      else if (CT._offerDefendCrown && CT._offerDefendCrown(loser.id, "shame", loserCards)) { break; }
-      else if (isRoyalOrThrone(loser) && CT._offerReaction(loser.id, "duel_consequence", {
-        effect: "duel_consequence", consequence: "shame", loserId: loser.id, loserCards: loserCards,
-      })) { break; }
-      else CT._maybeOfferRepLoss(loser.id, -1, "Shame");
-      break;
-    case "wound":
-      if (loserCards.indexOf("parry") !== -1) CT.log(loser.name + "'s Parry ignored Wound.", "note");
-      else { loser.wounded = true; CT.log(loser.name + " is Wounded — no hidden powers next turn."); }
-      break;
-    case "drive":
-      if (CT._offerDefendCrown && CT._offerDefendCrown(loser.id, "drive", loserCards)) { break; }
-      if (isRoyalOrThrone(loser) && CT._offerReaction(loser.id, "duel_consequence", {
-        effect: "duel_consequence", consequence: "drive", loserId: loser.id, loserCards: loserCards,
-      })) { break; }
-      if (CT._offerProtect && CT._offerProtect(loser.id, "drive_out")) { break; }
-      CT._driveOutPlayer(loser.id);
-      break;
-    case "search": CT.log(winner.name + " searches " + loser.name + " — resolve privately (show a justifying role or lose 1 Rep).", "note"); break;
+  var applyOne = function (conseq) {
+    switch (conseq) {
+      case "serious": CT.ui.roleDiscardFor = loser.id; CT.ui.roleDiscardRevealed = false; break;
+      case "disarm": CT.disarmRandom(loser.id, winnerCards.indexOf("disarm_card") !== -1 ? 3 : 2); break;
+      case "shame":
+        if (loserCards.indexOf("shield") !== -1) CT.log(loser.name + "'s Shield ignored Shame.", "note");
+        else if (CT._offerDefendCrown && CT._offerDefendCrown(loser.id, "shame", loserCards)) { return "pending"; }
+        else if (isRoyalOrThrone(loser) && CT._offerReaction(loser.id, "duel_consequence", {
+          effect: "duel_consequence", consequence: "shame", loserId: loser.id, loserCards: loserCards,
+        })) { return "pending"; }
+        else CT._maybeOfferRepLoss(loser.id, -1, second ? "Shame (Dirty Blow)" : "Shame");
+        break;
+      case "wound":
+        if (loserCards.indexOf("parry") !== -1) CT.log(loser.name + "'s Parry ignored Wound.", "note");
+        else { loser.wounded = true; CT.log(loser.name + " is Wounded — no hidden powers next turn."); }
+        break;
+      case "drive":
+        if (CT._offerDefendCrown && CT._offerDefendCrown(loser.id, "drive", loserCards)) { return "pending"; }
+        if (isRoyalOrThrone(loser) && CT._offerReaction(loser.id, "duel_consequence", {
+          effect: "duel_consequence", consequence: "drive", loserId: loser.id, loserCards: loserCards,
+        })) { return "pending"; }
+        if (CT._holdGroundBlocksDrive && CT._holdGroundBlocksDrive(loser, aT, dT)) { break; }
+        if (CT._offerProtect && CT._offerProtect(loser.id, "drive_out")) { return "pending"; }
+        CT._driveOutPlayer(loser.id);
+        break;
+      case "search": CT.log(winner.name + " searches " + loser.name + " — resolve privately (show a justifying role or lose 1 Rep).", "note"); break;
+    }
+    return "ok";
+  };
+  if (applyOne(first) === "pending") { u.open = null; CT.save(); return CT.render(); }
+  if (second && second !== first && dirtyBlowActive(winner)) {
+    CT.log(winner.name + " lands a Dirty Blow — second consequence.", "event");
+    if (applyOne(second) === "pending") { u.open = null; CT.save(); return CT.render(); }
+    CT.adjustRep(winner.id, -1, "Dirty Blow");
   }
   if (winnerCards.indexOf("cursed_blade") !== -1) {
     CT.adjustCorruption(1, "Cursed Blade");

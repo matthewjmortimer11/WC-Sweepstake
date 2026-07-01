@@ -38,7 +38,7 @@ _DETHRONE_CSP = (
     "frame-ancestors 'none'"
 )
 
-_DETHRONE_ASSET_VERSION = "20260701-p41"
+_DETHRONE_ASSET_VERSION = "20260701-p44"
 
 _CREATE_BUCKETS: dict[str, list[float]] = {}
 _CREATE_LIMIT = 30
@@ -340,6 +340,7 @@ def _dispatch(room, player, mtype: str, msg: dict) -> bool:
             player.id,
             str(msg.get("abilityId", "")),
             str(msg.get("targetId", "")) or None,
+            path_to=str(msg.get("pathTo", "")) or None,
         )
         return True
 
@@ -407,6 +408,14 @@ def _dispatch(room, player, mtype: str, msg: dict) -> bool:
 
     if mtype == "declineDefendCrown":
         g.resolve_defend_crown(player.id, accept=False)
+        return True
+
+    if mtype == "resolveStandWatch":
+        g.resolve_stand_watch(player.id, accept=True)
+        return True
+
+    if mtype == "declineStandWatch":
+        g.resolve_stand_watch(player.id, accept=False)
         return True
 
     if mtype == "resolveRecklessCharge":
@@ -562,6 +571,7 @@ def _dispatch(room, player, mtype: str, msg: dict) -> bool:
             att_card_ids=list(msg.get("attCardIds") or []),
             def_card_ids=list(msg.get("defCardIds") or []),
             reckless_charge=bool(msg.get("recklessCharge")),
+            second_consequence=str(msg.get("secondConsequence", "")) or None,
         )
         return True
 
