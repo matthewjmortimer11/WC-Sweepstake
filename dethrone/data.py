@@ -28,7 +28,7 @@ LOCATIONS = [
 CONNECTIONS: dict[str, list[str]] = {
     "market": ["tavern", "college", "throne"],
     "tavern": ["market", "graveyard"],
-    "college": ["market", "scrolls"],
+    "college": ["market"],
     "scrolls": ["college"],
     "throne": ["market", "barracks"],
     "barracks": ["throne", "graveyard"],

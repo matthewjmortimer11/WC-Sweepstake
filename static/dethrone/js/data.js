@@ -36,7 +36,7 @@ CT.LOCATIONS = [
 CT.CONNECTIONS = {
   market:    ["tavern", "college", "throne"],
   tavern:    ["market", "graveyard"],
-  college:   ["market", "scrolls"],
+  college:   ["market"],
   scrolls:   ["college"],
   throne:    ["market", "barracks"],
   barracks:  ["throne", "graveyard"],

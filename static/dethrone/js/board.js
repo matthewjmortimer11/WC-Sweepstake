@@ -22,7 +22,7 @@ CT.MAP_XY = {
 CT.mapRoutes = function () {
   var conn = CT.CONNECTIONS || {
     market: ["tavern", "college", "throne"], tavern: ["market", "graveyard"],
-    college: ["market", "scrolls"], scrolls: ["college"], throne: ["market", "barracks"],
+    college: ["market"], scrolls: ["college"], throne: ["market", "barracks"],
     barracks: ["throne", "graveyard"], graveyard: ["tavern", "barracks"],
   };
   var seen = {}, out = [];

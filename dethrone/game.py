@@ -50,6 +50,7 @@ class PlayerState:
     prev_location: Optional[str] = None
     location_last_round: str = D.START_LOCATION
     abilities_used_this_round: list[str] = field(default_factory=list)
+    abilities_used_this_game: list[str] = field(default_factory=list)
     is_bot: bool = False
     # setup only — dealt roles before public pick
     dealt_role_ids: list[str] = field(default_factory=list)
@@ -318,7 +319,11 @@ class CursedThroneGame:
 
     # ---- movement & turns ----
     def legal_moves(self, player: PlayerState) -> list[str]:
-        return list(D.CONNECTIONS.get(player.location, []))
+        moves = list(D.CONNECTIONS.get(player.location, []))
+        if player.location == "college" and "collegeadvisor" in self._all_role_ids(player):
+            if "scrolls" not in moves:
+                moves.append("scrolls")
+        return moves
 
     def move_player(self, pid: str, location_id: str, *, manual: bool = False, actor_id: Optional[str] = None) -> None:
         if self.status != STATUS_PLAY or self.winner:
@@ -1578,7 +1583,21 @@ class CursedThroneGame:
             self._log(f"Wrong — {target.name} reveals nothing. {caller.name} loses 1 Reputation.")
             self.adjust_rep(caller_id, -1, "wrong Call Out")
 
-    def _maybe_offer_rep_loss(
+    def _can_offer_false_trail(self, player: PlayerState) -> bool:
+        if player.status != "active":
+            return False
+        if "spy" not in self._all_role_ids(player):
+            return False
+        if player.location not in ("tavern", "market"):
+            return False
+        if "false_trail" in player.abilities_used_this_game:
+            return False
+        return any(
+            x.status == "active" and x.id != player.id and x.location == player.location
+            for x in self.players
+        )
+
+    def _finish_rep_loss(
         self,
         target_id: str,
         delta: int,
@@ -1602,6 +1621,68 @@ class CursedThroneGame:
             return True
         self.adjust_rep(target_id, delta, reason)
         return False
+
+    def _maybe_offer_rep_loss(
+        self,
+        target_id: str,
+        delta: int,
+        reason: str,
+        *,
+        trigger: str = "rep_loss",
+    ) -> bool:
+        if delta >= 0:
+            self.adjust_rep(target_id, delta, reason)
+            return False
+        target = self.player_by_id(target_id)
+        if target and self._can_offer_false_trail(target):
+            self.pending_ui_action[target_id] = {
+                "kind": "false_trail",
+                "playerId": target_id,
+                "delta": delta,
+                "reason": reason,
+                "trigger": trigger,
+            }
+            if target.is_bot:
+                self._bot_resolve_pending(target_id, random.Random())
+            return True
+        return self._finish_rep_loss(target_id, delta, reason, trigger=trigger)
+
+    def resolve_false_trail(
+        self,
+        pid: str,
+        *,
+        accept: bool,
+        redirect_id: Optional[str] = None,
+    ) -> None:
+        pending = self.pending_ui_action.get(pid)
+        if not pending or pending.get("kind") != "false_trail":
+            raise MoveError("No False Trail pending.")
+        delta = int(pending.get("delta", 0))
+        reason = str(pending.get("reason", ""))
+        trigger = str(pending.get("trigger", "rep_loss"))
+        self.pending_ui_action.pop(pid, None)
+        player = self.player_by_id(pid)
+        if not player:
+            raise MoveError("Unknown player.")
+        if accept:
+            if not redirect_id:
+                raise MoveError("Redirect target required.")
+            redirect = self.player_by_id(redirect_id)
+            if not redirect or redirect.status != "active":
+                raise MoveError("Invalid target.")
+            if redirect.id == pid:
+                raise MoveError("Invalid target.")
+            if redirect.location != player.location:
+                raise MoveError("Target must be at your location.")
+            player.abilities_used_this_game.append("false_trail")
+            self._log(
+                f"{player.name} uses False Trail — {redirect.name} takes the reputation hit instead.",
+                "event",
+            )
+            self._finish_rep_loss(redirect_id, delta, reason, trigger=trigger)
+        else:
+            self._log(f"{player.name} declines False Trail.", "note")
+            self._finish_rep_loss(pid, delta, reason, trigger=trigger)
 
     # ---- call out ----
     def call_out(self, caller_id: str, target_id: str, role_id: str) -> None:
@@ -2053,6 +2134,22 @@ class CursedThroneGame:
     def _bot_resolve_pending(self, player_id: str, rng: random.Random) -> bool:
         """Auto-resolve reaction prompts and reaction moves for bots."""
         pending = self.pending_ui_action.get(player_id)
+        if pending and pending.get("kind") == "false_trail":
+            p = self.player_by_id(player_id)
+            if p and rng.random() < 0.75:
+                others = [
+                    x for x in self.players
+                    if x.status == "active" and x.id != player_id and x.location == p.location
+                ]
+                if others:
+                    self.resolve_false_trail(
+                        player_id,
+                        accept=True,
+                        redirect_id=rng.choice(others).id,
+                    )
+                    return True
+            self.resolve_false_trail(player_id, accept=False)
+            return True
         if pending and pending.get("kind") == "reaction":
             cards = pending.get("cards") or []
             if cards and rng.random() < 0.75:
@@ -2370,6 +2467,7 @@ class CursedThroneGame:
             "seriousDuelUsed": p.serious_duel_used,
             "movedThisTurn": p.moved_this_turn,
             "abilitiesUsedThisRound": list(p.abilities_used_this_round),
+            "abilitiesUsedThisGame": list(p.abilities_used_this_game) if is_self else [],
             "isBot": p.is_bot,
         }
 
@@ -2445,6 +2543,7 @@ class CursedThroneGame:
                 "seriousDuelUsed": p["seriousDuelUsed"],
                 "movedThisTurn": p.get("movedThisTurn", False),
                 "abilitiesUsedThisRound": p.get("abilitiesUsedThisRound", []),
+                "abilitiesUsedThisGame": p.get("abilitiesUsedThisGame", []),
             })
         return {
             "version": 1,

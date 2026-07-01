@@ -139,6 +139,11 @@ open "index.html"          # macOS
 - **Per-player notes** — ally peeks sync online; local pass-and-play stores notes per player
 - **Parley shortcuts** — manual card focus opens Vote / Duel / Trade / Call Out helpers for starter cards
 
+### Phase 27 — Scholar & False Trail
+- **Scholar** — College Advisor unlocks College → Scrolls movement (hidden or public role); others use Market or Route Pass
+- **False Trail** — Spy at Tavern/Market may redirect one Reputation loss per game to another player at your location (hidden or public)
+- **Order** — False Trail is offered before reaction cards (Drunken Alibi, Quick Escape, etc.); online sync via `resolveFalseTrail` / `declineFalseTrail`
+
 ### Phase 4 — Throne & Succession
 A **Throne & Succession** panel tracks the crown and the line of succession.
 - **Throne control (§23)**: King / Queen / Successor controllers, set manually or via the **Claim helper** (claimant + crown; unchallenged → crowned, or challenged → "proof valid" crowns them and the challenger loses a role / "bluff" costs the claimant a role). Claim order is recorded.

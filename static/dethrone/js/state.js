@@ -123,6 +123,7 @@ CT.newGame = function (playersInput, undealtRoleIds, startingActionByPlayer, fir
         prevLocation: null,
         locationLastRound: C.START_LOCATION,
         abilitiesUsedThisRound: [],
+        abilitiesUsedThisGame: [],
       };
     }),
     decks: {},     // deckName -> [cardId] draw pile (shuffled)
@@ -359,12 +360,64 @@ CT.declineReaction = function () {
   CT.save();
 };
 
-CT._maybeOfferRepLoss = function (targetId, delta, reason, trigger) {
-  if (delta >= 0) { CT.adjustRep(targetId, delta, reason); return false; }
+CT._canOfferFalseTrail = function (player) {
+  if (!player || player.status !== "active") return false;
+  if (CT.allRoleIds(player).indexOf("spy") === -1) return false;
+  if (player.location !== "tavern" && player.location !== "market") return false;
+  if ((player.abilitiesUsedThisGame || []).indexOf("false_trail") !== -1) return false;
+  return CT.state.players.some(function (x) {
+    return x.status === "active" && x.id !== player.id && x.location === player.location;
+  });
+};
+
+CT._finishRepLoss = function (targetId, delta, reason, trigger) {
   var tr = trigger || "rep_loss";
+  if (delta >= 0) { CT.adjustRep(targetId, delta, reason); return false; }
   if (CT._offerReaction(targetId, tr, { effect: "rep_adjust", targetId: targetId, delta: delta, reason: reason })) return true;
   CT.adjustRep(targetId, delta, reason);
   return false;
+};
+
+CT._maybeOfferRepLoss = function (targetId, delta, reason, trigger) {
+  if (delta >= 0) { CT.adjustRep(targetId, delta, reason); return false; }
+  var target = CT.playerById(targetId);
+  if (target && CT._canOfferFalseTrail(target)) {
+    CT.ui.falseTrailOffer = {
+      playerId: targetId,
+      delta: delta,
+      reason: reason,
+      trigger: trigger || "rep_loss",
+    };
+    if (target.isBot && CT.bot && CT.bot.resolvePending) CT.bot.resolvePending(targetId);
+    return true;
+  }
+  return CT._finishRepLoss(targetId, delta, reason, trigger);
+};
+
+CT.resolveFalseTrail = function (accept, redirectId) {
+  var offer = CT.ui.falseTrailOffer;
+  if (!offer) return;
+  var p = CT.playerById(offer.playerId);
+  if (!p) return;
+  if (accept) {
+    if (!redirectId) return;
+    var redirect = CT.playerById(redirectId);
+    if (!redirect || redirect.status !== "active" || redirect.id === p.id) return;
+    if (redirect.location !== p.location) return;
+    if (!p.abilitiesUsedThisGame) p.abilitiesUsedThisGame = [];
+    p.abilitiesUsedThisGame.push("false_trail");
+    CT.log(p.name + " uses False Trail — " + redirect.name + " takes the reputation hit instead.", "event");
+    CT._finishRepLoss(redirectId, offer.delta, offer.reason, offer.trigger);
+  } else {
+    CT.log(p.name + " declines False Trail.", "note");
+    CT._finishRepLoss(offer.playerId, offer.delta, offer.reason, offer.trigger);
+  }
+  CT.ui.falseTrailOffer = null;
+  CT.save();
+};
+
+CT.declineFalseTrail = function () {
+  CT.resolveFalseTrail(false);
 };
 
 CT.endTurn = function () {
@@ -508,7 +561,11 @@ CT.archivePeek = function (playerId, mode, deckName) {
 
 /* legal normal moves = directly connected locations (§7). Special movement stays manual. */
 CT.legalMoves = function (player) {
-  return (CT.CONNECTIONS[player.location] || []).slice();
+  var moves = (CT.CONNECTIONS[player.location] || []).slice();
+  if (player.location === "college" && CT.allRoleIds(player).indexOf("collegeadvisor") !== -1) {
+    if (moves.indexOf("scrolls") === -1) moves.push("scrolls");
+  }
+  return moves;
 };
 
 /* ensure a deck draw pile has cards (reshuffle if needed) without drawing. */

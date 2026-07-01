@@ -9,6 +9,17 @@ CT.bot.isCursed = function (p) { return p.hiddenRoleIds.indexOf("cursedone") > -
 CT.bot.resolvePending = function (playerId) {
   var p = CT.playerById(playerId);
   if (!p || !p.isBot) return false;
+  if (CT.ui.falseTrailOffer && CT.ui.falseTrailOffer.playerId === playerId) {
+    var others = CT.state.players.filter(function (x) {
+      return x.status === "active" && x.id !== playerId && x.location === p.location;
+    });
+    if (others.length && Math.random() < 0.75) {
+      CT.resolveFalseTrail(true, others[Math.floor(Math.random() * others.length)].id);
+    } else {
+      CT.declineFalseTrail();
+    }
+    return true;
+  }
   if (CT.ui.reactionOffer && CT.ui.reactionOffer.playerId === playerId) {
     var cards = CT.ui.reactionOffer.cards || [];
     if (cards.length && Math.random() < 0.75) CT.resolveReaction(cards[Math.floor(Math.random() * cards.length)]);

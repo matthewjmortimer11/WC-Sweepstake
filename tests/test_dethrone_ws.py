@@ -980,6 +980,7 @@ def test_stitched_lip_offers_on_rumour(client):
     active = g.active_player().id
     victim = next(pid for pid in pids if pid != active)
     vp = g.player_by_id(victim)
+    _set_non_exempt_roles(vp, g)
     vp.gold = 0
     vp.action_card_ids = ["stitched_lip"]
     ap = g.player_by_id(active)
@@ -995,6 +996,7 @@ def test_stitched_lip_cancels_rumour(client):
     active = g.active_player().id
     victim = next(pid for pid in pids if pid != active)
     vp = g.player_by_id(victim)
+    _set_non_exempt_roles(vp, g)
     before_rep = vp.rep
     vp.gold = 0
     vp.action_card_ids = ["stitched_lip"]
@@ -1087,6 +1089,7 @@ def test_quick_escape_cancels_rep_loss(client):
     room, pids, g = _start_game(code)
     active = g.active_player().id
     ap = g.player_by_id(active)
+    _set_non_exempt_roles(ap, g)
     ap.action_card_ids = ["quick_escape"]
     before_rep = ap.rep
     assert g._maybe_offer_rep_loss(active, -1, "Test", trigger="rep_loss")
@@ -1246,6 +1249,59 @@ def test_trace_steps_prev_location(client):
     g.play_action_card(active.id, "trace_steps", target_id=target.id)
     note = g.private_notes.get(active.id, "")
     assert "Market" in note or "market" in note.lower()
+
+
+def test_scholar_college_to_scrolls(client):
+    code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
+    room, pids, g = _start_game(code)
+    pid = pids[0]
+    p = g.player_by_id(pid)
+    p.location = "college"
+    p.public_role_id = "gateguard"
+    p.hidden_role_ids = ["thief", "wanderingknight"]
+    assert "scrolls" not in g.legal_moves(p)
+    p.hidden_role_ids = ["collegeadvisor", "wanderingknight"]
+    assert "scrolls" in g.legal_moves(p)
+    g.move_player(pid, "scrolls", manual=True)
+    assert p.location == "scrolls"
+
+
+def test_false_trail_redirects_rep(client):
+    code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
+    room, pids, g = _start_game(code)
+    spy_id, victim_id = pids[0], pids[1]
+    spy = g.player_by_id(spy_id)
+    victim = g.player_by_id(victim_id)
+    spy.location = victim.location = "market"
+    spy.hidden_role_ids = ["spy", "thief"]
+    spy.public_role_id = "gateguard"
+    before_spy = spy.rep
+    before_victim = victim.rep
+    assert g._maybe_offer_rep_loss(spy_id, -1, "Test", trigger="rep_loss")
+    assert g.pending_ui_action.get(spy_id, {}).get("kind") == "false_trail"
+    g.resolve_false_trail(spy_id, accept=True, redirect_id=victim_id)
+    assert spy.rep == before_spy
+    assert victim.rep == before_victim - 1
+    assert "false_trail" in spy.abilities_used_this_game
+
+
+def test_false_trail_before_reaction(client):
+    code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
+    room, pids, g = _start_game(code)
+    spy_id = pids[0]
+    other_id = pids[1]
+    spy = g.player_by_id(spy_id)
+    other = g.player_by_id(other_id)
+    spy.location = other.location = "tavern"
+    spy.hidden_role_ids = ["spy", "thief"]
+    spy.public_role_id = "gateguard"
+    spy.action_card_ids = ["drunken_alibi"]
+    assert g._maybe_offer_rep_loss(spy_id, -1, "Test", trigger="rep_loss")
+    assert g.pending_ui_action.get(spy_id, {}).get("kind") == "false_trail"
+    g.resolve_false_trail(spy_id, accept=False)
+    assert g.pending_ui_action.get(spy_id, {}).get("kind") == "reaction"
+    g.resolve_reaction(spy_id, "drunken_alibi")
+    assert spy.rep == 3
 
 
 def D_ROLE_META_PUBLIC(role_id: str) -> bool:

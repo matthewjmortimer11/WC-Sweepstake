@@ -4,6 +4,7 @@ window.CT = window.CT || {};
 CT.ui = { privateFor: null, privateRevealed: false, rolesRevealed: false, showImport: false, showGuide: false,
   roleDiscardFor: null, roleDiscardRevealed: false, handFixFor: null, keepOne: null, playCard: null,
   logFilter: "all", privateNote: null, finalRiteOffer: null, reactionOffer: null, reactionMove: null,
+  falseTrailOffer: null,
   playTab: "play" };
 
 /* Play vs Test mode — Test reveals referee & per-player override tools (§32, §35).
@@ -874,6 +875,7 @@ function logPanel() {
 /* ============ overlays (private view, import) ============ */
 function overlays() {
   if (CT.ui.actionCardFocus) return CT.actionCardFocusModalHtml(CT.ui.actionCardFocus, CT.handPlayer && CT.handPlayer());
+  if (CT.ui.falseTrailOffer) return falseTrailView();
   if (CT.ui.reactionOffer) return reactionView();
   if (CT.ui.finalRiteOffer) return finalRiteView();
   if (CT.ui.roleAbility) return roleAbilityView();
@@ -987,6 +989,33 @@ function privateView() {
     + '<div class="btn-row" style="margin-top:20px"><div class="spacer"></div>'
     + '<button class="btn btn-primary" data-act="close-private">Hide & return to table</button></div>'
     + '</div></div>';
+}
+
+function falseTrailView() {
+  var offer = CT.ui.falseTrailOffer;
+  if (!offer) return "";
+  var p = CT.playerById(offer.playerId || CT.myId());
+  if (!p) { CT.ui.falseTrailOffer = null; return ""; }
+  var targets = CT.state.players.filter(function (x) {
+    return x.status === "active" && x.id !== p.id && x.location === p.location;
+  });
+  var opts = targets.map(function (x) {
+    return '<option value="' + x.id + '">' + CT.esc(x.name) + "</option>";
+  }).join("");
+  var loc = CT.locationById(p.location);
+  return '<div class="scrim"><div class="modal modal--reaction cover" style="max-width:520px">'
+    + '<div class="seal-big" style="background:var(--gold-soft);color:var(--wax)">🕵</div>'
+    + '<h1 style="margin:8px 0">False Trail</h1>'
+    + '<p class="muted" style="font-size:15px">You are about to lose 1 Reputation'
+    + (offer.reason ? " (" + CT.esc(offer.reason) + ")" : "") + " at "
+    + CT.esc(loc ? loc.name : p.location) + '. Redirect it to another player here (once per game), or take the hit.</p>'
+    + '<label class="field"><span class="field-label">Redirect to</span>'
+    + '<select id="false-trail-target"' + (targets.length ? "" : " disabled") + ">"
+    + opts + "</select></label>"
+    + '<div class="btn-row" style="justify-content:center;margin-top:20px;flex-wrap:wrap;gap:10px">'
+    + '<button class="btn btn-ghost" data-act="decline-false-trail">Take the hit</button>'
+    + '<button class="btn btn-gold" data-act="accept-false-trail"' + (targets.length ? "" : " disabled") + ">Redirect</button>"
+    + "</div></div></div>";
 }
 
 function reactionView() {
@@ -1308,6 +1337,23 @@ CT.handleAction = function (act, el, ev) {
       }
       CT.declineReaction();
       CT.ui.reactionOffer = null;
+      CT.render(); break;
+    case "accept-false-trail": {
+      var ftSel = document.getElementById("false-trail-target");
+      var ftTarget = ftSel ? ftSel.value : null;
+      if (CT.netAction({ type: "resolveFalseTrail", targetId: ftTarget })) {
+        CT.ui.falseTrailOffer = null; break;
+      }
+      CT.resolveFalseTrail(true, ftTarget);
+      CT.ui.falseTrailOffer = null;
+      CT.render(); break;
+    }
+    case "decline-false-trail":
+      if (CT.netAction({ type: "declineFalseTrail" })) {
+        CT.ui.falseTrailOffer = null; break;
+      }
+      CT.declineFalseTrail();
+      CT.ui.falseTrailOffer = null;
       CT.render(); break;
     case "bot-turn": {
       var bp = CT.activePlayer();

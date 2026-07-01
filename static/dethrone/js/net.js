@@ -85,6 +85,11 @@ CT.net.applyState = function (msg) {
   if (cs) {
     CT.state = cs;
     CT.state.phase = cs.phase || "play";
+    if (cs.players) {
+      cs.players.forEach(function (p) {
+        if (!p.abilitiesUsedThisGame) p.abilitiesUsedThisGame = [];
+      });
+    }
     if (cs.pendingKeepOne && CT.myId()) {
       CT.ui.keepOne = { playerId: CT.myId(), deck: cs.pendingKeepOne.deck, cards: cs.pendingKeepOne.cards };
     } else if (!cs.pendingKeepOne) {
@@ -96,6 +101,13 @@ CT.net.applyState = function (msg) {
         CT.ui.finalRiteOffer = pui.playerId;
       } else if (pui.kind === "reaction") {
         CT.ui.reactionOffer = { playerId: CT.myId(), trigger: pui.trigger, cards: pui.cards || [], resume: pui.resume };
+      } else if (pui.kind === "false_trail") {
+        CT.ui.falseTrailOffer = {
+          playerId: CT.myId(),
+          delta: pui.delta,
+          reason: pui.reason,
+          trigger: pui.trigger,
+        };
       } else if (pui.kind === "reaction_move") {
         CT.ui.reactionMove = { playerId: CT.myId(), maxSteps: pui.maxSteps || 1 };
       } else if (CT.helpers && !CT.helpers.ui.open) {
@@ -110,9 +122,10 @@ CT.net.applyState = function (msg) {
     } else if (CT.ui.finalRiteOffer === CT.myId()) {
       CT.ui.finalRiteOffer = null;
     }
-    if (!cs.pendingUiAction || (cs.pendingUiAction.kind !== "reaction" && cs.pendingUiAction.kind !== "reaction_move")) {
+    if (!cs.pendingUiAction || (cs.pendingUiAction.kind !== "reaction" && cs.pendingUiAction.kind !== "reaction_move" && cs.pendingUiAction.kind !== "false_trail")) {
       if (CT.ui.reactionOffer && CT.ui.reactionOffer.playerId === CT.myId()) CT.ui.reactionOffer = null;
       if (CT.ui.reactionMove && CT.ui.reactionMove.playerId === CT.myId()) CT.ui.reactionMove = null;
+      if (CT.ui.falseTrailOffer && CT.ui.falseTrailOffer.playerId === CT.myId()) CT.ui.falseTrailOffer = null;
     }
     if (cs.privateNote != null && CT.myId()) {
       if (typeof CT.setPrivateNote === "function") {

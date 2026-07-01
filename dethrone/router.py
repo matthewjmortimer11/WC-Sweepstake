@@ -38,7 +38,7 @@ _DETHRONE_CSP = (
     "frame-ancestors 'none'"
 )
 
-_DETHRONE_ASSET_VERSION = "20260701-p36"
+_DETHRONE_ASSET_VERSION = "20260701-p37"
 
 _CREATE_BUCKETS: dict[str, list[float]] = {}
 _CREATE_LIMIT = 30
@@ -371,6 +371,18 @@ def _dispatch(room, player, mtype: str, msg: dict) -> bool:
 
     if mtype == "declineReaction":
         g.resolve_reaction(player.id, None)
+        return True
+
+    if mtype == "resolveFalseTrail":
+        g.resolve_false_trail(
+            player.id,
+            accept=True,
+            redirect_id=str(msg.get("targetId", "")) or None,
+        )
+        return True
+
+    if mtype == "declineFalseTrail":
+        g.resolve_false_trail(player.id, accept=False)
         return True
 
     if mtype == "reactionMove":
