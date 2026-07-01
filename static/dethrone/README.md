@@ -20,7 +20,7 @@ Offline file open still works:
 open "index.html"          # macOS
 ```
 
-## What is implemented (Phases 1–31)
+## What is implemented (Phases 1–32)
 
 ### Phase 5 — playtest tooling & full card set
 - **Board art** — illustrated V3b kingdom poster (`cards/map/kingdom-background-v3b.jpg`) with curved gold/cursed roads, labelled site plaques, player tokens and per-location vignettes (see `board.js`, `cards-map.js`)
@@ -168,9 +168,10 @@ open "index.html"          # macOS
 - **Stand Watch (arrival)** — Graveyard Guard at the Graveyard is prompted when someone moves in; may force −1 Reputation (once per round per guard)
 - **Online sync** — `resolveStandWatch` / `declineStandWatch`; Hold Ground checked in duel Drive Out resolution
 
-### Planned — Phase 32 (Dirty Blow & Slip Away)
-- **Dirty Blow** — Black Knight at Tavern/Barracks/Graveyard: if you win a duel, choose two consequences (you lose 1 Reputation)
-- **Slip Away** — Thief reaction: ignore a tax levy (hidden or public role)
+### Phase 32 — Dirty Blow & Slip Away
+- **Dirty Blow** — Black Knight at Tavern/Barracks/Graveyard may apply two duel consequences when they win; costs 1 Reputation
+- **Slip Away** — Thief (hidden or public) ignores tax levies
+- **Online sync** — `duelConsequence` accepts `secondConsequence` for Dirty Blow
 
 ### Core play hardening (in-person online)
 - **Formal vote legality** — server enforces proposer Rep, seconder/Decree, and banish Rep caps (`proposerId`, `seconder`, `decree` on `formalVote`)

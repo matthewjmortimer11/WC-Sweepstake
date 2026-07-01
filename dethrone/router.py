@@ -38,7 +38,7 @@ _DETHRONE_CSP = (
     "frame-ancestors 'none'"
 )
 
-_DETHRONE_ASSET_VERSION = "20260701-p43"
+_DETHRONE_ASSET_VERSION = "20260701-p44"
 
 _CREATE_BUCKETS: dict[str, list[float]] = {}
 _CREATE_LIMIT = 30
@@ -571,6 +571,7 @@ def _dispatch(room, player, mtype: str, msg: dict) -> bool:
             att_card_ids=list(msg.get("attCardIds") or []),
             def_card_ids=list(msg.get("defCardIds") or []),
             reckless_charge=bool(msg.get("recklessCharge")),
+            second_consequence=str(msg.get("secondConsequence", "")) or None,
         )
         return True
 

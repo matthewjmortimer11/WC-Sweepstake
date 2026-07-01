@@ -542,6 +542,8 @@ class CursedThroneGame:
         roles = self._all_role_ids(target)
         if roles & D.TAX_EXEMPT_ROLE_IDS:
             return "tax exempt role"
+        if self._role_power_active(target, "thief"):
+            return "Slip Away"
         if "king" in roles:
             t = self.throne
             if collector_id in (t.get("queenControllerId"), t.get("successorId")):
@@ -2589,6 +2591,49 @@ class CursedThroneGame:
             "maxSteps": 2,
         }
 
+    def _dirty_blow_active(self, player: PlayerState) -> bool:
+        return (
+            self._role_power_active(player, "blackknight")
+            and player.location in ("tavern", "barracks", "graveyard")
+        )
+
+    def _apply_dirty_blow_second(
+        self,
+        loser: PlayerState,
+        consequence: str,
+        winner_cards: list[str],
+        loser_cards: list[str],
+        a_total: int,
+        d_total: int,
+        rng: random.Random,
+    ) -> None:
+        if consequence == "disarm":
+            disarm_n = 3 if "disarm_card" in winner_cards else 2
+            count = min(disarm_n, len(loser.action_card_ids))
+            for _ in range(count):
+                if not loser.action_card_ids:
+                    break
+                idx = rng.randrange(len(loser.action_card_ids))
+                self.discard_card(loser.id, loser.action_card_ids[idx], "Disarm")
+        elif consequence == "shame":
+            if "shield" not in loser_cards:
+                self._maybe_offer_rep_loss(loser.id, -1, "Shame (Dirty Blow)")
+        elif consequence == "wound":
+            if "parry" not in loser_cards:
+                loser.wounded = True
+                self._log(f"{loser.name} is Wounded — no hidden powers next turn.")
+        elif consequence == "drive":
+            if self._hold_ground_blocks_drive(loser, a_total, d_total):
+                return
+            if self._offer_protect(loser.id, "drive_out"):
+                return
+            self._drive_out_player(loser.id)
+        elif consequence == "search":
+            self._log(
+                f"Dirty Blow — search {loser.name} (resolve privately).",
+                "note",
+            )
+
     def duel_apply_consequence(
         self,
         attacker_id: str,
@@ -2602,6 +2647,7 @@ class CursedThroneGame:
         att_card_ids: Optional[list[str]] = None,
         def_card_ids: Optional[list[str]] = None,
         reckless_charge: bool = False,
+        second_consequence: Optional[str] = None,
     ) -> None:
         if self.status != STATUS_PLAY or self.winner:
             raise MoveError("No active game.")
@@ -2692,6 +2738,22 @@ class CursedThroneGame:
             self._maybe_offer_rep_loss(loser.id, -1, "Cursed Blade")
         if reckless_charge and loser.id == attacker_id:
             self._maybe_offer_rep_loss(attacker_id, -1, "Reckless Charge")
+        if (
+            second_consequence
+            and second_consequence != consequence
+            and self._dirty_blow_active(winner)
+        ):
+            self._log(f"{winner.name} lands a Dirty Blow — second consequence.", "event")
+            self._apply_dirty_blow_second(
+                loser,
+                second_consequence,
+                winner_cards,
+                loser_cards,
+                a_total,
+                d_total,
+                rng,
+            )
+            self.adjust_rep(winner.id, -1, "Dirty Blow")
 
     def _apply_duel_consequence_only(self, resume: dict) -> None:
         consequence = resume.get("consequence")

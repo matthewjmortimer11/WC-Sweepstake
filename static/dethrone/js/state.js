@@ -192,6 +192,7 @@ CT.taxExemptReason = function (target, collectorId) {
   for (var i = 0; i < roles.length; i++) {
     if (CT.TAX_EXEMPT_ROLES[roles[i]]) return "tax exempt role";
   }
+  if (CT.rolePowerActive(target, "thief")) return "Slip Away";
   if (roles.indexOf("king") !== -1) {
     var t = CT.state.throne;
     if (collectorId === t.queenControllerId || collectorId === t.successorId) return "Royal Tax Exemption";

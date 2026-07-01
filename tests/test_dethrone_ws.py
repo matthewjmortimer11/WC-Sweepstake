@@ -231,9 +231,9 @@ def _start_game(code: str, n: int = 4):
 
 
 def _set_non_exempt_roles(p, g=None):
-    """Deterministic roles for tax tests (no spy/firstborn/tinytyrant/courtfavourite)."""
+    """Deterministic roles for tax tests (no spy/firstborn/tinytyrant/thief slip-away)."""
     p.public_role_id = "gateguard"
-    p.hidden_role_ids = ["thief", "wanderingknight"]
+    p.hidden_role_ids = ["wanderingknight", "youngknight"]
     p.extra_shown_role_ids = []
     p.action_card_ids = [c for c in p.action_card_ids if c != "guild_seal"]
     if g is not None:
@@ -2015,6 +2015,44 @@ def test_stand_watch_on_graveyard_arrival(client):
     assert g.pending_ui_action.get(guard_id, {}).get("kind") == "stand_watch"
     g.resolve_stand_watch(guard_id, accept=True)
     assert arrival.rep == before_rep - 1
+
+
+def test_slip_away_ignores_tax(client):
+    code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
+    room, pids, g = _start_game(code)
+    collector = g.active_player()
+    target = next(p for p in g.players if p.id != collector.id)
+    _set_non_exempt_roles(target, g)
+    target.hidden_role_ids = ["thief", "wanderingknight", "gateguard"]
+    target.public_role_id = "gateguard"
+    reason = g._tax_exempt_reason(target, collector.id)
+    assert reason == "Slip Away"
+
+
+def test_dirty_blow_second_consequence_and_rep_loss(client):
+    import random
+    code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
+    room, pids, g = _start_game(code)
+    att_id = g.active_player().id
+    def_id = next(pid for pid in pids if pid != att_id)
+    att = g.player_by_id(att_id)
+    defender = g.player_by_id(def_id)
+    att.location = defender.location = "tavern"
+    att.hidden_role_ids = ["blackknight", "thief", "wanderingknight"]
+    att.public_role_id = "thief"
+    defender.action_card_ids = ["hidden_knife", "shield", "rumour_card"]
+    before_cards = len(defender.action_card_ids)
+    before_rep = att.rep
+    _strip_royal_guards(g)
+    _strip_royal_knights(g)
+    _strip_queens(g)
+    g.duel_apply_consequence(
+        att_id, def_id, 3, 0, False, "disarm", random.Random(0),
+        second_consequence="shame",
+    )
+    assert len(defender.action_card_ids) < before_cards
+    assert defender.rep == before_rep - 1
+    assert att.rep == before_rep - 1
 
 
 def D_ROLE_META_PUBLIC(role_id: str) -> bool:
