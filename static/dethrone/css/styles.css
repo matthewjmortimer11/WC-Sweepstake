@@ -582,6 +582,17 @@ svg.map-v3b--layered { background: #1c140c; }
 }
 .map-wrap--kingdom {
   max-width: none; margin: 0; border-radius: 0; box-shadow: none; border: 0;
+  width: 100%;
+}
+.v3b-kingdom__card .map-wrap--kingdom svg.map-v3b {
+  width: 100%; height: auto; min-height: 0;
+}
+@media (max-width: 919px) {
+  .v3b-kingdom__card .map-wrap--kingdom {
+    margin-left: -2px; margin-right: -2px; width: calc(100% + 4px);
+  }
+  .v3b-kingdom__head { padding: 12px 14px 8px; }
+  .v3b-kingdom__title { font-size: 18px; }
 }
 
 .loc-footer {
@@ -809,7 +820,14 @@ svg.map-v3b--layered { background: #1c140c; }
   transition: transform .12s, box-shadow .15s, border-color .15s;
   width: 100%;
 }
-.action-stub--compact { width: 108px; }
+.action-stub__art {
+  position: relative; aspect-ratio: 18 / 10; background: #3a3530; overflow: hidden;
+}
+.action-stub__art-img {
+  display: block; width: 100%; height: 100%; object-fit: cover; object-position: center;
+}
+.action-stub--compact .action-stub__art { aspect-ratio: 9 / 5; }
+.action-stub--compact { width: 116px; }
 .action-stub--full { flex: 1; min-width: 0; }
 .action-stub--playable .action-stub__frame {
   border-color: var(--gold-bright);
@@ -820,7 +838,17 @@ svg.map-v3b--layered { background: #1c140c; }
   padding: 8px 8px 6px; min-height: 54px;
   background: linear-gradient(180deg, #fff, #f4ecd6);
 }
-.action-stub--compact .action-stub__body { min-height: 72px; }
+.action-stub--compact .action-stub__body { min-height: 58px; }
+.hand-fix-row, .keep-one-card {
+  display: flex; flex-direction: column; gap: 10px; align-items: stretch;
+}
+.hand-fix-row {
+  flex-direction: row; align-items: center; gap: 12px;
+}
+.hand-fix-row .action-stub--full { flex: 1; min-width: 0; }
+.hand-fix-row__btn { flex-shrink: 0; }
+.keep-one-card__btn { width: 100%; }
+.keep-one-view .players { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); }
 .action-stub__timing { font-size: 14px; line-height: 1; }
 .action-stub__name {
   font-family: var(--serif); font-size: 12px; font-weight: 700;

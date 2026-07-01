@@ -1,5 +1,40 @@
-/* The Cursed Throne — action card stubs (V3b deck chrome, no art yet). */
+/* The Cursed Throne — action card stubs (V3b deck chrome + iconic vignettes). */
 window.CT = window.CT || {};
+
+CT.ACTION_CARD_VERSION = window.__DETHRONE_CARD_V || "20260630-p29";
+CT.ACTION_CARD_FILES = {
+  secret_passage: "action-secret_passage-v3b.jpg",
+  counterfeit_pass: "action-counterfeit_pass-v3b.jpg",
+  rumour_card: "action-rumour_card-v3b.jpg",
+  call_out: "action-call_out-v3b.jpg",
+  hidden_knife: "action-hidden_knife-v3b.jpg",
+  shield: "action-shield-v3b.jpg",
+  arrest: "action-arrest-v3b.jpg",
+  soul_debt: "action-soul_debt-v3b.jpg",
+  grave_pact: "action-grave_pact-v3b.jpg",
+  royal_decree: "action-royal_decree-v3b.jpg",
+  pardon_card: "action-pardon_card-v3b.jpg",
+  tax_collector: "action-tax_collector-v3b.jpg",
+};
+
+CT.actionCardUrl = function (cardId, opts) {
+  opts = opts || {};
+  var file = CT.ACTION_CARD_FILES[cardId];
+  if (!file) return "";
+  var v = opts.v != null ? opts.v : CT.ACTION_CARD_VERSION;
+  return "cards/action/" + file + (v ? "?v=" + encodeURIComponent(v) : "");
+};
+
+CT.actionCardArtHtml = function (cardId, opts) {
+  opts = opts || {};
+  var url = CT.actionCardUrl(cardId, opts);
+  if (!url) return "";
+  var c = CT.cardById(cardId);
+  var alt = opts.alt || (c ? c.name + " action card" : "Action card");
+  var cls = "action-stub__art-img" + (opts.compact ? " action-stub__art-img--compact" : "");
+  return '<img class="' + cls + '" src="' + url + '" alt="' + CT.esc(alt)
+    + '" loading="lazy" decoding="async">';
+};
 
 CT.DECK_ACCENT = {
   Market: "#5b4c38",
@@ -113,7 +148,11 @@ CT.actionCardStubHtml = function (cardId, player, opts) {
     playAct = state.mode === "prompt" ? "play-card-prompt" : "play-card";
   }
 
+  var art = CT.actionCardArtHtml(cardId, { compact: compact });
+  var artBlock = art ? '<div class="action-stub__art">' + art + "</div>" : "";
+
   var inner = '<div class="action-stub__frame" style="--stub-deck:' + accent + '">'
+    + artBlock
     + '<div class="action-stub__body">'
     + '<span class="action-stub__timing" title="' + CT.esc(meta.label) + '">' + meta.icon + "</span>"
     + '<div class="action-stub__name">' + CT.esc(c.name) + "</div>"

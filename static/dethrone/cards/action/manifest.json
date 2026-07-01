@@ -1,0 +1,27 @@
+{
+  "template": "V3b action vignettes (programmatic)",
+  "pixels": "360x200",
+  "palette": {
+    "cream": "#F4ECD6",
+    "ink": "#2A2014",
+    "gold": "#A8842C",
+    "royal": "#8C2F23",
+    "cursed": "#6B2420",
+    "knight": "#4A5568",
+    "guard": "#5B4C38"
+  },
+  "cards": {
+    "secret_passage": "action-secret_passage-v3b.jpg",
+    "counterfeit_pass": "action-counterfeit_pass-v3b.jpg",
+    "rumour_card": "action-rumour_card-v3b.jpg",
+    "call_out": "action-call_out-v3b.jpg",
+    "hidden_knife": "action-hidden_knife-v3b.jpg",
+    "shield": "action-shield-v3b.jpg",
+    "arrest": "action-arrest-v3b.jpg",
+    "soul_debt": "action-soul_debt-v3b.jpg",
+    "grave_pact": "action-grave_pact-v3b.jpg",
+    "royal_decree": "action-royal_decree-v3b.jpg",
+    "pardon_card": "action-pardon_card-v3b.jpg",
+    "tax_collector": "action-tax_collector-v3b.jpg"
+  }
+}

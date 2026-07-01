@@ -96,6 +96,8 @@ def test_dethrone_v3b_board_asset(client):
 
     action_js = Path("static/dethrone/js/cards-action.js").read_text(encoding="utf-8")
     assert "actionCardStubHtml" in action_js
+    assert "actionCardUrl" in action_js
+    assert "actionCardArtHtml" in action_js
     assert "handStripHtml" in action_js
     assert "duelCardPickerHtml" in action_js
     assert "notifyCardDraw" in action_js
@@ -103,6 +105,8 @@ def test_dethrone_v3b_board_asset(client):
     assert "handTabPanel" in app_js
     assert "deckArchivesHtml" in action_js
     assert "pactChipBar" in app_js
+    assert "h-open-challenge" in app_js
+    assert "parleyFooterRow" in app_js
 
     board = Path("static/dethrone/js/board.js").read_text(encoding="utf-8")
     assert "map-v3b--layered" in board
@@ -125,6 +129,17 @@ def test_dethrone_v3b_board_asset(client):
     bg = client.get(f"/dethrone/cards/map/{manifest['kingdom']['file']}")
     assert bg.status_code == 200
     assert len(bg.content) > 50000
+
+    action_manifest = json.loads(
+        Path("static/dethrone/cards/action/manifest.json").read_text(encoding="utf-8")
+    )
+    assert len(action_manifest["cards"]) >= 12
+    for card_id, fname in action_manifest["cards"].items():
+        assert fname.endswith(".jpg"), fname
+        r = client.get(f"/dethrone/cards/action/{fname}?v={_DETHRONE_ASSET_VERSION}")
+        assert r.status_code == 200, fname
+        assert r.headers["content-type"] in ("image/jpeg", "image/jpg"), fname
+        assert len(r.content) > 5000, fname
 
 
 def test_hidden_roles_not_leaked(client):

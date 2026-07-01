@@ -581,8 +581,8 @@ function parleyFooterRow(disabled) {
   }
   return '<div class="loc-footer__parley"><div class="eyebrow eyebrow--light">Parley</div>'
     + '<div class="loc-footer__parley-row">'
-    + b("h-open-duel", "⚔ Duel") + b("h-open-vote", "⚖ Vote") + b("h-open-trade", "⇄ Trade")
-    + b("h-open-callout", "Call out")
+    + b("h-open-challenge", "Challenge") + b("h-open-duel", "⚔ Duel") + b("h-open-vote", "⚖ Vote")
+    + b("h-open-trade", "⇄ Trade") + b("h-open-callout", "Call out")
     + "</div></div>";
 }
 
@@ -930,11 +930,9 @@ function handFixView() {
   var p = CT.playerById(CT.ui.handFixFor);
   if (!p) { CT.ui.handFixFor = null; return ""; }
   var cards = p.actionCardIds.map(function (id) {
-    var c = CT.cardById(id);
-    return '<div class="pcard" style="padding:12px"><div class="row" style="justify-content:space-between">'
-      + '<div><div class="pname" style="font-size:15px">' + CT.esc(c.name) + ' <span class="tag">' + c.deck + '</span></div>'
-      + '<div class="prole" style="margin-top:2px">' + CT.esc(c.effect) + '</div></div>'
-      + '<button class="btn btn-secondary btn-sm" data-act="do-discard-hand" data-id="' + id + '">Discard</button></div></div>';
+    var stub = CT.actionCardStubHtml(id, p, { compact: false, showEffect: true, interactive: false });
+    return '<div class="hand-fix-row">' + stub
+      + '<button class="btn btn-secondary btn-sm hand-fix-row__btn" data-act="do-discard-hand" data-id="' + id + '">Discard</button></div>';
   }).join("");
   return '<div class="scrim"><div class="modal" style="max-width:600px">'
     + '<div class="eyebrow">' + CT.esc(p.name) + ' · private</div>'
@@ -949,16 +947,16 @@ function handFixView() {
 /* Haggle keep-one (§13 Market) */
 function keepOneView() {
   var k = CT.ui.keepOne;
+  var player = CT.handPlayer && CT.handPlayer();
   var cards = k.cards.map(function (id) {
-    var c = CT.cardById(id);
-    return '<div class="pcard"><div class="pname" style="font-size:16px">' + CT.esc(c.name) + ' <span class="tag">' + c.deck + '</span></div>'
-      + '<div class="prole" style="margin:4px 0 10px">' + CT.esc(c.effect) + '</div>'
-      + '<button class="btn btn-primary btn-sm" style="width:100%" data-act="keep-card" data-keep="' + id + '">Keep this</button></div>';
+    var stub = CT.actionCardStubHtml(id, player, { compact: false, showEffect: true, interactive: false });
+    return '<div class="keep-one-card">' + stub
+      + '<button class="btn btn-primary btn-sm keep-one-card__btn" data-act="keep-card" data-keep="' + id + '">Keep this</button></div>';
   }).join("");
   return '<div class="scrim"><div class="modal">'
     + '<h2 style="margin-bottom:4px">Haggle — keep one</h2>'
     + '<p class="muted" style="font-size:14px;margin:0 0 12px">Others, look away. Keep one; the other is discarded.</p>'
-    + '<div class="players" style="grid-template-columns:1fr 1fr;gap:10px">' + cards + '</div></div></div>';
+    + '<div class="players keep-one-view" style="grid-template-columns:1fr 1fr;gap:10px">' + cards + '</div></div></div>';
 }
 function privateView() {
   var p = CT.playerById(CT.ui.privateFor);
