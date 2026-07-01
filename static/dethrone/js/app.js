@@ -1,7 +1,7 @@
 /* The Cursed Throne — main render + wiring (Phase 1) */
 window.CT = window.CT || {};
 
-CT.ui = { privateFor: null, privateRevealed: false, showImport: false, showGuide: false,
+CT.ui = { privateFor: null, privateRevealed: false, rolesRevealed: false, showImport: false, showGuide: false,
   roleDiscardFor: null, roleDiscardRevealed: false, handFixFor: null, keepOne: null, playCard: null,
   logFilter: "all", privateNote: null, finalRiteOffer: null, reactionOffer: null, reactionMove: null,
   playTab: "play" };
@@ -68,6 +68,25 @@ if (document.readyState === "loading") {
   CT.registerServiceWorker();
 }
 
+function handPlayPlayerId() {
+  if (CT.ui.privateFor) return CT.ui.privateFor;
+  var id = CT.myId();
+  if (id) return id;
+  var hp = CT.handPlayer && CT.handPlayer();
+  return hp ? hp.id : null;
+}
+
+function handCoachHint() {
+  if (CT.isSpectator()) return "";
+  try { if (localStorage.getItem("dethrone-hand-hint-seen")) return ""; } catch (e) {}
+  var p = CT.handPlayer && CT.handPlayer();
+  if (!p || !(p.actionCardIds && p.actionCardIds.length)) return "";
+  return '<div class="hand-coach" role="status">'
+    + "<span>Your cards are below the map — tap a glowing card to play.</span>"
+    + '<button type="button" class="btn btn-ghost btn-sm" data-act="dismiss-hand-hint">Got it</button>'
+    + "</div>";
+}
+
 function renderPlayTabs() {
   var nav = document.getElementById("play-tabs");
   if (!nav || !CT.state || CT.state.phase !== "play" || CT.state.winner) {
@@ -75,8 +94,10 @@ function renderPlayTabs() {
     return;
   }
   var tab = CT.ui.playTab || "play";
+  var handOn = tab === "hand" ? " on" : "";
   nav.className = "play-tabs";
   nav.innerHTML = '<button type="button" class="play-tabs__btn' + (tab === "play" ? " on" : "") + '" data-act="play-tab" data-tab="play">Play</button>'
+    + '<button type="button" class="play-tabs__btn' + handOn + '" data-act="play-tab" data-tab="hand">Hand</button>'
     + '<button type="button" class="play-tabs__btn' + (tab === "court" ? " on" : "") + '" data-act="play-tab" data-tab="court">Court</button>'
     + '<button type="button" class="play-tabs__btn' + (tab === "log" ? " on" : "") + '" data-act="play-tab" data-tab="log">Log</button>';
   nav.hidden = false;
@@ -114,7 +135,7 @@ function renderTurnDock() {
     + '<button class="btn btn-ghost btn-sm" data-act="h-open-vote" title="Vote">⚖</button>'
     + '<button class="btn btn-ghost btn-sm" data-act="h-open-trade" title="Trade">⇄</button>'
     + "</div>"
-    + '<button class="btn btn-secondary" data-act="view-private" data-id="' + ap.id + '">Hand</button>'
+    + '<button class="btn btn-secondary" data-act="play-tab" data-tab="hand">Cards</button>'
     + '<button class="btn btn-primary" data-act="end-turn"' + (over ? " disabled" : "") + '>End turn</button>'
     + "</div>";
   dock.hidden = false;
@@ -366,10 +387,12 @@ function gameScreen() {
     + waitingBanner()
     + handLimitBanner()
     + trackers()
+    + handCoachHint()
     + '<div class="play-layout play-tab-' + (CT.ui.playTab || "play") + '">'
     + '<section class="play-zone play-zone--kingdom">'
     + kingdomPanel() + parleyPanelCompact() + throneSuccPanel() + (CT.testMode ? manualGlobal() : "") + pactsPanel()
     + "</section>"
+    + '<section class="play-zone play-zone--hand">' + handTabPanel() + "</section>"
     + '<section class="play-zone play-zone--court">' + courtPanel(false) + "</section>"
     + '<section class="play-zone play-zone--log">' + logPanel() + "</section>"
     + "</div>";
@@ -431,6 +454,56 @@ function throneLabel() {
   return names.length ? names.join(" & ") : "Vacant";
 }
 
+/* ---- Hand tab: full action card grid + hidden roles ---- */
+function handTabPanel() {
+  var p = CT.handPlayer && CT.handPlayer();
+  if (!p) {
+    return '<div class="v3b-panel hand-tab-panel"><p class="muted">No hand to show.</p></div>';
+  }
+  var limit = CT.getRules().HAND_LIMIT;
+  var over = CT.overHandLimit(p);
+  var isMyTurn = !CT.isOnline() || p.id === CT.myId();
+  return '<div class="v3b-panel hand-tab-panel">'
+    + '<header class="hand-tab-panel__head">'
+    + '<div><h2 class="v3b-panel__title">Your hand</h2>'
+    + '<p class="muted" style="margin:4px 0 0;font-size:13px">Glowing cards can be played on your turn.</p></div>'
+    + '<span class="hand-tab-panel__count' + (over ? " hand-tab-panel__count--warn" : "") + '">'
+    + p.actionCardIds.length + "/" + limit + "</span>"
+    + "</header>"
+    + (over && isMyTurn
+      ? '<div class="hand-tab-panel__warn">Over hand limit — '
+        + '<button class="btn btn-gold btn-sm" data-act="fix-hand" data-id="' + p.id + '">Discard</button></div>'
+      : "")
+    + (CT.handGridHtml ? CT.handGridHtml(p) : "")
+    + handRolesSection(p)
+    + "</div>";
+}
+
+function handRolesSection(p) {
+  var canView = CT.isOnline() ? p.id === CT.myId() : (CT.handPlayer() && CT.handPlayer().id === p.id);
+  if (!canView) {
+    return '<div class="hand-roles-block"><h3 class="hand-roles-block__title">Hidden roles</h3>'
+      + "<p class=\"muted\">Only " + CT.esc(p.name) + " can view hidden roles.</p></div>";
+  }
+  if (!CT.ui.rolesRevealed) {
+    return '<div class="hand-roles-block"><h3 class="hand-roles-block__title">Hidden roles</h3>'
+      + '<p class="muted" style="font-size:13px">Hidden roles stay private — look away if it is not your seat.</p>'
+      + CT.roleCardBacksHtml(Math.max(p.hiddenRoleIds.length, 1))
+      + '<button type="button" class="btn btn-primary btn-sm" style="margin-top:12px" data-act="reveal-roles">Reveal hidden roles</button>'
+      + "</div>";
+  }
+  var hidden = p.hiddenRoleIds.map(function (id) {
+    var r = CT.roleById(id);
+    var body = '<span class="tag">' + r.family + "</span>"
+      + (r.id === "cursedone" ? ' <span class="tag wax">CURSED</span>' : "");
+    return CT.roleCardPickHtml(id, body, { size: "private" });
+  }).join("") || '<p class="muted">No hidden roles remaining.</p>';
+  return '<div class="hand-roles-block"><h3 class="hand-roles-block__title">Hidden roles</h3>'
+    + '<div class="role-card-grid">' + hidden + "</div>"
+    + '<button type="button" class="btn btn-ghost btn-sm" style="margin-top:12px" data-act="hide-roles">Hide roles</button>'
+    + "</div>";
+}
+
 /* ---- V3b kingdom stack: portrait map + location action footer ---- */
 function kingdomPanel() {
   var ap = CT.activePlayer();
@@ -447,6 +520,11 @@ function kingdomPanel() {
   var artBanner = vignette
     ? '<div class="loc-footer__art" style="background-image:url(' + vignette.replace(/'/g, "%27") + ')" aria-hidden="true"></div>'
     : "";
+  var handStrip = "";
+  if (!CT.isSpectator() && CT.handStripHtml) {
+    var hp = CT.handPlayer();
+    if (hp) handStrip = CT.handStripHtml(hp);
+  }
   return '<div class="v3b-kingdom">'
     + '<div class="v3b-kingdom__card">'
     + '<header class="v3b-kingdom__head">'
@@ -454,6 +532,7 @@ function kingdomPanel() {
     + (ap && !CT.isSpectator() ? '<span class="v3b-kingdom__turn">' + CT.esc(ap.name) + "</span>" : "")
     + "</header>"
     + '<div class="map-wrap map-wrap--kingdom">' + CT.boardMapSVG() + "</div>"
+    + handStrip
     + '<footer class="loc-footer" style="--loc-accent:' + accent + '">'
     + artBanner
     + '<div class="loc-footer__label">' + locLabel + " · " + (CT.isSpectator() ? "watching" : "actions") + "</div>"
@@ -855,53 +934,12 @@ function privateView() {
     return CT.roleCardPickHtml(id, body, { size: "private" });
   }).join("") || '<p class="muted">No hidden roles remaining.</p>';
 
-  var onTurn = CT.activePlayer() && CT.activePlayer().id === p.id && !CT.state.winner;
-  var groups = { OnTurn: [], Movement: [], Duel: [], Vote: [], Reaction: [], Other: [] };
-  p.actionCardIds.forEach(function (id) {
-    var c = CT.cardById(id);
-    if (!c) return;
-    var t = c.timing || "Other";
-    if (t === "Manual") t = "Other";
-    if (!groups[t]) t = "Other";
-    groups[t].push(id);
-  });
-  function cardRow(id) {
-    var c = CT.cardById(id);
-    var fx = CT.AUTO_PLAY[id];
-    var playBtn = "";
-    if (fx && onTurn) {
-      if (fx.needsTarget || fx.needsLocation || fx.needsDeck || fx.needsDiscardCard || fx.optionalTarget) {
-        playBtn = ' <button class="btn btn-ghost btn-sm" data-act="play-card-prompt" data-id="' + id + '">Play…</button>';
-      } else {
-        playBtn = ' <button class="btn btn-primary btn-sm" data-act="play-card" data-id="' + id + '">Play</button>';
-      }
-    } else if (CT.PROACTIVE_REACTIONS && CT.PROACTIVE_REACTIONS[id] && onTurn) {
-      playBtn = ' <button class="btn btn-primary btn-sm" data-act="play-card" data-id="' + id + '">Play now</button>'
-        + ' <span class="tag" style="font-size:11px">or hold for tax</span>';
-    } else if (c.timing === "Reaction") {
-      playBtn = ' <span class="tag wax" style="font-size:11px">when targeted</span>';
-    } else if (c.timing === "Duel" || c.timing === "Vote") {
-      playBtn = ' <span class="tag" style="font-size:11px">use in helper</span>';
-    } else if (!fx && c.requiresManualResolution !== false) {
-      playBtn = ' <span class="tag wax" style="font-size:11px">manual at table</span>';
-    }
-    return '<div class="pcard" style="padding:12px"><div class="row" style="justify-content:space-between;align-items:flex-start;gap:8px">'
-      + '<div><div class="pname" style="font-size:15px">' + CT.esc(c.name)
-      + ' <span class="tag">' + c.deck + '</span></div><div class="prole" style="margin-top:4px">' + CT.esc(c.effect) + '</div></div>'
-      + playBtn + '</div></div>';
-  }
-  var cardsBody = "";
-  ["OnTurn", "Movement", "Reaction", "Duel", "Vote", "Other"].forEach(function (g) {
-    if (!groups[g].length) return;
-    cardsBody += '<div class="eyebrow" style="margin:12px 0 6px">' + g + "</div><div class=\"stack\">"
-      + groups[g].map(cardRow).join("") + "</div>";
-  });
-  if (!cardsBody) cardsBody = '<p class="muted">No action cards.</p>';
+  var cardsBody = CT.handGridHtml ? CT.handGridHtml(p, { showPlay: false }) : '<p class="muted">No action cards.</p>';
   return '<div class="scrim"><div class="modal modal--roles" style="max-width:min(96vw,720px)">'
     + '<div class="eyebrow">Private · ' + CT.esc(p.name) + '</div>'
     + (CT.ui.privateNote ? '<div class="private-note-banner">' + CT.esc(CT.ui.privateNote) + '</div>' : '')
-    + '<h2 style="margin:6px 0 12px">Your hidden roles</h2><div class="role-card-grid">' + hidden + '</div>'
-    + '<h2 style="margin:18px 0 12px">Your action cards</h2>' + cardsBody
+    + '<h2 style="margin:6px 0 12px">Hidden roles</h2><div class="role-card-grid">' + hidden + '</div>'
+    + '<h2 style="margin:18px 0 12px">Action cards</h2>' + cardsBody
     + '<div class="btn-row" style="margin-top:20px"><div class="spacer"></div>'
     + '<button class="btn btn-primary" data-act="close-private">Hide & return to table</button></div>'
     + '</div></div>';
@@ -991,7 +1029,7 @@ function handleLocActionResult(r) {
 function handlePlayCardResult(res) {
   if (!res) return;
   if (!res.ok && res.msg) { alert(res.msg); return; }
-  if (res.keepOne) CT.ui.keepOne = { playerId: CT.ui.privateFor || CT.myId(), deck: res.keepOne.deck, cards: res.keepOne.cards };
+  if (res.keepOne) CT.ui.keepOne = { playerId: handPlayPlayerId(), deck: res.keepOne.deck, cards: res.keepOne.cards };
   if (res.openDuel && CT.helpers) CT.helpers.openDuelFromPending(res.openDuel);
   if (res.openVote && CT.helpers) CT.helpers.openVoteFromPending(res.openVote);
   if (res.openTrade && CT.helpers) CT.helpers.openTradeFromPending(res.openTrade);
@@ -1103,6 +1141,16 @@ CT.handleAction = function (act, el, ev) {
       CT.render(); break;
     case "play-tab":
       CT.ui.playTab = el.dataset.tab || "play";
+      CT.render(); break;
+    case "dismiss-hand-hint":
+      try { localStorage.setItem("dethrone-hand-hint-seen", "1"); } catch (e) {}
+      CT.render(); break;
+    case "reveal-roles":
+      CT.ui.rolesRevealed = true; CT.render(); break;
+    case "hide-roles":
+      CT.ui.rolesRevealed = false; CT.render(); break;
+    case "hand-card-focus":
+      CT.ui.playTab = "hand";
       CT.render(); break;
     case "create-room":
       CT.net.createRoom(5);
@@ -1298,20 +1346,33 @@ CT.handleAction = function (act, el, ev) {
       if (CT.ui.afterDiscard) { var fn = CT.ui.afterDiscard; CT.ui.afterDiscard = null; fn(); } // vote/duel follow-up effects
       CT.render(); break;
     case "close-lose-role": CT.ui.roleDiscardFor = null; CT.ui.roleDiscardRevealed = false; CT.ui.afterDiscard = null; CT.render(); break;
-    case "view-private":
-      if (CT.isOnline() && el.dataset.id !== CT.myId()) break;
-      CT.ui.privateFor = el.dataset.id; CT.ui.privateRevealed = CT.isOnline(); CT.render(); break;
+    case "view-private": {
+      if (CT.isSpectator()) break;
+      var vid = el.dataset.id;
+      var hp = CT.handPlayer && CT.handPlayer();
+      if (CT.isOnline() && vid === CT.myId()) {
+        CT.ui.playTab = "hand"; CT.render(); break;
+      }
+      if (!CT.isOnline() && hp && vid === hp.id) {
+        CT.ui.playTab = "hand"; CT.render(); break;
+      }
+      if (CT.isOnline() && vid !== CT.myId()) break;
+      CT.ui.privateFor = vid;
+      CT.ui.privateRevealed = false;
+      CT.render(); break;
+    }
     case "reveal-private-view": CT.ui.privateRevealed = true; CT.render(); break;
     case "close-private": CT.ui.privateFor = null; CT.ui.privateRevealed = false; CT.render(); break;
     case "play-card": {
-      var pid = CT.ui.privateFor || CT.myId();
+      var pid = handPlayPlayerId();
+      if (!pid) break;
       var msg = { type: "playCard", cardId: el.dataset.id };
       if (CT.netAction(msg)) { CT.ui.playCard = null; break; }
       handlePlayCardResult(CT.playActionCard(pid, el.dataset.id));
       CT.render(); break;
     }
     case "play-card-prompt":
-      CT.ui.playCard = { playerId: CT.ui.privateFor || CT.myId(), cardId: el.dataset.id };
+      CT.ui.playCard = { playerId: handPlayPlayerId(), cardId: el.dataset.id };
       CT.render(); break;
     case "close-play-card": CT.ui.playCard = null; CT.render(); break;
     case "confirm-play-card": {

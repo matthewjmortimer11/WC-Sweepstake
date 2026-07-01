@@ -507,12 +507,14 @@ svg.map-v3b--layered { background: #1c140c; }
 @media (min-width: 920px) {
   .play-layout {
     grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr);
-    grid-template-rows: auto auto;
+    grid-template-rows: auto auto auto;
     align-items: start;
   }
-  .play-zone--kingdom { grid-column: 1; grid-row: 1 / span 2; }
+  .play-zone--kingdom { grid-column: 1; grid-row: 1; }
+  .play-zone--hand { grid-column: 1; grid-row: 2; display: block !important; }
   .play-zone--court { grid-column: 2; grid-row: 1; }
-  .play-zone--log { grid-column: 2; grid-row: 2; }
+  .play-zone--log { grid-column: 2; grid-row: 2 / span 2; }
+  .hand-strip { display: none; }
 }
 
 .play-tabs {
@@ -543,6 +545,7 @@ svg.map-v3b--layered { background: #1c140c; }
   }
   .play-zone { display: none; }
   .play-tab-play .play-zone--kingdom,
+  .play-tab-hand .play-zone--hand,
   .play-tab-court .play-zone--court,
   .play-tab-log .play-zone--log { display: block; }
 }
@@ -720,3 +723,117 @@ svg.map-v3b--layered { background: #1c140c; }
 .toast {
   background: #1a1612; border-color: rgba(168,132,44,.4); color: var(--on-dark);
 }
+
+/* ---- Action card stubs + hand UI ---- */
+.hand-coach {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  margin: 0 0 var(--s4); padding: 10px 14px;
+  background: rgba(168,132,44,.14); border: 1px solid rgba(199,154,58,.35);
+  border-radius: 10px; color: var(--on-dark-soft); font-size: 13px;
+}
+.hand-strip {
+  background: linear-gradient(180deg, #fbf6e9, #efe3c6);
+  border-top: 1px solid #d8c6a0;
+  padding: 10px 12px 12px;
+}
+.hand-strip__head {
+  display: flex; align-items: center; gap: 8px; margin-bottom: 8px;
+}
+.hand-strip__title {
+  font-family: var(--serif); font-size: 13px; font-weight: 700; color: var(--ink);
+  letter-spacing: .04em;
+}
+.hand-strip__count {
+  font-size: 12px; font-weight: 700; color: var(--gold);
+  background: rgba(168,132,44,.12); padding: 2px 8px; border-radius: 999px;
+}
+.hand-strip__more { margin-left: auto; font-size: 11px !important; min-height: 32px !important; }
+.hand-strip__scroll {
+  display: flex; gap: 10px; overflow-x: auto; padding-bottom: 4px;
+  scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch;
+}
+.hand-strip__empty {
+  margin: 0; font-size: 12px; color: var(--ink-soft); font-style: italic;
+}
+.hand-tab-panel { margin-top: 0; }
+.hand-tab-panel__head {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;
+  margin-bottom: 12px;
+}
+.hand-tab-panel__count {
+  font-family: var(--serif); font-size: 14px; font-weight: 700; color: var(--gold);
+  white-space: nowrap; padding-top: 4px;
+}
+.hand-tab-panel__count--warn { color: var(--wax); }
+.hand-tab-panel__warn {
+  margin-bottom: 12px; padding: 10px 12px; border-radius: 8px;
+  background: rgba(140,47,35,.12); border: 1px solid rgba(140,47,35,.35);
+  font-size: 13px; color: var(--ink);
+}
+.hand-grid { display: flex; flex-direction: column; gap: 10px; }
+.hand-roles-block {
+  margin-top: var(--s5); padding-top: var(--s4);
+  border-top: 1px solid var(--line);
+}
+.hand-roles-block__title {
+  font-family: var(--serif); font-size: 17px; margin: 0 0 10px; color: var(--ink);
+}
+.action-row {
+  display: flex; align-items: stretch; gap: 10px;
+}
+.action-row__side {
+  display: flex; align-items: center; flex-shrink: 0;
+}
+.action-stub {
+  display: block; padding: 0; margin: 0; border: 0; background: none;
+  cursor: pointer; text-align: left; font: inherit; color: inherit;
+  flex-shrink: 0; scroll-snap-align: start;
+}
+.action-stub:focus { outline: none; }
+.action-stub:focus-visible .action-stub__frame {
+  box-shadow: 0 0 0 2px var(--gold-bright), var(--e2);
+}
+.action-stub__frame {
+  border: 2px solid rgba(168,132,44,.35);
+  border-radius: 10px; overflow: hidden;
+  background: #fbf6e9; box-shadow: var(--e1);
+  transition: transform .12s, box-shadow .15s, border-color .15s;
+  width: 100%;
+}
+.action-stub--compact { width: 108px; }
+.action-stub--full { flex: 1; min-width: 0; }
+.action-stub--playable .action-stub__frame {
+  border-color: var(--gold-bright);
+  box-shadow: 0 0 0 1px rgba(232,212,154,.45), 0 0 14px rgba(199,154,58,.28), var(--e2);
+}
+.action-stub--playable:hover .action-stub__frame { transform: translateY(-2px); }
+.action-stub__body {
+  padding: 8px 8px 6px; min-height: 54px;
+  background: linear-gradient(180deg, #fff, #f4ecd6);
+}
+.action-stub--compact .action-stub__body { min-height: 72px; }
+.action-stub__timing { font-size: 14px; line-height: 1; }
+.action-stub__name {
+  font-family: var(--serif); font-size: 12px; font-weight: 700;
+  line-height: 1.25; margin-top: 4px; color: var(--ink);
+}
+.action-stub--full .action-stub__name { font-size: 15px; }
+.action-stub__effect {
+  font-size: 11px; color: var(--ink-soft); margin-top: 4px; line-height: 1.35;
+}
+.action-stub__badge {
+  display: inline-block; margin-top: 6px; font-size: 9px; font-weight: 800;
+  letter-spacing: .08em; text-transform: uppercase;
+  color: var(--ink-soft); background: rgba(42,32,20,.08);
+  padding: 2px 6px; border-radius: 4px;
+}
+.action-stub__badge--play {
+  color: #6b4a12; background: rgba(199,154,58,.22);
+}
+.action-stub__foot {
+  background: var(--stub-deck, #5b4c38); color: #fbf6e9;
+  font-size: 9px; font-weight: 700; letter-spacing: .12em;
+  text-transform: uppercase; text-align: center; padding: 5px 6px;
+}
+.action-row__play { white-space: nowrap; }
+

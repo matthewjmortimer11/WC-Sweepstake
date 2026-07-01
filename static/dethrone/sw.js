@@ -1,5 +1,5 @@
 /* The Cursed Throne — offline shell for installed PWA */
-var CACHE = "dethrone-20260630-p25";
+var CACHE = "dethrone-20260630-p26";
 var SHELL = [
   "./",
   "./index.html",
@@ -11,6 +11,7 @@ var SHELL = [
   "./js/cards-roles.js",
   "./js/cards-court.js",
   "./js/cards-map.js",
+  "./js/cards-action.js",
   "./js/cards-extra.js",
   "./js/balance.js",
   "./js/report.js",

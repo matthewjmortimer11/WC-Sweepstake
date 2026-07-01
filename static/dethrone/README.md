@@ -24,6 +24,7 @@ open "index.html"          # macOS
 
 ### Phase 5 — playtest tooling & full card set
 - **Board art** — illustrated V3b kingdom poster (`cards/map/kingdom-background-v3b.jpg`) with curved gold/cursed roads, labelled site plaques, player tokens and per-location vignettes (see `board.js`, `cards-map.js`)
+- **Action card hand** — visible hand strip on the play screen, **Hand** tab with full grid + play buttons, V3b deck-coloured card stubs (`cards-action.js`)
 - **76 action cards** — full §27 deck in `cards-extra.js` (server synced in `dethrone/data.py`)
 - **Playtest report** — **Report** button exports a markdown chronicle (public info only); online rooms also at `GET /dethrone/api/rooms/{code}/report`
 - **Balance toggles** — host adjusts hand limit, corruption cap, Final Rite threshold, innocents to lose, starting gold/Rep in the lobby (online) or Test mode (local)
