@@ -327,6 +327,15 @@ ROLE_ABILITY_EFFECTS: dict[str, dict] = {
         "role": "graveyardguard", "name": "Stand Watch", "locations": ["graveyard"],
         "rep_loss": 1, "needs_target": True, "target_not_self": True,
     },
+    "gate_block_route": {
+        "role": "gateguard", "name": "Block Route",
+        "needs_target": True, "needs_path": True, "block_route": True,
+    },
+    "grave_watch_dead": {
+        "role": "graveyardguard", "name": "Watch the Dead",
+        "locations": ["barracks", "graveyard"],
+        "needs_target": True, "graveyard_watch": True,
+    },
 }
 
 # Role ids with standing exemption from royal / Tax Collector levies

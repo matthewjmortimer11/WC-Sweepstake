@@ -121,6 +121,8 @@ class CursedThroneGame:
         self.private_note_card_ids: dict[str, str] = {}
         self.tax_skip_remaining: dict[str, int] = {}
         self.royal_role_lost: bool = False
+        self.route_blocks: list[dict] = []
+        self.graveyard_watch: list[dict] = []
         self.balance: dict[str, int] = dict(D.DEFAULT_BALANCE)
 
     def _rule(self, key: str) -> int:
@@ -325,12 +327,30 @@ class CursedThroneGame:
     def _can_board_move(self, player: PlayerState) -> bool:
         return int(player.moves_used_this_turn) < self._move_limit(player)
 
+    def _route_blocked(self, player: PlayerState, dest: str) -> bool:
+        loc = player.location
+        for block in self.route_blocks:
+            if block.get("targetId") != player.id:
+                continue
+            a, b = block.get("locA"), block.get("locB")
+            if (loc == a and dest == b) or (loc == b and dest == a):
+                return True
+        return False
+
+    def _graveyard_watch_extra(self, player_id: str) -> int:
+        return sum(1 for w in self.graveyard_watch if w.get("targetId") == player_id)
+
+    def _expire_guard_effects_for(self, guard_id: str) -> None:
+        """Route blocks and Watch the Dead expire when the guard's next turn begins."""
+        self.route_blocks = [b for b in self.route_blocks if b.get("guardId") != guard_id]
+        self.graveyard_watch = [w for w in self.graveyard_watch if w.get("guardId") != guard_id]
+
     def legal_moves(self, player: PlayerState) -> list[str]:
         moves = list(D.CONNECTIONS.get(player.location, []))
         if player.location == "college" and self._role_power_active(player, "collegeadvisor"):
             if "scrolls" not in moves:
                 moves.append("scrolls")
-        return moves
+        return [m for m in moves if not self._route_blocked(player, m)]
 
     def move_player(self, pid: str, location_id: str, *, manual: bool = False, actor_id: Optional[str] = None) -> None:
         if self.status != STATUS_PLAY or self.winner:
@@ -482,6 +502,7 @@ class CursedThroneGame:
                 break
         wrapped = idx <= start
         self.active_player_index = idx
+        self._expire_guard_effects_for(self.players[idx].id)
         if wrapped:
             self.round += 1
             self._on_new_round()
@@ -1170,7 +1191,10 @@ class CursedThroneGame:
         defn = next((a for a in loc_acts if a["id"] == act_id), None)
         if not defn:
             raise MoveError("Unknown action.")
-        if ap.gold < defn.get("cost", 0):
+        base_cost = int(defn.get("cost", 0))
+        watch_extra = self._graveyard_watch_extra(ap.id) if act_id == "buy_grave" else 0
+        total_cost = base_cost + watch_extra
+        if ap.gold < total_cost:
             raise MoveError("Not enough gold.")
         if defn.get("requiresThrone"):
             t = self.throne
@@ -1179,7 +1203,7 @@ class CursedThroneGame:
         if act_id == "recover" and not (ap.wounded or ap.rep <= 2):
             raise MoveError("Nothing to recover.")
 
-        cost = defn.get("cost", 0)
+        cost = total_cost
         if cost:
             ap.gold -= cost
 
@@ -1196,7 +1220,13 @@ class CursedThroneGame:
             self._log(f"{ap.name} scavenged the Graveyard. +3 gold → {ap.gold}.")
             self._maybe_offer_rep_loss(ap.id, -1, "Scavenge")
         elif act_id == "buy_grave":
-            self._log(f"{ap.name} paid {cost} gold for a Graveyard card.")
+            if watch_extra:
+                self._log(
+                    f"{ap.name} paid {cost} gold for a Graveyard card "
+                    f"(+{watch_extra} from Watch the Dead).",
+                )
+            else:
+                self._log(f"{ap.name} paid {cost} gold for a Graveyard card.")
             self.adjust_corruption(1, "bought a Graveyard card")
             self.draw_card(ap.id, "Graveyard")
         elif act_id == "recover":
@@ -1253,7 +1283,14 @@ class CursedThroneGame:
         return {"ok": True}
 
     # ---- public role abilities (Phase 14) ----
-    def use_role_ability(self, actor_id: str, ability_id: str, target_id: Optional[str] = None) -> dict:
+    def use_role_ability(
+        self,
+        actor_id: str,
+        ability_id: str,
+        target_id: Optional[str] = None,
+        *,
+        path_to: Optional[str] = None,
+    ) -> dict:
         if self.status != STATUS_PLAY or self.winner:
             raise MoveError("No active game.")
         ap = self.active_player()
@@ -1289,6 +1326,12 @@ class CursedThroneGame:
                 raise MoveError("Target must be at your location.")
             if fx.get("target_not_self") and target.id == ap.id:
                 raise MoveError("Invalid target.")
+        if fx.get("needs_path"):
+            if not path_to:
+                raise MoveError("Path required.")
+            base_moves = list(D.CONNECTIONS.get(ap.location, []))
+            if path_to not in base_moves:
+                raise MoveError("Invalid path.")
         if cost:
             ap.gold -= cost
         aname = fx.get("name", ability_id)
@@ -1324,6 +1367,26 @@ class CursedThroneGame:
             self.adjust_gold(ap.id, int(fx["gold_gain"]), aname)
         elif fx.get("draw_deck"):
             self.draw_card(ap.id, fx["draw_deck"])
+        elif fx.get("block_route") and target and path_to:
+            if any(b.get("guardId") == ap.id for b in self.route_blocks):
+                raise MoveError("You already have an active route block.")
+            to_name = next((l["name"] for l in D.LOCATIONS if l["id"] == path_to), path_to)
+            self.route_blocks.append({
+                "guardId": ap.id,
+                "locA": ap.location,
+                "locB": path_to,
+                "targetId": target.id,
+            })
+            self._log(
+                f"{ap.name} blocks the path to {to_name} for {target.name} (until {ap.name}'s next turn).",
+            )
+        elif fx.get("graveyard_watch") and target:
+            if any(w.get("guardId") == ap.id for w in self.graveyard_watch):
+                raise MoveError("You already have an active Watch the Dead.")
+            self.graveyard_watch.append({"guardId": ap.id, "targetId": target.id})
+            self._log(
+                f"{ap.name} watches {target.name} — +1 gold on Graveyard buys until {ap.name}'s next turn.",
+            )
         if fx.get("once_per_round"):
             ap.abilities_used_this_round.append(ability_id)
         return {"ok": True}
@@ -1349,7 +1412,10 @@ class CursedThroneGame:
     def _role_bonus(self, p: PlayerState, key: str) -> int:
         if not p.public_role_id:
             return 0
-        return int(D.ROLE_META.get(p.public_role_id, {}).get(key, 0) or 0)
+        val = int(D.ROLE_META.get(p.public_role_id, {}).get(key, 0) or 0)
+        if key == "duelBonusDefence" and p.public_role_id == "royalguard" and p.location == "throne":
+            val = 2
+        return val
 
     def apply_role_discard(self, pid: str, slot: str, role_id: str, *, actor_id: Optional[str] = None) -> None:
         p = self.player_by_id(pid)
@@ -2789,8 +2855,14 @@ class CursedThroneGame:
                     if not others:
                         continue
                     target_id = rng.choice(others).id
+                path_to = None
+                if fx.get("needs_path"):
+                    paths = list(D.CONNECTIONS.get(p.location, []))
+                    if not paths:
+                        continue
+                    path_to = rng.choice(paths)
                 try:
-                    self.use_role_ability(p.id, aid, target_id)
+                    self.use_role_ability(p.id, aid, target_id, path_to=path_to)
                     return True
                 except MoveError:
                     continue
