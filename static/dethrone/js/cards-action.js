@@ -1,28 +1,13 @@
-/* The Cursed Throne — action card stubs (V3b deck chrome + iconic vignettes). */
+/* The Cursed Throne — action card stubs (V3b deck chrome + full-deck vignettes). */
 window.CT = window.CT || {};
 
-CT.ACTION_CARD_VERSION = window.__DETHRONE_CARD_V || "20260630-p29";
-CT.ACTION_CARD_FILES = {
-  secret_passage: "action-secret_passage-v3b.jpg",
-  counterfeit_pass: "action-counterfeit_pass-v3b.jpg",
-  rumour_card: "action-rumour_card-v3b.jpg",
-  call_out: "action-call_out-v3b.jpg",
-  hidden_knife: "action-hidden_knife-v3b.jpg",
-  shield: "action-shield-v3b.jpg",
-  arrest: "action-arrest-v3b.jpg",
-  soul_debt: "action-soul_debt-v3b.jpg",
-  grave_pact: "action-grave_pact-v3b.jpg",
-  royal_decree: "action-royal_decree-v3b.jpg",
-  pardon_card: "action-pardon_card-v3b.jpg",
-  tax_collector: "action-tax_collector-v3b.jpg",
-};
+CT.ACTION_CARD_VERSION = window.__DETHRONE_CARD_V || "20260630-p30";
 
 CT.actionCardUrl = function (cardId, opts) {
   opts = opts || {};
-  var file = CT.ACTION_CARD_FILES[cardId];
-  if (!file) return "";
+  if (!cardId) return "";
   var v = opts.v != null ? opts.v : CT.ACTION_CARD_VERSION;
-  return "cards/action/" + file + (v ? "?v=" + encodeURIComponent(v) : "");
+  return "cards/action/action-" + cardId + "-v3b.jpg" + (v ? "?v=" + encodeURIComponent(v) : "");
 };
 
 CT.actionCardArtHtml = function (cardId, opts) {
