@@ -918,6 +918,10 @@ svg.map-v3b--layered { background: #1c140c; }
   padding: 8px 0; border-bottom: 1px solid var(--line);
 }
 .helper-vote-card__btns { display: flex; gap: 8px; flex-wrap: wrap; }
+.helper-vote-card__meta { display: flex; flex-direction: column; gap: 6px; min-width: 140px; }
+.helper-vote-card__who { font-size: 13px; font-weight: 700; }
+.helper-vote-card__target { max-width: 180px; }
+.bribe-pending { background: rgba(168,132,44,.06); border-radius: var(--r2); padding: 8px 10px; }
 
 .pact-chips {
   display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: var(--s4);

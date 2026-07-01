@@ -821,6 +821,64 @@ def test_vote_card_hidden_witness(client):
     assert "hidden_witness" not in vp.action_card_ids
 
 
+def test_bribe_accepted_transfers_gold_and_sets_vote(client):
+    code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
+    room, pids, g = _start_game(code)
+    target_id = pids[2]
+    briber_id = pids[1]
+    voter_id = pids[3]
+    briber = g.player_by_id(briber_id)
+    target = g.player_by_id(target_id)
+    briber.gold = 3
+    target.gold = 1
+    briber.action_card_ids = ["bribe"]
+    votes = {voter_id: "no", briber_id: "yes"}
+    g.apply_formal_vote(
+        "accuse",
+        target_id,
+        votes,
+        bribes=[{
+            "briberId": briber_id,
+            "targetId": voter_id,
+            "side": "yes",
+            "accepted": True,
+        }],
+    )
+    assert briber.gold == 2
+    assert g.player_by_id(voter_id).gold == 3
+    assert "bribe" not in briber.action_card_ids
+    assert target_id in g.pending_role_discard
+
+
+def test_bribe_refused_discards_without_gold(client):
+    code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
+    room, pids, g = _start_game(code)
+    target_id = pids[2]
+    briber_id = pids[1]
+    voter_id = pids[3]
+    briber = g.player_by_id(briber_id)
+    voter = g.player_by_id(voter_id)
+    briber.gold = 3
+    voter.gold = 2
+    briber.action_card_ids = ["bribe"]
+    votes = {voter_id: "no", briber_id: "yes", pids[0]: "no"}
+    g.apply_formal_vote(
+        "accuse",
+        target_id,
+        votes,
+        bribes=[{
+            "briberId": briber_id,
+            "targetId": voter_id,
+            "side": "yes",
+            "accepted": False,
+        }],
+    )
+    assert briber.gold == 3
+    assert voter.gold == 2
+    assert "bribe" not in briber.action_card_ids
+    assert target_id not in g.pending_role_discard
+
+
 def test_stitched_lip_offers_on_rumour(client):
     code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
     room, pids, g = _start_game(code)

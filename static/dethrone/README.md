@@ -20,7 +20,7 @@ Offline file open still works:
 open "index.html"          # macOS
 ```
 
-## What is implemented (Phases 1–23)
+## What is implemented (Phases 1–24)
 
 ### Phase 5 — playtest tooling & full card set
 - **Board art** — illustrated V3b kingdom poster (`cards/map/kingdom-background-v3b.jpg`) with curved gold/cursed roads, labelled site plaques, player tokens and per-location vignettes (see `board.js`, `cards-map.js`)
@@ -123,6 +123,11 @@ open "index.html"          # macOS
 - **Bot location guards** — bots skip Royal Command unless they control the Throne; Serious Duel only once at Barracks
 - **Bot targeted cards** — bots play more auto cards with targets (Pardon, Loan Shark, Old Prophecy, Fence, etc.)
 - **Online peek art** — server syncs `privateNoteCardId` with investigation notes so online peeks show card vignettes
+
+### Phase 24 — Bribe in formal votes
+- **Vote helper** — during tally, offer 1 gold for a Yes/No vote; target accepts (gold transfers, vote set) or refuses
+- **Card art** — Bribe row uses the action vignette like Hidden Witness / Crown Witness
+- **Online sync** — `formalVote` carries resolved bribes; server validates gold, sets votes, discards the card
 
 ### Phase 4 — Throne & Succession
 A **Throne & Succession** panel tracks the crown and the line of succession.

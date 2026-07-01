@@ -1645,6 +1645,40 @@ class CursedThroneGame:
             self._log(f"{claimant.name}'s \"{label}\" was a failed bluff and they must lose a role.")
             self.require_role_discard(claimant_id, "challenge")
 
+    def _apply_vote_bribes(
+        self,
+        bribes: Optional[list[dict]],
+        votes: dict[str, str],
+    ) -> None:
+        for br in bribes or []:
+            briber_id = str(br.get("briberId", ""))
+            target_id = str(br.get("targetId", ""))
+            side = br.get("side")
+            accepted = bool(br.get("accepted"))
+            briber = self.player_by_id(briber_id)
+            target = self.player_by_id(target_id)
+            if not briber or not target or briber.status != "active" or target.status != "active":
+                raise MoveError("Invalid bribe players.")
+            if briber_id == target_id:
+                raise MoveError("Cannot bribe yourself.")
+            if D.VOTE_BRIBE_CARD not in briber.action_card_ids:
+                raise MoveError("Bribe card not in hand.")
+            if side not in ("yes", "no"):
+                raise MoveError("Bribe needs yes or no side.")
+            if accepted:
+                if briber.gold < 1:
+                    raise MoveError("Not enough gold to bribe.")
+                briber.gold -= 1
+                target.gold += 1
+                votes[target_id] = side
+                self._log(
+                    f"{target.name} accepted {briber.name}'s bribe and votes {side}.",
+                    "note",
+                )
+            else:
+                self._log(f"{target.name} refused {briber.name}'s bribe.", "note")
+            self.discard_card(briber_id, D.VOTE_BRIBE_CARD, "vote")
+
     def apply_formal_vote(
         self,
         vtype: str,
@@ -1655,12 +1689,14 @@ class CursedThroneGame:
         *,
         emergency: bool = False,
         vote_cards: Optional[list[dict]] = None,
+        bribes: Optional[list[dict]] = None,
     ) -> None:
         if self.status != STATUS_PLAY or self.winner:
             raise MoveError("No active game.")
         target = self.player_by_id(target_id)
         if not target:
             raise MoveError("Unknown target.")
+        self._apply_vote_bribes(bribes, votes)
         yes = bonus_yes
         no = bonus_no
         for vc in vote_cards or []:

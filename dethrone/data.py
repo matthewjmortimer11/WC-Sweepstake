@@ -260,6 +260,8 @@ VOTE_CARD_BONUSES: dict[str, int] = {
     "crown_witness": 2,
 }
 
+VOTE_BRIBE_CARD = "bribe"
+
 # Reaction cards — offered to the affected player before the effect resolves
 REACTION_EFFECTS: dict[str, dict] = {
     "stitched_lip": {"trigger": "rumour", "action": "cancel"},

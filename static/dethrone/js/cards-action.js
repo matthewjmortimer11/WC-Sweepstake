@@ -258,6 +258,25 @@ CT.voteCardRowHtml = function (player, cardId, used) {
     + "</div></div>";
 };
 
+CT.bribeOfferRowHtml = function (player, ps, u) {
+  if (!player || !ps) return "";
+  var others = ps.filter(function (x) { return x.id !== player.id; });
+  var stub = CT.actionCardStubHtml("bribe", player, { compact: true, showBadge: false, interactive: false });
+  return '<div class="helper-vote-card helper-vote-card--bribe">'
+    + stub
+    + '<div class="helper-vote-card__meta"><span class="helper-vote-card__who">' + CT.esc(player.name) + "</span>"
+    + '<select class="helper-vote-card__target" data-act="h-v-bribe-target" data-briber="' + player.id + '">'
+    + '<option value="">— target —</option>'
+    + others.map(function (x) { return '<option value="' + x.id + '">' + CT.esc(x.name) + "</option>"; }).join("")
+    + "</select></div>"
+    + '<div class="helper-vote-card__btns">'
+    + '<button type="button" class="btn btn-sm btn-primary" data-act="h-v-bribe-offer" data-briber="' + player.id
+    + '" data-side="yes">Offer 1g → Yes</button>'
+    + '<button type="button" class="btn btn-sm btn-danger" data-act="h-v-bribe-offer" data-briber="' + player.id
+    + '" data-side="no">Offer 1g → No</button>"
+    + "</div></div>";
+};
+
 CT.handGridHtml = function (player, opts) {
   opts = opts || {};
   if (!player) return '<p class="muted">No hand to show.</p>';

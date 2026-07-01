@@ -55,6 +55,42 @@ function voteCardsInHand(player) {
   return player.actionCardIds.filter(function (id) { return CT.VOTE_CARD_BONUSES[id]; });
 }
 
+function canOfferBribe(player, u) {
+  if (!player || player.actionCardIds.indexOf("bribe") === -1 || player.gold < 1) return false;
+  return !(u.bribes || []).some(function (b) { return b.briberId === player.id; });
+}
+
+function voteBribesHtml(ps, u) {
+  var pending = (u.bribes || []).filter(function (b) { return b.status === "pending"; });
+  var offerRows = ps.filter(function (p) { return canOfferBribe(p, u); }).map(function (p) {
+    if (CT.bribeOfferRowHtml) return CT.bribeOfferRowHtml(p, ps, u);
+    var others = ps.filter(function (x) { return x.id !== p.id; });
+    return '<div class="vote-row" style="font-size:13px"><span>' + CT.esc(p.name) + ': Bribe</span>'
+      + '<select data-act="h-v-bribe-target" data-briber="' + p.id + '">'
+      + '<option value="">— target —</option>'
+      + others.map(function (x) { return '<option value="' + x.id + '">' + CT.esc(x.name) + "</option>"; }).join("")
+      + '</select><div class="btn-row">'
+      + '<button class="btn btn-sm btn-primary" data-act="h-v-bribe-offer" data-briber="' + p.id + '" data-side="yes">Offer 1g → Yes</button>'
+      + '<button class="btn btn-sm btn-danger" data-act="h-v-bribe-offer" data-briber="' + p.id + '" data-side="no">Offer 1g → No</button>'
+      + "</div></div>";
+  }).join("");
+  var pendingRows = pending.map(function (b) {
+    var briber = CT.playerById(b.briberId), target = CT.playerById(b.targetId);
+  var sideLbl = b.side === "yes" ? "Yes" : "No";
+    return '<div class="vote-row bribe-pending"><span>'
+      + CT.esc(briber ? briber.name : "?") + " offers " + CT.esc(target ? target.name : "?")
+      + " <strong>1 gold</strong> to vote " + sideLbl + "</span>"
+      + '<div class="btn-row"><button class="btn btn-sm btn-primary" data-act="h-v-bribe-respond" data-briber="' + b.briberId
+      + '" data-accept="1">Accept</button><button class="btn btn-sm btn-ghost" data-act="h-v-bribe-respond" data-briber="'
+      + b.briberId + '" data-accept="0">Refuse</button></div></div>';
+  }).join("");
+  if (!offerRows && !pendingRows) return "";
+  var html = "";
+  if (offerRows) html += '<h3 style="margin:14px 0 8px;font-size:15px">Bribe</h3><div class="stack" style="gap:6px">' + offerRows + "</div>";
+  if (pendingRows) html += '<div class="stack" style="gap:6px;margin-top:8px">' + pendingRows + "</div>";
+  return html;
+}
+
 CT.helpers.view = function () {
   var u = CT.helpers.ui;
   switch (u.open) {
@@ -92,6 +128,7 @@ CT.helpers.openVote = function () {
   CT.helpers.ui = {
     open: "vote", vtype: "accuse", proposer: "", target: "", seconder: false,
     decree: false, emergency: false, phase: "setup", votes: {}, bonusYes: 0, bonusNo: 0, voteCards: [],
+    bribes: [],
   };
   CT.render();
 };
@@ -99,7 +136,7 @@ CT.helpers.openVoteFromPending = function (pui) {
   CT.helpers.ui = {
     open: "vote", vtype: pui.voteType || "accuse", proposer: pui.proposerId || "",
     target: pui.targetId || "", seconder: false, decree: !!pui.decree, emergency: !!pui.emergency,
-    phase: "setup", votes: {}, bonusYes: 0, bonusNo: 0, voteCards: [],
+    phase: "setup", votes: {}, bonusYes: 0, bonusNo: 0, voteCards: [], bribes: [],
   };
   if (CT.isOnline()) CT.net.send({ type: "clearPendingUi" });
   CT.render();
@@ -168,11 +205,13 @@ CT.helpers.vVote = function () {
         + '<button class="btn btn-sm btn-danger" data-act="h-v-playcard" data-pid="' + p.id + '" data-id="' + cid + '" data-side="no">+No</button></div></div>';
     }).join("");
   }).join("");
+  var bribeBtns = voteBribesHtml(ps, u);
   return wrap('<div class="eyebrow">' + (u.vtype === "accuse" ? "Accuse Cursed" : "Banish Threat") + ' · target: ' + CT.esc((CT.playerById(u.target) || {}).name || "?") + '</div>'
     + '<h2 style="margin:4px 0 10px">Cast votes</h2>'
     + (u.emergency ? '<p class="tag wax" style="margin-bottom:8px">Emergency Council — players at Throne &amp; Market must vote</p>' : "")
     + '<div class="stack" style="gap:6px">' + rows + "</div>"
     + (voteCardBtns ? '<h3 style="margin:14px 0 8px;font-size:15px">Vote cards</h3><div class="stack" style="gap:6px">' + voteCardBtns + "</div>" : "")
+    + bribeBtns
     + '<div class="row" style="gap:18px;margin-top:12px"><span class="muted" style="font-size:13px">Manual extra weight:</span>'
     + '<span>Yes <button class="step" data-act="h-v-bonus" data-side="yes" data-d="-1">−</button> ' + u.bonusYes + ' <button class="step" data-act="h-v-bonus" data-side="yes" data-d="1">+</button></span>'
     + '<span>No <button class="step" data-act="h-v-bonus" data-side="no" data-d="-1">−</button> ' + u.bonusNo + ' <button class="step" data-act="h-v-bonus" data-side="no" data-d="1">+</button></span></div>'
@@ -209,7 +248,7 @@ CT.helpers.openRoyalCommandFromPending = function (ui) {
 CT.helpers.openVoteFromDecree = function (proposerId) {
   CT.helpers.ui = {
     open: "vote", vtype: "accuse", proposer: proposerId || "", target: "",
-    seconder: false, decree: true, phase: "setup", votes: {}, bonusYes: 0, bonusNo: 0,
+    seconder: false, decree: true, phase: "setup", votes: {}, bonusYes: 0, bonusNo: 0, voteCards: [], bribes: [],
   };
   CT.render();
 };
@@ -539,6 +578,42 @@ CT.helpers.handle = function (act, el) {
       if (!u.voteCards) u.voteCards = [];
       u.voteCards.push({ playerId: el.dataset.pid, cardId: el.dataset.id, side: el.dataset.side });
       return CT.render();
+    case "h-v-bribe-offer": {
+      var briberId = el.dataset.briber, side = el.dataset.side;
+      var sel = document.querySelector('select[data-act="h-v-bribe-target"][data-briber="' + briberId + '"]');
+      var targetId = sel ? sel.value : "";
+      if (!targetId || targetId === briberId) { alert("Choose a different player to bribe."); return; }
+      var briber = CT.playerById(briberId);
+      if (!canOfferBribe(briber, u)) { alert("Cannot offer a bribe."); return; }
+      if (!u.bribes) u.bribes = [];
+      u.bribes.push({ briberId: briberId, targetId: targetId, side: side, status: "pending" });
+      return CT.render();
+    }
+    case "h-v-bribe-respond": {
+      var briberId = el.dataset.briber;
+      var accepted = el.dataset.accept === "1";
+      var b = (u.bribes || []).find(function (x) { return x.briberId === briberId && x.status === "pending"; });
+      if (!b) return;
+      var briber = CT.playerById(b.briberId), target = CT.playerById(b.targetId);
+      if (accepted) {
+        if (!briber || briber.gold < 1) { alert("Briber cannot pay."); return; }
+        if (!CT.isOnline()) {
+          briber.gold -= 1;
+          target.gold += 1;
+        }
+        u.votes[b.targetId] = b.side;
+        CT.log((target ? target.name : "?") + " accepted " + (briber ? briber.name : "?")
+          + "'s bribe and votes " + b.side + ".", "note");
+        b.status = "accepted";
+      } else {
+        CT.log((target ? target.name : "?") + " refused " + (briber ? briber.name : "?") + "'s bribe.", "note");
+        b.status = "refused";
+      }
+      if (!CT.isOnline() && briber && briber.actionCardIds.indexOf("bribe") !== -1) {
+        CT.discardCard(b.briberId, "bribe", "vote");
+      }
+      return CT.render();
+    }
     case "h-v-apply": return CT.helpers.applyVote();
 
     // duel
@@ -665,14 +740,21 @@ CT.helpers.handle = function (act, el) {
 /* ---------- apply functions ---------- */
 CT.helpers.applyVote = function () {
   var u = CT.helpers.ui, ps = actives();
+  if ((u.bribes || []).some(function (b) { return b.status === "pending"; })) {
+    alert("Resolve pending bribes before applying the vote.");
+    return;
+  }
+  var resolvedBribes = (u.bribes || []).map(function (b) {
+    return { briberId: b.briberId, targetId: b.targetId, side: b.side, accepted: b.status === "accepted" };
+  });
   if (CT.isOnline()) {
     CT.net.send({
       type: "formalVote", vtype: u.vtype, targetId: u.target,
       votes: u.votes, bonusYes: u.bonusYes, bonusNo: u.bonusNo,
-      emergency: !!u.emergency, voteCards: u.voteCards || [],
+      emergency: !!u.emergency, voteCards: u.voteCards || [], bribes: resolvedBribes,
     });
     u.open = null;
-    return;
+    return CT.render();
   }
   var yes = 0, no = 0;
   if (u.emergency) {
