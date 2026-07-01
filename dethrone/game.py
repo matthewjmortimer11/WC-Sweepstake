@@ -116,6 +116,7 @@ class CursedThroneGame:
         self.pending_role_discard: dict[str, dict] = {}
         self.pending_ui_action: dict[str, dict] = {}
         self.private_notes: dict[str, str] = {}
+        self.private_note_card_ids: dict[str, str] = {}
         self.tax_skip_remaining: dict[str, int] = {}
         self.royal_role_lost: bool = False
         self.balance: dict[str, int] = dict(D.DEFAULT_BALANCE)
@@ -591,8 +592,12 @@ class CursedThroneGame:
             pile = self.decks[deck_name]
         return pile
 
-    def _set_private_note(self, pid: str, text: str) -> None:
+    def _set_private_note(self, pid: str, text: str, card_id: Optional[str] = None) -> None:
         self.private_notes[pid] = text
+        if card_id:
+            self.private_note_card_ids[pid] = card_id
+        else:
+            self.private_note_card_ids.pop(pid, None)
 
     def _players_at(self, location_id: str, *, exclude: Optional[str] = None) -> list[PlayerState]:
         return [
@@ -818,14 +823,14 @@ class CursedThroneGame:
             top = pile[0] if pile else None
             cmeta = D.CARD_BY_ID.get(top or "", {})
             label = cmeta.get("name", top or "nothing")
-            self._set_private_note(pid, f"Top of {deck_name} deck: {label}")
+            self._set_private_note(pid, f"Top of {deck_name} deck: {label}", top)
             self._log(f"{p.name} consulted the {deck_name} deck.", "note")
         if fx.get("peek_discard_top") and deck_name:
             disc = self.discards.get(deck_name, [])
             top = disc[-1] if disc else None
             cmeta = D.CARD_BY_ID.get(top or "", {})
             label = cmeta.get("name", top or "empty")
-            self._set_private_note(pid, f"Top of {deck_name} discard: {label}")
+            self._set_private_note(pid, f"Top of {deck_name} discard: {label}", top)
             self._log(f"{p.name} read the {deck_name} discard pile.", "note")
         if fx.get("peek_discard_random"):
             dname = fx["peek_discard_random"]
@@ -834,7 +839,7 @@ class CursedThroneGame:
                 pick = disc[rng.randrange(len(disc))]
                 cmeta = D.CARD_BY_ID.get(pick, {})
                 label = cmeta.get("name", pick)
-                self._set_private_note(pid, f"Graveyard discard (random): {label}")
+                self._set_private_note(pid, f"Graveyard discard (random): {label}", pick)
             else:
                 self._set_private_note(pid, "Graveyard discard pile is empty.")
             self._log(f"{p.name} listened to the Graveyard whispers.", "note")
@@ -1019,7 +1024,7 @@ class CursedThroneGame:
             pile = self._ensure_draw_pile(deck_name, rng)
             top = pile[0] if pile else None
             label = D.CARD_BY_ID.get(top or "", {}).get("name", top or "nothing")
-            self._set_private_note(pid, f"Top of {deck_name} deck: {label}")
+            self._set_private_note(pid, f"Top of {deck_name} deck: {label}", top)
             self._log(f"{ap.name} surveyed the {deck_name} archives (Deep Research).", "note")
         elif mode == "discard_top":
             if not deck_name or deck_name not in D.DECK_NAMES:
@@ -1027,7 +1032,7 @@ class CursedThroneGame:
             disc = self.discards.get(deck_name, [])
             top = disc[-1] if disc else None
             label = D.CARD_BY_ID.get(top or "", {}).get("name", top or "empty")
-            self._set_private_note(pid, f"Top of {deck_name} discard: {label}")
+            self._set_private_note(pid, f"Top of {deck_name} discard: {label}", top)
             self._log(f"{ap.name} read the {deck_name} ledgers (Deep Research).", "note")
         elif mode == "discard_random":
             if not deck_name or deck_name not in D.DECK_NAMES:
@@ -1036,7 +1041,7 @@ class CursedThroneGame:
             if disc:
                 pick = disc[rng.randrange(len(disc))]
                 label = D.CARD_BY_ID.get(pick, {}).get("name", pick)
-                self._set_private_note(pid, f"{deck_name} discard (random): {label}")
+                self._set_private_note(pid, f"{deck_name} discard (random): {label}", pick)
             else:
                 self._set_private_note(pid, f"{deck_name} discard pile is empty.")
             self._log(f"{ap.name} cross-referenced the {deck_name} records (Deep Research).", "note")
@@ -1053,7 +1058,7 @@ class CursedThroneGame:
             else:
                 pick = target.action_card_ids[rng.randrange(len(target.action_card_ids))]
                 label = D.CARD_BY_ID.get(pick, {}).get("name", pick)
-                self._set_private_note(pid, f"{target.name}'s hand includes: {label}")
+                self._set_private_note(pid, f"{target.name}'s hand includes: {label}", pick)
             self._log(f"{ap.name} interviewed {target.name} at the Scrolls (Deep Research).", "note")
         else:
             raise MoveError("Unknown investigation type.")
@@ -1208,7 +1213,7 @@ class CursedThroneGame:
             if target.action_card_ids:
                 pick = target.action_card_ids[random.randrange(len(target.action_card_ids))]
                 label = D.CARD_BY_ID.get(pick, {}).get("name", pick)
-                self._set_private_note(ap.id, f"{target.name}'s hand includes: {label}")
+                self._set_private_note(ap.id, f"{target.name}'s hand includes: {label}", pick)
             else:
                 self._set_private_note(ap.id, f"{target.name} has no action cards.")
             self._log(f"{ap.name} peeked at {target.name}'s hand.", "note")
@@ -1979,6 +1984,36 @@ class CursedThroneGame:
             return False
         return False
 
+    def _bot_throne_controller(self, p: PlayerState) -> bool:
+        t = self.throne
+        return p.id in (t.get("kingControllerId"), t.get("queenControllerId"))
+
+    def _bot_location_action_ok(self, p: PlayerState, act: dict) -> bool:
+        if act.get("manual"):
+            return False
+        if p.gold < act.get("cost", 0):
+            return False
+        if act["id"] == "recover" and not (p.wounded or p.rep <= 2):
+            return False
+        if act.get("requiresThrone") and not self._bot_throne_controller(p):
+            return False
+        if act["id"] == "serious_duel":
+            if p.location != "barracks" or p.serious_duel_used:
+                return False
+        return True
+
+    def _bot_auto_targets(self, p: PlayerState, fx: dict) -> list[PlayerState]:
+        others = [x for x in self.players if x.status == "active" and x.id != p.id]
+        if fx.get("same_location"):
+            others = [x for x in others if x.location == p.location]
+        if fx.get("at_location") and p.location != fx["at_location"]:
+            return []
+        ov = fx.get("open_vote") or {}
+        max_rep = ov.get("max_rep")
+        if max_rep is not None:
+            others = [x for x in others if x.rep <= max_rep]
+        return others
+
     def _bot_try_play_card(self, p: PlayerState, rng: random.Random) -> bool:
         """Play a simple auto card or public role ability when useful."""
         if rng.random() > 0.45:
@@ -2040,6 +2075,57 @@ class CursedThroneGame:
                     return True
                 except MoveError:
                     pass
+        targeted = [
+            cid for cid in p.action_card_ids
+            if cid in D.CARD_AUTO_EFFECTS
+            and D.CARD_AUTO_EFFECTS[cid].get("needs_target")
+            and not D.CARD_AUTO_EFFECTS[cid].get("open_duel")
+            and not D.CARD_AUTO_EFFECTS[cid].get("open_vote")
+            and not D.CARD_AUTO_EFFECTS[cid].get("open_callout")
+        ]
+        if targeted and rng.random() < 0.35:
+            cid = rng.choice(targeted)
+            fx = D.CARD_AUTO_EFFECTS[cid]
+            targets = self._bot_auto_targets(p, fx)
+            if fx.get("optional_target") or targets:
+                target = rng.choice(targets) if targets else None
+                kwargs: dict[str, Any] = {"rng": rng}
+                skip = False
+                if target:
+                    kwargs["target_id"] = target.id
+                if fx.get("needs_deck"):
+                    kwargs["deck_name"] = rng.choice(D.DECK_NAMES)
+                if fx.get("needs_location"):
+                    if fx.get("named_location"):
+                        kwargs["location_id"] = rng.choice([loc["id"] for loc in D.LOCATIONS])
+                    elif not self.legal_moves(p):
+                        skip = True
+                    else:
+                        kwargs["location_id"] = rng.choice(self.legal_moves(p))
+                if fx.get("needs_discard_card"):
+                    sellable = [c for c in p.action_card_ids if c != cid]
+                    if sellable:
+                        kwargs["discard_card_id"] = rng.choice(sellable)
+                    else:
+                        skip = True
+                if fx.get("cost_gold") and p.gold < int(fx["cost_gold"]):
+                    skip = True
+                if fx.get("needs_target") and not fx.get("optional_target") and not target:
+                    skip = True
+                if fx.get("needs_deck") and "deck_name" not in kwargs:
+                    skip = True
+                if fx.get("needs_location") and "location_id" not in kwargs:
+                    skip = True
+                if fx.get("needs_discard_card") and "discard_card_id" not in kwargs:
+                    skip = True
+                if not skip:
+                    try:
+                        self.play_action_card(p.id, cid, **kwargs)
+                        if p.id in self.pending_ui_action:
+                            self._bot_resolve_pending(p.id, rng)
+                        return True
+                    except MoveError:
+                        pass
         return False
 
     def _bot_try_succession(self, p: PlayerState, rng: random.Random) -> bool:
@@ -2161,11 +2247,7 @@ class CursedThroneGame:
                 self.do_location_action(p.id, "petition")
                 return
         acts = D.LOCATION_ACTIONS.get(loc, [])
-        doable = [
-            a for a in acts
-            if not a.get("manual") and p.gold >= a.get("cost", 0)
-            and not (a["id"] == "recover" and not (p.wounded or p.rep <= 2))
-        ]
+        doable = [a for a in acts if self._bot_location_action_ok(p, a)]
         if not doable:
             return
         basic = [a for a in doable if a.get("kind") == "basic"]
@@ -2233,6 +2315,7 @@ class CursedThroneGame:
             "pendingRoleDiscard": self.pending_role_discard.get(pid),
             "pendingUiAction": self.pending_ui_action.get(pid),
             "privateNote": self.private_notes.get(pid),
+            "privateNoteCardId": self.private_note_card_ids.get(pid),
             "balance": dict(self.balance),
             "setup": {
                 "dealtRoleIds": setup_dealt,
@@ -2291,6 +2374,7 @@ class CursedThroneGame:
             "pendingRoleDiscard": v["pendingRoleDiscard"],
             "pendingUiAction": v.get("pendingUiAction"),
             "privateNote": v.get("privateNote"),
+            "privateNoteCardId": v.get("privateNoteCardId"),
             "balance": v["balance"],
             "setup": v["setup"],
         }

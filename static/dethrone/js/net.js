@@ -114,8 +114,16 @@ CT.net.applyState = function (msg) {
       if (CT.ui.reactionOffer && CT.ui.reactionOffer.playerId === CT.myId()) CT.ui.reactionOffer = null;
       if (CT.ui.reactionMove && CT.ui.reactionMove.playerId === CT.myId()) CT.ui.reactionMove = null;
     }
-    if (cs.privateNote && CT.myId()) {
-      CT.ui.privateNote = cs.privateNote;
+    if (cs.privateNote != null && CT.myId()) {
+      if (typeof CT.setPrivateNote === "function") {
+        CT.setPrivateNote(cs.privateNote, cs.privateNoteCardId || null);
+      } else {
+        CT.ui.privateNote = cs.privateNote;
+        CT.ui.privateNoteCardId = cs.privateNoteCardId || null;
+      }
+    } else if (CT.myId()) {
+      CT.ui.privateNote = null;
+      CT.ui.privateNoteCardId = null;
     }
     if (cs.pendingRoleDiscard && CT.myId()) {
       CT.ui.roleDiscardFor = CT.myId();

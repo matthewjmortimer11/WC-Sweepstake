@@ -601,6 +601,9 @@ def test_deep_research_deck_top_note(client):
     g.apply_deep_research(active, "deck_top", deck_name="Knowledge")
     view = room.state_for(active)["room"]["game"]
     assert "old_prophecy" in view["privateNote"]
+    assert view.get("privateNoteCardId") == "old_prophecy"
+    cs = room.state_for(active)["room"]["clientState"]
+    assert cs.get("privateNoteCardId") == "old_prophecy"
     assert active not in g.pending_ui_action
 
 
@@ -618,6 +621,30 @@ def test_deep_research_witness_note(client):
     g.apply_deep_research(active, "witness", target_id=witness, rng=__import__("random").Random(0))
     view = room.state_for(active)["room"]["game"]
     assert "spare_coin_purse" in view["privateNote"]
+    assert view.get("privateNoteCardId") == "spare_coin_purse"
+
+
+def test_bot_skips_royal_command_without_throne(client):
+    """Bots at the Throne must not exercise Royal Command unless they control it."""
+    code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
+    room = manager.get(code)
+    manager.join(room, "human1", "Alice")
+    room.players["human1"].connected = True
+    manager.fill_bots(room)
+    manager.deal_setup(room)
+    g = room.game
+    for p in g.players:
+        pub = next(r for r in p.dealt_role_ids if D_ROLE_META_PUBLIC(r))
+        g.pick_public_role(p.id, pub)
+    manager.begin_game(room, "random", 0)
+    bot = next(p for p in g.players if p.is_bot)
+    bot.location = "throne"
+    g.throne["kingControllerId"] = None
+    g.throne["queenControllerId"] = None
+    g.active_player_index = g.players.index(bot)
+    rng = __import__("random").Random(42)
+    g.bot_take_turn(bot.id, rng)
+    assert g.pending_ui_action.get(bot.id, {}).get("kind") != "royal_command"
 
 
 def test_loyal_bot_can_call_out_cursed(client):

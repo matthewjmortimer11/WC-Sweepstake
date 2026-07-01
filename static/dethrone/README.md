@@ -20,7 +20,7 @@ Offline file open still works:
 open "index.html"          # macOS
 ```
 
-## What is implemented (Phases 1–22)
+## What is implemented (Phases 1–23)
 
 ### Phase 5 — playtest tooling & full card set
 - **Board art** — illustrated V3b kingdom poster (`cards/map/kingdom-background-v3b.jpg`) with curved gold/cursed roads, labelled site plaques, player tokens and per-location vignettes (see `board.js`, `cards-map.js`)
@@ -118,6 +118,11 @@ open "index.html"          # macOS
 - **Play & reaction modals** — card art in play prompts, Fence sell picker, and reaction offers
 - **Peek previews** — archives / investigation notes show the peeked card with art
 - **Manual card focus** — tap a non-playable card for effect + Parley shortcut where applicable
+
+### Phase 23 — Bot hardening & online peek sync
+- **Bot location guards** — bots skip Royal Command unless they control the Throne; Serious Duel only once at Barracks
+- **Bot targeted cards** — bots play more auto cards with targets (Pardon, Loan Shark, Old Prophecy, Fence, etc.)
+- **Online peek art** — server syncs `privateNoteCardId` with investigation notes so online peeks show card vignettes
 
 ### Phase 4 — Throne & Succession
 A **Throne & Succession** panel tracks the crown and the line of succession.
