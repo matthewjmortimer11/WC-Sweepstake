@@ -2149,27 +2149,29 @@ def test_hidden_tantrum(client):
     for p in g.players:
         if p.id not in (active, victim_id):
             p.location = "tavern"
-        p.hidden_role_ids = [r for r in p.hidden_role_ids if r not in ("spy", "queen", "royalguard")]
+        p.public_role_id = "gateguard"
+        p.hidden_role_ids = ["wanderingknight", "youngknight"]
         p.action_card_ids = []
     ap.hidden_role_ids = ["tinytyrant", "wanderingknight", "youngknight"]
-    ap.public_role_id = "gateguard"
-    vp.public_role_id = "gateguard"
-    vp.hidden_role_ids = ["wanderingknight", "youngknight"]
     vp.rep = 3
     g.use_role_power(active, "tantrum", victim_id)
     assert "tyrant_tantrum" in ap.abilities_used_this_round
-    while g.pending_ui_action.get(victim_id):
-        kind = g.pending_ui_action[victim_id].get("kind")
-        if kind == "reaction":
-            g.resolve_reaction(victim_id, None)
-        elif kind == "false_trail":
-            g.resolve_false_trail(victim_id, accept=False)
-        elif kind == "sanctuary":
-            g.resolve_sanctuary(victim_id, accept=False)
-        elif kind == "protect":
-            g.resolve_protect(victim_id, accept=False)
-        else:
+    for _ in range(8):
+        pending = g.pending_ui_action
+        if not pending:
             break
+        for pid, act in list(pending.items()):
+            kind = act.get("kind")
+            if kind == "reaction":
+                g.resolve_reaction(pid, None)
+            elif kind == "false_trail":
+                g.resolve_false_trail(pid, accept=False)
+            elif kind == "sanctuary":
+                g.resolve_sanctuary(pid, accept=False)
+            elif kind == "protect":
+                g.resolve_protect(pid, accept=False)
+            else:
+                pending.pop(pid, None)
     assert vp.rep == 2
 
 
