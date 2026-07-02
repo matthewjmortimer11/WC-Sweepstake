@@ -75,7 +75,7 @@ sleep 1
 
 STARTED=0
 WINNING_ENTRY=""
-for entry in local_app.py server.py; do
+for entry in server.py local_app.py; do
   if [[ ! -f "$DASH/$entry" ]]; then
     log "Skip missing $entry"
     continue
@@ -112,7 +112,7 @@ if [[ "$STARTED" -eq 0 ]]; then
 fi
 
 log "--- Keep dashboard running in background ---"
-nohup python3 "$DASH/${entry:-local_app.py}" >"$LOG_DIR/dashboard.log" 2>&1 &
+nohup python3 "$DASH/$WINNING_ENTRY" >"$LOG_DIR/dashboard.log" 2>&1 &
 echo $! >"$LOG_DIR/dashboard.pid"
 sleep 2
 log "Dashboard pid $(cat "$LOG_DIR/dashboard.pid")"

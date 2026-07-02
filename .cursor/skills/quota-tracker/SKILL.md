@@ -10,7 +10,7 @@ makes updates live on their dashboard.
 
 ## One-time setup (user's machine)
 
-1. Start the Quota Tracker app (default `http://127.0.0.1:8765`).
+1. Start the Mission Control **web server** (Codex app: `python3 server.py`, not `local_app.py` which only polls an existing server).
 2. From this repo root:
 
 ```bash

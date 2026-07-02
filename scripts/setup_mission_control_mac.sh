@@ -31,8 +31,12 @@ DASH="$(find_dashboard)" || {
 echo "Using dashboard: $DASH"
 
 if ! port_up "http://127.0.0.1:8765/"; then
-  echo "Starting Mission Control on :8765..."
-  nohup python3 "$DASH/local_app.py" >"$LOG_DIR/dashboard.log" 2>&1 &
+  echo "Starting Mission Control web server on :8765..."
+  ENTRY=server.py
+  if [[ ! -f "$DASH/server.py" ]]; then
+    ENTRY=local_app.py
+  fi
+  nohup python3 "$DASH/$ENTRY" >"$LOG_DIR/dashboard.log" 2>&1 &
   echo $! >"$LOG_DIR/dashboard.pid"
   for _ in $(seq 1 20); do
     port_up "http://127.0.0.1:8765/" && break
