@@ -1967,12 +1967,13 @@ def test_hold_ground_blocks_drive_out(client):
     defender = g.player_by_id(def_id)
     att.location = defender.location = "barracks"
     defender.hidden_role_ids = ["gateguard", "thief", "wanderingknight"]
-    defender.public_role_id = "thief"
+    defender.public_role_id = "gateguard"
+    att.public_role_id = "collegeadvisor"
     before_loc = defender.location
     _strip_royal_guards(g)
     _strip_royal_knights(g)
     g.duel_apply_consequence(
-        att_id, def_id, 1, 0, False, "drive", random.Random(0),
+        att_id, def_id, 2, 0, False, "drive", random.Random(0),
     )
     assert defender.location == before_loc
 
@@ -2135,6 +2136,100 @@ def test_kneel_cancels_vote(client):
     assert g.pending_ui_action.get(target, {}).get("kind") == "reaction"
     g.resolve_reaction(target, "kneel")
     assert target not in g.pending_role_discard
+
+
+def test_hidden_tantrum(client):
+    code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
+    room, pids, g = _start_game(code)
+    active = g.active_player().id
+    victim_id = next(pid for pid in pids if pid != active)
+    ap = g.player_by_id(active)
+    vp = g.player_by_id(victim_id)
+    ap.location = vp.location = "market"
+    for p in g.players:
+        if p.id not in (active, victim_id):
+            p.location = "tavern"
+        p.hidden_role_ids = [r for r in p.hidden_role_ids if r not in ("spy", "queen", "royalguard")]
+        p.action_card_ids = []
+    ap.hidden_role_ids = ["tinytyrant", "wanderingknight", "youngknight"]
+    ap.public_role_id = "gateguard"
+    vp.public_role_id = "gateguard"
+    vp.hidden_role_ids = ["wanderingknight", "youngknight"]
+    vp.rep = 3
+    g.use_role_power(active, "tantrum", victim_id)
+    assert "tyrant_tantrum" in ap.abilities_used_this_round
+    while g.pending_ui_action.get(victim_id):
+        kind = g.pending_ui_action[victim_id].get("kind")
+        if kind == "reaction":
+            g.resolve_reaction(victim_id, None)
+        elif kind == "false_trail":
+            g.resolve_false_trail(victim_id, accept=False)
+        elif kind == "sanctuary":
+            g.resolve_sanctuary(victim_id, accept=False)
+        elif kind == "protect":
+            g.resolve_protect(victim_id, accept=False)
+        else:
+            break
+    assert vp.rep == 2
+
+
+def test_hidden_quiet_ambition(client):
+    code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
+    room, pids, g = _start_game(code)
+    active = g.active_player().id
+    ap = g.player_by_id(active)
+    ap.location = "tavern"
+    ap.hidden_role_ids = ["secondborn", "wanderingknight", "youngknight"]
+    ap.public_role_id = "gateguard"
+    g.royal_role_lost = True
+    before = ap.rep
+    g.use_role_power(active, "quiet_ambition")
+    assert ap.rep == before + 1
+
+
+def test_hidden_name_drop(client):
+    code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
+    room, pids, g = _start_game(code)
+    active = g.active_player().id
+    ap = g.player_by_id(active)
+    ap.location = "market"
+    ap.hidden_role_ids = ["distantcousin", "wanderingknight", "youngknight"]
+    ap.public_role_id = "gateguard"
+    before = ap.gold
+    g.use_role_power(active, "name_drop")
+    assert ap.gold == before + 1
+
+
+def test_inheritance_right_on_royal_discard(client):
+    code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
+    room, pids, g = _start_game(code)
+    royal_id = pids[0]
+    fb_id = pids[1]
+    royal = g.player_by_id(royal_id)
+    fb = g.player_by_id(fb_id)
+    royal.gold = 8
+    g.throne["kingControllerId"] = royal_id
+    royal.hidden_role_ids = ["king", "wanderingknight", "youngknight"]
+    royal.public_role_id = "gateguard"
+    fb.hidden_role_ids = ["firstborn", "wanderingknight", "youngknight"]
+    fb.public_role_id = "gateguard"
+    others_gold = {p.id: p.gold for p in g.players if p.id not in (royal_id,)}
+    g.apply_role_discard(royal_id, "hidden", "king")
+    share = 8 // 4
+    assert royal.gold == share
+    assert fb.gold == others_gold[fb_id] + share + 1
+
+
+def test_dubious_bloodline_on_challenge(client):
+    code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
+    room, pids, g = _start_game(code)
+    claimant_id = pids[0]
+    challenger_id = pids[1]
+    claimant = g.player_by_id(claimant_id)
+    claimant.hidden_role_ids = ["distantcousin", "wanderingknight", "youngknight"]
+    before = claimant.rep
+    g.resolve_challenge(claimant_id, challenger_id, "Peek", valid=True)
+    assert claimant.rep == before + 1
 
 
 def D_ROLE_META_PUBLIC(role_id: str) -> bool:

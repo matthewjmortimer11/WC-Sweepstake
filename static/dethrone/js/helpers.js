@@ -599,6 +599,7 @@ CT.helpers.applyRoyalProved = function () {
   }
   CT.setThroneController(u.crown, u.claimant, "claim upheld");
   CT.log(CT.playerById(u.challenger).name + " challenged the crown wrongly and must lose a role.");
+  if (CT.maybeDubiousBloodline) CT.maybeDubiousBloodline(u.claimant);
   CT.ui.roleDiscardFor = u.challenger; CT.ui.roleDiscardRevealed = false; u.open = null; CT.render();
 };
 CT.helpers.applyRoyalBluff = function () {
@@ -661,6 +662,7 @@ CT.helpers.handle = function (act, el) {
         u.open = null; return CT.render();
       }
       CT.log(CT.playerById(u.claimant).name + " proved \"" + (u.power || "their power") + "\". " + CT.playerById(u.challenger).name + " challenged wrongly and must lose a role.");
+      if (CT.maybeDubiousBloodline) CT.maybeDubiousBloodline(u.claimant);
       CT.ui.roleDiscardFor = u.challenger; CT.ui.roleDiscardRevealed = false; u.open = null; return CT.render();
     case "h-ch-bluff":
       if (CT.isOnline()) {

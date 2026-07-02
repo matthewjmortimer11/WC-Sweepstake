@@ -1235,6 +1235,22 @@ function rolePowerView() {
       + '<div class="spacer"></div><button class="btn btn-primary" data-act="confirm-role-power">Challenge!</button></div>'
       + "</div></div>";
   }
+  if (u.powerId === "tantrum") {
+    var tanTargets = CT.state.players.filter(function (x) {
+      return x.status === "active" && x.id !== p.id && x.location === p.location;
+    });
+    var tanOpts = tanTargets.map(function (x) {
+      return '<option value="' + x.id + '">' + CT.esc(x.name) + "</option>";
+    }).join("");
+    return '<div class="scrim"><div class="modal" style="max-width:420px">'
+      + '<div class="eyebrow">Role power</div>'
+      + '<h2 style="margin:6px 0 12px">Tantrum</h2>'
+      + '<label class="field" style="display:block;margin:12px 0"><span>Target loses 1 Reputation</span>'
+      + '<select id="role-power-target">' + tanOpts + "</select></label>"
+      + '<div class="btn-row" style="margin-top:16px"><button class="btn btn-ghost" data-act="close-role-power">Cancel</button>'
+      + '<div class="spacer"></div><button class="btn btn-primary" data-act="confirm-role-power">Tantrum!</button></div>'
+      + "</div></div>";
+  }
   CT.ui.rolePower = null;
   return "";
 }
@@ -1676,6 +1692,16 @@ CT.handleAction = function (act, el, ev) {
         CT.ui.rolePower = { playerId: ap4.id, powerId: pid };
         CT.render(); break;
       }
+      if (pid === "tantrum") {
+        CT.ui.rolePower = { playerId: ap4.id, powerId: pid };
+        CT.render(); break;
+      }
+      if (pid === "quiet_ambition" || pid === "name_drop") {
+        if (CT.netAction({ type: "useRolePower", powerId: pid })) break;
+        var rpRes = CT.useRolePower(ap4.id, pid);
+        if (!rpRes.ok && rpRes.msg) alert(rpRes.msg);
+        CT.render(); break;
+      }
       break;
     }
     case "close-role-power": CT.ui.rolePower = null; CT.render(); break;
@@ -1690,6 +1716,15 @@ CT.handleAction = function (act, el, ev) {
         }
         var kd = CT.startKnightDuel(rp.playerId, rtid);
         if (!kd.ok && kd.msg) alert(kd.msg);
+        CT.ui.rolePower = null;
+        CT.render(); break;
+      }
+      if (rp.powerId === "tantrum") {
+        if (CT.netAction({ type: "useRolePower", powerId: "tantrum", targetId: rtid })) {
+          CT.ui.rolePower = null; break;
+        }
+        var tr = CT.useRolePower(rp.playerId, "tantrum", rtid);
+        if (!tr.ok && tr.msg) alert(tr.msg);
         CT.ui.rolePower = null;
         CT.render(); break;
       }

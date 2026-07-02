@@ -38,7 +38,7 @@ _DETHRONE_CSP = (
     "frame-ancestors 'none'"
 )
 
-_DETHRONE_ASSET_VERSION = "20260701-p45"
+_DETHRONE_ASSET_VERSION = "20260701-p46"
 
 _CREATE_BUCKETS: dict[str, list[float]] = {}
 _CREATE_LIMIT = 30
@@ -350,6 +350,14 @@ def _dispatch(room, player, mtype: str, msg: dict) -> bool:
 
     if mtype == "useCollegeResearch":
         g.use_college_research(player.id)
+        return True
+
+    if mtype == "useRolePower":
+        g.use_role_power(
+            player.id,
+            str(msg.get("powerId", "")),
+            str(msg.get("targetId", "")) or None,
+        )
         return True
 
     if mtype == "resolveKeepOne":

@@ -20,7 +20,7 @@ Offline file open still works:
 open "index.html"          # macOS
 ```
 
-## What is implemented (Phases 1–33)
+## What is implemented (Phases 1–34)
 
 ### Phase 5 — playtest tooling & full card set
 - **Board art** — illustrated V3b kingdom poster (`cards/map/kingdom-background-v3b.jpg`) with curved gold/cursed roads, labelled site plaques, player tokens and per-location vignettes (see `board.js`, `cards-map.js`)
@@ -178,6 +178,14 @@ open "index.html"          # macOS
 - **Deep Research (College Advisor)** — hidden College Advisor at the Scrolls may use Deep Research via role power (2 gold)
 - **Tiny Tyrant Tax** — when crowned with Tiny Tyrant, Royal Tax may levy +1 extra gold from one chosen player
 - **Online sync** — `startKnightDuel`, `useCollegeResearch`; `royalCommand` accepts `extraTaxTargetId`
+
+### Phase 34 — Hidden Succession Powers & Royal Aftermath
+- **Hidden Tantrum** — hidden Tiny Tyrant may force −1 Reputation on a target at your location once per round
+- **Hidden Quiet Ambition** — hidden Secondborn at Tavern/Market gains +1 Reputation when a royal has lost a role
+- **Hidden Name Drop** — hidden Distant Cousin at Tavern/Market gains +1 gold
+- **Inheritance Right** — when a crowned King/Queen is stripped, their gold splits among players; Firstborns gain +1 extra
+- **Dubious Bloodline** — Distant Cousin gains +1 Reputation after surviving a challenge (power or royal claim)
+- **Online sync** — `useRolePower` with `powerId` (`tantrum`, `quiet_ambition`, `name_drop`)
 
 ### Core play hardening (in-person online)
 - **Formal vote legality** — server enforces proposer Rep, seconder/Decree, and banish Rep caps (`proposerId`, `seconder`, `decree` on `formalVote`)

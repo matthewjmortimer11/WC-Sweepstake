@@ -1546,6 +1546,77 @@ class CursedThroneGame:
         self._log(f"{ap.name} begins Deep Research at the Scrolls (College Advisor, paid 2 gold).", "event")
         self.pending_ui_action[ap.id] = {"kind": "deep_research", "researcherId": ap.id}
 
+    def use_role_power(
+        self,
+        actor_id: str,
+        power_id: str,
+        target_id: Optional[str] = None,
+    ) -> None:
+        if self.status != STATUS_PLAY or self.winner:
+            raise MoveError("No active game.")
+        ap = self._require_active_turn(actor_id)
+        fx = D.HIDDEN_ROLE_POWERS.get(power_id)
+        if not fx:
+            raise MoveError("Unknown role power.")
+        role_id = fx["role"]
+        if not self._role_power_active(ap, role_id):
+            raise MoveError("You do not have that role power.")
+        if ap.public_role_id == role_id:
+            raise MoveError("Use your public role ability instead.")
+        locs = fx.get("locations")
+        if locs and ap.location not in locs:
+            raise MoveError("Wrong location for this power.")
+        round_key = fx.get("round_key", power_id)
+        if fx.get("once_per_round") and round_key in ap.abilities_used_this_round:
+            raise MoveError("Already used this round.")
+        if fx.get("requires_royal_role_lost") and not self.royal_role_lost:
+            raise MoveError("No royal has lost a role yet.")
+        target: Optional[PlayerState] = None
+        if fx.get("needs_target"):
+            if not target_id:
+                raise MoveError("Target required.")
+            target = self.player_by_id(target_id)
+            if not target or target.status != "active":
+                raise MoveError("Invalid target.")
+            if fx.get("same_location") and target.location != ap.location:
+                raise MoveError("Target must be at your location.")
+            if target.id == ap.id:
+                raise MoveError("Invalid target.")
+        aname = fx.get("name", power_id)
+        self._log(f"{ap.name} uses {aname} (hidden role power).", "event")
+        if fx.get("rep_loss") and target:
+            self._maybe_offer_rep_loss(target.id, -int(fx["rep_loss"]), aname)
+        elif fx.get("rep_gain"):
+            self.adjust_rep(ap.id, int(fx["rep_gain"]), aname)
+        elif fx.get("gold_gain"):
+            self.adjust_gold(ap.id, int(fx["gold_gain"]), aname)
+        if fx.get("once_per_round"):
+            ap.abilities_used_this_round.append(round_key)
+
+    def _split_royal_wealth(self, controller: PlayerState) -> None:
+        pool = controller.gold
+        if pool <= 0:
+            return
+        active = [p for p in self.players if p.status == "active"]
+        if not active:
+            return
+        share = pool // len(active)
+        controller.gold = 0
+        if share > 0:
+            for p in active:
+                p.gold += share
+        self._log(f"Royal wealth split ({pool} gold).", "event")
+        for p in active:
+            if "firstborn" in self._all_role_ids(p):
+                p.gold += 1
+                self._log(f"{p.name} claims Inheritance Right (+1 gold).", "event")
+
+    def _maybe_dubious_bloodline(self, survivor_id: str) -> None:
+        survivor = self.player_by_id(survivor_id)
+        if not survivor or "distantcousin" not in self._all_role_ids(survivor):
+            return
+        self.adjust_rep(survivor_id, 1, "Dubious Bloodline")
+
     def resolve_keep_one(self, pid: str, deck: str, keep_id: str, drop_id: str) -> None:
         p = self.player_by_id(pid)
         if not p:
@@ -1602,12 +1673,16 @@ class CursedThroneGame:
             self.royal_role_lost = True
 
         t = self.throne
-        if role_id == "king" and t.get("kingControllerId") == pid:
+        was_king_controller = role_id == "king" and t.get("kingControllerId") == pid
+        was_queen_controller = role_id == "queen" and t.get("queenControllerId") == pid
+        if was_king_controller:
             t["kingControllerId"] = None
             self._log(f"{p.name} is removed as King; the crown's control is lost.", "event")
-        if role_id == "queen" and t.get("queenControllerId") == pid:
+            self._split_royal_wealth(p)
+        if was_queen_controller:
             t["queenControllerId"] = None
             self._log(f"{p.name} is removed as Queen; the crown's control is lost.", "event")
+            self._split_royal_wealth(p)
 
         remaining = (1 if p.public_role_id else 0) + len(p.hidden_role_ids) + len(p.extra_shown_role_ids)
         if remaining == 0 and p.status == "active":
@@ -2419,6 +2494,7 @@ class CursedThroneGame:
             self._log(
                 f"{claimant.name} proved \"{label}\". {challenger.name} challenged wrongly and must lose a role."
             )
+            self._maybe_dubious_bloodline(claimant_id)
             self.require_role_discard(challenger_id, "challenge")
         else:
             self._log(f"{claimant.name}'s \"{label}\" was a failed bluff and they must lose a role.")
@@ -2839,6 +2915,7 @@ class CursedThroneGame:
     def royal_claim_resolved(self, claimant_id: str, challenger_id: str, crown: str, valid: bool) -> None:
         if valid:
             self.set_throne_controller(crown, claimant_id, "claim upheld")
+            self._maybe_dubious_bloodline(claimant_id)
             challenger = self.player_by_id(challenger_id)
             if challenger:
                 self._log(f"{challenger.name} challenged the crown wrongly and must lose a role.")

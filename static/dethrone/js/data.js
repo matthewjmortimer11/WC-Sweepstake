@@ -437,6 +437,23 @@ CT.rolePowersAvailable = function (p) {
       && p.publicRoleId !== "collegeadvisor") {
     out.push({ id: "college_research", name: "Deep Research", goldCost: 2 });
   }
+  if (CT.rolePowerActive(p, "tinytyrant") && p.publicRoleId !== "tinytyrant"
+      && (p.abilitiesUsedThisRound || []).indexOf("tyrant_tantrum") === -1) {
+    var tantrumOpps = CT.state.players.filter(function (x) {
+      return x.status === "active" && x.id !== p.id && x.location === p.location;
+    });
+    if (tantrumOpps.length) {
+      out.push({ id: "tantrum", name: "Tantrum", needsTarget: true });
+    }
+  }
+  if (CT.rolePowerActive(p, "secondborn") && p.publicRoleId !== "secondborn"
+      && (p.location === "tavern" || p.location === "market") && CT.state.royalRoleLost) {
+    out.push({ id: "quiet_ambition", name: "Quiet Ambition" });
+  }
+  if (CT.rolePowerActive(p, "distantcousin") && p.publicRoleId !== "distantcousin"
+      && (p.location === "tavern" || p.location === "market")) {
+    out.push({ id: "name_drop", name: "Name Drop" });
+  }
   return out;
 };
 CT.playerSuccessionRoles = function (p) {

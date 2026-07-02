@@ -287,6 +287,23 @@ REACTION_EFFECTS: dict[str, dict] = {
     "royal_guard_detail": {"trigger": "duel_consequence", "action": "cancel"},
 }
 
+# Hidden/public role powers via role-power UI (Phase 33+).
+HIDDEN_ROLE_POWERS: dict[str, dict] = {
+    "tantrum": {
+        "role": "tinytyrant", "name": "Tantrum", "rep_loss": 1,
+        "needs_target": True, "same_location": True, "once_per_round": True,
+        "round_key": "tyrant_tantrum",
+    },
+    "quiet_ambition": {
+        "role": "secondborn", "name": "Quiet Ambition",
+        "locations": ["tavern", "market"], "rep_gain": 1, "requires_royal_role_lost": True,
+    },
+    "name_drop": {
+        "role": "distantcousin", "name": "Name Drop",
+        "locations": ["tavern", "market"], "gold_gain": 1,
+    },
+}
+
 # Public-role AtLocation abilities (Phase 14) — mechanical subset; others stay at the table.
 ROLE_ABILITY_EFFECTS: dict[str, dict] = {
     "thief_steal": {

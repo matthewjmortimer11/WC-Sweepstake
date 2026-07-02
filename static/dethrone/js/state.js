@@ -1615,6 +1615,75 @@ CT.useCollegeResearch = function (playerId) {
   return { ok: true, openDeepResearch: { researcherId: playerId } };
 };
 
+CT.useRolePower = function (playerId, powerId, targetId) {
+  var p = CT.playerById(playerId);
+  if (!p) return { ok: false, msg: "Invalid player." };
+  if (powerId === "tantrum") {
+    if (!CT.rolePowerActive(p, "tinytyrant")) return { ok: false, msg: "No Tantrum power." };
+    if (p.publicRoleId === "tinytyrant") return { ok: false, msg: "Use your public role ability instead." };
+    if ((p.abilitiesUsedThisRound || []).indexOf("tyrant_tantrum") !== -1) {
+      return { ok: false, msg: "Already used Tantrum this round." };
+    }
+    var target = CT.playerById(targetId);
+    if (!target || target.status !== "active" || target.location !== p.location) {
+      return { ok: false, msg: "Invalid target." };
+    }
+    if (!p.abilitiesUsedThisRound) p.abilitiesUsedThisRound = [];
+    p.abilitiesUsedThisRound.push("tyrant_tantrum");
+    CT.log(p.name + " uses Tantrum (hidden role power).", "event");
+    CT._maybeOfferRepLoss(target.id, -1, "Tantrum");
+    CT.save();
+    return { ok: true };
+  }
+  if (powerId === "quiet_ambition") {
+    if (!CT.rolePowerActive(p, "secondborn")) return { ok: false, msg: "No Quiet Ambition power." };
+    if (p.publicRoleId === "secondborn") return { ok: false, msg: "Use your public role ability instead." };
+    if (p.location !== "tavern" && p.location !== "market") return { ok: false, msg: "Wrong location." };
+    if (!CT.state.royalRoleLost) return { ok: false, msg: "No royal has lost a role yet." };
+    CT.log(p.name + " uses Quiet Ambition (hidden role power).", "event");
+    CT.adjustRep(playerId, 1, "Quiet Ambition");
+    CT.save();
+    return { ok: true };
+  }
+  if (powerId === "name_drop") {
+    if (!CT.rolePowerActive(p, "distantcousin")) return { ok: false, msg: "No Name Drop power." };
+    if (p.publicRoleId === "distantcousin") return { ok: false, msg: "Use your public role ability instead." };
+    if (p.location !== "tavern" && p.location !== "market") return { ok: false, msg: "Wrong location." };
+    CT.log(p.name + " uses Name Drop (hidden role power).", "event");
+    CT.adjustGold(playerId, 1, "Name Drop");
+    CT.save();
+    return { ok: true };
+  }
+  return { ok: false, msg: "Unknown role power." };
+};
+
+CT.splitRoyalWealth = function (controllerId) {
+  var controller = CT.playerById(controllerId);
+  if (!controller) return;
+  var pool = controller.gold;
+  if (pool <= 0) return;
+  var active = CT.state.players.filter(function (x) { return x.status === "active"; });
+  if (!active.length) return;
+  var share = Math.floor(pool / active.length);
+  controller.gold = 0;
+  if (share > 0) {
+    active.forEach(function (pl) { pl.gold += share; });
+  }
+  CT.log("Royal wealth split (" + pool + " gold).", "event");
+  active.forEach(function (pl) {
+    if (CT.allRoleIds(pl).indexOf("firstborn") !== -1) {
+      pl.gold += 1;
+      CT.log(pl.name + " claims Inheritance Right (+1 gold).", "event");
+    }
+  });
+};
+
+CT.maybeDubiousBloodline = function (survivorId) {
+  var survivor = CT.playerById(survivorId);
+  if (!survivor || CT.allRoleIds(survivor).indexOf("distantcousin") === -1) return;
+  CT.adjustRep(survivorId, 1, "Dubious Bloodline");
+};
+
 /* resolve a Haggle keep-1 choice */
 CT.resolveKeepOne = function (playerId, deck, keepId, dropId) {
   var p = CT.playerById(playerId); if (!p) return;
@@ -1651,11 +1720,17 @@ CT.applyRoleDiscard = function (playerId, slot, roleId) {
   if (roleId === "king" || roleId === "queen") CT.state.royalRoleLost = true;
 
   // Royal removal (§23): a discarded King/Queen loses any Throne control they held
-  if (roleId === "king" && CT.state.throne.kingControllerId === playerId) {
-    CT.state.throne.kingControllerId = null; CT.log(p.name + " is removed as King; the crown's control is lost.", "event");
+  var wasKing = roleId === "king" && CT.state.throne.kingControllerId === playerId;
+  var wasQueen = roleId === "queen" && CT.state.throne.queenControllerId === playerId;
+  if (wasKing) {
+    CT.state.throne.kingControllerId = null;
+    CT.log(p.name + " is removed as King; the crown's control is lost.", "event");
+    CT.splitRoyalWealth(playerId);
   }
-  if (roleId === "queen" && CT.state.throne.queenControllerId === playerId) {
-    CT.state.throne.queenControllerId = null; CT.log(p.name + " is removed as Queen; the crown's control is lost.", "event");
+  if (wasQueen) {
+    CT.state.throne.queenControllerId = null;
+    CT.log(p.name + " is removed as Queen; the crown's control is lost.", "event");
+    CT.splitRoyalWealth(playerId);
   }
 
   // elimination check (§20)
