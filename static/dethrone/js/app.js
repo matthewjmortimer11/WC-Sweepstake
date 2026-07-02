@@ -613,8 +613,15 @@ function actionsPanelBody() {
     return '<button class="btn btn-loc btn-loc--cream" data-act="role-ability" data-id="' + a.id + '"' + (disabled ? " disabled" : "") + '>'
       + CT.esc(a.name) + ' <span class="btn-loc__tag">public</span></button>';
   }).join("");
-  var roleSection = roleBtns
-    ? '<div class="loc-footer__roles"><div class="eyebrow eyebrow--light">Public role</div><div class="loc-footer__grid">' + roleBtns + "</div></div>"
+  var rolePowers = CT.rolePowersAvailable ? CT.rolePowersAvailable(p) : [];
+  var rolePowerBtns = rolePowers.map(function (a) {
+    var cost = a.goldCost ? ' <span class="btn-loc__cost">' + a.goldCost + "g</span>" : "";
+    return '<button class="btn btn-loc btn-loc--gold" data-act="role-power" data-id="' + a.id + '"' + (disabled ? " disabled" : "") + '>'
+      + CT.esc(a.name) + cost + ' <span class="btn-loc__tag">role</span></button>';
+  }).join("");
+  var roleSection = (roleBtns || rolePowerBtns)
+    ? '<div class="loc-footer__roles"><div class="eyebrow eyebrow--light">Role powers</div><div class="loc-footer__grid">'
+      + rolePowerBtns + roleBtns + "</div></div>"
     : "";
 
   var succ = CT.state.throne.succession || { open: false };
@@ -894,6 +901,7 @@ function overlays() {
   if (CT.ui.reactionOffer) return reactionView();
   if (CT.ui.finalRiteOffer) return finalRiteView();
   if (CT.ui.roleAbility) return roleAbilityView();
+  if (CT.ui.rolePower) return rolePowerView();
   if (CT.ui.showGuide) return playtestGuideView();
   if (CT.ui.playCard) return playCardView();
   if (CT.ui.privateFor) return privateView();
@@ -1204,6 +1212,31 @@ function roleAbilityView() {
     + '<div class="btn-row" style="margin-top:16px"><button class="btn btn-ghost" data-act="close-role-ability">Cancel</button>'
     + '<div class="spacer"></div><button class="btn btn-primary" data-act="confirm-role-ability">Use ability</button></div>'
     + "</div></div>";
+}
+
+function rolePowerView() {
+  var u = CT.ui.rolePower;
+  if (!u) return "";
+  var p = CT.playerById(u.playerId);
+  if (!p) { CT.ui.rolePower = null; return ""; }
+  if (u.powerId === "knight_duel") {
+    var targets = CT.state.players.filter(function (x) {
+      return x.status === "active" && x.id !== p.id && x.location === p.location;
+    });
+    var opts = targets.map(function (x) {
+      return '<option value="' + x.id + '">' + CT.esc(x.name) + "</option>";
+    }).join("");
+    return '<div class="scrim"><div class="modal" style="max-width:420px">'
+      + '<div class="eyebrow">Role power</div>'
+      + '<h2 style="margin:6px 0 12px">Knight\'s Challenge</h2>'
+      + '<label class="field" style="display:block;margin:12px 0"><span>Duel</span>'
+      + '<select id="role-power-target">' + opts + "</select></label>"
+      + '<div class="btn-row" style="margin-top:16px"><button class="btn btn-ghost" data-act="close-role-power">Cancel</button>'
+      + '<div class="spacer"></div><button class="btn btn-primary" data-act="confirm-role-power">Challenge!</button></div>'
+      + "</div></div>";
+  }
+  CT.ui.rolePower = null;
+  return "";
 }
 
 function playtestGuideView() {
@@ -1627,6 +1660,40 @@ CT.handleAction = function (act, el, ev) {
       var res = CT.useRoleAbility(ap3.id, aid);
       if (!res.ok && res.msg) alert(res.msg);
       CT.render(); break;
+    }
+    case "role-power": {
+      var ap4 = CT.activePlayer();
+      if (!ap4) break;
+      var pid = el.dataset.id;
+      if (pid === "college_research") {
+        if (CT.netAction({ type: "useCollegeResearch" })) break;
+        var cr = CT.useCollegeResearch(ap4.id);
+        if (!cr.ok && cr.msg) alert(cr.msg);
+        if (cr.openDeepResearch && CT.helpers) CT.helpers.openDeepResearchFromPending(cr.openDeepResearch);
+        CT.render(); break;
+      }
+      if (pid === "knight_duel") {
+        CT.ui.rolePower = { playerId: ap4.id, powerId: pid };
+        CT.render(); break;
+      }
+      break;
+    }
+    case "close-role-power": CT.ui.rolePower = null; CT.render(); break;
+    case "confirm-role-power": {
+      var rp = CT.ui.rolePower;
+      if (!rp) break;
+      var rts = document.getElementById("role-power-target");
+      var rtid = rts ? rts.value : "";
+      if (rp.powerId === "knight_duel") {
+        if (CT.netAction({ type: "startKnightDuel", targetId: rtid })) {
+          CT.ui.rolePower = null; break;
+        }
+        var kd = CT.startKnightDuel(rp.playerId, rtid);
+        if (!kd.ok && kd.msg) alert(kd.msg);
+        CT.ui.rolePower = null;
+        CT.render(); break;
+      }
+      break;
     }
     case "close-role-ability": CT.ui.roleAbility = null; CT.render(); break;
     case "confirm-role-ability": {

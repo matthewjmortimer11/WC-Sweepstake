@@ -38,7 +38,7 @@ _DETHRONE_CSP = (
     "frame-ancestors 'none'"
 )
 
-_DETHRONE_ASSET_VERSION = "20260701-p44"
+_DETHRONE_ASSET_VERSION = "20260701-p45"
 
 _CREATE_BUCKETS: dict[str, list[float]] = {}
 _CREATE_LIMIT = 30
@@ -344,6 +344,14 @@ def _dispatch(room, player, mtype: str, msg: dict) -> bool:
         )
         return True
 
+    if mtype == "startKnightDuel":
+        g.start_knight_duel(player.id, str(msg.get("targetId", "")))
+        return True
+
+    if mtype == "useCollegeResearch":
+        g.use_college_research(player.id)
+        return True
+
     if mtype == "resolveKeepOne":
         g.resolve_keep_one(
             player.id,
@@ -474,6 +482,7 @@ def _dispatch(room, player, mtype: str, msg: dict) -> bool:
             player.id,
             str(msg.get("choice", "")),
             target_id=msg.get("targetId") or None,
+            extra_tax_target_id=msg.get("extraTaxTargetId") or None,
         )
         return True
 

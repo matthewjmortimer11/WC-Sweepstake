@@ -42,6 +42,8 @@ ROLE_IDS = [
     "collegeadvisor", "tavernwhisperer",
 ]
 
+KNIGHT_ROLE_IDS = frozenset({"royalknight", "blackknight", "wanderingknight", "youngknight"})
+
 ROLE_META: dict[str, dict] = {
     "king": {"name": "King", "family": "Royal", "canBePublic": True},
     "queen": {"name": "Queen", "family": "Royal", "canBePublic": True},

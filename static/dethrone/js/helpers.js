@@ -32,6 +32,9 @@ function dirtyBlowActive(p) {
   return p && CT.rolePowerActive && CT.rolePowerActive(p, "blackknight")
     && ["tavern", "barracks", "graveyard"].indexOf(p.location) !== -1;
 }
+function tinyTyrantTaxActive(p) {
+  return p && CT.rolePowerActive && CT.rolePowerActive(p, "tinytyrant");
+}
 function roleBonus(p, key) {
   var r = p && p.publicRoleId ? CT.roleById(p.publicRoleId) : null;
   var val = (r && r[key]) || 0;
@@ -322,19 +325,32 @@ CT.helpers.vRoyalCommand = function () {
       + '<hr class="rule"><div class="btn-row"><button class="btn btn-ghost" data-act="h-rcmd-back">← Back</button>'
       + '<div class="spacer"></div><button class="btn btn-primary" data-act="h-rcmd-pardon"' + (u.target ? "" : " disabled") + '>Issue pardon</button></div>');
   }
+  if (u.phase === "tyrant_tax") {
+    var taxTargets = ps.filter(function (p) { return p.id !== u.controllerId; });
+    return wrap('<div class="eyebrow">Tiny Tyrant Tax</div><h2 style="margin:4px 0 2px">Extra levy</h2>'
+      + '<p class="muted" style="font-size:13px;margin:0 0 12px">Royal Tax collected. Choose one player for an extra +1 gold (Tiny Tyrant), or skip.</p>'
+      + field("Extra tax", '<select data-act="h-rcmd-tyrant-target">' + opt(taxTargets, u.tyrantTarget, "— who —") + "</select>")
+      + '<hr class="rule"><div class="btn-row"><button class="btn btn-ghost" data-act="h-rcmd-tyrant-skip">Skip extra tax</button>'
+      + '<div class="spacer"></div><button class="btn btn-primary" data-act="h-rcmd-tyrant-go"' + (u.tyrantTarget ? "" : " disabled") + '>Levy +1 gold</button></div>');
+  }
+  var tyrantNote = tinyTyrantTaxActive(ctrl)
+    ? '<p class="tag wax" style="margin-bottom:10px">Tiny Tyrant — Royal Tax may take +1 extra gold from one chosen player.</p>'
+    : "";
   return wrap('<div class="eyebrow">Royal Command</div><h2 style="margin:4px 0 2px">'
     + CT.esc(ctrl ? ctrl.name : "Throne") + " commands</h2>"
     + '<p class="muted" style="font-size:13px;margin:0 0 14px">Tax, Pardon, or Decree. Challengeable at the table unless you are the confirmed public controller.</p>'
+    + tyrantNote
     + '<div class="stack" style="gap:10px">'
     + '<button class="btn btn-gold" data-act="h-rcmd-tax">Royal Tax — take 1 gold from each player</button>'
     + '<button class="btn btn-secondary" data-act="h-rcmd-pardon-pick">Royal Pardon — +1 Reputation to one player</button>'
     + '<button class="btn btn-secondary" data-act="h-rcmd-decree">Royal Decree — formal vote without seconder</button>'
     + "</div>");
 };
-CT.helpers.applyRoyalCommand = function (choice, targetId) {
+CT.helpers.applyRoyalCommand = function (choice, targetId, extraTaxTargetId) {
   if (CT.isOnline()) {
     var msg = { type: "royalCommand", choice: choice };
     if (targetId) msg.targetId = targetId;
+    if (extraTaxTargetId) msg.extraTaxTargetId = extraTaxTargetId;
     CT.net.send(msg);
     CT.helpers.ui.open = null;
     return CT.render();
@@ -344,6 +360,22 @@ CT.helpers.applyRoyalCommand = function (choice, targetId) {
   if (!ap) { u.open = null; return CT.render(); }
   if (choice === "tax") {
     var royalTaken = CT.collectTax(ap, 1);
+    if (extraTaxTargetId && tinyTyrantTaxActive(ap)) {
+      var extra = CT.playerById(extraTaxTargetId);
+      if (extra && extra.status === "active" && extra.id !== ap.id) {
+        var reason = CT.taxExemptReason(extra, ap.id);
+        if (reason) {
+          CT.log(extra.name + " ignored Tiny Tyrant Tax (" + reason + ").", "note");
+        } else if (extra.gold >= 1) {
+          extra.gold -= 1;
+          ap.gold += 1;
+          royalTaken += 1;
+          CT.log(extra.name + " paid +1 gold (Tiny Tyrant Tax).");
+        } else {
+          CT.log(extra.name + " had no gold for Tiny Tyrant Tax.", "note");
+        }
+      }
+    }
     CT.log(ap.name + " levied Royal Tax" + (royalTaken ? " — collected " + royalTaken + " gold." : " — no gold collected."), royalTaken ? "event" : "note");
   } else if (choice === "pardon" && targetId) {
     CT.adjustRep(targetId, 1, "Royal Pardon");
@@ -754,7 +786,17 @@ CT.helpers.handle = function (act, el) {
     case "h-rc-bluff": return CT.helpers.applyRoyalBluff();
 
     // royal command (strong location action)
-    case "h-rcmd-tax": return CT.helpers.applyRoyalCommand("tax");
+    case "h-rcmd-tax": {
+      if (tinyTyrantTaxActive(CT.playerById(u.controllerId))) {
+        u.phase = "tyrant_tax";
+        u.tyrantTarget = "";
+        return CT.render();
+      }
+      return CT.helpers.applyRoyalCommand("tax");
+    }
+    case "h-rcmd-tyrant-target": u.tyrantTarget = el.value; return CT.render();
+    case "h-rcmd-tyrant-skip": return CT.helpers.applyRoyalCommand("tax");
+    case "h-rcmd-tyrant-go": return CT.helpers.applyRoyalCommand("tax", null, u.tyrantTarget);
     case "h-rcmd-pardon-pick": u.phase = "pardon"; return CT.render();
     case "h-rcmd-target": u.target = el.value; return CT.render();
     case "h-rcmd-back": u.phase = "choice"; u.target = ""; return CT.render();

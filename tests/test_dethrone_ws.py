@@ -1972,7 +1972,7 @@ def test_hold_ground_blocks_drive_out(client):
     _strip_royal_guards(g)
     _strip_royal_knights(g)
     g.duel_apply_consequence(
-        att_id, def_id, 2, 0, False, "drive", random.Random(0),
+        att_id, def_id, 1, 0, False, "drive", random.Random(0),
     )
     assert defender.location == before_loc
 
@@ -2053,6 +2053,88 @@ def test_dirty_blow_second_consequence_and_rep_loss(client):
     assert len(defender.action_card_ids) < before_cards
     assert defender.rep == before_rep - 1
     assert att.rep == before_rep - 1
+
+
+def test_start_knight_duel(client):
+    code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
+    room, pids, g = _start_game(code)
+    att_id = g.active_player().id
+    def_id = next(pid for pid in pids if pid != att_id)
+    att = g.player_by_id(att_id)
+    defender = g.player_by_id(def_id)
+    att.location = defender.location = "barracks"
+    att.hidden_role_ids = ["royalknight", "thief", "wanderingknight"]
+    att.public_role_id = "thief"
+    g.start_knight_duel(att_id, def_id)
+    pending = g.pending_ui_action.get(att_id)
+    assert pending and pending.get("kind") == "duel"
+    assert pending.get("defenderId") == def_id
+    assert "knight_duel" in att.abilities_used_this_round
+
+
+def test_use_college_research_hidden(client):
+    code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
+    room, pids, g = _start_game(code)
+    pid = g.active_player().id
+    p = g.player_by_id(pid)
+    p.location = "scrolls"
+    p.public_role_id = "thief"
+    p.hidden_role_ids = ["collegeadvisor", "wanderingknight", "youngknight"]
+    p.gold = 4
+    g.use_college_research(pid)
+    assert p.gold == 2
+    assert g.pending_ui_action.get(pid, {}).get("kind") == "deep_research"
+
+
+def test_tiny_tyrant_extra_tax(client):
+    code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
+    room, pids, g = _start_game(code)
+    active = g.active_player().id
+    victim_id = next(pid for pid in pids if pid != active)
+    ap = g.player_by_id(active)
+    victim = g.player_by_id(victim_id)
+    ap.location = "throne"
+    g.throne["kingControllerId"] = active
+    for p in g.players:
+        _set_non_exempt_roles(p, g)
+        if p.id != active:
+            p.gold = 2
+    ap.hidden_role_ids = ["tinytyrant", "wanderingknight", "youngknight"]
+    ap.public_role_id = "gateguard"
+    g.do_location_action(active, "royal_command")
+    before = ap.gold
+    g.apply_royal_command(active, "tax", extra_tax_target_id=victim_id)
+    assert ap.gold == before + 4
+    assert victim.gold == 0
+
+
+def test_blackmail_cancels_vote(client):
+    code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
+    room, pids, g = _start_game(code)
+    target = g.players[1].id
+    tp = g.player_by_id(target)
+    tp.action_card_ids = ["blackmail"]
+    tp.rep = 3
+    votes = {pid: "yes" for pid in pids}
+    g.apply_formal_vote("accuse", target, votes, proposer_id=pids[0], seconder=True)
+    assert g.pending_ui_action.get(target, {}).get("kind") == "reaction"
+    g.resolve_reaction(target, "blackmail")
+    assert target not in g.pending_role_discard
+    assert tp.rep == 2
+
+
+def test_kneel_cancels_vote(client):
+    code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
+    room, pids, g = _start_game(code)
+    g.throne["kingControllerId"] = pids[0]
+    target = g.players[1].id
+    tp = g.player_by_id(target)
+    tp.action_card_ids = ["kneel"]
+    votes = {pid: "yes" for pid in pids}
+    g.apply_formal_vote("accuse", target, votes, proposer_id=pids[0], seconder=True)
+    assert g.pending_ui_action.get(target, {}).get("kind") == "reaction"
+    g.resolve_reaction(target, "kneel")
+    assert target not in g.pending_role_discard
 
 
 def D_ROLE_META_PUBLIC(role_id: str) -> bool:

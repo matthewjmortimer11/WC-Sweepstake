@@ -1160,6 +1160,7 @@ class CursedThroneGame:
         choice: str,
         *,
         target_id: Optional[str] = None,
+        extra_tax_target_id: Optional[str] = None,
     ) -> None:
         pending = self.pending_ui_action.get(pid)
         if not pending or pending.get("kind") != "royal_command":
@@ -1175,6 +1176,22 @@ class CursedThroneGame:
 
         if choice == "tax":
             taken = self._collect_tax(ap, 1)
+            if extra_tax_target_id and self._role_power_active(ap, "tinytyrant"):
+                extra = self.player_by_id(extra_tax_target_id)
+                if extra and extra.status == "active" and extra.id != ap.id:
+                    reason = self._tax_exempt_reason(extra, ap.id)
+                    if reason:
+                        self._log(
+                            f"{extra.name} ignored Tiny Tyrant Tax ({reason}).",
+                            "note",
+                        )
+                    elif extra.gold >= 1:
+                        extra.gold -= 1
+                        ap.gold += 1
+                        taken += 1
+                        self._log(f"{extra.name} paid +1 gold (Tiny Tyrant Tax).")
+                    else:
+                        self._log(f"{extra.name} had no gold for Tiny Tyrant Tax.", "note")
             if taken:
                 self._log(f"{ap.name} levied Royal Tax — collected {taken} gold.")
             else:
@@ -1483,6 +1500,51 @@ class CursedThroneGame:
         if fx.get("once_per_round"):
             ap.abilities_used_this_round.append(ability_id)
         return {"ok": True}
+
+    def _has_knight_duel_power(self, player: PlayerState) -> bool:
+        return any(self._role_power_active(player, rid) for rid in D.KNIGHT_ROLE_IDS)
+
+    def start_knight_duel(self, actor_id: str, target_id: str) -> None:
+        if self.status != STATUS_PLAY or self.winner:
+            raise MoveError("No active game.")
+        ap = self._require_active_turn(actor_id)
+        if not self._has_knight_duel_power(ap):
+            raise MoveError("No knight duel power.")
+        if "knight_duel" in ap.abilities_used_this_round:
+            raise MoveError("Already used Knight's Challenge this round.")
+        target = self.player_by_id(target_id)
+        if not target or target.status != "active":
+            raise MoveError("Invalid target.")
+        if target.id == ap.id:
+            raise MoveError("Invalid target.")
+        if target.location != ap.location:
+            raise MoveError("Target must be at your location.")
+        ap.abilities_used_this_round.append("knight_duel")
+        self._log(f"{ap.name} challenges {target.name} to a duel!", "event")
+        self.pending_ui_action[ap.id] = {
+            "kind": "duel",
+            "attackerId": ap.id,
+            "defenderId": target.id,
+        }
+        self._offer_reaction(
+            target.id,
+            "duel_declared",
+            {"effect": "cancel_duel", "attackerId": ap.id},
+        )
+
+    def use_college_research(self, actor_id: str) -> None:
+        if self.status != STATUS_PLAY or self.winner:
+            raise MoveError("No active game.")
+        ap = self._require_active_turn(actor_id)
+        if not self._role_power_active(ap, "collegeadvisor"):
+            raise MoveError("No College Advisor power.")
+        if ap.location != "scrolls":
+            raise MoveError("Must be at the Scrolls.")
+        if ap.gold < 2:
+            raise MoveError("Not enough gold.")
+        ap.gold -= 2
+        self._log(f"{ap.name} begins Deep Research at the Scrolls (College Advisor, paid 2 gold).", "event")
+        self.pending_ui_action[ap.id] = {"kind": "deep_research", "researcherId": ap.id}
 
     def resolve_keep_one(self, pid: str, deck: str, keep_id: str, drop_id: str) -> None:
         p = self.player_by_id(pid)

@@ -1578,6 +1578,43 @@ CT.useRoleAbility = function (playerId, abilityId, opts) {
   return { ok: true };
 };
 
+CT.startKnightDuel = function (playerId, targetId) {
+  var p = CT.playerById(playerId);
+  var target = CT.playerById(targetId);
+  if (!p || !target || target.status !== "active") return { ok: false, msg: "Invalid target." };
+  var hasKnight = CT.KNIGHT_ROLE_IDS.some(function (rid) { return CT.rolePowerActive(p, rid); });
+  if (!hasKnight) return { ok: false, msg: "No knight duel power." };
+  if ((p.abilitiesUsedThisRound || []).indexOf("knight_duel") !== -1) {
+    return { ok: false, msg: "Already used Knight's Challenge this round." };
+  }
+  if (target.location !== p.location) return { ok: false, msg: "Target must be at your location." };
+  if (!p.abilitiesUsedThisRound) p.abilitiesUsedThisRound = [];
+  p.abilitiesUsedThisRound.push("knight_duel");
+  CT.log(p.name + " challenges " + target.name + " to a duel!", "event");
+  if (CT.helpers) {
+    CT.helpers.ui = {
+      open: "duel", phase: "setup", att: p.id, def: target.id,
+      attBonus: 0, defBonus: 0, serious: false, override: false,
+      attDuelCards: [], defDuelCards: [],
+    };
+  }
+  CT._offerReaction(target.id, "duel_declared", { effect: "cancel_duel", attackerId: p.id });
+  CT.save();
+  return { ok: true };
+};
+
+CT.useCollegeResearch = function (playerId) {
+  var p = CT.playerById(playerId);
+  if (!p) return { ok: false, msg: "Invalid player." };
+  if (!CT.rolePowerActive(p, "collegeadvisor")) return { ok: false, msg: "No College Advisor power." };
+  if (p.location !== "scrolls") return { ok: false, msg: "Must be at the Scrolls." };
+  if (p.gold < 2) return { ok: false, msg: "Not enough gold." };
+  p.gold -= 2;
+  CT.log(p.name + " begins Deep Research at the Scrolls (College Advisor, paid 2 gold).", "event");
+  CT.save();
+  return { ok: true, openDeepResearch: { researcherId: playerId } };
+};
+
 /* resolve a Haggle keep-1 choice */
 CT.resolveKeepOne = function (playerId, deck, keepId, dropId) {
   var p = CT.playerById(playerId); if (!p) return;

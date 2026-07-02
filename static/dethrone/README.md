@@ -20,7 +20,7 @@ Offline file open still works:
 open "index.html"          # macOS
 ```
 
-## What is implemented (Phases 1–32)
+## What is implemented (Phases 1–33)
 
 ### Phase 5 — playtest tooling & full card set
 - **Board art** — illustrated V3b kingdom poster (`cards/map/kingdom-background-v3b.jpg`) with curved gold/cursed roads, labelled site plaques, player tokens and per-location vignettes (see `board.js`, `cards-map.js`)
@@ -172,6 +172,12 @@ open "index.html"          # macOS
 - **Dirty Blow** — Black Knight at Tavern/Barracks/Graveyard may apply two duel consequences when they win; costs 1 Reputation
 - **Slip Away** — Thief (hidden or public) ignores tax levies
 - **Online sync** — `duelConsequence` accepts `secondConsequence` for Dirty Blow
+
+### Phase 33 — Knight's Challenge, College Research & Tiny Tyrant Tax
+- **Knight's Challenge** — any knight role (hidden or public) may start a duel against someone at your location once per round
+- **Deep Research (College Advisor)** — hidden College Advisor at the Scrolls may use Deep Research via role power (2 gold)
+- **Tiny Tyrant Tax** — when crowned with Tiny Tyrant, Royal Tax may levy +1 extra gold from one chosen player
+- **Online sync** — `startKnightDuel`, `useCollegeResearch`; `royalCommand` accepts `extraTaxTargetId`
 
 ### Core play hardening (in-person online)
 - **Formal vote legality** — server enforces proposer Rep, seconder/Decree, and banish Rep caps (`proposerId`, `seconder`, `decree` on `formalVote`)

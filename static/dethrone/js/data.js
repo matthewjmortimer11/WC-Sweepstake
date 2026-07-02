@@ -318,6 +318,7 @@ CT.SUCCESSION = {
   distantcousin: { rank: 4, window: 3, label: "Weak Claim",   note: "survive 3 full rounds" },
 };
 CT.SUCCESSION_ORDER = ["firstborn", "secondborn", "tinytyrant", "distantcousin"];
+CT.KNIGHT_ROLE_IDS = ["royalknight", "blackknight", "wanderingknight", "youngknight"];
 
 /* lookups */
 CT.roleById = function (id) { return CT.ROLES.find(function (r) { return r.id === id; }); };
@@ -417,6 +418,25 @@ CT.roleAbilitiesAvailable = function (p) {
     if ((fx.goldCost || 0) > p.gold) return;
     out.push({ id: aid, name: fx.name, needsTarget: !!fx.needsTarget, needsPath: !!fx.needsPath });
   });
+  return out;
+};
+/* Hidden/public role powers (Phase 33) — knight duel, college research, etc. */
+CT.rolePowersAvailable = function (p) {
+  if (!p || p.status !== "active" || !CT.state) return [];
+  var out = [];
+  var hasKnight = CT.KNIGHT_ROLE_IDS.some(function (rid) { return CT.rolePowerActive(p, rid); });
+  if (hasKnight && (p.abilitiesUsedThisRound || []).indexOf("knight_duel") === -1) {
+    var opps = CT.state.players.filter(function (x) {
+      return x.status === "active" && x.id !== p.id && x.location === p.location;
+    });
+    if (opps.length) {
+      out.push({ id: "knight_duel", name: "Knight's Challenge", needsTarget: true });
+    }
+  }
+  if (CT.rolePowerActive(p, "collegeadvisor") && p.location === "scrolls" && p.gold >= 2
+      && p.publicRoleId !== "collegeadvisor") {
+    out.push({ id: "college_research", name: "Deep Research", goldCost: 2 });
+  }
   return out;
 };
 CT.playerSuccessionRoles = function (p) {
