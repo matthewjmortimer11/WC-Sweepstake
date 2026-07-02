@@ -3431,7 +3431,13 @@ class CursedThroneGame:
             "players": [self._player_public(p, pid) for p in self.players],
             "legalMoves": (
                 self.legal_moves(me)
-                if me and self.status == STATUS_PLAY and self._can_board_move(me)
+                if (
+                    me
+                    and self.status == STATUS_PLAY
+                    and self.active_player()
+                    and me.id == self.active_player().id
+                    and self._can_board_move(me)
+                )
                 else []
             ),
             "pendingKeepOne": self.pending_keep_one.get(pid),
@@ -3496,6 +3502,8 @@ class CursedThroneGame:
             "discards": {},
             "undealtRoleIds": [],
             "legalMoves": v["legalMoves"],
+            "routeBlocks": [dict(b) for b in self.route_blocks],
+            "graveyardWatch": [dict(w) for w in self.graveyard_watch],
             "pendingKeepOne": v["pendingKeepOne"],
             "pendingRoleDiscard": v["pendingRoleDiscard"],
             "pendingUiAction": v.get("pendingUiAction"),

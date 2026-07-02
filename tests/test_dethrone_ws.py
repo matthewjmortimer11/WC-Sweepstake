@@ -199,6 +199,49 @@ def test_move_and_end_turn_via_websocket(client):
         assert nxt["room"]["game"]["activePlayerId"] != active
 
 
+def test_active_player_only_gets_legal_moves(client):
+    """legalMoves in clientState are only for the active player (not waiting opponents)."""
+    code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
+    room, pids, g = _start_game(code)
+    active = g.active_player().id
+    other = next(pid for pid in pids if pid != active)
+
+    with client.websocket_connect(f"/dethrone/ws/{code}?pid={active}&name=Active") as ws_active:
+        ws_active.receive_json()
+        state = ws_active.receive_json()
+        cs = state["room"]["clientState"]
+        assert cs["legalMoves"], "active player should see reachable sites"
+        assert state["room"]["game"]["legalMoves"] == cs["legalMoves"]
+
+    with client.websocket_connect(f"/dethrone/ws/{code}?pid={other}&name=Other") as ws_other:
+        ws_other.receive_json()
+        state = ws_other.receive_json()
+        cs = state["room"]["clientState"]
+        assert cs["legalMoves"] == [], "non-active player should not get board highlights"
+
+
+def test_route_blocks_synced_to_client_state(client):
+    code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
+    room, pids, g = _start_game(code)
+    guard_id = g.active_player().id
+    guard = g.player_by_id(guard_id)
+    victim_id = next(pid for pid in pids if pid != guard_id)
+    victim = g.player_by_id(victim_id)
+    guard.public_role_id = "gateguard"
+    guard.location = victim.location = "market"
+    g.use_role_ability(guard_id, "gate_block_route", victim_id, path_to="tavern")
+    assert "tavern" not in g.legal_moves(victim)
+
+    with client.websocket_connect(f"/dethrone/ws/{code}?pid={victim_id}&name=Victim") as ws:
+        ws.receive_json()
+        state = ws.receive_json()
+        blocks = state["room"]["clientState"]["routeBlocks"]
+        assert any(
+            b.get("targetId") == victim_id and b.get("locA") == "market" and b.get("locB") == "tavern"
+            for b in blocks
+        )
+
+
 def test_wrong_player_cannot_move(client):
     code = client.post("/dethrone/api/rooms", json={"playerCount": 4}).json()["code"]
     room, pids = _room_with_players(code, 4)

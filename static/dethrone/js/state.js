@@ -991,9 +991,13 @@ CT.legalMovesForTurn = function (player) {
 /* Authoritative highlights for the active player (online uses server legalMoves). */
 CT.legalMovesForActive = function (player) {
   if (!player || player.status !== "active" || !CT.state || CT.state.winner) return [];
+  if (!CT.isMyActiveTurn || !CT.isMyActiveTurn()) return [];
   if (CT.isOnline && CT.isOnline()) {
-    if (player.id !== CT.myId()) return [];
-    if (CT.state.legalMoves) return CT.state.legalMoves.slice();
+    var serverMoves = CT.state.legalMoves;
+    if (Array.isArray(serverMoves)) {
+      if (serverMoves.length) return serverMoves.slice();
+      if (!CT.canBoardMove(player)) return [];
+    }
   }
   return CT.legalMovesForTurn(player);
 };
