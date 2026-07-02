@@ -1648,9 +1648,15 @@ CT.handleAction = function (act, el, ev) {
         }
       }
       var apr = CT.activePlayer();
-      if (!apr || apr.id !== CT.myId()) break;
+      if (!apr || !CT.isMyActiveTurn()) {
+        if (CT.isOnline && CT.isOnline()) CT.showToast("It is not your turn.");
+        break;
+      }
       var boardMoves = CT.legalMovesForActive(apr);
-      if (boardMoves.indexOf(el.dataset.id) === -1) break;
+      if (boardMoves.indexOf(el.dataset.id) === -1) {
+        CT.showToast("That location is not reachable.");
+        break;
+      }
       if (CT.netAction({ type: "move", locationId: el.dataset.id })) break;
       CT.movePlayer(apr.id, el.dataset.id, false);
       CT.render(); break;

@@ -193,6 +193,20 @@ CT.net.applyState = function (msg) {
         }
       }
     }
+    if (CT.helpers && CT.helpers.ui && CT.helpers.ui.open) {
+      var keepHelper = cs.pendingUiAction && (
+        cs.pendingUiAction.kind === "duel"
+        || cs.pendingUiAction.kind === "royal_command"
+        || cs.pendingUiAction.kind === "deep_research"
+        || cs.pendingUiAction.kind === "trade"
+        || cs.pendingUiAction.kind === "callout"
+        || cs.pendingUiAction.kind === "contract"
+        || cs.pendingUiAction.kind === "vote"
+      );
+      if (!keepHelper && CT.isMyActiveTurn && !CT.isMyActiveTurn()) {
+        CT.helpers.ui.open = null;
+      }
+    }
     var ap = cs.players && cs.players[cs.activePlayerIndex];
     if (ap && ap.id === CT.myId() && ap.actionCardIds && ap.actionCardIds.length > CT.getRules().HAND_LIMIT) {
       if (CT.net._lastActiveId !== ap.id) {
