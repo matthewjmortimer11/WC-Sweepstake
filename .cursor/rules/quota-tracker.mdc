@@ -1,0 +1,29 @@
+---
+description: Keep the local AI Quota Tracker card updated for cursor-workspace
+alwaysApply: true
+---
+
+# AI Quota Tracker (cursor-workspace)
+
+When `$QUOTA_TRACKER_URL` is set, push status at meaningful moments:
+session start, phase changes (exploring/coding/testing/debugging/waiting), after
+test runs, when blocked on the user, and when opening or updating a PR.
+
+Use the helper (never curl by hand unless the script is unavailable):
+
+```bash
+python3 scripts/agent_status.py push \
+  --phase "<phase>" \
+  --summary "<one short sentence>" \
+  --status live|waiting|limited|warning|offline
+```
+
+Optional flavor: `--vibe "on fire"` or `--metric "Tests:42 passed"`.
+
+Rules:
+- Stable tracker id: `cursor-workspace` (script default).
+- Never send secrets, tokens, API keys, private prompts, or sensitive content.
+- Summaries only; keep under ~140 characters.
+- If POST fails, continue the task — do not loop retries.
+
+If `QUOTA_TRACKER_URL` is unset, skip silently.
