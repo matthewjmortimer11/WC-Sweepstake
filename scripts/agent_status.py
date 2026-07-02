@@ -21,6 +21,10 @@ import urllib.request
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT / "scripts"))
+
+from mission_control.sites import detect_sites_from_git, site_metrics  # noqa: E402
+
 DEFAULT_TRACKER_ID = "cursor-workspace"
 DEFAULT_NAME = "Cursor workspace"
 DEFAULT_VENDOR = "Cursor"
@@ -84,6 +88,7 @@ def build_payload(
     if changed is not None:
         metrics.append({"label": "Changed files", "value": changed_value})
     metrics.append({"label": "Tests", "value": test_status.replace("green", "passed").replace("failed", "failing")})
+    metrics.extend(site_metrics(detect_sites_from_git(ROOT)))
     metrics.extend(extra_metrics)
 
     payload = {
