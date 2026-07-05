@@ -1,12 +1,7 @@
+/* Shared tokens come from /shared/theme.css; --accent is whoami green via
+   [data-game="whoami"]. Only whoami-specific colours live here. */
 :root{
-  --bg:#0e1016; --panel:#1a1e2b; --panel-2:#212636; --line:#2c3346; --line-strong:#3b4459;
-  --ink:#f4f7ff; --ink-2:#aab4c9; --ink-3:#717c92;
-  --accent:#ffc53d; --accent-2:#f0a417; --accent-ink:#2a1c02;
-  --got:#21d4cf; --got-deep:#0c8f93;
-  --radius:18px; --radius-sm:13px;
-  --font:"Nunito",system-ui,sans-serif; --head:"Fredoka",var(--font);
-  --shadow:0 24px 60px -28px rgba(0,0,0,.85);
-  --ease:cubic-bezier(.34,1.56,.64,1);
+  --got:#12A594; --got-deep:#0c6f66;
 }
 *{box-sizing:border-box}
 html,body{height:100%}
@@ -28,9 +23,9 @@ h1{font-family:var(--head);font-weight:600;font-size:clamp(1.8rem,7vw,2.6rem);li
 h1 .em{color:var(--accent)}
 .lede{color:var(--ink-2);margin:.4rem 0 0;line-height:1.5;font-size:.98rem}
 label.fl{display:grid;gap:6px;font-size:.78rem;font-weight:800;color:var(--ink-2)}
-input.in{font:inherit;font-weight:700;color:var(--ink);background:#0a0a08;border:2px solid var(--line-strong);
+input.in{font:inherit;font-weight:700;color:var(--ink);background:var(--panel-2);border:2px solid var(--line-strong);
   border-radius:var(--radius-sm);padding:.78em .95em;width:100%}
-input.in:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 4px rgba(255,197,61,.14)}
+input.in:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 4px rgba(0,0,0,.08)}
 .btn{appearance:none;cursor:pointer;font:inherit;font-weight:800;font-family:var(--head);color:var(--ink);
   background:var(--panel-2);border:0;border-radius:var(--radius-sm);padding:.85em 1.2em;
   display:inline-flex;align-items:center;justify-content:center;gap:.5em;
@@ -87,7 +82,7 @@ input.in:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 4px rgba
 .tiny{font-size:.78rem}
 .muted{color:var(--ink-3)}
 .toast{position:fixed;left:50%;bottom:max(16px,env(safe-area-inset-bottom));transform:translateX(-50%);
-  background:#1a1e2b;border:1px solid var(--line-strong);color:var(--ink);padding:.75em 1.2em;
+  background:var(--ink);border:1px solid var(--line-strong);color:#fff;padding:.75em 1.2em;
   border-radius:12px;font-weight:700;z-index:50;box-shadow:var(--shadow);max-width:min(92vw,420px);text-align:center}
 /* Avatar */
 .av-row{display:flex;align-items:center;gap:14px}
@@ -107,7 +102,7 @@ input.in:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 4px rgba
 .wai-card__name{font-family:var(--head);font-size:1.05rem;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .wai-card__tag{font-size:.72rem;color:var(--ink-3);font-weight:800;text-transform:uppercase;letter-spacing:.1em}
 .wai-card__char{font-family:var(--head);font-size:clamp(1.2rem,5.5vw,1.6rem);font-weight:600;line-height:1.2;
-  padding:10px 12px;border-radius:10px;background:#0a0a08;border:1px dashed var(--line-strong);text-align:center}
+  padding:10px 12px;border-radius:10px;background:var(--panel-2);border:1px dashed var(--line-strong);text-align:center}
 .wai-card__char.hidden{color:var(--ink-3);letter-spacing:.2em}
 .wai-card__char.reveal{color:var(--accent-ink);background:linear-gradient(180deg,var(--accent),var(--accent-2));border:0}
 .wai-card__meta{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}

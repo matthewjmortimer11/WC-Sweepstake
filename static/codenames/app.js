@@ -286,7 +286,7 @@
 
   // ── theme ──────────────────────────────────────────────────────────────────
   function initTheme() {
-    const saved = localStorage.getItem(LS.theme) || "dark";
+    const saved = localStorage.getItem(LS.theme) || "light";
     document.documentElement.dataset.theme = saved;
   }
   function toggleTheme() {

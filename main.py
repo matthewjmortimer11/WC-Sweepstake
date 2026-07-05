@@ -1207,12 +1207,16 @@ app.include_router(qualification_router)
 
 _GAMES_TEMPLATE = Path("templates/games.html")
 
+from game_registry import render_cards as _render_game_cards  # noqa: E402
+
 
 @app.get("/games", response_class=HTMLResponse)
 async def games_page():
     if not _GAMES_TEMPLATE.is_file():
         raise HTTPException(status_code=404, detail="not found")
-    return HTMLResponse(content=_GAMES_TEMPLATE.read_text(encoding="utf-8"))
+    html = _GAMES_TEMPLATE.read_text(encoding="utf-8")
+    html = html.replace("<!--GAME_CARDS-->", _render_game_cards())
+    return HTMLResponse(content=html)
 
 
 # Content Security Policy. Tuned to exactly what the app loads: React/Babel from
@@ -3514,6 +3518,14 @@ async def tweaks_panel():
 @app.get("/app/{filename:path}")
 async def app_static(filename: str):
     path = _safe_static_path(_STATIC / "app", filename)
+    mt = _JS_TYPES.get(path.suffix, "application/octet-stream")
+    return FileResponse(path, media_type=mt)
+
+
+# Shared theme (design tokens + components) used by the dashboard and every game.
+@app.get("/shared/{filename:path}")
+async def shared_static(filename: str):
+    path = _safe_static_path(_STATIC / "shared", filename)
     mt = _JS_TYPES.get(path.suffix, "application/octet-stream")
     return FileResponse(path, media_type=mt)
 

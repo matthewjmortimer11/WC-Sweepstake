@@ -1,0 +1,108 @@
+/* Wheesht shared theme — "printed game-box" editorial system.
+   One source of truth for the games dashboard AND every game. Games reuse the
+   same CSS variable names they always had (--bg, --panel, --accent, --head, …),
+   so redefining them here re-skins each game. Per-game accent comes from a
+   [data-game="…"] attribute on <html>. See docs/ADDING_A_GAME.md. */
+
+@import url("https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;700;800&family=Hanken+Grotesk:wght@500;600;700;800&display=swap");
+
+:root{
+  color-scheme:light;                     /* light-only; block browser auto-dark */
+  /* Canvas + ink */
+  --bg:#F4EEE3; --bg-2:#EDE5D6;
+  --panel:#FFFFFF; --panel-2:#FBF6EC;
+  --line:#E4DBC9; --line-strong:#1A1A1A;
+  --ink:#1A1A1A; --ink-2:#5A554C; --ink-3:#8A8378;
+
+  /* Brand accent (yellow). Games override --accent via [data-game]. */
+  --accent:#F5C800; --accent-2:#D9AE00; --accent-ink:#1A1A1A;
+
+  /* Shape + type + motion */
+  --radius:20px; --radius-sm:14px;
+  --font:"Hanken Grotesk",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --head:"Bricolage Grotesque",var(--font);
+  --shadow:0 6px 0 var(--ink);            /* signature chunky offset */
+  --shadow-sm:0 3px 0 var(--ink);
+  --ease:cubic-bezier(.34,1.56,.64,1);
+}
+
+/* ── Per-game accents ─────────────────────────────────────────────────────
+   Base UI stays yellow/black; each game swaps in its signature accent. */
+[data-game="cipher"]  {--accent:#6C5CE7; --accent-2:#4B3FD0; --accent-ink:#FFFFFF;}
+[data-game="imposter"]{--accent:#E8455E; --accent-2:#C62C45; --accent-ink:#FFFFFF;}
+[data-game="dial"]    {--accent:#12A594; --accent-2:#0C7D70; --accent-ink:#FFFFFF;}
+[data-game="charades"]{--accent:#F5960B; --accent-2:#CF7A00; --accent-ink:#1A1A1A;}
+[data-game="whoami"]  {--accent:#3FA34D; --accent-2:#2F7D3A; --accent-ink:#FFFFFF;}
+[data-game="dethrone"]{--accent:#9B2242; --accent-2:#6F142E; --accent-ink:#FFFFFF;}
+
+/* ── Dashboard + shared building blocks (wa- namespace) ──────────────────── */
+.wa-reset,.wa-reset *{box-sizing:border-box}
+
+.wa-wrap{max-width:600px;margin:0 auto;
+  padding:clamp(20px,5vw,36px);
+  padding-bottom:max(24px,env(safe-area-inset-bottom))}
+
+.wa-eyebrow{font-family:var(--head);font-weight:800;font-size:.75rem;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--accent-2);display:block;margin-bottom:.55rem}
+.wa-title{font-family:var(--head);font-weight:800;letter-spacing:-.02em;
+  font-size:clamp(2.3rem,9vw,3rem);line-height:.98;margin:0;color:var(--ink)}
+.wa-title .hl{position:relative;white-space:nowrap}
+.wa-title .hl::after{content:"";position:absolute;left:0;right:-2px;bottom:.14em;height:.28em;
+  background:var(--accent);border-radius:2px;z-index:-1}
+.wa-lede{max-width:44ch;margin:.9rem 0 1.6rem;color:var(--ink-2);
+  font-weight:500;line-height:1.5;font-size:1rem}
+
+/* Full-width hero card */
+.wa-stack{display:grid;gap:14px}
+.wa-hero{display:flex;align-items:center;gap:16px;text-decoration:none;color:inherit;
+  background:var(--panel);border:3px solid var(--ink);border-radius:var(--radius);
+  padding:15px 16px;box-shadow:var(--shadow);
+  transition:transform .14s var(--ease),box-shadow .14s var(--ease),border-color .14s}
+.wa-hero:hover{transform:translateY(-3px);box-shadow:0 9px 0 var(--ink);border-color:var(--accent)}
+.wa-hero:active{transform:translateY(0);box-shadow:var(--shadow-sm)}
+.wa-hero__tile{flex:none;width:66px;height:66px;border-radius:16px;border:2.5px solid var(--ink);
+  background:var(--accent);display:flex;align-items:center;justify-content:center;box-shadow:var(--shadow-sm)}
+.wa-hero__tile svg{width:34px;height:34px;fill:none;stroke:var(--accent-ink);
+  stroke-width:2.3;stroke-linecap:round;stroke-linejoin:round}
+.wa-hero__body{flex:1;min-width:0;display:flex;flex-direction:column;align-items:flex-start}
+.wa-hero__title{display:block;font-family:var(--head);font-weight:800;letter-spacing:-.01em;
+  font-size:1.3rem;line-height:1.1;color:var(--ink)}
+.wa-hero__desc{display:block;color:var(--ink-2);font-weight:500;font-size:.88rem;line-height:1.4;margin:.2rem 0 .6rem}
+.wa-meta{display:flex;gap:7px;flex-wrap:wrap}
+.wa-pill{font-weight:700;font-size:.72rem;color:var(--ink-2);background:var(--bg);
+  border:1.5px solid var(--line);padding:3px 9px;border-radius:20px}
+.wa-pill--beta{color:var(--accent-ink);background:var(--accent);border-color:var(--accent);
+  text-transform:uppercase;letter-spacing:.06em}
+.wa-hero__go{flex:none;width:40px;height:40px;border-radius:50%;border:2.5px solid var(--ink);
+  background:var(--accent);display:flex;align-items:center;justify-content:center;
+  font-family:var(--head);font-weight:700;font-size:1.25rem;color:var(--accent-ink)}
+.wa-hero:hover .wa-hero__go{transform:translateX(2px)}
+
+/* "New game" placeholder / coming soon */
+.wa-hero--soon{border-style:dashed;box-shadow:none;background:var(--panel-2);cursor:default}
+.wa-hero--soon:hover{transform:none;box-shadow:none;border-color:var(--ink-3)}
+.wa-hero--soon .wa-hero__tile{border-style:dashed;box-shadow:none;background:var(--bg)}
+.wa-hero--soon .wa-hero__tile svg{stroke:var(--ink-3)}
+.wa-hero--soon .wa-hero__title{color:var(--ink-3)}
+.wa-hero--soon .wa-hero__go{background:var(--bg);border-style:dashed;color:var(--ink-3)}
+
+.wa-foot{margin-top:1.8rem;text-align:center;font-family:var(--head);font-weight:700;
+  font-size:.8rem;color:var(--ink-3)}
+.wa-foot a{color:var(--ink);text-decoration:none;border-bottom:2px solid var(--accent)}
+
+/* Shared top bar used by each game to return to the hub */
+.wa-topbar{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.wa-topbar .wa-brand{font-family:var(--head);font-weight:800;font-size:1.05rem;
+  display:flex;align-items:center;gap:.5rem;color:var(--ink)}
+.wa-topbar .wa-brand .tag{color:var(--ink-3);font-size:.68rem;text-transform:uppercase;
+  letter-spacing:.14em;font-weight:800}
+.wa-back{color:var(--ink);text-decoration:none;font-family:var(--head);font-weight:700;
+  font-size:.82rem;border:2.5px solid var(--ink);background:var(--panel);
+  padding:.4em .8em;border-radius:12px;box-shadow:var(--shadow-sm);transition:.12s var(--ease)}
+.wa-back:hover{background:var(--accent);color:var(--accent-ink)}
+.wa-back:active{transform:translateY(3px);box-shadow:0 0 0 var(--ink)}
+
+@media (prefers-reduced-motion:reduce){
+  .wa-hero,.wa-back,.wa-hero__go{transition-duration:.01ms}
+  .wa-hero:hover{transform:none}
+}
