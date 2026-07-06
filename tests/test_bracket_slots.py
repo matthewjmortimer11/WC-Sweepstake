@@ -70,6 +70,22 @@ def test_third_place_assigned_in_match_order():
     assert assigned["r32-74"] == "T3C"
 
 
+def test_all_qualified_thirds_are_placed_even_when_greedy_would_strand():
+    """Every qualified third must get a slot. Groups {A,B,E,F,G,I,K,L} are a case
+    where a naive per-slot greedy strands group K's third: K fits ONLY slot
+    r32-80 (candidates EHIJK), which greedy hands to group E's third first. Proper
+    bipartite matching must still place all eight."""
+    groups = ["A", "B", "E", "F", "G", "I", "K", "L"]
+    thirds = [
+        ThirdPlaceStanding(f"T{g}", g, 3, 0, 1, rank=i + 1, qualifies=True)
+        for i, g in enumerate(groups)
+    ]
+    assigned = assign_third_place_slots(thirds)
+    assert len(assigned) == 8                                   # every slot filled
+    assert set(assigned.values()) == {f"T{g}" for g in groups}  # every third placed
+    assert assigned["r32-80"] == "TK"                           # K's only eligible slot
+
+
 def test_group_winner_faces_assigned_third():
     teams_e, fix_e = _four_group("E", ["E1", "E2", "E3", "E4"])
     teams_a, fix_a = _four_group("A", ["A1", "A2", "A3", "A4"])

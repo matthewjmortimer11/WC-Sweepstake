@@ -54,22 +54,59 @@ THIRD_SLOT_ORDER: List[Tuple[str, str]] = [
 def assign_third_place_slots(
     thirds: List[ThirdPlaceStanding],
 ) -> Dict[str, str]:
-    """Map each third-place R32 match id to the qualifying team code."""
-    ranked = [t for t in thirds if t.qualifies]
-    used: set[str] = set()
-    out: Dict[str, str] = {}
-    for match_id, candidates in THIRD_SLOT_ORDER:
-        groups = set(candidates)
-        eligible = [
-            t for t in ranked
-            if t.team_id not in used and t.group in groups
-        ]
-        if not eligible:
-            continue
-        pick = min(eligible, key=lambda t: t.rank or 999)
-        out[match_id] = pick.team_id
-        used.add(pick.team_id)
-    return out
+    """Map each third-place R32 match id to the qualifying team code.
+
+    Each slot accepts thirds only from a fixed set of candidate groups, so this
+    is a bipartite assignment, not a per-slot pick: a naive greedy ("give each
+    slot its best eligible team") can strand a third whose group fits only one
+    already-taken slot, leaving that team out of the bracket even though a full
+    assignment exists. We use maximum bipartite matching (Kuhn's algorithm),
+    which the FIFA slot template guarantees can place all eight qualified thirds.
+    Thirds are considered best-rank-first so the matching is deterministic and
+    tends to seat higher-ranked teams in the earlier slots.
+    """
+    ranked = sorted(
+        (t for t in thirds if t.qualifies),
+        key=lambda t: (t.rank if t.rank is not None else 999, t.team_id),
+    )
+    slot_order = [match_id for match_id, _ in THIRD_SLOT_ORDER]
+    slot_groups: Dict[str, set] = {mid: set(c) for mid, c in THIRD_SLOT_ORDER}
+    group_of: Dict[str, str] = {t.team_id: t.group for t in ranked}
+    third_of_slot: Dict[str, str] = {}   # match_id -> team_id
+    slot_of_third: Dict[str, str] = {}   # team_id -> match_id
+
+    # Greedy first: give each slot (in match order) its best-ranked eligible third.
+    # This seats stronger teams in the earlier slots, matching FIFA's ordering.
+    used: set = set()
+    for match_id in slot_order:
+        pick = next(
+            (t for t in ranked if t.team_id not in used and t.group in slot_groups[match_id]),
+            None,
+        )
+        if pick is not None:
+            third_of_slot[match_id] = pick.team_id
+            slot_of_third[pick.team_id] = match_id
+            used.add(pick.team_id)
+
+    # Greedy can strand a third whose group fits only an already-taken slot. Place
+    # any such team with an augmenting path — reshuffling minimally so all eight are
+    # seated, without disturbing the greedy ordering elsewhere.
+    def _augment(team_id: str, seen: set) -> bool:
+        for match_id in slot_order:
+            if match_id in seen or group_of[team_id] not in slot_groups[match_id]:
+                continue
+            seen.add(match_id)
+            holder = third_of_slot.get(match_id)
+            if holder is None or _augment(holder, seen):
+                third_of_slot[match_id] = team_id
+                slot_of_third[team_id] = match_id
+                return True
+        return False
+
+    for t in ranked:
+        if t.team_id not in slot_of_third:
+            _augment(t.team_id, set())
+    return third_of_slot
 
 
 def _group_leaders(
