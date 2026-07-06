@@ -222,6 +222,9 @@ function BracketPanel(props) {
   var prefs = kbLoadPrefs(prefScope);
   var hasTree = KB_ROUND_ORDER.some(function (k) { return (rounds[k] || []).length; });
   var hasThird = (rounds.third || []).length > 0;
+  var anyEntrant = KB_LIST_ORDER.some(function (k) {
+    return (rounds[k] || []).some(function (t) { return t.entrant && !t.you && !t.bracketPad; });
+  });
   var layout = hasTree && kbTreeValid(rounds) ? kbLayoutTree(rounds) : null;
   var [view, setView] = kbState(prefs.view || (kbHasFullTree(rounds) ? 'tree' : (layout ? 'tree' : 'list')));
   var effectiveView = (view === 'tree' && layout) ? 'tree' : 'list';
@@ -289,7 +292,7 @@ function BracketPanel(props) {
       )}
       <div style={{ display: 'flex', gap: 12, fontSize: 10.5, fontWeight: 700, color: 'var(--ink2)', marginBottom: 8, flexWrap: 'wrap' }}>
         <span><span style={{ display: 'inline-block', width: 10, height: 10, background: 'var(--yellow)', border: '2px solid var(--ink)', borderRadius: 2, verticalAlign: 'middle', marginRight: 4 }} /> Your team</span>
-        <span><span style={{ display: 'inline-block', width: 10, height: 10, border: '2px solid var(--red)', borderRadius: 2, verticalAlign: 'middle', marginRight: 4 }} /> Entrant in tie</span>
+        {anyEntrant && <span><span style={{ display: 'inline-block', width: 10, height: 10, border: '2px solid var(--red)', borderRadius: 2, verticalAlign: 'middle', marginRight: 4 }} /> Entrant in tie</span>}
         {fromStandings && <span><span style={{ display: 'inline-block', width: 10, height: 10, border: '2px dashed var(--ink2)', borderRadius: 2, verticalAlign: 'middle', marginRight: 4 }} /> Pairing from standings</span>}
         <span><span style={{ display: 'inline-block', width: 10, height: 10, background: 'rgba(0,0,0,.04)', border: '2px solid var(--line)', borderRadius: 2, verticalAlign: 'middle', marginRight: 4 }} /> TBD</span>
         {showPathLegend && <span><span style={{ display: 'inline-block', width: 10, height: 10, background: 'var(--yellow)', border: '3px solid var(--ink)', borderRadius: 2, verticalAlign: 'middle', marginRight: 4 }} /> Your tie</span>}

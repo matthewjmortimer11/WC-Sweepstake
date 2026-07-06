@@ -24,6 +24,12 @@
     function ownersOf(code) {
       return PEOPLE.filter(function (p) { return p.team === code; });
     }
+    // The "entrant in tie" marker only means something when some teams are
+    // undrawn. If every team has an owner, every tie has an entrant, so the
+    // marker (red border + dot) would be on everything — suppress it then.
+    var someTeamUnowned = PEOPLE.length === 0 || TEAM_LIST.some(function (t) {
+      return ownersOf(t.code).length === 0;
+    });
     function rate(list) {
       if (!list.length) return 0;
       return Math.round(100 * list.filter(function (p) { return p.alive; }).length / list.length);
@@ -450,7 +456,7 @@
         var ownersA = ownersOf(f.a);
         var ownersB = ownersOf(f.b);
         var you = !!(myCode && (f.a === myCode || f.b === myCode));
-        var entrant = ownersA.length + ownersB.length > 0;
+        var entrant = someTeamUnowned && (ownersA.length + ownersB.length > 0);
         rounds[st].push({
           id: f.id,
           a: f.a,
@@ -573,7 +579,7 @@
             afterExtraTime: !!t.afterExtraTime,
             pens: !!t.pens,
             you: you,
-            entrant: ownersA.length + ownersB.length > 0,
+            entrant: someTeamUnowned && (ownersA.length + ownersB.length > 0),
             ownersA: ownersA.length,
             ownersB: ownersB.length,
             projectedWinner: !!t.projectedWinner,
