@@ -39,7 +39,11 @@ function kbLayoutTree(rounds) {
   var active = KB_ROUND_ORDER.filter(function (k) { return (rounds[k] || []).length; });
   if (!active.length) return null;
   var rootCount = (rounds[active[0]] || []).length;
-  var totalH = KB_LABEL_H + Math.max(rootCount * KB_CELL_H, KB_CELL_H);
+  // Root-column cells sit on a 2×KB_CELL_H pitch (each cell owns a slot twice its
+  // height so the connectors between rounds line up). The canvas must reserve that
+  // full pitch, or the bottom half of every column is clipped by the scroller's
+  // overflow-y:hidden — which showed only 8 of 16 R16 teams and 4 of 8 in the QF.
+  var totalH = KB_LABEL_H + Math.max(rootCount * KB_CELL_H * 2, KB_CELL_H);
   var cols = [];
   active.forEach(function (stage, colIdx) {
     var ties = rounds[stage] || [];
