@@ -12,8 +12,9 @@ var KB_LIST_ORDER = ['r32', 'r16', 'qf', 'sf', 'final', 'third'];
 var KB_PREFS_KEY = 'wc-ko-bracket-prefs';
 var KB_CELL_H = 46;
 var KB_COL_W = 128;
-var KB_GAP_W = 32;
+var KB_GAP_W = 22;
 var KB_LABEL_H = 26;
+var KB_ROW_GAP = 12;   // vertical gap between sibling cells in the first column
 
 function kbFirstRound(rounds) {
   var kr = WCkb.meta && WCkb.meta.knockoutRound;
@@ -39,21 +40,20 @@ function kbLayoutTree(rounds) {
   var active = KB_ROUND_ORDER.filter(function (k) { return (rounds[k] || []).length; });
   if (!active.length) return null;
   var rootCount = (rounds[active[0]] || []).length;
-  // Root-column cells sit on a 2×KB_CELL_H pitch (each cell owns a slot twice its
-  // height so the connectors between rounds line up). The canvas must reserve that
-  // full pitch, or the bottom half of every column is clipped by the scroller's
-  // overflow-y:hidden — which showed only 8 of 16 R16 teams and 4 of 8 in the QF.
-  var totalH = KB_LABEL_H + Math.max(rootCount * KB_CELL_H * 2, KB_CELL_H);
+  // First-column cells sit on a compact pitch (cell height + a small gap). Each
+  // later round doubles that pitch and offsets by half, so every cell stays
+  // centred on the pair that feeds it and the connectors line up. The canvas
+  // reserves the full first-column height so nothing is clipped.
+  var pitch0 = KB_CELL_H + KB_ROW_GAP;
+  var baseCenter = KB_LABEL_H + KB_CELL_H / 2;
+  var totalH = KB_LABEL_H + KB_CELL_H + Math.max(0, rootCount - 1) * pitch0 + KB_ROW_GAP;
   var cols = [];
   active.forEach(function (stage, colIdx) {
     var ties = rounds[stage] || [];
-    var mult = Math.pow(2, colIdx);
-    var slotSpan = KB_CELL_H * mult;
+    var pitch = pitch0 * Math.pow(2, colIdx);
+    var firstCenter = baseCenter + (pitch - pitch0) / 2;
     var slots = ties.map(function (tie, i) {
-      return {
-        tie: tie,
-        top: KB_LABEL_H + i * slotSpan * 2 + (slotSpan - KB_CELL_H) / 2,
-      };
+      return { tie: tie, top: firstCenter + i * pitch - KB_CELL_H / 2 };
     });
     cols.push({
       stage: stage,
