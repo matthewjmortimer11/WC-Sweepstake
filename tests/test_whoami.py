@@ -59,5 +59,5 @@ def test_character_pool_api(client):
 
 def test_games_hub_lists_all_party_games(client):
     t = client.get("/games").text
-    for marker in ("Who Am I?", "Cipher", "Imposter", "Dial", "Charades", "UK celebs"):
+    for marker in ("Who Am I?", "Cipher", "Imposter", "Dial", "Charades", 'href="/whoami"'):
         assert marker in t, f"missing games hub marker: {marker!r}"
