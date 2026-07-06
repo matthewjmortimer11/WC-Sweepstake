@@ -43,6 +43,14 @@ function mcStatus(f) {
 }
 function mcOrd(n) { const s = ['th', 'st', 'nd', 'rd'], v = n % 100; return n + (s[(v - 20) % 10] || s[v] || s[0]); }
 function mcStageRank(st) { return ({ final: 6, sf: 5, qf: 4, r16: 3, r32: 2, group: 1 })[st] || 1; }
+// Order the list by "what's next": games still to come first (soonest kick-off
+// at the top), then finished games most-recent first.
+function mcNextFirst(a, b) {
+  const da = mcStatus(a) === 'done', db = mcStatus(b) === 'done';
+  if (da !== db) return da ? 1 : -1;
+  const ka = mcKickoffMs(a) || 0, kb = mcKickoffMs(b) || 0;
+  return da ? (kb - ka) : (ka - kb);
+}
 function mcStageLabel(f) {
   const st = f.stage || 'group';
   if (st === 'group') return 'Group ' + f.group;
@@ -417,7 +425,6 @@ function MatchCentreScreen() {
   else if (filter === 'knockouts') list = list.filter(f => f.stage && f.stage !== 'group');
 
   const byDate = []; const seen = {};
-  const inKnockouts = mcKnockoutsVisible() || !!(WCmc.meta && WCmc.meta.knockoutRound);
   if (filter === 'knockouts') {
     list.sort(function (a, b) {
       var ra = mcStageRank(a.stage || 'group');
@@ -425,13 +432,10 @@ function MatchCentreScreen() {
       if (ra !== rb) return rb - ra;
       return (mcKickoffMs(a) || 0) - (mcKickoffMs(b) || 0);
     });
-  } else if (filter === 'all' && inKnockouts) {
-    list.sort(function (a, b) {
-      var ka = (a.stage && a.stage !== 'group') ? 1 : 0;
-      var kb = (b.stage && b.stage !== 'group') ? 1 : 0;
-      if (ka !== kb) return kb - ka;
-      return (mcKickoffMs(a) || 0) - (mcKickoffMs(b) || 0);
-    });
+  } else {
+    // Everything else reads top-to-bottom as "what's next" — upcoming games
+    // soonest-first, then finished games most-recent-first.
+    list.sort(mcNextFirst);
   }
   list.forEach(f => {
     if (!seen[f.dateISO]) { seen[f.dateISO] = { label: f.dateLabel, items: [] }; byDate.push(seen[f.dateISO]); }
