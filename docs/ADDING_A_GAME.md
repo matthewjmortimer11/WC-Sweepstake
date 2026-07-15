@@ -17,12 +17,15 @@ yourgame/
   __init__.py     # from .router import router ;  __all__ = ["router"]
   game.py         # pure rules: MoveError, Settings, YourGame (state machine)
   manager.py      # Room / Player / Manager (in-memory rooms + WebSocket broadcast)
-  router.py       # APIRouter: GET page, POST /yourgame/api/rooms, GET assets, WS
+  router.py       # APIRouter: GET page, GET manifest, POST /yourgame/api/rooms, GET assets, WS
 ```
 
 In `router.py` rename every `/imposter` path to `/yourgame` (page route,
-`/yourgame/api/rooms`, `/yourgame/assets/{filename}`, `/yourgame/ws/{code}`),
-and point `_TEMPLATE`/`_ASSETS` at your template and `static/yourgame/`.
+`/yourgame/manifest.webmanifest`, `/yourgame/api/rooms`,
+`/yourgame/assets/{filename}`, `/yourgame/ws/{code}`), and point
+`_TEMPLATE`/`_ASSETS` at your template and `static/yourgame/`. The
+`/yourgame/manifest.webmanifest` route serves `static/yourgame/manifest.webmanifest`
+so the game installs as its own home-screen app (see step 5).
 
 ## 2. Register the router in `main.py`
 
@@ -74,6 +77,14 @@ Copy `static/imposter/styles.css` to `static/yourgame/styles.css` and
   `<link rel="stylesheet" href="/shared/theme.css" />` **before** the game's own
   stylesheet, set `<html data-game="yourgame">`, keep
   `<meta name="color-scheme" content="light" />`, and update the title/icon.
+- PWA app logo: keep the two lines that make the game installable —
+  `<link rel="manifest" href="/yourgame/manifest.webmanifest" />` and
+  `<link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png?v=…" />`
+  (the emoji `<link rel="icon">` stays for the browser tab). Copy
+  `static/imposter/manifest.webmanifest` to `static/yourgame/manifest.webmanifest`
+  and update `id`/`name` (`Wheesht · Your Game`)/`short_name`/`description` and the
+  `start_url`+`scope` (`/yourgame`). All games share the Wheesht wordmark set in
+  `static/icons/`, so the icon list needs no changes.
 - Stylesheet: the shared tokens (`--bg`, `--panel`, `--ink`, `--accent`,
   `--radius`, `--font`, `--head`, `--shadow`, `--ease`) come from the theme — only
   keep game-specific colours in your `:root`. Consume `var(--…)` everywhere; don't

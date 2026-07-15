@@ -62,6 +62,18 @@ async def charades_page() -> HTMLResponse:
     return HTMLResponse(_TEMPLATE.read_text(encoding="utf-8"), headers={"Content-Security-Policy": _CSP})
 
 
+@router.get("/charades/manifest.webmanifest")
+async def charades_manifest() -> FileResponse:
+    path = _ASSETS / "manifest.webmanifest"
+    if not path.is_file():
+        raise HTTPException(status_code=404)
+    return FileResponse(
+        path,
+        media_type="application/manifest+json",
+        headers={"Cache-Control": "public, max-age=300"},
+    )
+
+
 @router.post("/charades/api/rooms")
 async def create_room(request: Request) -> JSONResponse:
     _rate_limit_create(request)

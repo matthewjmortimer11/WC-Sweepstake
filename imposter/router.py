@@ -68,6 +68,18 @@ async def imposter_page() -> HTMLResponse:
     )
 
 
+@router.get("/imposter/manifest.webmanifest")
+async def imposter_manifest() -> FileResponse:
+    path = _ASSETS / "manifest.webmanifest"
+    if not path.is_file():
+        raise HTTPException(status_code=404)
+    return FileResponse(
+        path,
+        media_type="application/manifest+json",
+        headers={"Cache-Control": "public, max-age=300"},
+    )
+
+
 @router.get("/imposter/api/celebs")
 async def celebs_meta() -> JSONResponse:
     return JSONResponse({"count": len(CELEBS)})
