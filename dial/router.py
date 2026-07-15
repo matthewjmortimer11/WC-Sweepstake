@@ -102,6 +102,18 @@ async def wheel_page() -> HTMLResponse:
     )
 
 
+@router.get("/wheel/manifest.webmanifest")
+async def wheel_manifest() -> FileResponse:
+    path = _ASSETS / "manifest.webmanifest"
+    if not path.is_file():
+        raise HTTPException(status_code=404)
+    return FileResponse(
+        path,
+        media_type="application/manifest+json",
+        headers={"Cache-Control": "public, max-age=300"},
+    )
+
+
 @router.post("/wheel/api/rooms")
 async def create_room(request: Request) -> JSONResponse:
     _rate_limit_create(request)

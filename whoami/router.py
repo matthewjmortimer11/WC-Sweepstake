@@ -55,6 +55,18 @@ async def whoami_page() -> HTMLResponse:
     )
 
 
+@router.get("/whoami/manifest.webmanifest")
+async def whoami_manifest() -> FileResponse:
+    path = _ASSETS / "manifest.webmanifest"
+    if not path.is_file():
+        raise HTTPException(status_code=404)
+    return FileResponse(
+        path,
+        media_type="application/manifest+json",
+        headers={"Cache-Control": "public, max-age=300"},
+    )
+
+
 @router.get("/whoami/api/packs")
 async def packs() -> JSONResponse:
     return JSONResponse({"packs": pack_meta()})
