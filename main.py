@@ -3481,6 +3481,15 @@ async def web_manifest():
     )
 
 
+@app.get("/games/manifest.webmanifest")
+async def games_manifest():
+    return FileResponse(
+        _STATIC / "games.webmanifest",
+        media_type="application/manifest+json",
+        headers={"Cache-Control": "public, max-age=300"},
+    )
+
+
 @app.get("/sw.js")
 async def service_worker():
     return FileResponse(
