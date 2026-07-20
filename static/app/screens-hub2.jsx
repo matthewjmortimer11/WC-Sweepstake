@@ -387,13 +387,17 @@ function PreVerdict(){
   );
 }
 
-/* ---- The champion card — only painted when the organiser declares a winner. ---- */
+/* ---- The champion card — painted once the final's result decides it (same
+   resolver the Dashboard banner uses), falling back to the organiser's
+   manually-declared 'winner' answer for leagues run off the clipboard. ---- */
 function ChampionCard(){
-  const code = vAnswer('winner');           // set in the organiser's clipboard
+  const auto = WC2.championTeam ? WC2.championTeam() : null;
+  const code = (auto && auto.code) || vAnswer('winner');
   if (!code) return null;
   const t = vTeam(code);
   const owners = vOwners(code);
   const win = vPot();
+  const share = owners.length > 1 ? win / owners.length : win;
   return (
     <>
       <SH2>Champions of the world</SH2>
@@ -401,12 +405,21 @@ function ChampionCard(){
         <div style={{fontSize:56,lineHeight:1}}>{t.flag}</div>
         <div className="dh" style={{fontSize:34,marginTop:6}}>{t.name}</div>
         <div style={{fontSize:12.5,fontWeight:800,letterSpacing:'.05em',textTransform:'uppercase',color:'var(--ink2)',marginTop:4}}>Lift the trophy</div>
-        {owners.length > 0 && (
+        {owners.length > 0 ? (
           <div style={{marginTop:14,background:'var(--ink)',color:'#fff',borderRadius:16,padding:'13px 14px'}}>
             <div style={{fontSize:11,fontWeight:800,letterSpacing:'.05em',textTransform:'uppercase',color:'var(--yellow)'}}>Your sweepstake winner{owners.length>1?'s':''}</div>
             <div className="dh" style={{fontSize:24,margin:'4px 0',color:'#fff'}}>{owners.map(function(o){ return o.name; }).join(', ')}</div>
-            <div className="dh" style={{fontSize:34,color:'var(--yellow)'}}>{money2(owners.length>1 ? win/owners.length : win)}</div>
-            <div style={{fontSize:12,fontWeight:700,opacity:.8}}>held {t.name} from the very first draw. Insufferable. Deserved.</div>
+            <div className="dh" style={{fontSize:34,color:'var(--yellow)'}}>{money2(share)}{owners.length>1 ? ' each' : ''}</div>
+            <div style={{fontSize:12,fontWeight:700,opacity:.8}}>
+              {owners.length > 1
+                ? 'held ' + t.name + ' between them — the winner’s pot splits evenly.'
+                : 'held ' + t.name + ' from the very first draw. Insufferable. Deserved.'}
+            </div>
+          </div>
+        ) : (
+          <div style={{marginTop:14,background:'var(--ink)',color:'#fff',borderRadius:16,padding:'13px 14px'}}>
+            <div style={{fontSize:11,fontWeight:800,letterSpacing:'.05em',textTransform:'uppercase',color:'var(--yellow)'}}>No sweepstake winner</div>
+            <div style={{fontSize:12.5,fontWeight:700,marginTop:4,lineHeight:1.35}}>Nobody drew {t.name} — the organiser decides what happens to the pot.</div>
           </div>
         )}
       </Card2>

@@ -1362,6 +1362,14 @@
       var fx = window.WheeshtFixtures;
       return fx && fx.tournamentPhase ? fx.tournamentPhase() : 'group';
     },
+    championTeam: function () {
+      var fx = window.WheeshtFixtures;
+      return fx && fx.championTeam ? fx.championTeam() : null;
+    },
+    championOwners: function () {
+      var fx = window.WheeshtFixtures;
+      return fx && fx.championOwners ? fx.championOwners() : [];
+    },
     teamSweepstakePhase: function (code) {
       var fx = window.WheeshtFixtures;
       return fx && fx.teamSweepstakePhase ? fx.teamSweepstakePhase(code) : 'in_group';

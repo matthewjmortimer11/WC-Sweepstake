@@ -35,6 +35,12 @@ function appFixtureDone(f){
   return ['done','ft','fulltime','full_time','full-time','finished'].indexOf(st)>=0;
 }
 
+/* True once the overall winner is decided — a team crowned by results, or the
+   organiser's declared 'winner' answer (championTeam covers both). */
+function overallWinnerKnown(){
+  try{ return !!(A_WC.championTeam && A_WC.championTeam()); }catch(e){ return false; }
+}
+
 function AppSystemEffects(){
   const [updateReg,setUpdateReg]=aState(null);
   const [offline,setOffline]=aState(typeof navigator!=='undefined' ? !navigator.onLine : false);
@@ -533,9 +539,17 @@ function App(){
     };
   }
   const me = A_S.active();
-  const [tab,_setTab]=aState('me');
+  const [tab,_setTab]=aState(function(){
+    // Tournament over → open on the Verdict so the champion (and who won the
+    // sweepstake) is the first thing returning entrants see. NB: first paint
+    // only carries league-agnostic base state (no team stages), so this
+    // usually resolves after Store.refresh() — the effect below handles that.
+    return overallWinnerKnown() ? 'summary' : 'me';
+  });
+  const userNavRef = React.useRef(false);   // any tab change cancels the auto-hop
   const [chatBadge,setChatBadge]=aState(null); // null | 'new' | 'wheesht'
   function setTab(t){
+    userNavRef.current = true;
     _setTab(t);
     if(t==='chat'){
       setChatBadge(null);
@@ -573,6 +587,27 @@ function App(){
   // re-render on any store change
   aEffect(()=>A_S.subscribe(()=>tick(x=>x+1)),[]);
   aEffect(()=>{ refreshStore(); },[]);
+
+  /* ---- Land on the Verdict once the tournament is over ----
+     First paint only carries base state (teams without stages), so the boot
+     initializer above can't see the champion — the league's results arrive
+     via Store.refresh() just after mount. When that first refresh reveals
+     the winner, hop from the default Me tab to the Verdict — but only inside
+     a short boot window, and never over the user's own navigation. */
+  aEffect(function(){
+    if(flow!=='app') return;
+    var deadline = Date.now() + 20000;
+    var done = false;
+    var unsub = A_S.subscribe(function(){
+      if(done) return;
+      if(Date.now() > deadline || userNavRef.current){ done = true; return; }
+      if(overallWinnerKnown()){
+        done = true;
+        _setTab('summary');
+      }
+    });
+    return unsub;
+  },[flow]); // eslint-disable-line
   aEffect(function(){
     if (flow === 'gate' && A_S.trackEvent) A_S.trackEvent('gate_view');
   },[flow]);
@@ -926,13 +961,52 @@ function App(){
       var wonCup = st === 'winner' && prevStage !== 'winner';
       if(st !== prevStage && t.alive !== false && st !== 'group' && st !== 'out-group' && st !== 'out'
           && String(st).indexOf('out-') !== 0 && (fromGroup || wonCup)){
-        var labels = { r32: 'Round of 32', r16: 'Round of 16', qf: 'Quarter-finals', sf: 'Semi-finals', final: 'the Final', winner: 'champions' };
+        var labels = { r32: 'Round of 32', r16: 'Round of 16', qf: 'Quarter-finals', sf: 'Semi-finals', final: 'the Final' };
         var lbl = labels[st] || st;
         var tn = t.name || code;
-        window.wcToast && window.wcToast(tn + (st === 'winner' ? ' are ' : ' are into ') + lbl + '.', st === 'winner' ? 'celebrating' : 'confident');
+        var msg = st === 'winner'
+          ? tn + ' have won the World Cup — that’s your team. The pot is coming your way.'
+          : tn + ' are into ' + lbl + '.';
+        window.wcToast && window.wcToast(msg, st === 'winner' ? 'celebrating' : 'confident');
         if(st === 'winner') window.wcConfetti && window.wcConfetti({ y: .35, count: 90 });
       }
       prevStage = st;
+    });
+    return unsub;
+  },[flow,me&&me.id]); // eslint-disable-line
+
+  /* ---- Toast + confetti for EVERYONE when the champion is crowned ----
+     The watcher above only fires for the viewer's own team; this one announces
+     the overall winner (e.g. "Spain have won the World Cup") to every viewer.
+     Diffing prev → next means it fires once per crowning, not on every
+     refresh, and never on a mount where the champion is already known. ---- */
+  aEffect(function(){
+    if(flow!=='app') return;
+    function championCode(){
+      if(A_WC.championTeam){ var ct = A_WC.championTeam(); return ct ? ct.code : null; }
+      var list = A_WC.TEAM_LIST || [];
+      for(var i = 0; i < list.length; i++){ if(list[i].stage === 'winner') return list[i].code; }
+      return null;
+    }
+    var prev = championCode();
+    var ready = false;
+    var unsub = A_S.subscribe(function(){
+      var code = championCode();
+      if(!ready){ prev = code; ready = true; return; }
+      if(code && code !== prev && !(me && me.team === code)){
+        // (When it IS your team, the personal watcher above does the honours.)
+        var t = A_WC.TEAMS[code] || {};
+        var tn = t.name || code;
+        var owners = A_WC.championOwners ? A_WC.championOwners() : [];
+        var names = owners.map(function(o){ return o.name; });
+        var msg = tn + ' have won the World Cup.';
+        if(names.length === 1) msg += ' ' + names[0] + ' takes the pot.';
+        else if(names.length > 1) msg += ' ' + names.join(' & ') + ' split the pot.';
+        else msg += ' Nobody drew them — no sweepstake winner.';
+        window.wcToast && window.wcToast(msg, 'celebrating');
+        window.wcConfetti && window.wcConfetti({ y: .35, count: 90 });
+      }
+      prev = code;
     });
     return unsub;
   },[flow,me&&me.id]); // eslint-disable-line
@@ -980,7 +1054,12 @@ function App(){
     proceedToDraw(p);
   }
   function resumeAccount(id){
-    Promise.resolve(A_S.resumeAccount?A_S.resumeAccount(id):A_S.setActive(id)).then(()=>{ setFlow('app'); setTab('me'); });
+    Promise.resolve(A_S.resumeAccount?A_S.resumeAccount(id):A_S.setActive(id)).then(()=>{
+      setFlow('app');
+      // resumeAccount() resolves after Store.refresh(), so the league state is
+      // loaded — land on the Verdict when the tournament is already decided.
+      setTab(overallWinnerKnown() ? 'summary' : 'me');
+    });
   }
 
   // Dev console picked a league to administer: remember where we were, switch
