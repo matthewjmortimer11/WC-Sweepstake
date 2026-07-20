@@ -533,7 +533,12 @@ function App(){
     };
   }
   const me = A_S.active();
-  const [tab,_setTab]=aState('me');
+  const [tab,_setTab]=aState(function(){
+    // Tournament over → open on the Verdict so the champion (and who won the
+    // sweepstake) is the first thing returning entrants see.
+    try{ if(A_WC.championTeam && A_WC.championTeam()) return 'summary'; }catch(e){}
+    return 'me';
+  });
   const [chatBadge,setChatBadge]=aState(null); // null | 'new' | 'wheesht'
   function setTab(t){
     _setTab(t);
