@@ -35,6 +35,12 @@ function appFixtureDone(f){
   return ['done','ft','fulltime','full_time','full-time','finished'].indexOf(st)>=0;
 }
 
+/* True once the overall winner is decided — a team crowned by results, or the
+   organiser's declared 'winner' answer (championTeam covers both). */
+function overallWinnerKnown(){
+  try{ return !!(A_WC.championTeam && A_WC.championTeam()); }catch(e){ return false; }
+}
+
 function AppSystemEffects(){
   const [updateReg,setUpdateReg]=aState(null);
   const [offline,setOffline]=aState(typeof navigator!=='undefined' ? !navigator.onLine : false);
@@ -535,12 +541,15 @@ function App(){
   const me = A_S.active();
   const [tab,_setTab]=aState(function(){
     // Tournament over → open on the Verdict so the champion (and who won the
-    // sweepstake) is the first thing returning entrants see.
-    try{ if(A_WC.championTeam && A_WC.championTeam()) return 'summary'; }catch(e){}
-    return 'me';
+    // sweepstake) is the first thing returning entrants see. NB: first paint
+    // only carries league-agnostic base state (no team stages), so this
+    // usually resolves after Store.refresh() — the effect below handles that.
+    return overallWinnerKnown() ? 'summary' : 'me';
   });
+  const userNavRef = React.useRef(false);   // any tab change cancels the auto-hop
   const [chatBadge,setChatBadge]=aState(null); // null | 'new' | 'wheesht'
   function setTab(t){
+    userNavRef.current = true;
     _setTab(t);
     if(t==='chat'){
       setChatBadge(null);
@@ -578,6 +587,27 @@ function App(){
   // re-render on any store change
   aEffect(()=>A_S.subscribe(()=>tick(x=>x+1)),[]);
   aEffect(()=>{ refreshStore(); },[]);
+
+  /* ---- Land on the Verdict once the tournament is over ----
+     First paint only carries base state (teams without stages), so the boot
+     initializer above can't see the champion — the league's results arrive
+     via Store.refresh() just after mount. When that first refresh reveals
+     the winner, hop from the default Me tab to the Verdict — but only inside
+     a short boot window, and never over the user's own navigation. */
+  aEffect(function(){
+    if(flow!=='app') return;
+    var deadline = Date.now() + 20000;
+    var done = false;
+    var unsub = A_S.subscribe(function(){
+      if(done) return;
+      if(Date.now() > deadline || userNavRef.current){ done = true; return; }
+      if(overallWinnerKnown()){
+        done = true;
+        _setTab('summary');
+      }
+    });
+    return unsub;
+  },[flow]); // eslint-disable-line
   aEffect(function(){
     if (flow === 'gate' && A_S.trackEvent) A_S.trackEvent('gate_view');
   },[flow]);
@@ -1024,7 +1054,12 @@ function App(){
     proceedToDraw(p);
   }
   function resumeAccount(id){
-    Promise.resolve(A_S.resumeAccount?A_S.resumeAccount(id):A_S.setActive(id)).then(()=>{ setFlow('app'); setTab('me'); });
+    Promise.resolve(A_S.resumeAccount?A_S.resumeAccount(id):A_S.setActive(id)).then(()=>{
+      setFlow('app');
+      // resumeAccount() resolves after Store.refresh(), so the league state is
+      // loaded — land on the Verdict when the tournament is already decided.
+      setTab(overallWinnerKnown() ? 'summary' : 'me');
+    });
   }
 
   // Dev console picked a league to administer: remember where we were, switch

@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'wheesht-pwa-20260720-champion-2';
+const CACHE_VERSION = 'wheesht-pwa-20260720-champion-3';
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const PAGE_CACHE = `${CACHE_VERSION}-pages`;
 

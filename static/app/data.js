@@ -167,10 +167,18 @@
     }
 
     // The champion, derived straight from results: standings flip the winning
-    // team's stage to 'winner' once the final's score is logged. Null until then.
+    // team's stage to 'winner' once the final's score is logged. Falls back to
+    // the organiser's declared 'winner' answer for clipboard-run leagues where
+    // no final fixture ever lands in the feed. Null until decided either way.
     function championTeam() {
       for (var i = 0; i < TEAM_LIST.length; i++) {
         if (TEAM_LIST[i].stage === 'winner') return TEAM_LIST[i];
+      }
+      var preds = WC.PREDICTIONS || [];
+      for (var j = 0; j < preds.length; j++) {
+        if (preds[j].key === 'winner' && preds[j].answer && TEAMS[preds[j].answer]) {
+          return TEAMS[preds[j].answer];
+        }
       }
       return null;
     }
