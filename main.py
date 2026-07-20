@@ -983,6 +983,12 @@ def _base_state() -> Dict[str, Any]:
     chosen. No participants, no pot — just the shared tournament scaffolding."""
     data = dict(_wc_data)
     data["fixtures"] = _base_fixtures()
+    # Run the rules engine on the global baseline so first paint already knows
+    # each team's stage — without this, the client can't tell the tournament is
+    # over (champion, "finished" phase) until its first league refresh lands.
+    data["teams"] = standings.compute_team_status(
+        _wc_data["teams"], data["fixtures"], _wc_data["meta"]["stageLadder"]
+    )
     data["people"] = []
     data["league"] = None
     meta = dict(_wc_data["meta"])
@@ -997,7 +1003,7 @@ def _base_state() -> Dict[str, Any]:
     phase = meta.get("phase") or "pre"
     meta.update(_tournament_fixture_meta(
         data.get("fixtures") or [],
-        _wc_data.get("teams") or [],
+        data["teams"],
         phase,
         stage_labels,
     ))

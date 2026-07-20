@@ -41,6 +41,28 @@ function overallWinnerKnown(){
   try{ return !!(A_WC.championTeam && A_WC.championTeam()); }catch(e){ return false; }
 }
 
+/* Device memory of "this league's tournament is over", so later opens boot
+   straight onto the Verdict with no visible Me→Verdict hop while the league
+   refresh is still in flight. Keyed per league; self-heals if the organiser
+   un-declares the winner. */
+function tournamentOverKey(){
+  try{
+    var lg = A_S.activeLeague && A_S.activeLeague();
+    return lg && lg.code ? 'wcTournamentOver_' + lg.code : null;
+  }catch(e){ return null; }
+}
+function tournamentOverRemembered(){
+  try{ var k = tournamentOverKey(); return !!(k && localStorage.getItem(k)); }catch(e){ return false; }
+}
+function rememberTournamentOver(over){
+  try{
+    var k = tournamentOverKey();
+    if(!k) return;
+    if(over) localStorage.setItem(k, '1');
+    else localStorage.removeItem(k);
+  }catch(e){}
+}
+
 function AppSystemEffects(){
   const [updateReg,setUpdateReg]=aState(null);
   const [offline,setOffline]=aState(typeof navigator!=='undefined' ? !navigator.onLine : false);
@@ -541,10 +563,12 @@ function App(){
   const me = A_S.active();
   const [tab,_setTab]=aState(function(){
     // Tournament over → open on the Verdict so the champion (and who won the
-    // sweepstake) is the first thing returning entrants see. NB: first paint
-    // only carries league-agnostic base state (no team stages), so this
-    // usually resolves after Store.refresh() — the effect below handles that.
-    return overallWinnerKnown() ? 'summary' : 'me';
+    // sweepstake) is the first thing returning entrants see. Server-staged
+    // base state answers this at first paint for feed-decided leagues; the
+    // per-device memory covers clipboard-run leagues whose winner only
+    // arrives with the league refresh (the effect below handles the very
+    // first reveal on this device).
+    return (overallWinnerKnown() || tournamentOverRemembered()) ? 'summary' : 'me';
   });
   const userNavRef = React.useRef(false);   // any tab change cancels the auto-hop
   const [chatBadge,setChatBadge]=aState(null); // null | 'new' | 'wheesht'
@@ -589,16 +613,22 @@ function App(){
   aEffect(()=>{ refreshStore(); },[]);
 
   /* ---- Land on the Verdict once the tournament is over ----
-     First paint only carries base state (teams without stages), so the boot
-     initializer above can't see the champion — the league's results arrive
-     via Store.refresh() just after mount. When that first refresh reveals
-     the winner, hop from the default Me tab to the Verdict — but only inside
-     a short boot window, and never over the user's own navigation. */
+     The server now stages base-state teams, so a feed-decided champion is
+     known at first paint and the boot initializer lands here directly. This
+     hop remains as the fallback for clipboard-run leagues, whose winner only
+     arrives with the league refresh: it fires inside a short boot window,
+     and never over the user's own navigation. Either way the outcome is
+     remembered per-device so subsequent opens boot straight onto the
+     Verdict with no visible jump. */
   aEffect(function(){
     if(flow!=='app') return;
     var deadline = Date.now() + 20000;
     var done = false;
     var unsub = A_S.subscribe(function(){
+      // Keep the device memory current on every store change: set once the
+      // winner is known, cleared if a loaded league no longer has one.
+      if(overallWinnerKnown()) rememberTournamentOver(true);
+      else if((A_S.allSync ? A_S.allSync() : []).length > 0) rememberTournamentOver(false);
       if(done) return;
       if(Date.now() > deadline || userNavRef.current){ done = true; return; }
       if(overallWinnerKnown()){
