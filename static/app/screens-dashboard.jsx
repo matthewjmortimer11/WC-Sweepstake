@@ -714,6 +714,7 @@ function MeScreen(props) {
     <div className="pad">
       <ProfileHeader me={me} onEdit={() => setEdit(true)} />
       <div style={{ height: 12 }} />
+      {window.ChampionBanner && <window.ChampionBanner />}
       <GroupsDoneBanner />
       <Saysd mood={greetMood} label={'hey ' + (Sd.shownName ? Sd.shownName(me) : me.name).split(' ')[0]} animate>
         {pre ? <>You've drawn {t.name}. No games yet — get your predictions in while the slate's clean.</> : (t.alive ? <>{t.name} are still standing. Keep your predictions sharp — the pot's in play.</> : <>Your team is out, but the predictions league is still live. Wheesht isn't done with you yet.</>)}

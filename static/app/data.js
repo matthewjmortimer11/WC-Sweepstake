@@ -67,6 +67,9 @@
     WC.PEOPLE = PEOPLE;
     WC.YOU = YOU;
     WC.ownersOf = ownersOf;
+    // Declarations hoist within build(), so these are safe to wire up here.
+    WC.championTeam = championTeam;
+    WC.championOwners = championOwners;
     WC.scotlandEliminated = function () {
       var t = TEAMS.SCO;
       return !!(t && t.alive === false);
@@ -161,6 +164,21 @@
       if (meta.knockoutRound || meta.knockoutsInFeed || meta.r32Published) return 'knockout';
       if (meta.groupsComplete) return 'group_complete';
       return 'group';
+    }
+
+    // The champion, derived straight from results: standings flip the winning
+    // team's stage to 'winner' once the final's score is logged. Null until then.
+    function championTeam() {
+      for (var i = 0; i < TEAM_LIST.length; i++) {
+        if (TEAM_LIST[i].stage === 'winner') return TEAM_LIST[i];
+      }
+      return null;
+    }
+    // Entrant(s) who drew the champion team — [] while undecided, and possibly
+    // several people (teams double up once all are claimed) or none (undrawn).
+    function championOwners() {
+      var t = championTeam();
+      return t ? ownersOf(t.code) : [];
     }
 
     function knockoutFeedActive() {
@@ -1002,6 +1020,8 @@
       stageNameForTeam: stageNameForTeam,
       nextForTeam: nextFixtureForTeam,
       tournamentPhase: tournamentPhase,
+      championTeam: championTeam,
+      championOwners: championOwners,
       teamSweepstakePhase: teamSweepstakePhase,
       knockoutPathForTeam: knockoutPathForTeam,
       buildKnockoutBracket: buildKnockoutBracket,

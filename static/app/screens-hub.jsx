@@ -56,6 +56,59 @@ function winnerPotShare() {
     : (WC.meta && WC.meta.charitySplit != null ? WC.meta.charitySplit : 0.5);
   return gross * (1 - split);
 }
+function hubChampionTeam() {
+  if (window.Store && window.Store.championTeam) return window.Store.championTeam();
+  if (WC.championTeam) return WC.championTeam();
+  return (WC.TEAM_LIST || []).filter(function (t) { return t.stage === 'winner'; })[0] || null;
+}
+function hubChampionOwners(t) {
+  if (window.Store && window.Store.championOwners) return window.Store.championOwners();
+  if (WC.championOwners) return WC.championOwners();
+  return t && WC.ownersOf ? WC.ownersOf(t.code) : [];
+}
+
+/* =================== CHAMPION BANNER (once it's all over) =================== */
+function ChampionBanner(){
+  const t = hubChampionTeam();
+  if (!t) return null;                       // no final result logged yet
+  const owners = hubChampionOwners(t);
+  const me = (window.Store && window.Store.active) ? window.Store.active() : WC.YOU;
+  const youWon = !!(me && owners.some(function(o){ return o.id === me.id; }));
+  const win = winnerPotShare();
+  const share = owners.length > 1 ? win / owners.length : win;
+  return (
+    <>
+    <Card bordered className="pop" style={{background:'var(--yellow)',textAlign:'center',padding:'22px 18px'}}>
+      <div style={{fontSize:11,fontWeight:800,letterSpacing:'.08em',textTransform:'uppercase',color:'var(--ink2)'}}>Tournament over</div>
+      <div style={{marginTop:8}}><Flag team={t} size={56}/></div>
+      <div className="dh" style={{fontSize:34,marginTop:6}}>{t.name}</div>
+      <div style={{fontSize:12.5,fontWeight:800,letterSpacing:'.05em',textTransform:'uppercase',color:'var(--ink2)',marginTop:4}}>Champions of the world</div>
+      {owners.length > 0 ? (
+        <div style={{marginTop:14,background:'var(--ink)',color:'#fff',borderRadius:16,padding:'13px 14px'}}>
+          <div style={{fontSize:11,fontWeight:800,letterSpacing:'.05em',textTransform:'uppercase',color:'var(--yellow)'}}>
+            {youWon ? '🏆 You won it!' : 'Your sweepstake winner' + (owners.length > 1 ? 's' : '')}
+          </div>
+          <div className="dh" style={{fontSize:24,margin:'4px 0',color:'#fff'}}>{owners.map(function(o){ return o.name; }).join(', ')}</div>
+          <div className="dh" style={{fontSize:34,color:'var(--yellow)'}}>{money(share)}{owners.length > 1 ? ' each' : ''}</div>
+          <div style={{fontSize:12,fontWeight:700,opacity:.8}}>
+            {owners.length > 1
+              ? 'held ' + t.name + ' between them — the winner’s pot splits evenly.'
+              : 'held ' + t.name + ' from the very first draw. Insufferable. Deserved.'}
+          </div>
+        </div>
+      ) : (
+        <div style={{marginTop:14,background:'var(--ink)',color:'#fff',borderRadius:16,padding:'13px 14px'}}>
+          <div style={{fontSize:11,fontWeight:800,letterSpacing:'.05em',textTransform:'uppercase',color:'var(--yellow)'}}>No sweepstake winner</div>
+          <div style={{fontSize:12.5,fontWeight:700,marginTop:4,lineHeight:1.35}}>
+            Nobody drew {t.name} — the organiser decides what happens to the pot.
+          </div>
+        </div>
+      )}
+    </Card>
+    <div style={{height:12}}/>
+    </>
+  );
+}
 
 /* =================== DASHBOARD =================== */
 function ConverterCard(props){
@@ -242,6 +295,7 @@ function DashboardScreen(props){
   const potShare = winnerPotShare();
   return (
     <div className="pad">
+      <ChampionBanner/>
       {props.eliminated ? <DashTeamOut goBets={props.goBets}/> : <DashTeam/>}
       <div style={{height:12}}/>
       {props.eliminated
@@ -659,5 +713,6 @@ function TrackerScreen(){
 }
 
 window.DashboardScreen = DashboardScreen;
+window.ChampionBanner = ChampionBanner;
 window.TrackerScreen = TrackerScreen;
 window.PersonSnapshot = PersonSnapshot;
