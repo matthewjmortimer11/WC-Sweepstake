@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Concept C — Play / Court / Log tabs</title>
+  <style>
+    :root {
+      --cream: #f4ecd6; --cream-hi: #fbf6e9; --ink: #2a2014; --ink2: #5b4c38;
+      --gold: #a8842c; --gold-b: #c79a3a;
+      --serif: "Iowan Old Style", Palatino, Georgia, serif;
+      --sans: system-ui, sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: var(--sans); color: var(--ink); background: var(--cream); min-height: 100vh; }
+    .banner {
+      background: var(--ink); color: var(--cream); font-size: 12px;
+      padding: 8px 14px; display: flex; justify-content: space-between;
+    }
+    .banner a { color: var(--gold-b); }
+    .screen { display: none; padding: 12px 14px 80px; max-width: 420px; margin: 0 auto; }
+    .screen.on { display: block; }
+    .tabs {
+      position: fixed; bottom: 0; left: 0; right: 0; display: flex;
+      background: var(--ink); padding: 6px 8px calc(6px + env(safe-area-inset-bottom));
+      gap: 6px; border-top: 1px solid #3a3530;
+    }
+    .tabs button {
+      flex: 1; min-height: 48px; border: 0; border-radius: 10px;
+      background: transparent; color: #c9b896; font-weight: 600; font-size: 13px;
+    }
+    .tabs button.on { background: var(--gold); color: var(--ink); }
+    .panel {
+      background: var(--cream-hi); border: 1px solid #d8c6a0; border-radius: 12px;
+      overflow: hidden; box-shadow: 0 4px 14px rgba(42,32,20,.1);
+    }
+    .court-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .pcard {
+      border: 1px solid #d8c6a0; border-radius: 10px; overflow: hidden; background: var(--cream-hi);
+    }
+    .pcard .art { height: 120px; background: linear-gradient(180deg,#ece0c0,#d8c6a0); position: relative; }
+    .pcard .art img { width: 100%; height: 100%; object-fit: cover; object-position: top; }
+    .pcard .foot { padding: 8px 10px; background: #5b4c38; color: var(--cream-hi); font-size: 12px; }
+    .pcard.active { outline: 2px solid var(--gold-b); }
+    .log .row { padding: 10px 12px; border-bottom: 1px solid #ece0c0; font-size: 13px; }
+    .log .row:last-child { border: 0; }
+    .log .who { font-weight: 700; color: var(--gold); }
+    .desktop-note {
+      max-width: 420px; margin: 12px auto; padding: 10px 12px; font-size: 12px;
+      color: var(--ink2); background: #ece0c0; border-radius: 8px; text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="banner">
+    <strong>Concept C — Play / Court / Log</strong>
+    <a href="index.html">All concepts</a>
+  </div>
+
+  <p class="desktop-note">Tap tabs below to switch screens (mobile-first). Desktop would show map + court side-by-side.</p>
+
+  <section id="play" class="screen on">
+    <div class="panel">
+      <div style="padding:10px 14px;border-bottom:1px solid #d8c6a0">
+        <div style="font-family:var(--serif);font-size:18px">The Kingdom</div>
+        <div style="font-size:11px;color:var(--ink2)">Your turn · tap glowing site</div>
+      </div>
+      <div style="height:280px;background:linear-gradient(180deg,#f4ecd6,#ece0c0);display:grid;place-items:center;color:var(--ink2);font-size:13px">
+        Full V3b portrait map
+      </div>
+      <div style="padding:12px;display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <button style="min-height:44px;border-radius:7px;border:1px solid #cdb98c;background:var(--cream)">Action A</button>
+        <button style="min-height:44px;border-radius:7px;border:1px solid #cdb98c;background:var(--cream)">Action B</button>
+        <button style="min-height:44px;border-radius:7px;border:0;background:var(--gold);font-weight:700;grid-column:span 2">End turn</button>
+      </div>
+    </div>
+  </section>
+
+  <section id="court" class="screen">
+    <div style="font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink2);margin-bottom:10px">The court</div>
+    <div class="court-grid">
+      <div class="pcard active">
+        <div class="art"><img src="../cards/roles/king-card-v3b-poker.png" alt=""></div>
+        <div class="foot"><strong>Jo</strong> · Throne · Rep 4</div>
+      </div>
+      <div class="pcard">
+        <div class="art" style="background:#3a3530"></div>
+        <div class="foot"><strong>Alex</strong> · Market</div>
+      </div>
+      <div class="pcard">
+        <div class="art" style="background:#3a3530"></div>
+        <div class="foot"><strong>Sam</strong> · Barracks</div>
+      </div>
+      <div class="pcard">
+        <div class="art"><img src="../cards/roles/spy-card-v3b-poker.png" alt=""></div>
+        <div class="foot"><strong>Pat</strong> · revealed Spy</div>
+      </div>
+    </div>
+  </section>
+
+  <section id="log" class="screen">
+    <div class="panel log">
+      <div class="row"><span class="who">System</span> — Sam moved to Barracks</div>
+      <div class="row"><span class="who">Alex</span> — played Rumour at Market</div>
+      <div class="row"><span class="who">Jo</span> — Crown rite (public)</div>
+      <div class="row"><span class="who">Pat</span> — revealed as Spy</div>
+    </div>
+  </section>
+
+  <nav class="tabs" aria-label="Main">
+    <button class="on" data-tab="play">Play</button>
+    <button data-tab="court">Court</button>
+    <button data-tab="log">Log</button>
+  </nav>
+
+  <script>
+    document.querySelectorAll(".tabs button").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        document.querySelectorAll(".tabs button").forEach(function (b) { b.classList.remove("on"); });
+        document.querySelectorAll(".screen").forEach(function (s) { s.classList.remove("on"); });
+        btn.classList.add("on");
+        document.getElementById(btn.dataset.tab).classList.add("on");
+      });
+    });
+  </script>
+</body>
+</html>
