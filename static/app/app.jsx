@@ -783,10 +783,34 @@ function App(){
     const nm = A_S.shownName ? A_S.shownName(me) : me.name;
     const fl = myTeam ? myTeam.flag : '';
     const tn = myTeam ? myTeam.name : '';
-    const id=setTimeout(()=>{
+    let cancelled=false, retryId=null, waits=0;
+    function championNow(){ try{ return A_WC.championTeam ? A_WC.championTeam() : null; }catch(e){ return null; } }
+    const fire=()=>{
+      if(cancelled) return;
+      // First paint only carries base state (no entrants, no stages), so we
+      // can't yet tell "tournament over" from "not loaded" — wait briefly for
+      // the league refresh (people arriving = league state is in) so the
+      // stale "predictions are locked" line doesn't fire after the final.
+      const peopleIn = (A_S.allSync ? A_S.allSync() : (A_WC.PEOPLE || [])).length > 0;
+      if(!peopleIn && waits < 4){ waits++; retryId=setTimeout(fire, 900); return; }
       const picksLocked = A_S.predictionsLocked && A_S.predictionsLocked();
       const hasMarkets = A_WC.PREDICTIONS && A_WC.PREDICTIONS.length > 0;
-      if(hasMarkets && picksLocked){
+      const champ = championNow();
+      if(champ){
+        // Tournament decided: the locked/open predictions chatter is over —
+        // the only story left is the champion (and who took the pot).
+        const owners = A_WC.championOwners ? A_WC.championOwners() : [];
+        const winners = owners.map(function(o){ return o.name; }).join(' & ');
+        const potLine = winners ? ' ' + winners + (owners.length > 1 ? ' split the pot.' : ' takes the pot.') : '';
+        const pool=[
+          ['That’s a wrap. '+champ.name+' are champions of the world.'+potLine,'celebrating'],
+          [champ.name+' took the whole thing. The Verdict tab has Wheesht’s final word.','broadcast'],
+          ['Tournament over. '+champ.name+' lifted it.'+potLine+' Wheesht rests its case.','confident'],
+          ['Full time on the whole thing. '+champ.name+' are champions. Wheesht saw it coming. Obviously.','confident'],
+        ];
+        const pick=pool[(Math.random()*pool.length)|0];
+        window.wcToast&&window.wcToast(pick[0],pick[1]);
+      } else if(hasMarkets && picksLocked){
         const pool=[
           ['Predictions are locked. Wheesht has the receipts. All of them.','confident'],
           ['The markets are closed, '+nm+'. Wheesht is judging your choices as we speak.','mischievous'],
@@ -849,8 +873,9 @@ function App(){
           setTimeout(function () { window.wcToast && window.wcToast(sp[0], sp[1]); }, scoOut ? 900 : 1600);
         }
       }
-    },650);
-    return ()=>clearTimeout(id);
+    };
+    const id=setTimeout(fire,650);
+    return ()=>{ cancelled=true; clearTimeout(id); if(retryId) clearTimeout(retryId); };
   },[flow,me&&me.id]); // eslint-disable-line
 
   aEffect(function(){
