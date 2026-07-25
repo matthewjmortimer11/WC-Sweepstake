@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import random
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import Callable, Optional
 
 from .spectra import SPECTRA
 
@@ -187,13 +187,26 @@ class DialGame:
                     self.player_scores[pid] = self.player_scores.get(pid, 0) + pts
         self.phase = PHASE_REVEAL
 
-    def next_round(self, rng: random.Random) -> None:
+    def next_round(
+        self,
+        rng: random.Random,
+        psychic_resolver: Optional[Callable[[int], str]] = None,
+    ) -> None:
         if self.status != STATUS_PLAYING or self.phase != PHASE_REVEAL:
             raise MoveError("Finish the reveal first.")
         if self._check_winner():
             self.status = STATUS_ENDED
             return
+        # Resolve the next psychic (which may fail if the upcoming active team
+        # has no connected players) before mutating any round state, so a
+        # rejected move never leaves the game half-advanced.
+        next_psychic_id = None
+        if self.settings.mode == MODE_TEAMS and psychic_resolver is not None:
+            next_active_team = self.round_no % 2
+            next_psychic_id = psychic_resolver(next_active_team)
         self._begin_round(rng)
+        if next_psychic_id is not None:
+            self.psychic_id = next_psychic_id
 
     def _check_winner(self) -> bool:
         target = self.settings.target_score
