@@ -105,10 +105,15 @@ class Room:
             if p.connected and p.id != psychic and p.role != ROLE_SPECTATOR
         ]
 
-    def pick_team_psychic(self) -> str:
-        """Rotate psychic among active team members."""
+    def pick_team_psychic(self, team_idx: Optional[int] = None) -> str:
+        """Rotate psychic among active team members.
+
+        ``team_idx`` lets a caller resolve the psychic for a team that isn't
+        (yet) ``game.active_team`` — e.g. before committing to a round advance.
+        """
         g = self.game
-        team = TEAM_0 if g.active_team == 0 else TEAM_1
+        idx = g.active_team if team_idx is None else team_idx
+        team = TEAM_0 if idx == 0 else TEAM_1
         members = [
             p.id for p in self.players.values()
             if p.team == team and p.connected and p.role != ROLE_SPECTATOR
