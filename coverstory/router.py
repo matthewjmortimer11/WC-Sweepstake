@@ -262,6 +262,7 @@ async def game_socket(ws: WebSocket, code: str) -> None:
     await ws.accept()
     pid = (ws.query_params.get("pid") or "").strip()[:64] or uuid.uuid4().hex
     name = ws.query_params.get("name") or ""
+    old = None
 
     async with room.lock:
         mutation_token = ""
@@ -274,11 +275,6 @@ async def game_socket(ws: WebSocket, code: str) -> None:
                 if snapshot:
                     manager.apply_snapshot(room, snapshot)
             player = manager.join(room, pid, name)
-        except MoveError as exc:
-            await ws.send_json({"type": "fatal", "message": str(exc)})
-            await ws.close()
-            return
-        try:
             old = room.sockets.get(pid)
             room.sockets[pid] = ws
             room.touch()
@@ -287,6 +283,10 @@ async def game_socket(ws: WebSocket, code: str) -> None:
             await ws.send_json({"type": "hello", "pid": pid, "code": room.code})
             manager.ensure_subscription(room)
             await manager.persist_room(room, publish=True)
+        except MoveError as exc:
+            await ws.send_json({"type": "fatal", "message": str(exc)})
+            await ws.close()
+            return
         finally:
             if mutation_token:
                 await manager.realtime.release_mutation_lock(room.code, mutation_token)

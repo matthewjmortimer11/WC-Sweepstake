@@ -1,4 +1,5 @@
 import asyncio
+import importlib
 import random
 import time
 
@@ -527,6 +528,8 @@ class _FakeRealtime:
     def __init__(self):
         self.saved = {}
         self.published = []
+        self.mutation_locks = []
+        self.released_mutation_locks = []
 
     async def save_room(self, code, snapshot, *, ttl_secs):
         self.saved[code] = {"snapshot": snapshot, "ttl": ttl_secs}
@@ -541,6 +544,15 @@ class _FakeRealtime:
         return True
 
     async def acquire_timer_lock(self, code, *, ttl_secs=5):
+        return True
+
+    async def acquire_mutation_lock(self, code, *, ttl_secs=5):
+        token = f"lock-{code}"
+        self.mutation_locks.append((code, token))
+        return token
+
+    async def release_mutation_lock(self, code, token):
+        self.released_mutation_locks.append((code, token))
         return True
 
     async def status(self):
@@ -636,6 +648,29 @@ async def test_coverstory_manager_timer_lock_prevents_duplicate_expiry():
 
     assert room.game.phase == PHASE_PLAY
     assert manager.stats()["timerExpiries"] == 0
+
+
+def test_coverstory_websocket_rejected_join_releases_mutation_lock(client):
+    router_mod = importlib.import_module("coverstory.router")
+
+    fake = _FakeRealtime()
+    previous_realtime = router_mod.manager.realtime
+    router_mod.manager.realtime = fake
+    try:
+        room = router_mod.manager.create_room()
+        for i in range(MIN_PLAYERS):
+            router_mod.manager.join(room, f"p{i}", f"P{i}")
+        router_mod.manager.start_game(room)
+
+        with client.websocket_connect(f"/coverstory/ws/{room.code}?pid=late&name=Late") as ws:
+            msg = ws.receive_json()
+
+        assert msg["type"] == "fatal"
+        assert "Round in progress" in msg["message"]
+        assert fake.mutation_locks == [(room.code, f"lock-{room.code}")]
+        assert fake.released_mutation_locks == [(room.code, f"lock-{room.code}")]
+    finally:
+        router_mod.manager.realtime = previous_realtime
 
 
 def test_coverstory_history_endpoint_serves(client):
