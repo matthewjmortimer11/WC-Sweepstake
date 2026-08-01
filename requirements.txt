@@ -5,6 +5,7 @@ uvicorn[standard]>=0.29
 pydantic>=2.6
 sqlalchemy>=2.0
 asyncpg
+redis>=5.0
 httpx>=0.27
 stripe>=8.0
 Pillow>=10.0

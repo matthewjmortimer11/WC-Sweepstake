@@ -45,7 +45,7 @@ from sqlalchemy.exc import IntegrityError
 import standings
 from bracket_projection import build_projected_bracket
 import sync
-from db import AsyncSessionLocal, engine
+from db import AsyncSessionLocal, DATABASE_URL, engine
 from models import (
     AdminOverride,
     AuditEvent,
@@ -1122,6 +1122,9 @@ async def _ensure_schema() -> None:
     `ADD COLUMN IF NOT EXISTS` is a no-op when create_all already made the table
     fresh (with the column) and a clean add when it pre-existed without it.
     """
+    if DATABASE_URL.startswith("sqlite"):
+        return
+
     statements = [
         "ALTER TABLE profiles ADD COLUMN IF NOT EXISTS display_name VARCHAR NOT NULL DEFAULT ''",
         "ALTER TABLE leagues ADD COLUMN IF NOT EXISTS organiser_hash VARCHAR",
@@ -1188,6 +1191,7 @@ app = FastAPI(title="Wheesht — World Cup Sweepstake 2026", lifespan=lifespan)
 # /play. Fully self-contained (in-memory rooms + WebSockets); see codenames/.
 from codenames import router as cipher_router  # noqa: E402
 from charades import router as charades_router  # noqa: E402
+from coverstory import router as coverstory_router  # noqa: E402
 from dial import router as dial_router  # noqa: E402
 from imposter import router as imposter_router  # noqa: E402
 from whoami import router as whoami_router  # noqa: E402
@@ -1202,6 +1206,7 @@ app.include_router(dial_router)
 app.include_router(imposter_router)
 app.include_router(charades_router)
 app.include_router(whoami_router)
+app.include_router(coverstory_router)
 app.include_router(dethrone_router)
 app.include_router(qualification_router)
 

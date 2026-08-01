@@ -295,3 +295,82 @@ class AuditEvent(Base):
     # Participant id of the actor when known (organiser entry, dev, etc.).
     actor_id: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     detail: Mapped[str] = mapped_column(String, nullable=False, default="")
+
+
+class CoverStoryCustomPack(Base):
+    """Reusable user-created location pack for Cover Story.
+
+    Stores only authored location content. Live secret round state is never
+    persisted here.
+    """
+
+    __tablename__ = "coverstory_custom_packs"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    name: Mapped[str] = mapped_column(String, nullable=False)
+    description: Mapped[str] = mapped_column(String, nullable=False, default="")
+    locations: Mapped[list[dict[str, Any]]] = mapped_column(JSON, nullable=False, default=list)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class CoverStoryRound(Base):
+    """Durable completed-round summary for Cover Story.
+
+    Intentionally summary-only: it stores final public result data after reveal,
+    not private covers or unrevealed active-round state.
+    """
+
+    __tablename__ = "coverstory_rounds"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    room_code: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    winner: Mapped[str] = mapped_column(String, nullable=False)
+    location_name: Mapped[str] = mapped_column(String, nullable=False, default="")
+    player_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    timer_secs: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    spy_count: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    pack_ids: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
+    completed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class CoverStoryPlaytestReport(Base):
+    """Structured beta playtest notes for Cover Story.
+
+    Reports are intentionally group/session-level. Avoid player names and
+    private role data.
+    """
+
+    __tablename__ = "coverstory_playtest_reports"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    table_size: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    timer_secs: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    pack_ids: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
+    completed_rounds: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    rejoin_issues: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    confusing_locations: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
+    notes: Mapped[str] = mapped_column(String, nullable=False, default="")
+    rating: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class CoverStoryPlayerProfile(Base):
+    """Durable lightweight identity for Cover Story players.
+
+    This is intentionally separate from sweepstake league participants: party-game
+    users may arrive from a shared link with no league account. The row stores
+    non-secret continuity only: alias, preferences, and recent room codes.
+    """
+
+    __tablename__ = "coverstory_player_profiles"
+
+    player_id: Mapped[str] = mapped_column(String, primary_key=True)
+    alias: Mapped[str] = mapped_column(String, nullable=False, default="")
+    preferred_timer_secs: Mapped[int] = mapped_column(Integer, nullable=False, default=420)
+    preferred_pack_ids: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
+    preferred_custom_pack_ids: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
+    preferred_spy_count: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    preferred_view_mode: Mapped[str] = mapped_column(String, nullable=False, default="table")
+    recent_rooms: Mapped[list[dict[str, Any]]] = mapped_column(JSON, nullable=False, default=list)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)

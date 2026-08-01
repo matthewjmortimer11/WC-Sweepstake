@@ -33,6 +33,7 @@
 [data-game="dial"]    {--accent:#12A594; --accent-2:#0C7D70; --accent-ink:#FFFFFF;}
 [data-game="charades"]{--accent:#F5960B; --accent-2:#CF7A00; --accent-ink:#1A1A1A;}
 [data-game="whoami"]  {--accent:#3FA34D; --accent-2:#2F7D3A; --accent-ink:#FFFFFF;}
+[data-game="coverstory"]{--accent:#1746A2; --accent-2:#0F2D6B; --accent-ink:#FFFFFF;}
 [data-game="dethrone"]{--accent:#9B2242; --accent-2:#6F142E; --accent-ink:#FFFFFF;}
 
 /* ── Dashboard + shared building blocks (wa- namespace) ──────────────────── */

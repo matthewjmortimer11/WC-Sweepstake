@@ -53,6 +53,10 @@ _IC_DETHRONE = (
     '<path d="M6 24h20"/><path d="M6 24 4 10l6 5 6-9 6 9 6-5-2 14z"/>'
     '<path d="M11 24v-3M16 24v-4M21 24v-3"/>'
 )
+_IC_COVERSTORY = (
+    '<path d="M8 6h13l3 3v17H8z"/><path d="M21 6v5h5"/>'
+    '<path d="M11 15h10M11 19h8"/><circle cx="15" cy="23" r="2"/>'
+)
 
 
 GAMES: list[GameCard] = [
@@ -80,6 +84,11 @@ GAMES: list[GameCard] = [
         slug="whoami", title="Who Am I?", route="/whoami",
         tagline="Secret identities on your forehead — pick your packs, then guess.",
         icon=_IC_WHOAMI, players="2–12 players", playtime="15 min",
+    ),
+    GameCard(
+        slug="coverstory", title="Cover Story", route="/coverstory",
+        tagline="A cinematic location-deduction game. Everyone has a cover except the plant.",
+        icon=_IC_COVERSTORY, players="3–16 players", playtime="7 min", beta=True,
     ),
     GameCard(
         slug="dethrone", title="The Cursed Throne", route="/dethrone",

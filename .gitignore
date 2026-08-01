@@ -6,6 +6,8 @@ venv/
 
 # Runtime data (participant store is generated at runtime)
 data/
+.coverstory_dev.db*
+.coverstory_redis_smoke*.db*
 
 # Build vendor deps (large third-party; see scripts/vendor/README.md)
 scripts/vendor/react.development.js

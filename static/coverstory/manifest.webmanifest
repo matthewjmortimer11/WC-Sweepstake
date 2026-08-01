@@ -1,0 +1,56 @@
+{
+  "id": "/coverstory",
+  "name": "Wheesht - Cover Story",
+  "short_name": "Cover Story",
+  "description": "A cinematic location-deduction game. Everyone has a cover except the plant.",
+  "start_url": "/coverstory?source=pwa",
+  "scope": "/coverstory",
+  "display": "standalone",
+  "display_override": ["standalone", "browser"],
+  "orientation": "portrait-primary",
+  "background_color": "#F4EEE3",
+  "theme_color": "#1746A2",
+  "categories": ["games", "entertainment", "social"],
+  "shortcuts": [
+    {
+      "name": "Create Cover Story room",
+      "short_name": "Create room",
+      "description": "Start a new Cover Story room.",
+      "url": "/coverstory?source=shortcut",
+      "icons": [{"src": "/icons/icon-192.png?v=20260715-app-logo", "sizes": "192x192"}]
+    },
+    {
+      "name": "Join Cover Story room",
+      "short_name": "Join room",
+      "description": "Open Cover Story and enter a room code.",
+      "url": "/coverstory?join=1&source=shortcut",
+      "icons": [{"src": "/icons/icon-192.png?v=20260715-app-logo", "sizes": "192x192"}]
+    }
+  ],
+  "icons": [
+    {
+      "src": "/icons/icon-192.png?v=20260715-app-logo",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512.png?v=20260715-app-logo",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/maskable-192.png?v=20260715-app-logo",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icons/maskable-512.png?v=20260715-app-logo",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
