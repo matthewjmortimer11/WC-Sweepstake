@@ -254,9 +254,9 @@ def test_coverstory_rejects_invalid_timer():
 
 
 def test_coverstory_has_week_three_content_depth():
-    assert len(LOCATIONS) >= 60
+    assert len(LOCATIONS) >= 72
     packs = public_packs()
-    assert {p["id"] for p in packs} >= {"classic", "luxury", "chaos", "football", "weird", "family", "afterdark"}
+    assert {p["id"] for p in packs} >= {"classic", "luxury", "chaos", "football", "weird", "family", "afterdark", "brutal"}
     assert all(p["count"] > 0 for p in packs)
 
 
@@ -265,6 +265,17 @@ def test_coverstory_filters_locations_by_pack():
 
     assert football
     assert all(loc.get("pack") == "football" for loc in football)
+
+
+def test_coverstory_brutal_pack_has_requested_dark_locations():
+    brutal = locations_for_packs(["brutal"])
+    names = {loc["name"] for loc in brutal}
+
+    assert len(brutal) >= 12
+    assert "Hitler's Bunker" in names
+    assert "Auschwitz Memorial Archive" in names
+    assert "Pyongyang State Hotel" in names
+    assert all(loc.get("pack") == "brutal" for loc in brutal)
 
 
 def test_coverstory_parse_settings_keeps_pack_selection():
