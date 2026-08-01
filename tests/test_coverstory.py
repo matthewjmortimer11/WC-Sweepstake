@@ -336,9 +336,12 @@ def test_coverstory_manager_needs_three_connected_players():
 
 
 def test_coverstory_route_and_assets_serve(client):
-    assert client.get("/coverstory").status_code == 200
+    page = client.get("/coverstory")
+    assert page.status_code == 200
+    assert "/shared/pwa-register.js" in page.text
     assert client.get("/coverstory/assets/app.js").status_code == 200
     assert client.get("/coverstory/assets/styles.css").status_code == 200
+    assert client.get("/shared/pwa-register.js").status_code == 200
     manifest = client.get("/coverstory/manifest.webmanifest")
     assert manifest.status_code == 200
     assert manifest.json()["shortcuts"]

@@ -1,10 +1,19 @@
-const CACHE_VERSION = 'wheesht-pwa-20260720-champion-3';
+const CACHE_VERSION = 'wheesht-pwa-20260801-coverstory-1';
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const PAGE_CACHE = `${CACHE_VERSION}-pages`;
 
 const STATIC_ASSETS = [
   '/',
   '/manifest.webmanifest',
+  '/games',
+  '/games/manifest.webmanifest',
+  '/coverstory',
+  '/coverstory/manifest.webmanifest',
+  '/coverstory/assets/app.js',
+  '/coverstory/assets/styles.css',
+  '/shared/theme.css',
+  '/shared/pwa-register.js',
+  '/og/coverstory-og.png',
   '/icons/icon-192.png',
   '/icons/icon-512.png',
   '/icons/maskable-192.png',
@@ -70,7 +79,12 @@ function isApiRequest(url) {
 function isStaticRequest(url) {
   return url.origin === self.location.origin && (
     url.pathname === '/manifest.webmanifest' ||
+    url.pathname === '/games/manifest.webmanifest' ||
+    url.pathname === '/coverstory/manifest.webmanifest' ||
     url.pathname.startsWith('/icons/') ||
+    url.pathname.startsWith('/shared/') ||
+    url.pathname.startsWith('/coverstory/assets/') ||
+    url.pathname.startsWith('/og/') ||
     url.pathname.startsWith('/app/') ||
     url.pathname === '/tweaks-panel.jsx'
   );
@@ -79,6 +93,7 @@ function isStaticRequest(url) {
 function isCodeRequest(url) {
   return url.origin === self.location.origin && (
     url.pathname.startsWith('/app/') ||
+    url.pathname.startsWith('/coverstory/assets/') ||
     url.pathname === '/tweaks-panel.jsx'
   );
 }

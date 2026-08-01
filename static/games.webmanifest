@@ -2,7 +2,7 @@
   "id": "/games",
   "name": "Wheesht Party Games",
   "short_name": "Wheesht Games",
-  "description": "Free online party games from Wheesht — Cipher, Imposter, Dial, Charades, and Who Am I? Everyone on their own phone.",
+  "description": "Free online party games from Wheesht — Cipher, Imposter, Cover Story, Dial, Charades, and Who Am I? Everyone on their own phone.",
   "start_url": "/games?source=pwa",
   "scope": "/",
   "display": "standalone",
@@ -11,6 +11,22 @@
   "background_color": "#F4EEE3",
   "theme_color": "#F4EEE3",
   "categories": ["games", "entertainment", "social"],
+  "shortcuts": [
+    {
+      "name": "Play Cover Story",
+      "short_name": "Cover Story",
+      "description": "Start the cinematic location-deduction game.",
+      "url": "/coverstory?source=pwa-shortcut",
+      "icons": [{"src": "/icons/icon-games-192.png?v=games-1", "sizes": "192x192"}]
+    },
+    {
+      "name": "Open games hub",
+      "short_name": "Games",
+      "description": "Pick a Wheesht party game.",
+      "url": "/games?source=pwa-shortcut",
+      "icons": [{"src": "/icons/icon-games-192.png?v=games-1", "sizes": "192x192"}]
+    }
+  ],
   "icons": [
     {
       "src": "/icons/icon-games-192.png?v=games-1",

@@ -39,6 +39,15 @@ def test_charades_has_multiplayer_api(client):
 
 def test_games_hub_lists_all_party_games(client):
     t = client.get("/games").text
-    for marker in ("party games", "Cipher", "Imposter", "Dial", "Charades", "Who Am I?", 'href="/play"', 'href="/charades"', 'href="/whoami"'):
+    for marker in ("party games", "Cipher", "Imposter", "Cover Story", "Dial", "Charades", "Who Am I?", 'href="/play"', 'href="/coverstory"', 'href="/charades"', 'href="/whoami"', "/shared/pwa-register.js"):
         assert marker in t, f"missing games hub marker: {marker!r}"
     assert 'href="/"' not in t or "Open Wheesht" not in t
+
+
+def test_games_manifest_includes_coverstory_shortcut(client):
+    r = client.get("/games/manifest.webmanifest")
+
+    assert r.status_code == 200
+    body = r.json()
+    assert "Cover Story" in body["description"]
+    assert any(item["url"].startswith("/coverstory") for item in body["shortcuts"])
