@@ -3003,6 +3003,14 @@ class CursedThroneGame:
             pass
         else:
             self._bot_act(p, cursed, rng)
+        for _ in range(4):
+            if self._bot_resolve_pending(player_id, rng):
+                continue
+            if self._bot_resolve_active_prompt(p, rng):
+                continue
+            break
+        if player_id in self.pending_role_discard:
+            self._bot_auto_role_discard(player_id, rng)
         guard = 0
         while self.over_hand_limit(p) and guard < 10:
             if not p.action_card_ids:
@@ -3092,6 +3100,132 @@ class CursedThroneGame:
             return True
         if player_id in self.pending_role_discard:
             return False
+        return False
+
+    def _bot_resolve_active_prompt(self, p: PlayerState, rng: random.Random) -> bool:
+        """Resolve active-player UI prompts so bots can finish their turn."""
+        pending = self.pending_ui_action.get(p.id)
+        if not pending:
+            return False
+        kind = pending.get("kind")
+        try:
+            if kind == "royal_command":
+                if self._bot_throne_controller(p) and p.location == "throne":
+                    targets = [
+                        x for x in self.players
+                        if x.status == "active" and x.id != p.id
+                    ]
+                    if targets and rng.random() < 0.35:
+                        self.apply_royal_command(
+                            p.id,
+                            "pardon",
+                            target_id=rng.choice(targets).id,
+                        )
+                    else:
+                        self.apply_royal_command(p.id, "tax")
+                else:
+                    self.clear_pending_ui(p.id)
+                return True
+            if kind == "deep_research":
+                self.apply_deep_research(
+                    p.id,
+                    "deck_top",
+                    deck_name=rng.choice(D.DECK_NAMES),
+                    rng=rng,
+                )
+                return True
+            if kind == "vote":
+                target_id = str(pending.get("targetId") or "")
+                if not target_id:
+                    target = next(
+                        (
+                            x for x in self.players
+                            if x.status == "active"
+                            and x.id != p.id
+                            and self.bot_is_cursed(x)
+                        ),
+                        None,
+                    )
+                    target_id = target.id if target else ""
+                if not target_id:
+                    self.clear_pending_ui(p.id)
+                    return True
+                votes = {}
+                for voter in self.players:
+                    if voter.status != "active":
+                        continue
+                    votes[voter.id] = "no" if self.bot_is_cursed(voter) else "yes"
+                self.apply_formal_vote(
+                    str(pending.get("voteType") or "accuse"),
+                    target_id,
+                    votes,
+                    proposer_id=p.id,
+                    seconder=True,
+                    decree=bool(pending.get("decree")),
+                    emergency=bool(pending.get("emergency")),
+                )
+                self.clear_pending_ui(p.id)
+                return True
+            if kind == "trade":
+                partners = [
+                    x for x in self.players
+                    if x.status == "active"
+                    and x.id != p.id
+                    and x.location == p.location
+                    and x.gold >= 1
+                    and p.gold >= 1
+                ]
+                if partners:
+                    self.apply_trade(p.id, rng.choice(partners).id, 1, 1, None, None)
+                self.clear_pending_ui(p.id)
+                return True
+            if kind == "callout":
+                target = next(
+                    (
+                        x for x in self.players
+                        if x.status == "active"
+                        and x.id != p.id
+                        and self.bot_is_cursed(x)
+                    ),
+                    None,
+                )
+                self.clear_pending_ui(p.id)
+                if target:
+                    self.call_out(p.id, target.id, "cursedone")
+                return True
+            if kind == "duel":
+                defender_id = str(pending.get("defenderId") or "")
+                defender = self.player_by_id(defender_id) if defender_id else None
+                if not defender:
+                    candidates = [
+                        x for x in self.players
+                        if x.status == "active"
+                        and x.id != p.id
+                        and x.location == p.location
+                    ]
+                    defender = rng.choice(candidates) if candidates else None
+                self.clear_pending_ui(p.id)
+                if defender:
+                    self.duel_apply_consequence(
+                        p.id,
+                        defender.id,
+                        0,
+                        0,
+                        bool(pending.get("serious")),
+                        (
+                            "serious"
+                            if pending.get("serious")
+                            else rng.choice(["shame", "disarm", "drive"])
+                        ),
+                        rng,
+                    )
+                return True
+            if kind == "contract":
+                self.clear_pending_ui(p.id)
+                return True
+        except MoveError:
+            self.clear_pending_ui(p.id)
+            return True
         return False
 
     def _bot_throne_controller(self, p: PlayerState) -> bool:
