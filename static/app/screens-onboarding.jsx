@@ -16,7 +16,7 @@ const inp = {
   fontFamily: 'var(--body)', fontWeight: 600, fontSize: 16, background: '#fff', color: 'var(--ink)',
   outline: 'none', marginTop: 6
 };
-function Lab(p) { return <label style={{ fontWeight: 800, fontSize: 13, fontFamily: 'var(--disp)', letterSpacing: '.02em' }}>{p.children}{p.opt && <span style={{ color: 'var(--ink2)', fontWeight: 600 }}> · optional</span>}</label>; }
+function Lab(p) { return <label htmlFor={p.htmlFor} style={{ fontWeight: 800, fontSize: 13, fontFamily: 'var(--disp)', letterSpacing: '.02em' }}>{p.children}{p.opt && <span style={{ color: 'var(--ink2)', fontWeight: 600 }}> · optional</span>}</label>; }
 function Seg(p) {
   return <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
     {p.options.map(o => (
@@ -184,6 +184,7 @@ function JoinLeague(props) {
   const [code, setCode] = oState((props.initialCode || '').toUpperCase());
   oEffect(function () { if (props.initialCode) setCode(String(props.initialCode).toUpperCase()); }, [props.initialCode]);
   const [pw, setPw] = oState('');
+  const [showPw, setShowPw] = oState(false);
   const [err, setErr] = oState('');
   const [busy, setBusy] = oState(false);
   const [preview, setPreview] = oState(null);
@@ -229,58 +230,99 @@ function JoinLeague(props) {
   }
 
   return (
-    <div className="moment">
-      <div className="mscroll" style={{ padding: '30px 22px 28px' }}>
-        <button onClick={props.onBack} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, fontWeight: 800, color: 'var(--ink2)', padding: 0, marginBottom: 14 }}>← Back</button>
-        <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-          <Wo mood="mischievous" size={72} animate />
-          <div>
-            <div className="dh" style={{ fontSize: 24, lineHeight: 1 }}>Join a league</div>
-            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink2)', marginTop: 4 }}>Enter the league code and member password your organiser gave you.</div>
-          </div>
+    <div className="moment join-league">
+      <div className="mscroll join-league__scroll">
+        <div className="join-league__layout">
+          <section className="join-league__intro" aria-labelledby="join-league-title">
+            <button className="join-league__back" onClick={props.onBack}>← Back</button>
+            <div className="join-league__hero">
+              <div className="join-league__mascot"><Wo mood="mischievous" size={72} animate /></div>
+              <div>
+                <div className="join-league__kicker">World Cup 2026</div>
+                <h1 className="dh join-league__title" id="join-league-title">Join a league</h1>
+                <p className="join-league__lede">Enter the league code and member password your organiser gave you.</p>
+              </div>
+            </div>
+            <div className="join-league__support">
+              <div className="join-league__support-title">You’ll need</div>
+              <div className="join-league__support-row">
+                <span className="join-league__support-icon" aria-hidden="true">1</span>
+                <span><b>League code</b><small>Identifies the right sweepstake.</small></span>
+              </div>
+              <div className="join-league__support-row">
+                <span className="join-league__support-icon" aria-hidden="true">2</span>
+                <span><b>Member password</b><small>Shared privately by your organiser.</small></span>
+              </div>
+            </div>
+          </section>
+
+          <section className="join-league__form-panel" aria-labelledby="join-form-title">
+            <div className="join-league__form-heading">
+              <div className="join-league__form-kicker">League access</div>
+              <h2 className="dh" id="join-form-title">Enter your details</h2>
+              <p>We’ll check the league before you continue.</p>
+            </div>
+            {preview && preview.name && <div className="join-league__preview">
+              <span className="join-league__preview-check" aria-hidden="true">✓</span>
+              <div>
+                <div className="dh join-league__preview-name">{preview.name}</div>
+                <div className="join-league__preview-count">
+                  {(copy.joinPreviewCount || '{count} already in').replace('{count}', String(preview.entrantCount || 0))}
+                </div>
+              </div>
+            </div>}
+            {previewBusy && !preview && code.trim().length >= 2 && <div className="join-league__lookup" role="status">{copy.joinPreviewLoading || 'Looking up league…'}</div>}
+
+            <div className="join-league__field">
+              <Lab htmlFor="join-league-code">League code</Lab>
+              <input
+                id="join-league-code"
+                autoFocus={!props.deck || !props.initialCode}
+                style={{ ...inp, textTransform: 'uppercase', letterSpacing: '.14em', fontSize: 22, textAlign: 'center' }}
+                value={code}
+                onChange={e => { setCode(e.target.value); setErr(''); }}
+                placeholder="e.g. OFFICE26"
+                maxLength={12}
+                autoComplete="off"
+                spellCheck={false}
+              />
+            </div>
+            <div className="join-league__field">
+              <Lab htmlFor="join-member-password">Member password</Lab>
+              <div className="join-league__password">
+                <input
+                  id="join-member-password"
+                  autoFocus={!!props.deck && !!props.initialCode}
+                  type={showPw ? 'text' : 'password'}
+                  style={{ ...inp, paddingRight: 72 }}
+                  value={pw}
+                  onChange={e => { setPw(e.target.value); setErr(''); }}
+                  onKeyDown={e => e.key === 'Enter' && submit()}
+                  placeholder="Member password"
+                  autoComplete="off"
+                />
+                <button type="button" className="join-league__reveal" onClick={() => setShowPw(v => !v)}
+                  aria-label={showPw ? 'Hide member password' : 'Show member password'}>
+                  {showPw ? 'Hide' : 'Show'}
+                </button>
+              </div>
+            </div>
+            {err && <div className="join-league__error" role="alert">{err}</div>}
+            {pwFails >= 2 && preview && preview.name && <div className="join-league__help">
+              {(copy.joinPasswordHelp || 'Ask your organiser for the member password. You can copy the invite link below.')}
+              {window.WheeshtShare && <button type="button" onClick={function () {
+                window.WheeshtShare.copyText(window.WheeshtShare.inviteUrl(code)).then(function () {
+                  if (window.wcToast) window.wcToast('Invite link copied.', 'confident');
+                });
+              }} className="join-league__copy">Copy invite link</button>}
+            </div>}
+            <div className="join-league__submit">
+              <Bo variant="ink" block disabled={busy || !ok} onClick={submit}>{busy ? 'Checking…' : 'Join league →'}</Bo>
+            </div>
+            <button onClick={props.onCreate} className="join-league__create">No league yet? Create one</button>
+            <p className="join-league__privacy">Your details stay within this league.</p>
+          </section>
         </div>
-        {preview && preview.name && <div style={{ marginTop: 16, background: '#fff', border: '2.5px solid var(--ink)', borderRadius: 16, padding: '12px 14px', boxShadow: '0 4px 0 var(--ink)' }}>
-          <div className="dh" style={{ fontSize: 18 }}>{preview.name}</div>
-          <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--ink2)', marginTop: 4 }}>
-            {(copy.joinPreviewCount || '{count} already in').replace('{count}', String(preview.entrantCount || 0))}
-          </div>
-        </div>}
-        {previewBusy && !preview && code.trim().length >= 2 && <div style={{ marginTop: 14, fontSize: 12.5, fontWeight: 700, color: 'var(--ink2)' }}>{copy.joinPreviewLoading || 'Looking up league…'}</div>}
-        <div style={{ marginTop: 20 }}>
-          <Lab>League code</Lab>
-          <input
-            autoFocus
-            style={{ ...inp, textTransform: 'uppercase', letterSpacing: '.14em', fontSize: 22, textAlign: 'center' }}
-            value={code}
-            onChange={e => { setCode(e.target.value); setErr(''); }}
-            placeholder="e.g. OFFICE26"
-            maxLength={12}
-          />
-        </div>
-        <div style={{ marginTop: 14 }}>
-          <Lab>Member password</Lab>
-          <input
-            type="password"
-            style={inp}
-            value={pw}
-            onChange={e => { setPw(e.target.value); setErr(''); }}
-            onKeyDown={e => e.key === 'Enter' && submit()}
-            placeholder="Member password"
-          />
-        </div>
-        {err && <div style={{ marginTop: 10, fontSize: 13, fontWeight: 700, color: 'var(--red)' }}>{err}</div>}
-        {pwFails >= 2 && preview && preview.name && <div style={{ marginTop: 10, fontSize: 12.5, fontWeight: 600, color: 'var(--ink2)', lineHeight: 1.4 }}>
-          {(copy.joinPasswordHelp || 'Ask your organiser for the member password. You can copy the invite link below.')}
-          {window.WheeshtShare && <button type="button" onClick={function () {
-            window.WheeshtShare.copyText(window.WheeshtShare.inviteUrl(code)).then(function () {
-              if (window.wcToast) window.wcToast('Invite link copied.', 'confident');
-            });
-          }} style={{ display: 'block', marginTop: 8, background: 'none', border: 'none', cursor: 'pointer', fontWeight: 800, color: 'var(--ink)', textDecoration: 'underline', padding: 0 }}>Copy invite link</button>}
-        </div>}
-        <div style={{ marginTop: 18 }}>
-          <Bo variant="ink" block disabled={busy || !ok} onClick={submit}>{busy ? 'Checking…' : 'Join league →'}</Bo>
-        </div>
-        <button onClick={props.onCreate} style={{ width: '100%', marginTop: 12, background: 'none', border: 'none', cursor: 'pointer', fontSize: 13.5, fontWeight: 800, color: 'var(--ink2)', textDecoration: 'underline', padding: '4px 0' }}>No league yet? Create one</button>
       </div>
     </div>
   );
