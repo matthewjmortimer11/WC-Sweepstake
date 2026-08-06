@@ -768,7 +768,7 @@ function App(){
       : <><svg width="18" height="14" viewBox="0 0 22 16" fill="none" stroke="currentColor" strokeWidth="2"><rect x="1" y="1" width="20" height="12" rx="2"/><line x1="8" y1="15" x2="14" y2="15"/></svg>Desktop view</>}
   </button> : null;
   // Wrap onboarding/identity flows in a centred column when in deck mode.
-  function frame(node){ return deck ? <div className="deck-solo">{node}</div> : node; }
+  function frame(node, kind){ return deck ? <div className={'deck-solo' + (kind ? ' deck-solo--' + kind : '')}>{node}</div> : node; }
 
   // tweaks → DOM
   aEffect(()=>{ document.documentElement.style.setProperty('--red', t.accent); },[t.accent]);
@@ -1134,8 +1134,8 @@ function App(){
     {viewToggle}<window.ToastLayer/><window.ConfettiLayer/><AppSystemEffects/>
   </React.Fragment>;
   if(flow==='join') return <React.Fragment>
-    {frame(<window.JoinLeague initialCode={joinPrefill} onBack={()=>setFlow('gate')} onCreate={()=>{setOrganiser(true);setFlow('create');}}
-      onJoined={(league)=>{ setOrganiser(false); setFlow(league&&league.seeded?'oi-roster':'find'); }}/>)}
+    {frame(<window.JoinLeague deck={deck} initialCode={joinPrefill} onBack={()=>setFlow('gate')} onCreate={()=>{setOrganiser(true);setFlow('create');}}
+      onJoined={(league)=>{ setOrganiser(false); setFlow(league&&league.seeded?'oi-roster':'find'); }}/>, 'join')}
     {viewToggle}<window.ToastLayer/><window.ConfettiLayer/><AppSystemEffects/>
   </React.Fragment>;
   if(flow==='create') return <React.Fragment>
