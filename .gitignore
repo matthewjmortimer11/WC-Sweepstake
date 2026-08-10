@@ -21,3 +21,6 @@ World Cup Sweepstake.zip
 # Debug page
 static/diag.html
 .claude/
+
+# Local secrets (MCP tokens, API keys)
+.env
