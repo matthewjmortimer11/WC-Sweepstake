@@ -1,0 +1,34 @@
+---
+description: Keep Mission Control cursor-workspace card updated via QUOTA_TRACKER_URL
+alwaysApply: true
+---
+
+# Mission Control (cursor-workspace)
+
+When `QUOTA_TRACKER_URL` is set, push status before/after meaningful phases.
+Sync site health periodically: `python3 scripts/sync_sites.py`
+
+```bash
+python3 scripts/agent_status.py push \
+  --phase "<phase>" \
+  --summary "<one short sentence>" \
+  --status live \
+  --test-status unknown|running|green|failed
+```
+
+Site auto-detection: editing `dethrone/` etc. adds Site + URL metrics automatically.
+
+Blocked / PR ready:
+
+```bash
+python3 scripts/agent_status.py push --phase blocked --attention --attention-reason "Need env var"
+python3 scripts/agent_status.py push --phase pr-ready --attention --pr-url "https://github.com/..."
+```
+
+Requires env: `QUOTA_TRACKER_URL`, `QUOTA_TRACKER_TOKEN`, `QUOTA_TRACKER_ID` (default `cursor-workspace`).
+
+Rules:
+- Never send secrets, tokens, API keys, private prompts, or file contents in summary/metrics.
+- `attention=true` only when blocked, tests fail, PR ready, or user action needed.
+- If POST fails, continue the task — do not loop retries.
+- If `QUOTA_TRACKER_URL` is unset, skip silently.

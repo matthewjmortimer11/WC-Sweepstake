@@ -1,0 +1,92 @@
+{
+  "production_base": "https://wheesht.xyz",
+  "repo_url": "https://github.com/matthewjmortimer11/WC-Sweepstake",
+  "sites": [
+    {
+      "id": "wheesht",
+      "name": "Wheesht",
+      "path": "/",
+      "description": "WC sweepstake hub — leagues, draw, chat, predictions, Pro",
+      "paths": ["main.py", "static/app/", "templates/index.html", "standings.py", "models.py", "wc_data.py"],
+      "tests": "tests/test_security.py"
+    },
+    {
+      "id": "welcome",
+      "name": "Welcome",
+      "path": "/welcome",
+      "description": "Brand landing page",
+      "paths": ["templates/welcome.html"],
+      "tests": ""
+    },
+    {
+      "id": "games",
+      "name": "Party games hub",
+      "path": "/games",
+      "description": "Picker for all party games",
+      "paths": ["templates/games.html"],
+      "tests": ""
+    },
+    {
+      "id": "cipher",
+      "name": "Cipher",
+      "path": "/play",
+      "description": "Codenames-style word game",
+      "paths": ["codenames/", "templates/cipher.html", "static/codenames/"],
+      "tests": "tests/test_cipher.py"
+    },
+    {
+      "id": "imposter",
+      "name": "Imposter",
+      "path": "/imposter",
+      "description": "Social deduction / Celebrity Dance",
+      "paths": ["imposter/", "templates/imposter.html", "static/imposter/"],
+      "tests": "tests/test_imposter_ws.py"
+    },
+    {
+      "id": "dial",
+      "name": "Dial",
+      "path": "/wheel",
+      "description": "Wavelength-style psychic dial",
+      "paths": ["dial/", "templates/dial.html", "static/dial/"],
+      "tests": "tests/test_dial_ws.py"
+    },
+    {
+      "id": "charades",
+      "name": "Charades",
+      "path": "/charades",
+      "description": "Mime and guess celebrities",
+      "paths": ["charades/", "templates/charades.html", "static/charades/"],
+      "tests": "tests/test_charades_ws.py"
+    },
+    {
+      "id": "whoami",
+      "name": "Who Am I?",
+      "path": "/whoami",
+      "description": "Forehead identity guessing game",
+      "paths": ["whoami/", "templates/whoami.html", "static/whoami/"],
+      "tests": "tests/test_whoami_ws.py"
+    },
+    {
+      "id": "dethrone",
+      "name": "Dethrone",
+      "path": "/dethrone",
+      "description": "The Cursed Throne — bluffing kingdom board game",
+      "paths": ["dethrone/", "static/dethrone/"],
+      "tests": "tests/test_dethrone_ws.py"
+    },
+    {
+      "id": "qualification",
+      "name": "Qualification",
+      "path": "/scotland-qualification",
+      "description": "Scotland WC qualification tracker",
+      "paths": ["qualification/", "templates/qualification.html"],
+      "tests": "tests/test_qualification.py"
+    }
+  ],
+  "links": [
+    { "label": "Production", "url": "https://wheesht.xyz/" },
+    { "label": "Games hub", "url": "https://wheesht.xyz/games" },
+    { "label": "GitHub", "url": "https://github.com/matthewjmortimer11/WC-Sweepstake" },
+    { "label": "Qualification", "url": "https://wheesht.xyz/scotland-qualification" }
+  ]
+}
