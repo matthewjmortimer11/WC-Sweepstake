@@ -492,10 +492,15 @@ function DeckShell(props){
   const tab = props.tab;
   const head = DECK_HEAD[tab];
   const isChat = tab==='chat';
-  return <div className="deck-shell">
+  const mainRef = React.useRef(null);
+  React.useEffect(function(){
+    if(mainRef.current) mainRef.current.scrollTop=0;
+  },[tab,props.me&&props.me.id]);
+  const demoDeck = A_S.isDemoMode && A_S.isDemoMode();
+  return <div className="deck-shell" style={demoDeck ? {paddingTop:52,boxSizing:'border-box'} : null}>
     <DeckRail me={props.me} tab={tab} setTab={props.setTab} chatBadge={props.chatBadge}
       onAccount={props.onAccount} onAdmin={props.onAdmin} onDev={props.onDev}/>
-    <main className="deck-main">
+    <main className="deck-main" ref={mainRef}>
       <div className={isChat?'deck-canvas deck-canvas--chat':'deck-canvas'} key={tab+(props.me?props.me.id:'')}>
         {head && <header className="deck-head">
           <div className="kk" style={{display:'flex',alignItems:'center',flexWrap:'wrap',gap:4}}>
@@ -778,7 +783,7 @@ function App(){
 
   // landing flourish
   aEffect(()=>{
-    if(flow!=='app'||!me) return;
+    if(flow!=='app'||!me||(A_S.quietMode&&A_S.quietMode())) return;
     const myTeam = A_WC.TEAMS[me.team];
     const nm = A_S.shownName ? A_S.shownName(me) : me.name;
     const fl = myTeam ? myTeam.flag : '';
@@ -1294,8 +1299,22 @@ class AppErrorBoundary extends React.Component {
   }
 }
 
+function BootHandoff(){
+  React.useEffect(function(){
+    try {
+      if(new URLSearchParams(window.location.search).get('__boot')==='preview') return;
+    } catch(e) {}
+    if(window.__wcBootReady) window.__wcBootReady();
+    else document.body.classList.add('app-ready');
+  },[]);
+  return null;
+}
+
 ReactDOM.createRoot(document.getElementById('root')).render(
-  <AppErrorBoundary>
-    <App />
-  </AppErrorBoundary>
+  <>
+    <BootHandoff />
+    <AppErrorBoundary>
+      <App />
+    </AppErrorBoundary>
+  </>
 );

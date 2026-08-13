@@ -30,8 +30,8 @@ STATIC = ROOT / "static"
 APP = STATIC / "app"
 VENDOR = Path(__file__).resolve().parent / "vendor"
 
-# Plain JS, load order matters: data snapshot → data layer → store.
-PLAIN_JS = ["wc-snapshot.js", "data.js", "store.js"]
+# Plain JS, load order matters: data snapshot → data layer → demo fixture → store.
+PLAIN_JS = ["wc-snapshot.js", "data.js", "demo-data.js", "store.js"]
 
 # JSX components, load order matters (mascot/ui before screens, app last).
 # Keep this in lockstep with the <script> order in templates/index.html.
