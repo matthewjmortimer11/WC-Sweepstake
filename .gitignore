@@ -21,3 +21,16 @@ World Cup Sweepstake.zip
 # Debug page
 static/diag.html
 .claude/
+
+# Frontend build outputs (regenerate with `npm run build`)
+node_modules/
+static/app/bundle.*.js
+static/app/build-manifest.json
+static/app/vendor/
+
+# Alembic local scratch databases
+.ci_migration_check.db*
+.alembic_gen.db*
+
+# Local cache-test scratch database
+.cachetest.db*

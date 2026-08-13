@@ -21,6 +21,7 @@ import hmac
 import html
 import io
 import json
+from functools import lru_cache
 import logging
 import os
 import re
@@ -37,7 +38,9 @@ from typing import Any, Dict, List, Optional
 from zoneinfo import ZoneInfo
 
 from fastapi import FastAPI, Header, HTTPException, Request
-from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse, Response
+from fastapi.encoders import jsonable_encoder
+from fastapi.middleware.gzip import GZipMiddleware
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTextResponse, Response
 from pydantic import BaseModel, Field
 from sqlalchemy import delete, func, select, text
 from sqlalchemy.exc import IntegrityError
@@ -59,19 +62,23 @@ from models import (
     Profile,
     ProfileAsset,
 )
+from cache import league_cache
+import ops
+import wc_data as wc_data_module
 from wc_data import _initials, generate_wc_data, get_admin_pin, get_league_seed
 import knockout_predictions
 
+ops.configure_logging()
+ops.init_sentry()
 log = logging.getLogger(__name__)
 
 # Generate the tournament scenario once at startup (teams, fixtures, markets…).
-_wc_data = generate_wc_data()
-_ROSTER: List[Dict[str, Any]] = _wc_data["people"]  # seeded league base roster
-_CONFIG_LEAGUE_CODE: str = _wc_data["league"]["code"]
-# Valid team codes a member may pick as their FAVOURITE team (distinct from the
-# team they were drawn). Used to validate profile writes.
-_TEAM_CODES: set = {t["code"] for t in _wc_data.get("teams", [])}
-
+# Payload for the DEFAULT tournament only. Per-league state must go through
+# _data_for(league.tournament_id); this backs the seeded config league, the
+# pre-league landing payload and the single sync loop.
+_DEFAULT_DATA = generate_wc_data()
+_ROSTER: List[Dict[str, Any]] = _DEFAULT_DATA["people"]  # seeded league base roster
+_CONFIG_LEAGUE_CODE: str = _DEFAULT_DATA["league"]["code"]
 # Avatar bytes are resized/cropped on the client to a small square before upload;
 # this ceiling is a generous backstop against an oversized or hand-crafted body.
 _MAX_AVATAR_BYTES = 600 * 1024
@@ -80,6 +87,30 @@ _MAX_DISPLAY_NAME = 40
 
 _HTML_TEMPLATE = Path("templates/index.html").read_text(encoding="utf-8")
 _JOIN_TEMPLATE = Path("templates/join.html").read_text(encoding="utf-8")
+
+
+# bundle.<hash>.js, and the pinned React UMD builds under app/vendor/.
+_IMMUTABLE_ASSET = re.compile(r"^(bundle\.[0-9a-f]{8,}\.js|react(-dom)?\.production\.min\.js)$")
+
+
+@lru_cache(maxsize=1)
+def _frontend_bundle() -> str:
+    """Hashed filename of the built JS bundle (see scripts/build_frontend.mjs).
+
+    The name carries a content hash, so the file can be cached forever and a
+    rebuild busts it automatically.
+
+    Resolved lazily rather than at import: the test suite imports this module
+    without a Node toolchain, and coupling 493 backend tests to `npm run build`
+    buys nothing. Serving HTML *does* need it, so that path fails loudly.
+    """
+    manifest = Path("static/app/build-manifest.json")
+    if not manifest.exists():
+        raise RuntimeError(
+            "static/app/build-manifest.json is missing — run `npm run build` "
+            "before serving the app."
+        )
+    return json.loads(manifest.read_text(encoding="utf-8"))["bundle"]
 _OG_IMAGE_PATH = "/og/wheesht-og.png"
 
 # Master developer key for the hidden cross-league dev console. It must come
@@ -608,11 +639,34 @@ async def _guard_account_write(
 
 # ── State assembly ────────────────────────────────────────────────────────────
 
-def _base_fixtures() -> List[Dict[str, Any]]:
-    return sync.fixture_cache if sync.fixture_cache else _wc_data["fixtures"]
+def _data_for(tournament_id: Optional[str]) -> Dict[str, Any]:
+    """The cached payload for a tournament, falling back to the default.
+
+    A league stores the competition it plays, so every piece of state assembly
+    below is parameterised by the resulting payload rather than reading one
+    process-wide global. The fallback covers rows written before leagues
+    carried a tournament, and any id whose config file has since been removed —
+    both should degrade to the default rather than 500.
+    """
+    tid = tournament_id or wc_data_module.default_tournament()
+    if not wc_data_module.tournament_exists(tid):
+        log.warning("League references unknown tournament %r; using default", tid)
+        tid = wc_data_module.default_tournament()
+    return wc_data_module.tournament_data(tid)
 
 
-def _resolve(league_people: List[Dict[str, Any]], admin: Dict[str, Any]):
+def _base_fixtures(data: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """Live fixtures for this tournament if sync holds them, else generated ones.
+
+    Guarded by tournament: the sync cache belongs to exactly one competition,
+    so an unguarded read would hand a Euros league the World Cup schedule.
+    """
+    live = sync.fixtures_for((data.get("meta") or {}).get("id") or "")
+    return live if live else data["fixtures"]
+
+
+def _resolve(league_people: List[Dict[str, Any]], admin: Dict[str, Any],
+             data: Dict[str, Any]):
     """Resolve a league's full state from the GLOBAL baseline + its own overrides.
 
     Composition (per league):
@@ -628,12 +682,12 @@ def _resolve(league_people: List[Dict[str, Any]], admin: Dict[str, Any]):
     admin_teams = admin.get("teams") or {}
     admin_fixtures = admin.get("fixtures") or {}
     admin_preds = admin.get("predictions") or {}
-    phase = (admin.get("meta") or {}).get("phase") or _wc_data["meta"]["phase"]
-    ladder = _wc_data["meta"]["stageLadder"]
+    phase = (admin.get("meta") or {}).get("phase") or data["meta"]["phase"]
+    ladder = data["meta"]["stageLadder"]
 
     # 1. fixtures = baseline + explicit overrides (others untouched)
     fixtures = []
-    for f in _base_fixtures():
+    for f in _base_fixtures(data):
         o = admin_fixtures.get(f["id"])
         if o:
             f = dict(f)
@@ -646,7 +700,7 @@ def _resolve(league_people: List[Dict[str, Any]], admin: Dict[str, Any]):
         fixtures.append(f)
 
     # 2. rules engine from this league's results, then manual team overrides
-    teams = standings.compute_team_status(_wc_data["teams"], fixtures, ladder)
+    teams = standings.compute_team_status(data["teams"], fixtures, ladder)
     for t in teams:
         o = admin_teams.get(t["code"])
         if o:
@@ -659,7 +713,7 @@ def _resolve(league_people: List[Dict[str, Any]], admin: Dict[str, Any]):
     people = standings.apply_to_people(league_people, teams)
 
     # 4. auto-grade predictions, then apply manual answers on top
-    predictions = standings.grade_predictions(_wc_data["predictions"], teams, fixtures, ladder)
+    predictions = standings.grade_predictions(data["predictions"], teams, fixtures, ladder)
 
     # 4b. inject dynamic fixture markets (auto-grade from this league's results)
     dm_list = admin.get("dynamicMarkets") or []
@@ -753,15 +807,17 @@ def _resolve(league_people: List[Dict[str, Any]], admin: Dict[str, Any]):
 
 
 def _league_state(league: League, league_people: List[Dict[str, Any]], admin: Dict[str, Any]) -> Dict[str, Any]:
-    teams, fixtures, people, predictions, phase = _resolve(league_people, admin)
+    # Everything below is built from THIS league's tournament, not a global.
+    tdata = _data_for(league.tournament_id)
+    teams, fixtures, people, predictions, phase = _resolve(league_people, admin, tdata)
     admin_meta = admin.get("meta") or {}
-    fee = _wc_data["fee"]
+    fee = tdata["fee"]
     try:
         if admin_meta.get("entryFee") is not None:
             fee = max(0, float(admin_meta.get("entryFee")))
     except (TypeError, ValueError):
-        fee = _wc_data["fee"]
-    data = dict(_wc_data)
+        fee = tdata["fee"]
+    data = dict(tdata)
     data["fee"] = fee
     data["teams"] = teams
     data["fixtures"] = fixtures
@@ -772,11 +828,12 @@ def _league_state(league: League, league_people: List[Dict[str, Any]], admin: Di
     # from the server (keeps admin actions consistent across devices).
     data["adminOverrides"] = admin
 
-    meta = dict(_wc_data["meta"])
+    meta = dict(tdata["meta"])
     meta.pop("adminPin", None)
     meta["phase"] = phase
-    stage_labels = dict(_wc_data["meta"].get("stageLabels") or {})
-    meta.update(_tournament_fixture_meta(fixtures, teams, phase, stage_labels))
+    stage_labels = dict(tdata["meta"].get("stageLabels") or {})
+    meta.update(_tournament_fixture_meta(
+        fixtures, teams, phase, stage_labels, tdata["meta"]["stageLadder"]))
     meta["groupSize"] = len(people)
     meta["stillIn"] = sum(1 for p in people if p.get("alive"))
     meta["out"] = sum(1 for p in people if not p.get("alive"))
@@ -802,7 +859,7 @@ def _league_state(league: League, league_people: List[Dict[str, Any]], admin: Di
     )
     meta.update(_pro_meta(league))
     meta.update(_fixture_health(fixtures))
-    meta.update(_sync_meta())
+    meta.update(_sync_meta(tdata["meta"]["id"]))
     data["meta"] = meta
     data["pot"] = len(people) * fee
     data["charitySplit"] = meta["charitySplit"]
@@ -852,8 +909,10 @@ def _fixture_pick_open(f: Optional[Dict[str, Any]]) -> bool:
     return True
 
 
-def _sync_meta() -> Dict[str, Any]:
-    st = sync.sync_status
+def _sync_meta(tournament_id: str) -> Dict[str, Any]:
+    """Sync health for the tournament this league plays — an organiser looking
+    at a Euros league should not be shown the World Cup's last sync time."""
+    st = sync.status_for(tournament_id)
     return {
         "syncAdapter": st.get("adapter"),
         "syncLastAt": st.get("lastSyncAt"),
@@ -897,6 +956,7 @@ def _tournament_fixture_meta(
     teams: List[Dict[str, Any]],
     phase: str,
     stage_labels: Dict[str, str],
+    stage_ladder: List[str],
 ) -> Dict[str, Any]:
     """Fixture inventory + group/knockout phase signals for client and admin."""
     codes = {t["code"] for t in teams}
@@ -928,7 +988,7 @@ def _tournament_fixture_meta(
     r32_published = standings.opening_knockout_draw_complete(
         fixtures or [],
         codes,
-        _wc_data["meta"]["stageLadder"],
+        stage_ladder,
     )
 
     ko_order = ["r32", "r16", "qf", "sf", "final"]
@@ -981,25 +1041,27 @@ def _tournament_fixture_meta(
 def _base_state() -> Dict[str, Any]:
     """League-agnostic payload injected at first paint / used before a league is
     chosen. No participants, no pot — just the shared tournament scaffolding."""
-    data = dict(_wc_data)
-    data["fixtures"] = _base_fixtures()
+    tdata = _data_for(None)
+    data = dict(tdata)
+    data["fixtures"] = _base_fixtures(tdata)
     data["people"] = []
     data["league"] = None
-    meta = dict(_wc_data["meta"])
+    meta = dict(tdata["meta"])
     meta.pop("adminPin", None)
     meta["groupSize"] = 0
     meta["stillIn"] = 0
     meta["out"] = 0
     meta["currency"] = "£"
     meta.update(_fixture_health(data.get("fixtures") or []))
-    meta.update(_sync_meta())
-    stage_labels = dict(_wc_data["meta"].get("stageLabels") or {})
+    meta.update(_sync_meta(tdata["meta"]["id"]))
+    stage_labels = dict(tdata["meta"].get("stageLabels") or {})
     phase = meta.get("phase") or "pre"
     meta.update(_tournament_fixture_meta(
         data.get("fixtures") or [],
-        _wc_data.get("teams") or [],
+        tdata.get("teams") or [],
         phase,
         stage_labels,
+        tdata["meta"]["stageLadder"],
     ))
     data["meta"] = meta
     data["pot"] = 0
@@ -1016,7 +1078,8 @@ def _build_html() -> str:
     # The hidden dev console is only reachable when a dev key is configured.
     parts.append("window.WC_DEV_ENABLED = " + ("true" if _DEV_KEY else "false") + ";")
     injection = "<script>" + "".join(parts) + "</script>"
-    return _HTML_TEMPLATE.replace("<!-- WC_DATA_INJECTION -->", injection)
+    html = _HTML_TEMPLATE.replace("<!-- WC_DATA_INJECTION -->", injection)
+    return html.replace("<!-- WC_BUNDLE -->", _frontend_bundle())
 
 
 # ── Startup: seed the config league + migrate any legacy JSON ──────────────────
@@ -1113,43 +1176,42 @@ async def _migrate_legacy_json(session, league: League) -> None:
 
 # ── Lifespan ──────────────────────────────────────────────────────────────────
 
-async def _ensure_schema() -> None:
-    """Idempotent column adds for tables that shipped in an earlier deploy.
 
-    `create_all` only ever CREATEs missing tables — it never ALTERs an existing
-    one. The `profiles` table was deployed before `display_name` existed, so on
-    any database where that table already exists the column would be missing.
-    `ADD COLUMN IF NOT EXISTS` is a no-op when create_all already made the table
-    fresh (with the column) and a clean add when it pre-existed without it.
+
+
+def sync_worker_spec(tournament_id: str, api_key: str):
+    """Adapter + competition code for one tournament, or None if unknown.
+
+    Each tournament needs its OWN adapter: the provider adapter matches team
+    names against that tournament's team list, and is bound to that
+    tournament's season. Sharing one across competitions would mis-map fixtures
+    and request the wrong season.
     """
-    if DATABASE_URL.startswith("sqlite"):
-        return
-
-    statements = [
-        "ALTER TABLE profiles ADD COLUMN IF NOT EXISTS display_name VARCHAR NOT NULL DEFAULT ''",
-        "ALTER TABLE leagues ADD COLUMN IF NOT EXISTS organiser_hash VARCHAR",
-        "ALTER TABLE participants ADD COLUMN IF NOT EXISTS password_hash VARCHAR",
-        "ALTER TABLE profiles ADD COLUMN IF NOT EXISTS google_id VARCHAR",
-        "ALTER TABLE participants ADD COLUMN IF NOT EXISTS custom_fields JSON NOT NULL DEFAULT '{}'::json",
-        "ALTER TABLE participants ADD COLUMN IF NOT EXISTS payment_status VARCHAR NOT NULL DEFAULT 'unpaid'",
-        "ALTER TABLE leagues ADD COLUMN IF NOT EXISTS pro_status VARCHAR NOT NULL DEFAULT 'free'",
-        "ALTER TABLE leagues ADD COLUMN IF NOT EXISTS pro_purchased_at TIMESTAMPTZ",
-        "CREATE INDEX IF NOT EXISTS ix_profiles_google_id ON profiles (google_id) WHERE google_id IS NOT NULL",
-    ]
-    async with engine.begin() as conn:
-        for stmt in statements:
-            await conn.execute(text(stmt))
+    if not wc_data_module.tournament_exists(tournament_id):
+        return None
+    data = wc_data_module.tournament_data(tournament_id)
+    comp_code = data["meta"]["competitionCode"]
+    if api_key:
+        from adapters.football_data_org import FootballDataOrgAdapter
+        return FootballDataOrgAdapter(
+            api_key,
+            known_teams=data.get("teams") or [],
+            season=data["meta"].get("providerSeason"),
+        ), comp_code
+    from adapters.mock import MockAdapter
+    return MockAdapter(), comp_code
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-
-    try:
-        await _ensure_schema()
-    except Exception as exc:  # never let a migration crash boot
-        log.error("Schema ensure failed: %s", exc)
+    # Schema is owned by Alembic and applied by scripts/db_upgrade.py as a
+    # deploy step, so a bad migration fails the deploy instead of a live boot.
+    # SQLite (tests, local dev) still builds the schema in-process: it is always
+    # a throwaway database, and create_all is verified to produce a schema
+    # identical to `alembic upgrade head`.
+    if DATABASE_URL.startswith("sqlite"):
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
 
     try:
         await _seed_and_migrate()
@@ -1163,29 +1225,144 @@ async def lifespan(app: FastAPI):
 
     api_key = os.environ.get("FOOTBALL_DATA_API_KEY", "")
     if api_key:
-        from adapters.football_data_org import FootballDataOrgAdapter
-        adapter = FootballDataOrgAdapter(api_key, known_teams=_wc_data.get("teams") or [])
         sync.set_sync_adapter("football-data.org")
         log.info("Using FootballDataOrgAdapter")
     else:
-        from adapters.mock import MockAdapter
-        adapter = MockAdapter()
         sync.set_sync_adapter("mock")
         log.warning("FOOTBALL_DATA_API_KEY not set — using MockAdapter (no live data)")
 
+    def _make_worker(tournament_id: str):
+        return sync_worker_spec(tournament_id, api_key)
+
+    # Background jobs are singletons per deployment, elected through Redis. With
+    # several workers and no Redis there is nothing to elect through, so every
+    # worker would sync — multiplying provider calls by the worker count.
+    workers = int(os.environ.get("WEB_CONCURRENCY") or 1)
+    if workers > 1 and not league_cache.enabled:
+        log.warning(
+            "WEB_CONCURRENCY=%d without Redis: every worker will run its own "
+            "sync loop and poll the provider %dx. Set REDIS_URL, or run one worker.",
+            workers, workers,
+        )
+
+    # One loop per tournament a league actually plays, added as leagues appear.
     task = asyncio.create_task(
-        sync.start_sync(adapter, _wc_data["meta"]["id"], _wc_data["meta"]["competitionCode"])
+        sync.start_all_syncs(_make_worker, _DEFAULT_DATA["meta"]["id"])
     )
     yield
+    # Shutdown must be bounded. A background task cancelled mid-query can leave
+    # the pool busy, and waiting on it indefinitely wedges the process — the
+    # platform would eventually SIGKILL, losing a clean database close.
     task.cancel()
     try:
-        await task
-    except asyncio.CancelledError:
+        await asyncio.wait_for(asyncio.shield(task), timeout=5)
+    except (asyncio.CancelledError, asyncio.TimeoutError):
         pass
+    except Exception as exc:
+        log.warning("Sync supervisor did not stop cleanly: %s", exc)
     await engine.dispose()
 
 
 app = FastAPI(title="Wheesht — World Cup Sweepstake 2026", lifespan=lifespan)
+
+# Compress the JS bundle, the injected league state, and every JSON API response.
+# The bundle alone drops from ~548KB to well under a third of that on the wire.
+# minimum_size skips payloads too small for compression to be worth the CPU.
+app.add_middleware(GZipMiddleware, minimum_size=1000)
+
+@app.middleware("http")
+async def _request_context(request: Request, call_next):
+    """Tag each request with an id, and log one line per request.
+
+    Outermost middleware, so the duration covers everything inside it. Replaces
+    uvicorn's access log (disabled in ops.configure_logging) with a line that
+    carries status, duration and the request id — the fields you actually
+    filter on when something is slow at 3am.
+    """
+    rid = ops.new_request_id(request.headers.get("x-request-id"))
+    token = ops.request_id_var.set(rid)
+    started = time.perf_counter()
+    try:
+        response = await call_next(request)
+    except Exception:
+        # Log before re-raising so the failing request is attributable even if
+        # the exception handler cannot run.
+        log.exception(
+            "request failed",
+            extra={"wh_method": request.method, "wh_path": request.url.path,
+                   "wh_durationMs": round((time.perf_counter() - started) * 1000, 1)},
+        )
+        ops.request_id_var.reset(token)
+        raise
+
+    duration_ms = round((time.perf_counter() - started) * 1000, 1)
+    response.headers["X-Request-Id"] = rid
+    # Health probes fire constantly and would drown everything else.
+    if request.url.path not in ("/healthz", "/readyz"):
+        log.log(
+            logging.WARNING if response.status_code >= 500 else logging.INFO,
+            "%s %s %s %sms", request.method, request.url.path,
+            response.status_code, duration_ms,
+            extra={"wh_method": request.method, "wh_path": request.url.path,
+                   "wh_status": response.status_code, "wh_durationMs": duration_ms},
+        )
+    ops.request_id_var.reset(token)
+    return response
+
+
+@app.get("/healthz")
+async def healthz():
+    """Liveness: the process is up and serving. Deliberately touches nothing
+    external — a database blip must not cause the platform to kill a process
+    that is otherwise fine."""
+    return {"status": "ok"}
+
+
+@app.get("/readyz")
+async def readyz():
+    """Readiness: this instance can actually serve requests, i.e. the database
+    answers. Returns 503 when it cannot, so a broken instance is taken out of
+    rotation instead of serving errors."""
+    checks: Dict[str, Any] = {"database": "ok", "cache": "disabled"}
+    status_code = 200
+    try:
+        async with AsyncSessionLocal() as session:
+            await session.execute(text("SELECT 1"))
+    except Exception as exc:
+        checks["database"] = f"error: {type(exc).__name__}"
+        status_code = 503
+
+    if league_cache.enabled:
+        # A degraded cache costs speed, not correctness, so it never fails
+        # readiness — it is reported for visibility only.
+        checks["cache"] = "ok" if await league_cache.ping() else "unreachable"
+
+    return JSONResponse({"status": "ok" if status_code == 200 else "degraded",
+                         "checks": checks}, status_code=status_code)
+
+
+# Matches /api/leagues/<CODE> and anything under it.
+_LEAGUE_PATH = re.compile(r"^/api/leagues/([A-Za-z0-9]{2,12})(?:/|$)")
+
+
+@app.middleware("http")
+async def _invalidate_league_cache(request: Request, call_next):
+    """Bump a league's cache version after any successful write to it.
+
+    Done centrally rather than in each handler on purpose: there are 25
+    league-scoped write endpoints, and an invalidation you forget to add is a
+    cache serving stale data — the failure mode that makes caches infamous.
+    Here it cannot be forgotten, and it covers endpoints added later for free.
+
+    Only 2xx responses invalidate: a rejected write changed nothing.
+    """
+    response = await call_next(request)
+    if request.method == "GET" or not (200 <= response.status_code < 300):
+        return response
+    match = _LEAGUE_PATH.match(request.url.path)
+    if match:
+        await league_cache.bump_league(match.group(1))
+    return response
 
 # Cipher — a customisable, real-time word-association party game served from
 # /play. Fully self-contained (in-memory rooms + WebSockets); see codenames/.
@@ -1407,12 +1584,12 @@ async def _backfill_pro_leagues() -> None:
 
 
 def _entry_fee_pence(admin: Dict[str, Any]) -> int:
-    fee = _wc_data["fee"]
+    fee = _DEFAULT_DATA["fee"]
     try:
         if (admin.get("meta") or {}).get("entryFee") is not None:
             fee = max(0.0, float((admin.get("meta") or {}).get("entryFee")))
     except (TypeError, ValueError):
-        fee = _wc_data["fee"]
+        fee = _DEFAULT_DATA["fee"]
     return max(0, int(round(float(fee) * 100)))
 
 
@@ -1573,6 +1750,9 @@ class LeagueCreate(BaseModel):
     code: str
     password: str
     organiserCode: Optional[str] = None
+    # Which competition this league plays. Omitted by older clients, which
+    # predate the picker, so it falls back to the deployment default.
+    tournamentId: Optional[str] = None
     purpose: str = "work"
     includeDepartment: bool = True
     includeLocation: bool = True
@@ -1671,6 +1851,27 @@ def _clean_custom_answers(values: Dict[str, Any], fields: List[Dict[str, Any]]) 
     return out
 
 
+@app.get("/api/tournaments")
+async def list_tournaments():
+    """Competitions a new league can be created against.
+
+    Backed by the files in tournaments/, so adding a competition is a config
+    file rather than a deploy of new code.
+    """
+    out = []
+    for tid in wc_data_module.available_tournaments():
+        data = wc_data_module.tournament_data(tid)
+        meta = data.get("meta") or {}
+        out.append({
+            "id": tid,
+            "name": data.get("sweepstakeName") or meta.get("name") or tid,
+            "season": meta.get("season") or "",
+            "teams": len(data.get("teams") or []),
+            "isDefault": tid == wc_data_module.default_tournament(),
+        })
+    return {"tournaments": out}
+
+
 @app.post("/api/leagues")
 async def create_league(payload: LeagueCreate, request: Request):
     _rate_limit(request, "league:create", 20, 10 * 60)
@@ -1685,6 +1886,12 @@ async def create_league(payload: LeagueCreate, request: Request):
         raise HTTPException(status_code=400, detail="Organiser code must be at least 4 characters")
     if payload.organiserCode is not None and hmac.compare_digest(organiser_code, payload.password or ""):
         raise HTTPException(status_code=400, detail="Use a different organiser code from the member password")
+    # Reject an unknown tournament rather than silently falling back: a league
+    # created against the wrong competition would draw the wrong teams, and that
+    # is not recoverable once entrants have been assigned.
+    tournament_id = (payload.tournamentId or "").strip() or wc_data_module.default_tournament()
+    if not wc_data_module.tournament_exists(tournament_id):
+        raise HTTPException(status_code=400, detail="Unknown tournament")
     purpose = "friends" if payload.purpose == "friends" else "work"
     try:
         entry_fee = max(0.0, round(float(payload.entryFee), 2))
@@ -1715,6 +1922,7 @@ async def create_league(payload: LeagueCreate, request: Request):
             raise HTTPException(status_code=409, detail="That code is already taken")
         league = League(
             id=uuid.uuid4().hex, code=code, slug=_slugify(name), name=name,
+            tournament_id=tournament_id,
             password_hash=_hash_password(payload.password),
             organiser_hash=_hash_password(organiser_code),
             seeded=False, created_at=_now(),
@@ -1984,7 +2192,7 @@ async def export_predictions_csv(
         people = _league_people(league, rows, profile_map)
         admin = await _get_admin_data(session, league)
         hidden = set((admin.get("meta") or {}).get("hiddenPredictions") or [])
-        _, _, _, predictions, _ = _resolve(people, admin)
+        _, _, _, predictions, _ = _resolve(people, admin, _data_for(league.tournament_id))
         dyn = [
             {"key": m["key"], "q": m.get("q") or m["key"]}
             for m in predictions
@@ -2078,7 +2286,7 @@ async def league_analytics(
         admin = await _get_admin_data(session, league)
         hidden = set((admin.get("meta") or {}).get("hiddenPredictions") or [])
         markets = [
-            m for m in (_wc_data.get("predictions") or [])
+            m for m in (_data_for(league.tournament_id).get("predictions") or [])
             if isinstance(m, dict) and m.get("key") and m["key"] not in hidden
         ]
         for k in (admin.get("predictions") or {}):
@@ -2088,7 +2296,7 @@ async def league_analytics(
             (admin.get("meta") or {}).get("knockoutPredictions"),
         )
         if kp.get("enabled"):
-            _, _, _, preds, _ = _resolve(people, admin)
+            _, _, _, preds, _ = _resolve(people, admin, _data_for(league.tournament_id))
             for m in preds:
                 if str(m.get("key", "")).startswith("ko_") and m["key"] not in hidden:
                     markets.append({"key": m["key"], "q": m.get("q") or m["key"]})
@@ -2138,16 +2346,53 @@ async def league_analytics(
         }
 
 
+def _etag_response(request: Request, body: str, extra_headers: Optional[Dict[str, str]] = None) -> Response:
+    """Return `body` as JSON with an ETag, or 304 if the client already has it.
+
+    Weak (`W/`) deliberately: responses are gzipped downstream, and a strong
+    ETag is required to be unique per content-coding. Weak means "semantically
+    the same payload", which is what a poller actually cares about.
+
+    Every member of a league polls the same endpoint every 30 s and usually
+    gets an identical answer; this turns those into empty 304s.
+    """
+    etag = 'W/"' + hashlib.sha256(body.encode("utf-8")).hexdigest()[:32] + '"'
+    headers = {"ETag": etag, "Cache-Control": "no-cache"}
+    if extra_headers:
+        headers.update(extra_headers)
+    if request.headers.get("if-none-match") == etag:
+        return Response(status_code=304, headers=headers)
+    return Response(content=body, media_type="application/json", headers=headers)
+
+
 @app.get("/api/leagues/{code}/state")
-async def league_state(code: str):
+async def league_state(code: str, request: Request):
+    code = code.upper()
+
+    # The cache key carries the league version and this tournament's fixture
+    # revision, so a superseded entry is unreachable rather than stale. Reading
+    # the version needs the league's tournament, which we only know after the
+    # league row — but that lookup is a single indexed hit, unlike the four
+    # queries plus standings/prediction engines that building the state costs.
     async with AsyncSessionLocal() as session:
-        league = await _get_league_by_code(session, code.upper())
+        league = await _get_league_by_code(session, code)
         if league is None:
             raise HTTPException(status_code=404, detail="league not found")
+
+        revision = sync.status_for(league.tournament_id).get("cacheRevision", 0)
+        version = await league_cache.league_version(code)
+        cached = await league_cache.get_state(code, version, revision)
+        if cached is not None:
+            return _etag_response(request, cached, {"X-Wheesht-Cache": "hit"})
+
         rows = await _participant_rows(session, league)
         admin = await _get_admin_data(session, league)
         profiles = await _profiles_for(session, league)
-    return _league_state(league, _league_people(league, rows, profiles), admin)
+
+    state = _league_state(league, _league_people(league, rows, profiles), admin)
+    body = json.dumps(jsonable_encoder(state), ensure_ascii=False, separators=(",", ":"))
+    await league_cache.set_state(code, version, revision, body)
+    return _etag_response(request, body, {"X-Wheesht-Cache": "miss"})
 
 
 # ── Participants (league-scoped) ──────────────────────────────────────────────
@@ -2554,7 +2799,7 @@ async def set_pick(
         key = str(payload.key or "")
         if key.startswith("ko_") or key.startswith("dm_"):
             admin = await _get_admin_data(session, league)
-            _, fixtures, _, predictions, _ = _resolve([], admin)
+            _, fixtures, _, predictions, _ = _resolve([], admin, _data_for(league.tournament_id))
             market = next((m for m in predictions if isinstance(m, dict) and m.get("key") == key), None)
             if market is None:
                 raise HTTPException(status_code=400, detail="Unknown prediction market")
@@ -2672,7 +2917,11 @@ async def put_profile(
         fav = payload.favouriteTeam
         if fav is not None:
             fav = (fav or "").strip().upper()
-            if fav and fav not in _TEAM_CODES:
+            # Valid FAVOURITE team codes (distinct from the team they were
+            # drawn), taken from THIS league's competition — a global set would
+            # reject a legitimate pick in any non-default tournament.
+            team_codes = {t["code"] for t in _data_for(league.tournament_id).get("teams", [])}
+            if fav and fav not in team_codes:
                 raise HTTPException(status_code=400, detail="unknown team")
 
         prof = await session.get(Profile, participant_id)
@@ -3285,7 +3534,7 @@ async def create_match_prediction(
         fix = next((f for f in _base_fixtures() if f["id"] == payload.fixture_id), None)
         if fix is None:
             raise HTTPException(status_code=404, detail="fixture not found")
-        team_map = {t["code"]: t for t in _wc_data["teams"]}
+        team_map = {t["code"]: t for t in _data_for(league.tournament_id)["teams"]}
         ta = team_map.get(fix["a"], {}); tb = team_map.get(fix["b"], {})
         na = ta.get("name", fix["a"]); nb = tb.get("name", fix["b"])
         fa = ta.get("flag", ""); fb = tb.get("flag", "")
@@ -3533,7 +3782,12 @@ async def tweaks_panel():
 async def app_static(filename: str):
     path = _safe_static_path(_STATIC / "app", filename)
     mt = _JS_TYPES.get(path.suffix, "application/octet-stream")
-    return FileResponse(path, media_type=mt)
+    headers = None
+    # Content-hashed bundles and pinned vendor builds never change under a given
+    # name, so they can be cached indefinitely — a rebuild produces a new name.
+    if _IMMUTABLE_ASSET.match(path.name):
+        headers = {"Cache-Control": "public, max-age=31536000, immutable"}
+    return FileResponse(path, media_type=mt, headers=headers)
 
 
 # Shared theme (design tokens + components) used by the dashboard and every game.

@@ -141,3 +141,63 @@ def test_name_fallback_when_no_tla():
 
 def test_unknown_stage_skipped():
     assert _match_to_canonical(_sample_match(stage="MYSTERY_ROUND"), "world-cup-2026", **_ctx()) is None
+
+
+# ── season selection ────────────────────────────────────────────────────────
+#
+# The season used to be hardcoded to "2026", which is correct for exactly one
+# tournament and silently wrong for every later one. It now comes from the
+# tournament config, so one deployment can sync several competition-seasons.
+
+import httpx
+import pytest
+
+from adapters.football_data_org import FootballDataOrgAdapter
+
+
+def _capturing_adapter(seen, **kwargs):
+    """An adapter whose HTTP calls are recorded instead of sent."""
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append((request.url.path, dict(request.url.params)))
+        if request.url.path.endswith("/teams"):
+            return httpx.Response(200, json={"teams": []})
+        return httpx.Response(200, json={"matches": []})
+
+    adapter = FootballDataOrgAdapter("test-key", **kwargs)
+    adapter._client = httpx.AsyncClient(
+        transport=httpx.MockTransport(handler), base_url="https://example.test"
+    )
+    return adapter
+
+
+@pytest.mark.asyncio
+async def test_season_is_sent_for_fixtures_and_teams():
+    seen: list = []
+    adapter = _capturing_adapter(seen, season=2028)
+    await adapter.get_fixtures("euro-2028", "EC")
+
+    paths = {p: params for p, params in seen}
+    assert paths["/competitions/EC/teams"]["season"] == "2028"
+    assert paths["/competitions/EC/matches"]["season"] == "2028"
+
+
+@pytest.mark.asyncio
+async def test_two_tournaments_request_their_own_seasons():
+    """The reason this matters: a Euro 2028 league must not be fed 2026 data."""
+    wc_seen: list = []
+    eu_seen: list = []
+    await _capturing_adapter(wc_seen, season="2026").get_fixtures("world-cup-2026", "WC")
+    await _capturing_adapter(eu_seen, season="2028").get_fixtures("euro-2028", "EC")
+
+    wc = dict(wc_seen)["/competitions/WC/matches"]["season"]
+    eu = dict(eu_seen)["/competitions/EC/matches"]["season"]
+    assert (wc, eu) == ("2026", "2028")
+
+
+@pytest.mark.asyncio
+async def test_no_season_falls_back_to_the_current_one():
+    """Omitting the parameter lets the provider answer for the current season —
+    a safer default than a fixed year that expires."""
+    seen: list = []
+    await _capturing_adapter(seen, season=None).get_fixtures("world-cup-2026", "WC")
+    assert all("season" not in params for _, params in seen)

@@ -72,7 +72,8 @@ async def test_ko_pick_rejected_after_kickoff(client, monkeypatch):
         "status": "upcoming", "dateISO": "2020-01-01", "time": "12:00",
         "score": [None, None], "dateLabel": "Test", "timeLabel": "12:00",
     }
-    monkeypatch.setattr(main, "_base_fixtures", lambda: [fake_fix])
+    # _base_fixtures now takes the tournament payload (fixtures are per-competition).
+    monkeypatch.setattr(main, "_base_fixtures", lambda _data: [fake_fix])
     lg = await make_league(client)
     grant = await client.post(
         f"/api/leagues/{lg['code']}/pro/grant",

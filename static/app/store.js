@@ -39,7 +39,17 @@
   var COLORS = ['#E8272A', '#1a7a44', '#0a3b8c', '#7A3FB0', '#E07A1A', '#0d8a8a', '#C0246B', '#3a6ea5'];
 
   // ---- active league ------------------------------------------------------
-  function activeLeague() { return lsGet(K.league, null); }
+  // A previous development build briefly persisted the sample league. Remove
+  // only that explicit marker so no visitor can boot into a ghost DEMO league.
+  var staleDemoLeague = lsGet(K.league, null);
+  if (staleDemoLeague && staleDemoLeague.demo) {
+    lsSet(K.league, null);
+    if (lsGet(K.active, null) === 'demo-you') lsSet(K.active, null);
+  }
+  function activeLeague() {
+    if (window.WC_DEMO_MODE && WC.league && WC.league.demo) return WC.league;
+    return lsGet(K.league, null);
+  }
   function leagueCode() { var L = activeLeague(); return L ? L.code : null; }
   function knownLeagues() { return lsGet(K.leagues, {}); }
   function rememberLeague(L) {
@@ -235,11 +245,13 @@
   }
 
   function charitySplitValue() {
+    if (window.WC_DEMO_MODE && WC.meta && WC.meta.charitySplit != null) return Number(WC.meta.charitySplit);
     if (admin.meta && admin.meta.charitySplit != null) return Number(admin.meta.charitySplit);
     var v = WC.charitySplit != null ? WC.charitySplit : WC.CHARITY_SPLIT;
     return v == null ? CHARITY_SPLIT : Number(v);
   }
   function currencyValue() {
+    if (window.WC_DEMO_MODE && WC.meta && WC.meta.currency) return String(WC.meta.currency).trim().slice(0, 4) || '£';
     var c = (admin.meta && admin.meta.currency) || (WC.meta && WC.meta.currency) || BASE.meta.currency || '£';
     c = String(c || '£').trim().slice(0, 4);
     return c || '£';
@@ -332,6 +344,7 @@
   // ---- cache (active-league participants) ---------------------------------
   var mine = lsGet(K.mine, []);
   var cache = [];
+  var demoSession = null;
   function liveStatus(p) {
     var t = WC.TEAMS[p.team];
     if (!t) return p;
@@ -424,6 +437,16 @@
     var serverById = {};
     (WC.PEOPLE || []).forEach(function (p) { serverById[p.id] = p; });
     cache = [];
+    // Demo people are a sealed client-side fixture. Do not merge device entries,
+    // local profiles, or removal flags from a visitor's real leagues into it.
+    if (window.WC_DEMO_MODE) {
+      cache = (WC.PEOPLE || []).map(function (p) { return liveStatus(Object.assign({}, p)); });
+      if (WC.meta) {
+        WC.meta.stillIn = cache.filter(function (p) { return p.alive; }).length;
+        WC.meta.out = cache.length - WC.meta.stillIn;
+      }
+      return;
+    }
     // device-created entries: only those for the active league (or untagged)
     mine.forEach(function (p) {
       if (seen[p.id] || removed.indexOf(p.id) >= 0) return;
@@ -633,7 +656,12 @@
       options.customFields = cleanCustomFields(options.customFields || []);
       var organiserCode = options.organiserCode || '';
       delete options.organiserCode;
+      // A league property, not an organiser setting — keep it out of the admin
+      // meta blob that `options` becomes below.
+      var tournamentId = options.tournamentId || '';
+      delete options.tournamentId;
       var body = Object.assign({ name: name, code: code, password: password, organiserCode: organiserCode }, options);
+      if (tournamentId) body.tournamentId = tournamentId;
       if (!LIVE) {
         var L = { id: 'mock-' + code, code: (code || '').toUpperCase(), name: name || 'Sweepstake', seeded: false };
         admin.meta = Object.assign({}, admin.meta || {}, options);
@@ -690,7 +718,7 @@
         return found;
       }).filter(Boolean);
     },
-    activeId: function () { return lsGet(K.active, null); },
+    activeId: function () { return window.WC_DEMO_MODE ? 'demo-you' : lsGet(K.active, null); },
     active: function () { var id = this.activeId(); return id ? this.getSync(id) : null; },
     setActive: function (id) { lsSet(K.active, id); emit(); },
     signOutDevice: function (id) {
@@ -790,6 +818,7 @@
     },
 
     update: function (id, patch) {
+      if (window.WC_DEMO_MODE) return null;
       var idx = -1; mine.forEach(function (p, i) { if (p.id === id) idx = i; });
       if (idx < 0) return null;
       var current = Store.getSync(id) || mine[idx];
@@ -1061,10 +1090,15 @@
     },
 
     refresh: function () {
+      if (window.WC_DEMO_MODE) return Promise.resolve(window.WC_DATA);
       if (!LIVE) return Promise.resolve();
       var c = leagueCode();
       if (!c) return Promise.resolve();
       return fetch('/api/leagues/' + encodeURIComponent(c) + '/state', { cache: 'no-store' }).then(parseJson).then(function (d) {
+        // The visitor may have switched leagues (or entered the sealed demo)
+        // while this request was in flight. Never let a stale response replace
+        // the newer active state.
+        if (window.WC_DEMO_MODE || leagueCode() !== c) return window.WC_DATA;
         if (d && Array.isArray(d.people)) {
           window.WC_DATA = d;
           if (d.adminOverrides) admin = d.adminOverrides;
@@ -1208,19 +1242,36 @@
     },
     isDemoMode: function () { return !!window.WC_DEMO_MODE; },
     enterDemoMode: function () {
+      if (window.WC_DEMO_MODE) return Promise.resolve(window.WC_DATA);
+      if (!window.WC_BUILD_DEMO_DATA) return Promise.reject(new Error('Demo data is unavailable'));
+      demoSession = {
+        data: window.WC_DATA,
+      };
+      var demoData = window.WC_BUILD_DEMO_DATA();
       window.WC_DEMO_MODE = true;
-      var def = WC.league || { code: 'OI', name: 'The Office Sweepstake', seeded: true };
-      setActiveLeague(def);
-      return Store.refresh().then(function () { rebuild(); emit(); });
+      window.WC_DATA = demoData;
+      if (window.__rebuildWC) window.__rebuildWC();
+      Store.PREDICTIONS = WC.PREDICTIONS || [];
+      rebuild(); emit();
+      return Promise.resolve(demoData);
     },
     exitDemoMode: function () {
       window.WC_DEMO_MODE = false;
-      lsSet(K.league, null);
-      lsSet(K.active, null);
+      if (demoSession) {
+        window.WC_DATA = demoSession.data;
+        if (window.__rebuildWC) window.__rebuildWC();
+      }
+      Store.PREDICTIONS = WC.PREDICTIONS || [];
+      demoSession = null;
       rebuild(); emit();
+    },
+    demoChat: function () {
+      if (!window.WC_DEMO_MODE) return null;
+      return ((window.WC_DATA && window.WC_DATA.demoChat) || []).map(function (msg) { return Object.assign({}, msg); });
     },
     isReadOnly: function () { return !!window.WC_DEMO_MODE; },
     quietMode: function () {
+      if (window.WC_DEMO_MODE) return true;
       try { return localStorage.getItem('wheesht_quiet') === '1'; } catch (e) { return false; }
     },
     setQuietMode: function (on) {

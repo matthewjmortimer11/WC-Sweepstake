@@ -1,7 +1,7 @@
 """
 Adapter for the Football-Data.org v4 API.
 
-Fetches fixtures from:  GET /competitions/{comp_code}/matches?season=2026
+Fetches fixtures from:  GET /competitions/{comp_code}/matches?season={season}
 Auth header:            X-Auth-Token: <FOOTBALL_DATA_API_KEY>
 """
 
@@ -215,8 +215,19 @@ def _match_to_canonical(
 class FootballDataOrgAdapter:
     """Adapter for Football-Data.org v4 API."""
 
-    def __init__(self, api_key: str, known_teams: List[Dict[str, Any]] | None = None) -> None:
+    def __init__(self, api_key: str, known_teams: List[Dict[str, Any]] | None = None,
+                 season: str | int | None = None) -> None:
+        """`season` is the provider's season identifier — its starting year, so
+        Euro 2028 is "2028". One adapter instance serves one competition-season,
+        which is how a deployment can sync several tournaments at once.
+
+        None means "omit the parameter", and the provider answers for the
+        competition's current season. That is deliberately the fallback rather
+        than a fixed year: a hardcoded year is correct for exactly one
+        tournament and silently wrong afterwards.
+        """
         self._api_key = api_key
+        self._season = str(season) if season not in (None, "") else ""
         self._client: httpx.AsyncClient | None = None
         self._known_codes: Set[str] = {str(t.get("code")) for t in (known_teams or []) if t.get("code")}
         self._name_to_code = _build_name_index(known_teams)
@@ -237,8 +248,11 @@ class FootballDataOrgAdapter:
             return
         client = self._get_client()
         url = f"/competitions/{comp_code}/teams"
-        log.info("Fetching team list from football-data.org: %s", url)
-        response = await client.get(url)
+        # Scoped to the same season as the fixtures: the squads that played the
+        # 2026 World Cup are not the ones playing in 2030.
+        params = {"season": self._season} if self._season else {}
+        log.info("Fetching team list from football-data.org: %s %s", url, params)
+        response = await client.get(url, params=params)
         response.raise_for_status()
         for t in response.json().get("teams") or []:
             tid = t.get("id")
@@ -261,7 +275,7 @@ class FootballDataOrgAdapter:
         await self._ensure_team_map(comp_code)
         client = self._get_client()
         url = f"/competitions/{comp_code}/matches"
-        params = {"season": "2026"}
+        params = {"season": self._season} if self._season else {}
         log.info("Fetching fixtures from football-data.org: %s %s", url, params)
         response = await client.get(url, params=params)
         response.raise_for_status()

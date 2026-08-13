@@ -1,0 +1,358 @@
+# =============================================================================
+#  Tournament configuration — UEFA Euro 2028
+#
+#  A SECOND tournament, added to prove the config drives the app rather than
+#  the code. Deliberately a different shape from World Cup 2026: 24 teams in
+#  6 groups, and a stage ladder with NO round of 32 — the group stage resolves
+#  straight into a round of 16 via the four best third-placed teams.
+#
+#  A league picks its tournament by id (see League.tournament_id); this file
+#  can also be made the deployment default with WC_TOURNAMENT=euro-2028.
+#
+#  NOTE ON THE TEAM LIST: Euro 2028 qualifying is not complete and the draw has
+#  not been made, so the 24 teams and their groups below are a PLACEHOLDER — a
+#  plausible field including the UK & Ireland hosts. Replace [[teams]] with the
+#  real draw when it happens; nothing in the code depends on these specific
+#  entries. Venues and dates are the announced host grounds.
+# =============================================================================
+
+id = "euro-2028"
+competition_code = "EC"                       # Football-Data.org competition code
+provider_season = 2028                        # provider season id (its starting year)
+sweepstake_name = "The Euro Sweepstake"       # app title (meta.name)
+season = "Euro 2028"                          # subtitle (meta.season)
+phase = "pre"                                 # pre | live | done
+
+# No r32: 24 teams -> 16, unlike the World Cup's 48 -> 32. This is the whole
+# point of the second config — the bracket depth is data, not code.
+stage_ladder = ["group", "r16", "qf", "sf", "final", "winner"]
+
+# Home nations: all four hosts get the bespoke draw moments.
+special_teams = ["SCO", "ENG", "WAL", "IRL"]
+
+[entry]
+fee = 5
+charity_split = 0.5
+
+# Not a pre-seeded league: the roster below is empty and `seeded` is false, so
+# startup does not create a League row for this tournament. Only the DEFAULT
+# tournament's [league] is seeded (see _seed_and_migrate), and giving this one
+# a distinct code keeps it from ever colliding with the office league.
+[league]
+code = "EU28"
+name = "The Euro Sweepstake"
+password = ""
+seeded = false
+
+[stage_labels]
+group  = "Group stage"
+r16    = "Round of 16"
+qf     = "Quarter-final"
+sf     = "Semi-final"
+final  = "Final"
+winner = "Winner"
+
+# 6 groups of 4. Top two plus the four best third-placed teams reach the R16.
+[qualification]
+groups = 6
+group_size = 4
+qualify_per_group = 2
+best_third_qualifiers = 4
+
+[meta]
+stage_label = "Not started"
+kickoff = "Fri 9 June"
+final_venue = "Wembley Stadium, London"
+final_date = "Sun 9 July"
+# Local/dev organiser PIN only. Production sets WC_ADMIN_PIN.
+admin_pin = "1996"
+
+# --- Fixture schedule generation -------------------------------------------
+# Group-stage round-robin knobs; the algorithm lives in wc_data.py.
+[schedule]
+start_date = 2028-06-09
+times = ["17:00", "20:00"]
+round_robin = [
+  [[0, 1], [2, 3]],
+  [[0, 2], [3, 1]],
+  [[0, 3], [1, 2]],
+]
+venues = [
+  "Wembley Stadium, London", "Principality Stadium, Cardiff", "Hampden Park, Glasgow",
+  "Aviva Stadium, Dublin", "Casement Park, Belfast", "Etihad Stadium, Manchester",
+  "Everton Stadium, Liverpool", "St James' Park, Newcastle", "Villa Park, Birmingham",
+  "Tottenham Hotspur Stadium, London",
+]
+
+# --- Teams ------------------------------------------------------------------
+# 24 teams across 6 groups A–F. odds are display-only (American format).
+[[teams]]
+name = "England"
+code = "ENG"
+flag = "🏴󠁧󠁢󠁥󠁮󠁧󠁿"
+group = "A"
+color = "#1a1a1a"
+odds = "+450"
+[[teams]]
+name = "Denmark"
+code = "DEN"
+flag = "🇩🇰"
+group = "A"
+color = "#C8102E"
+odds = "+4000"
+[[teams]]
+name = "Serbia"
+code = "SRB"
+flag = "🇷🇸"
+group = "A"
+color = "#7A3FB0"
+odds = "+8000"
+[[teams]]
+name = "Hungary"
+code = "HUN"
+flag = "🇭🇺"
+group = "A"
+color = "#436F4D"
+odds = "+15000"
+[[teams]]
+name = "Scotland"
+code = "SCO"
+flag = "🏴󠁧󠁢󠁳󠁣󠁴󠁿"
+group = "B"
+color = "#0a3b8c"
+odds = "+20000"
+[[teams]]
+name = "Netherlands"
+code = "NED"
+flag = "🇳🇱"
+group = "B"
+color = "#E07A1A"
+odds = "+900"
+[[teams]]
+name = "Austria"
+code = "AUT"
+flag = "🇦🇹"
+group = "B"
+color = "#ED2939"
+odds = "+6000"
+[[teams]]
+name = "Romania"
+code = "ROU"
+flag = "🇷🇴"
+group = "B"
+color = "#0d8a8a"
+odds = "+20000"
+[[teams]]
+name = "Wales"
+code = "WAL"
+flag = "🏴󠁧󠁢󠁷󠁬󠁳󠁿"
+group = "C"
+color = "#C0246B"
+odds = "+15000"
+[[teams]]
+name = "Portugal"
+code = "POR"
+flag = "🇵🇹"
+group = "C"
+color = "#1a7a44"
+odds = "+700"
+[[teams]]
+name = "Czechia"
+code = "CZE"
+flag = "🇨🇿"
+group = "C"
+color = "#11457E"
+odds = "+10000"
+[[teams]]
+name = "Türkiye"
+code = "TUR"
+flag = "🇹🇷"
+group = "C"
+color = "#E30A17"
+odds = "+6000"
+[[teams]]
+name = "Republic of Ireland"
+code = "IRL"
+flag = "🇮🇪"
+group = "D"
+color = "#169B62"
+odds = "+15000"
+[[teams]]
+name = "France"
+code = "FRA"
+flag = "🇫🇷"
+group = "D"
+color = "#0055A4"
+odds = "+550"
+[[teams]]
+name = "Poland"
+code = "POL"
+flag = "🇵🇱"
+group = "D"
+color = "#DC143C"
+odds = "+10000"
+[[teams]]
+name = "Ukraine"
+code = "UKR"
+flag = "🇺🇦"
+group = "D"
+color = "#3a6ea5"
+odds = "+8000"
+[[teams]]
+name = "Spain"
+code = "ESP"
+flag = "🇪🇸"
+group = "E"
+color = "#C60B1E"
+odds = "+500"
+[[teams]]
+name = "Italy"
+code = "ITA"
+flag = "🇮🇹"
+group = "E"
+color = "#0066CC"
+odds = "+1200"
+[[teams]]
+name = "Norway"
+code = "NOR"
+flag = "🇳🇴"
+group = "E"
+color = "#BA0C2F"
+odds = "+2500"
+[[teams]]
+name = "Sweden"
+code = "SWE"
+flag = "🇸🇪"
+group = "E"
+color = "#006AA7"
+odds = "+6000"
+[[teams]]
+name = "Germany"
+code = "GER"
+flag = "🇩🇪"
+group = "F"
+color = "#DD0000"
+odds = "+600"
+[[teams]]
+name = "Belgium"
+code = "BEL"
+flag = "🇧🇪"
+group = "F"
+color = "#E8272A"
+odds = "+2000"
+[[teams]]
+name = "Croatia"
+code = "CRO"
+flag = "🇭🇷"
+group = "F"
+color = "#C0392B"
+odds = "+2500"
+[[teams]]
+name = "Switzerland"
+code = "SUI"
+flag = "🇨🇭"
+group = "F"
+color = "#D52B1E"
+odds = "+5000"
+
+# --- Prediction markets -----------------------------------------------------
+[[markets]]
+key = "winner"
+q = "Tournament Winner"
+kind = "team"
+points = 25
+options = ["ESP", "FRA", "ENG", "GER", "POR", "NED"]
+[[markets]]
+key = "final"
+q = "The Final Matchup"
+kind = "team2"
+points = 15
+options = ["ESP", "FRA", "ENG", "GER"]
+[[markets]]
+key = "goldenBoot"
+q = "Golden Boot Winner"
+kind = "player"
+points = 15
+options = [
+  { id = "mbappe", name = "K. Mbappé", team = "FRA" },
+  { id = "yamal", name = "L. Yamal", team = "ESP" },
+  { id = "haaland", name = "E. Haaland", team = "NOR" },
+  { id = "bellingham", name = "J. Bellingham", team = "ENG" },
+]
+[[markets]]
+key = "scotland"
+q = "How far do Scotland go?"
+kind = "stage"
+points = 10
+options = ["Group stage", "Round of 16", "Quarter Final", "Semi Final", "Final", "Winner"]
+[[markets]]
+key = "england"
+q = "How far do England go?"
+kind = "stage"
+points = 10
+options = ["Group stage", "Round of 16", "Quarter Final", "Semi Final", "Final", "Winner"]
+[[markets]]
+key = "surprise"
+q = "Biggest Surprise Team"
+kind = "team"
+points = 10
+options = ["NOR", "AUT", "UKR", "SRB", "CZE", "WAL"]
+[[markets]]
+key = "flop"
+q = "Biggest Disappointment"
+kind = "team"
+points = 10
+options = ["ENG", "BEL", "GER", "ITA", "NED"]
+[[markets]]
+key = "cleanSheets"
+q = "Most Clean Sheets"
+kind = "team"
+points = 10
+options = ["ESP", "FRA", "ITA", "ENG"]
+[[markets]]
+key = "totalGoals"
+q = "How many goals will be scored?"
+kind = "number"
+points = 10
+placeholder = "Total tournament goals"
+options = []
+[[markets]]
+key = "totalCards"
+q = "How many cards will be given?"
+kind = "number"
+points = 10
+placeholder = "Total yellow + red cards"
+options = []
+[[markets]]
+key = "youngPlayer"
+q = "Best Young Player"
+kind = "player"
+points = 10
+options = [
+  { id = "yamal", name = "L. Yamal", team = "ESP" },
+  { id = "wirtz", name = "F. Wirtz", team = "GER" },
+  { id = "yildiz", name = "K. Yıldız", team = "TUR" },
+  { id = "zaire", name = "W. Zaïre-Emery", team = "FRA" },
+]
+
+# --- Wheesht's commentary ---------------------------------------------------
+[lines]
+welcome = "A home Euros. Wheesht has waited a long time for this. Wheesht is calm."
+drawGood = "A serious side. Wheesht approves — quietly, and without commitment."
+drawMid = "Middling. Could go either way. Wheesht is reserving judgement."
+drawBad = "…Wheesht is not going to say anything. Lovely flag, though."
+drawYou = "A home nation. On home soil. Wheesht is being extremely professional about this."
+upset = "Nobody saw that coming. Wheesht did not either. Wheesht's predictions stand regardless."
+england = "…Wheesht is remaining professional. It is their tournament too. Allegedly."
+scotland = "Scotland. At a home Euros. Wheesht needs a moment and possibly a sit down."
+eliminated = "You're out. Wheesht is… sorry. (Wheesht is not sorry. Wheesht saw this coming.)"
+sideBets = "You're out. But Wheesht isn't finished with you yet."
+sideBets2 = "Watching objectively now. Arguably the better position."
+predOpen = "Predictions are open. Back yourself. Wheesht remembers every single one."
+predLocked = "Predictions are locked. No takebacks. Wheesht has your answers in writing."
+empty = "Nothing here yet. Wheesht is watching the space."
+error = "Something went wrong. Wheesht is investigating. Wheesht suspects foul play."
+finalBuild = "Two teams left, and Wembley waiting. Wheesht has officiated since 1966. Wheesht is almost speechless."
+
+# No [[roster]]: this tournament has no pre-assigned office league. Organisers
+# create their own leagues against it.

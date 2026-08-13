@@ -13,37 +13,86 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
+import uuid
 from datetime import datetime, timezone, timedelta
 from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
+from cache import try_lead
 from db import AsyncSessionLocal, engine
-from models import Fixture
+from models import Fixture, League
 from provider import CanonicalFixture
 
 log = logging.getLogger(__name__)
 
-# ── In-memory cache (read by main.py's _state()) ─────────────────────────────
+# ── In-memory caches, one per tournament ─────────────────────────────────────
+# Leagues can be for different competitions, so each tournament keeps its own
+# fixtures and its own sync health. Read them through fixtures_for()/status_for()
+# rather than touching these dicts.
+_caches: dict[str, list[dict]] = {}
+_statuses: dict[str, dict[str, Any]] = {}
+
+# The deployment default, set by main.py at startup. The legacy module globals
+# below mirror this tournament so existing readers keep working unchanged.
+default_tournament_id: str = ""
+
+# Legacy view of the DEFAULT tournament's cache. qualification/ reads these
+# directly and is inherently about World Cup qualifying, so it does not need to
+# become tournament-aware; mirroring keeps it correct without touching it.
 fixture_cache: list[dict] = []
 # Bumped on every cache rebuild so hot-path readers (e.g. qualification API)
 # can invalidate their own derived caches without hashing fixture rows.
 fixture_cache_revision: int = 0
 
-# Read by main.py for organiser/admin health UI.
-sync_status: dict[str, Any] = {
-    "adapter": "mock",
-    "lastSyncAt": None,
-    "lastError": None,
-    "fixtureCount": 0,
-    "sleepSeconds": 3600,
-    "cacheRevision": 0,
-}
+_ADAPTER_NAME = "mock"
+
+
+def _new_status() -> dict[str, Any]:
+    return {
+        "adapter": _ADAPTER_NAME,
+        "lastSyncAt": None,
+        "lastError": None,
+        "fixtureCount": 0,
+        "sleepSeconds": 3600,
+        "cacheRevision": 0,
+    }
+
+
+# Read by main.py for organiser/admin health UI. Kept as the DEFAULT
+# tournament's status so existing readers are unaffected.
+sync_status: dict[str, Any] = _new_status()
+
+
+def status_for(tournament_id: str) -> dict[str, Any]:
+    """Sync health for one tournament (never None — an unsynced tournament
+    reports an empty, error-free status rather than the default's)."""
+    if tournament_id and tournament_id == default_tournament_id:
+        return sync_status
+    return _statuses.get(tournament_id) or _new_status()
+
+
+def fixtures_for(tournament_id: str) -> list[dict]:
+    """Live fixtures for one tournament, or [] if it has none cached.
+
+    Callers fall back to the tournament's own generated fixtures on []. A
+    tournament with no sync loop running never borrows another's fixtures.
+    """
+    if not tournament_id:
+        return []
+    return _caches.get(tournament_id) or []
 
 
 def set_sync_adapter(name: str) -> None:
+    """Record which provider adapter is in use. One adapter type serves every
+    tournament, so this applies to all statuses, present and future."""
+    global _ADAPTER_NAME
+    _ADAPTER_NAME = name
     sync_status["adapter"] = name
+    for st in _statuses.values():
+        st["adapter"] = name
 
 # ── Date/time helpers ─────────────────────────────────────────────────────────
 _BST = timedelta(hours=1)
@@ -108,15 +157,24 @@ def _next_sleep(fixtures: list[CanonicalFixture]) -> int:
     return 3600
 
 
-def _rebuild_cache(fixtures: list[CanonicalFixture]) -> None:
-    """Sort fixtures by (dateISO, time) and repopulate fixture_cache."""
+def _rebuild_cache(fixtures: list[CanonicalFixture], tournament_id: str) -> None:
+    """Sort fixtures by (dateISO, time) and repopulate one tournament's cache."""
     global fixture_cache, fixture_cache_revision
     frontend = [_to_frontend(f) for f in fixtures]
     frontend.sort(key=lambda d: (d["dateISO"], d["time"]))
-    fixture_cache = frontend
-    fixture_cache_revision += 1
-    sync_status["fixtureCount"] = len(frontend)
-    sync_status["cacheRevision"] = fixture_cache_revision
+    _caches[tournament_id] = frontend
+
+    status = _statuses.setdefault(tournament_id, _new_status())
+    status["fixtureCount"] = len(frontend)
+    status["cacheRevision"] = status.get("cacheRevision", 0) + 1
+
+    # Mirror the default tournament into the legacy globals for qualification/
+    # and the admin health UI, which read them directly.
+    if tournament_id == default_tournament_id:
+        fixture_cache = frontend
+        fixture_cache_revision += 1
+        sync_status["fixtureCount"] = len(frontend)
+        sync_status["cacheRevision"] = fixture_cache_revision
 
 
 async def _upsert(fixtures: list[CanonicalFixture], session) -> None:
@@ -201,21 +259,31 @@ async def _load_from_db(tournament_id: str) -> None:
         )
         for r in rows
     ]
-    _rebuild_cache(canonical)
-    sync_status["lastSyncAt"] = datetime.now(tz=timezone.utc).isoformat()
+    _rebuild_cache(canonical, tournament_id)
+    status_for(tournament_id)["lastSyncAt"] = datetime.now(tz=timezone.utc).isoformat()
     log.info("Loaded %d fixtures from DB into cache for %s", len(canonical), tournament_id)
 
 
-async def start_sync(adapter, tournament_id: str, comp_code: str) -> None:
+async def start_sync(adapter, tournament_id: str, comp_code: str, is_leader=None) -> None:
     """
     Async sync loop. Intended to run as a background asyncio task.
 
     Flow per cycle:
-      1. Fetch fixtures from the adapter.
-      2. Upsert to Postgres + rebuild in-memory cache.
+      1. FETCHING is leader-only — one process per deployment talks to the
+         provider, or several workers would multiply its rate limit.
+      2. REFRESHING from the database happens in EVERY worker. The in-memory
+         cache is process-local, so without this the non-leader workers would
+         hold no fixtures at all and serve generated ones instead — the same
+         league answering differently depending on which worker replied.
       3. Sleep 60 s (live), 3600 s (quiet), 300 s (error).
+
+    `is_leader` is an async predicate; None means "always fetch" (single
+    process, and the path tests take).
     """
     log.info("Sync worker starting for %s (%s)", tournament_id, comp_code)
+    status = _statuses.setdefault(tournament_id, _new_status())
+    if tournament_id == default_tournament_id:
+        status = sync_status
 
     # Warm the cache from DB so we're never empty between restarts.
     try:
@@ -226,19 +294,23 @@ async def start_sync(adapter, tournament_id: str, comp_code: str) -> None:
     while True:
         sleep_seconds = 300  # default on error
         try:
-            log.info("Fetching fixtures from adapter …")
-            fixtures = await adapter.get_fixtures(tournament_id, comp_code)
-            log.info("Received %d fixtures", len(fixtures))
+            leading = True if is_leader is None else await is_leader()
+            fixtures: list[CanonicalFixture] = []
+            if leading:
+                log.info("Fetching fixtures from adapter …")
+                fixtures = await adapter.get_fixtures(tournament_id, comp_code)
+                log.info("Received %d fixtures", len(fixtures))
 
-            async with AsyncSessionLocal() as session:
-                await _upsert(fixtures, session)
+                async with AsyncSessionLocal() as session:
+                    await _upsert(fixtures, session)
 
+            # Every worker refreshes from the database, leader or not.
             await _load_from_db(tournament_id)
 
-            sleep_seconds = _next_sleep(fixtures)
-            sync_status["lastSyncAt"] = datetime.now(tz=timezone.utc).isoformat()
-            sync_status["lastError"] = None
-            sync_status["sleepSeconds"] = sleep_seconds
+            sleep_seconds = _next_sleep(fixtures) if leading else 60
+            status["lastSyncAt"] = datetime.now(tz=timezone.utc).isoformat()
+            status["lastError"] = None
+            status["sleepSeconds"] = sleep_seconds
             log.info(
                 "Cache updated (%d fixtures). Next sync in %ds.",
                 len(fixtures), sleep_seconds,
@@ -248,11 +320,93 @@ async def start_sync(adapter, tournament_id: str, comp_code: str) -> None:
             log.info("Sync worker cancelled — shutting down.")
             raise
         except Exception as exc:
-            sync_status["lastError"] = str(exc)
-            log.error("Sync error: %s — retrying in %ds", exc, sleep_seconds)
+            status["lastError"] = str(exc)
+            log.error("[%s] sync error: %s — retrying in %ds", tournament_id, exc, sleep_seconds)
 
         try:
             await asyncio.sleep(sleep_seconds)
         except asyncio.CancelledError:
             log.info("Sync worker cancelled during sleep — shutting down.")
             raise
+
+
+# ── Supervisor: one sync loop per tournament in use ──────────────────────────
+
+async def tournaments_in_use(default_id: str) -> set[str]:
+    """Tournaments worth polling: the deployment default, plus any a league
+    actually plays.
+
+    Deliberately NOT every configured tournament — a config file nobody has
+    created a league against should not burn provider quota. The default is
+    always included because it backs the pre-league landing payload.
+    """
+    ids = {default_id} if default_id else set()
+    try:
+        async with AsyncSessionLocal() as session:
+            rows = await session.execute(select(League.tournament_id).distinct())
+            ids.update(t for t in rows.scalars().all() if t)
+    except Exception as exc:
+        # A DB blip must not kill the supervisor; the default keeps syncing.
+        log.warning("Could not list tournaments in use: %s", exc)
+    return ids
+
+
+async def start_all_syncs(make_worker, default_id: str, poll_seconds: int = 300) -> None:
+    """Run a sync loop per tournament in use, adding loops as leagues appear.
+
+    `make_worker(tournament_id)` returns `(adapter, comp_code)`, or None if the
+    tournament has no usable config — main.py owns that, so this module needs
+    no tournament-config knowledge.
+
+    Re-checks periodically because a league for a new competition can be created
+    at any time; a tournament that gains its first league starts syncing within
+    one poll rather than at the next deploy. Loops are never stopped: a league
+    on that tournament almost certainly still exists, and an idle loop costs one
+    request an hour.
+    """
+    global default_tournament_id
+    default_tournament_id = default_id
+    workers: dict[str, asyncio.Task] = {}
+    # Identifies this process in the leader lock, so the holder can renew its
+    # own claim and only its own.
+    holder = f"{os.getpid()}-{uuid.uuid4().hex[:8]}"
+    try:
+        # Fetching from the provider is leader-only; refreshing each worker's
+        # cache from the database is not. Passing the predicate down (rather
+        # than gating the whole supervisor) is what keeps every worker's
+        # fixtures warm while only one process talks to the provider.
+        async def is_leader() -> bool:
+            return await try_lead("sync", holder, ttl=poll_seconds * 3)
+
+        while True:
+            for tid in sorted(await tournaments_in_use(default_id)):
+                existing = workers.get(tid)
+                if existing is not None and not existing.done():
+                    continue
+                if existing is not None:
+                    # A finished task means the loop raised out; log and restart.
+                    exc = existing.exception() if not existing.cancelled() else None
+                    if exc:
+                        log.error("Sync worker for %s died (%s) — restarting", tid, exc)
+                spec = make_worker(tid)
+                if spec is None:
+                    log.warning("No sync config for tournament %s — skipping", tid)
+                    continue
+                adapter, comp_code = spec
+                workers[tid] = asyncio.create_task(
+                    start_sync(adapter, tid, comp_code, is_leader=is_leader)
+                )
+                log.info("Started sync worker for %s (%s)", tid, comp_code)
+            await asyncio.sleep(poll_seconds)
+    except asyncio.CancelledError:
+        # Bounded: a worker cancelled mid-query can take a while to unwind, and
+        # a shutdown that waits on it forever blocks the whole process from
+        # stopping. Losing a poll cycle on the way down costs nothing.
+        for task in workers.values():
+            task.cancel()
+        for task in workers.values():
+            try:
+                await asyncio.wait_for(asyncio.shield(task), timeout=2)
+            except (asyncio.CancelledError, asyncio.TimeoutError, Exception):
+                pass
+        raise

@@ -62,6 +62,14 @@ class League(Base):
     __tablename__ = "leagues"
 
     id: Mapped[str] = mapped_column(String, primary_key=True)  # uuid hex
+    # Which competition this league is playing. Matches a tournaments/<id>.toml
+    # and the tournament_id on Fixture. Before this column the active tournament
+    # was a process-wide env var, so one deployment could serve exactly one
+    # competition; storing it per league is what allows a single deployment to
+    # host World Cup, Euros and domestic cup leagues side by side.
+    tournament_id: Mapped[str] = mapped_column(
+        String, nullable=False, default="world-cup-2026", index=True
+    )
     # Join code people type at sign-up. Stored uppercased; unique across the app.
     code: Mapped[str] = mapped_column(String, nullable=False, unique=True, index=True)
     slug: Mapped[str] = mapped_column(String, nullable=False)

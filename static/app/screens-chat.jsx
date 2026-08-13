@@ -29,6 +29,7 @@ function ChatScreen() {
   const isLive = !!window.WC_LIVE;
   const leagueCode = Sch.leagueCode && Sch.leagueCode();
   const isOrganiser = Sch.hasAdminTokenForActive ? Sch.hasAdminTokenForActive() : false;
+  const isDemo = Sch.isDemoMode ? Sch.isDemoMode() : false;
 
   function scrollBottom() {
     setTimeout(function() {
@@ -37,6 +38,13 @@ function ChatScreen() {
   }
 
   function load() {
+    if (isDemo && Sch.demoChat) {
+      var demoMessages = Sch.demoChat() || [];
+      setMsgs(demoMessages);
+      setErr(false);
+      if (window.__wcOnChatPoll) window.__wcOnChatPoll(demoMessages);
+      return;
+    }
     if (!leagueCode) {
       setMsgs([]);
       setErr(false);
@@ -61,9 +69,9 @@ function ChatScreen() {
     mountedRef.current = true;
     load();
     scrollBottom();
-    var iv = setInterval(load, 15000);
+    var iv = isDemo ? null : setInterval(load, 15000);
     return function() { mountedRef.current = false; clearInterval(iv); };
-  }, [isLive, leagueCode]);
+  }, [isLive, leagueCode, isDemo]);
 
   cEffect(function() { scrollBottom(); }, [msgs.length]);
 
@@ -212,7 +220,11 @@ function ChatScreen() {
       </div>
 
       {/* input bar */}
-      {(me || isOrganiser) ? (
+      {isDemo ? (
+        <div style={{ padding: '12px 16px', textAlign: 'center', fontSize: 12.5, color: 'var(--ink2)', fontWeight: 750, borderTop: '1.5px solid var(--line)', background: 'var(--bg)', flexShrink: 0 }}>
+          Sample matchday chat · read only
+        </div>
+      ) : (me || isOrganiser) ? (
         <div style={{ borderTop: '1.5px solid var(--line)', background: asWheesht ? 'var(--ink)' : 'var(--bg)', flexShrink: 0 }}>
           {isOrganiser && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 12px 0' }}>

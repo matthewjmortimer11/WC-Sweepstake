@@ -22,7 +22,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <link rel="apple-touch-startup-image" href="/icons/icon-512.png?v=20260720-champion-3" />
 <meta name="format-detection" content="telephone=no" />
-<link rel="stylesheet" href="app/wheesht.css?v=20260720-champion-3" />
+<link rel="stylesheet" href="app/wheesht.css?v=20260806-demo-league-1" />
 <link rel="manifest" href="/manifest.webmanifest" />
 <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png?v=20260720-champion-3" />
 <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png?v=20260720-champion-3" />
@@ -47,6 +47,99 @@ body{
 }
 button{font-family:inherit;}
 .dh{font-family:var(--disp); font-weight:800; letter-spacing:-.02em; line-height:.98;}
+
+/* ---------- first paint / app handoff ---------- */
+.boot-loader{
+  position:fixed;inset:0;z-index:20000;overflow:hidden;background:#15130e;color:#f5efe4;
+  display:flex;flex-direction:column;padding:clamp(22px,3.2vw,46px);
+  transition:opacity .3s ease,visibility .3s ease;
+}
+.app-ready .boot-loader{opacity:0;visibility:hidden;pointer-events:none;}
+body:not(.app-ready) #scaler,
+body:not(.app-ready) .stage-bg,
+body:not(.app-ready) .stage-word,
+body:not(.app-ready) .stage-panel{visibility:hidden!important;opacity:0!important;}
+.boot-loader::before{
+  content:'';position:absolute;inset:-24%;pointer-events:none;
+  background:
+    radial-gradient(circle at 18% 18%,rgba(245,200,0,.17),transparent 27%),
+    radial-gradient(circle at 84% 72%,rgba(26,122,68,.14),transparent 28%);
+}
+.boot-loader::after{
+  content:'';position:absolute;inset:0;pointer-events:none;opacity:.14;
+  background-image:radial-gradient(rgba(255,255,255,.35) .7px,transparent .7px);
+  background-size:13px 13px;
+}
+.boot-loader__top,.boot-loader__main,.boot-loader__foot{position:relative;z-index:1;width:100%;max-width:1280px;margin-left:auto;margin-right:auto;}
+.boot-loader__top{display:flex;align-items:center;justify-content:space-between;gap:18px;}
+.boot-loader__brand{display:flex;align-items:center;gap:13px;}
+.boot-loader__mark{
+  width:50px;height:50px;border-radius:50%;background:var(--yellow);border:2.5px solid #000;
+  box-shadow:0 4px 0 #000;display:flex;align-items:center;justify-content:center;overflow:hidden;flex:0 0 auto;
+}
+.boot-loader__mark img{width:42px;height:42px;object-fit:contain;}
+.boot-loader__name,.boot-loader__season{display:block;}
+.boot-loader__name{font-family:var(--disp);font-weight:800;font-size:21px;line-height:1;letter-spacing:-.03em;color:#fff;}
+.boot-loader__season{font-size:9.5px;font-weight:800;letter-spacing:.19em;text-transform:uppercase;color:var(--yellow);margin-top:5px;}
+.boot-loader__secure{display:flex;align-items:center;gap:8px;font-size:11.5px;font-weight:750;color:#bdb4a3;}
+.boot-loader__secure i{display:block;width:8px;height:8px;border-radius:50%;background:#66cf8b;box-shadow:0 0 0 5px rgba(102,207,139,.1);}
+.boot-loader__main{
+  flex:1;display:grid;grid-template-columns:minmax(0,1.05fr) minmax(360px,.72fr);
+  align-items:center;gap:clamp(56px,9vw,140px);padding:clamp(42px,7vh,82px) 0;
+}
+.boot-loader__copy{max-width:650px;}
+.boot-loader__kicker{font-family:var(--disp);font-size:10.5px;font-weight:800;letter-spacing:.18em;text-transform:uppercase;color:var(--yellow);}
+.boot-loader h1{
+  font-family:var(--disp);font-weight:800;font-size:clamp(44px,6.3vw,82px);line-height:.92;
+  letter-spacing:-.055em;margin:17px 0 0;max-width:760px;color:#fff;
+}
+.boot-loader__lede{font-size:clamp(15px,1.4vw,18px);font-weight:600;line-height:1.52;color:#c9c0b0;margin:24px 0 0;max-width:570px;}
+.boot-loader__progress{height:4px;border-radius:999px;background:rgba(255,255,255,.13);overflow:hidden;margin-top:36px;max-width:570px;position:relative;}
+.boot-loader__progress span{
+  display:block;position:absolute;inset:0 auto 0 0;width:38%;border-radius:inherit;background:var(--yellow);
+  animation:bootProgress 1.45s cubic-bezier(.55,.05,.35,.95) infinite;
+}
+.boot-loader__state{display:flex;align-items:center;gap:10px;margin-top:15px;font-size:12.5px;font-weight:750;color:#eee7da;}
+.boot-loader__spinner{width:15px;height:15px;border-radius:50%;border:2px solid rgba(255,255,255,.22);border-top-color:var(--yellow);animation:bootSpin .8s linear infinite;}
+.boot-loader__slow{display:none;margin-top:18px;padding-left:25px;font-size:12px;font-weight:650;line-height:1.45;color:#a99f8d;max-width:560px;}
+.boot-loader.is-slow .boot-loader__slow{display:block;}
+.boot-loader__retry{display:none;margin-top:14px;border:1.5px solid rgba(255,255,255,.25);border-radius:10px;background:rgba(255,255,255,.06);color:#fff;padding:8px 12px;font:800 12px var(--body);cursor:pointer;}
+.boot-loader.is-stuck .boot-loader__retry{display:inline-flex;}
+.boot-loader__preview{border:1.5px solid rgba(255,255,255,.13);border-radius:22px;background:rgba(255,255,255,.055);padding:24px;box-shadow:0 34px 90px rgba(0,0,0,.28);}
+.boot-loader__preview-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:22px;}
+.boot-loader__preview-title{font-family:var(--disp);font-weight:800;font-size:11px;letter-spacing:.15em;text-transform:uppercase;color:#d7cebd;}
+.boot-loader__preview-live{font-size:9px;font-weight:850;letter-spacing:.1em;color:#15130e;background:var(--yellow);border-radius:999px;padding:5px 8px;}
+.boot-loader__skeleton{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin-bottom:10px;}
+.boot-loader__sk-card,.boot-loader__sk-row{
+  position:relative;overflow:hidden;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.075);
+}
+.boot-loader__sk-card{height:86px;border-radius:14px;}
+.boot-loader__sk-row{height:48px;border-radius:12px;margin-top:9px;}
+.boot-loader__sk-card::after,.boot-loader__sk-row::after{
+  content:'';position:absolute;inset:0;transform:translateX(-105%);
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.09),transparent);
+  animation:bootShimmer 1.8s ease-in-out infinite;
+}
+.boot-loader__sk-card:nth-child(2)::after,.boot-loader__sk-row:nth-child(2)::after{animation-delay:.16s;}
+.boot-loader__sk-card:nth-child(3)::after,.boot-loader__sk-row:nth-child(3)::after{animation-delay:.32s;}
+.boot-loader__foot{display:flex;align-items:center;justify-content:space-between;gap:18px;font-size:10.5px;font-weight:750;letter-spacing:.04em;color:#847c6e;}
+.boot-loader__foot strong{color:#b8af9e;font-weight:750;}
+@keyframes bootProgress{0%{transform:translateX(-110%)}55%{transform:translateX(120%)}100%{transform:translateX(285%)}}
+@keyframes bootSpin{to{transform:rotate(360deg)}}
+@keyframes bootShimmer{0%{transform:translateX(-105%)}60%,100%{transform:translateX(105%)}}
+@media (max-width:760px){
+  .boot-loader{padding:22px 20px 28px;background:#15130e;}
+  .boot-loader__secure,.boot-loader__preview{display:none;}
+  .boot-loader__main{display:flex;padding:54px 4px 40px;}
+  .boot-loader h1{font-size:clamp(42px,13vw,62px);max-width:9ch;}
+  .boot-loader__lede{font-size:15px;max-width:32ch;margin-top:20px;}
+  .boot-loader__progress{margin-top:32px;}
+  .boot-loader__foot{align-items:flex-start;flex-direction:column;gap:5px;}
+}
+@media (prefers-reduced-motion:reduce){
+  .boot-loader,.boot-loader__progress span,.boot-loader__spinner,.boot-loader__sk-card::after,.boot-loader__sk-row::after{animation:none!important;transition:none!important;}
+  .boot-loader__progress span{width:42%;}
+}
 
 /* ---------- phone frame ---------- */
 #scaler{ transform-origin:center center; }
@@ -532,6 +625,69 @@ body.deck .deck-canvas{animation:screenIn .42s cubic-bezier(.2,.8,.25,1) both;}
 </style>
 </head>
 <body>
+<div id="boot-loader" class="boot-loader" role="status" aria-live="polite" aria-label="Loading Wheesht">
+  <div class="boot-loader__top">
+    <div class="boot-loader__brand">
+      <span class="boot-loader__mark"><img src="/icons/icon-192.png?v=20260720-champion-3" alt="" /></span>
+      <span>
+        <span class="boot-loader__name">Wheesht</span>
+        <span class="boot-loader__season">World Cup 2026</span>
+      </span>
+    </div>
+    <span class="boot-loader__secure"><i></i>Loading securely</span>
+  </div>
+  <div class="boot-loader__main">
+    <section class="boot-loader__copy">
+      <div class="boot-loader__kicker">Matchday, without the spreadsheet</div>
+      <h1>Getting your sweepstake ready.</h1>
+      <p class="boot-loader__lede" id="boot-message">Loading your league, fixtures and predictions.</p>
+      <div class="boot-loader__progress" aria-hidden="true"><span></span></div>
+      <div class="boot-loader__state"><span class="boot-loader__spinner" aria-hidden="true"></span><span id="boot-state">Setting up matchday</span></div>
+      <div class="boot-loader__slow" id="boot-slow">This is taking a little longer than usual. Your league is safe — we’re still connecting to the latest data.</div>
+      <button class="boot-loader__retry" type="button" onclick="window.location.reload()">Try loading again</button>
+    </section>
+    <aside class="boot-loader__preview" aria-hidden="true">
+      <div class="boot-loader__preview-head">
+        <span class="boot-loader__preview-title">Matchday desk</span>
+        <span class="boot-loader__preview-live">LIVE DATA</span>
+      </div>
+      <div class="boot-loader__skeleton">
+        <span class="boot-loader__sk-card"></span>
+        <span class="boot-loader__sk-card"></span>
+        <span class="boot-loader__sk-card"></span>
+      </div>
+      <div class="boot-loader__sk-row"></div>
+      <div class="boot-loader__sk-row"></div>
+      <div class="boot-loader__sk-row"></div>
+    </aside>
+  </div>
+  <div class="boot-loader__foot">
+    <strong>Officially impartial. Constitutionally Scottish.</strong>
+    <span>No account needed to view your league.</span>
+  </div>
+</div>
+<script>
+(function(){
+  var boot=document.getElementById('boot-loader');
+  var state=document.getElementById('boot-state');
+  var slowTimer=setTimeout(function(){if(boot)boot.classList.add('is-slow');},6500);
+  var stuckTimer=setTimeout(function(){if(boot)boot.classList.add('is-stuck');},12000);
+  function connectivity(){
+    if(!state)return;
+    state.textContent=navigator.onLine?'Setting up matchday':'You’re offline — loading saved league data';
+  }
+  connectivity();
+  window.addEventListener('online',connectivity);
+  window.addEventListener('offline',connectivity);
+  window.__wcBootReady=function(){
+    clearTimeout(slowTimer);clearTimeout(stuckTimer);
+    window.removeEventListener('online',connectivity);
+    window.removeEventListener('offline',connectivity);
+    document.body.classList.add('app-ready');
+    if(boot)boot.setAttribute('aria-hidden','true');
+  };
+})();
+</script>
 <!-- Desktop stage: ambient backdrop + editorial branding (hidden on phones) -->
 <div class="stage-bg" aria-hidden="true">
   <span class="blob blob--y"></span>
@@ -550,9 +706,11 @@ body.deck .deck-canvas{animation:screenIn .42s cubic-bezier(.2,.8,.25,1) both;}
 </div>
 <div id="tweaks-root"></div>
 
-<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
-<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
-<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<!-- Production React, self-hosted (no CDN dependency, no dev-build overhead).
+     JSX is transpiled ahead of time by scripts/build_frontend.mjs, so Babel is
+     never shipped to the browser. -->
+<script src="/app/vendor/react.production.min.js"></script>
+<script src="/app/vendor/react-dom.production.min.js"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 
 <script>
@@ -573,29 +731,10 @@ body.deck .deck-canvas{animation:screenIn .42s cubic-bezier(.2,.8,.25,1) both;}
 
 <!-- Single source of truth: generated from wc_data.py by scripts/build_snapshot.py.
      No-op when the server injects window.WC_DATA above (live mode). -->
-<script src="app/wc-snapshot.js?v=20260720-champion-3"></script>
-<script src="app/data.js?v=20260720-champion-3"></script>
-<script src="app/copy.js?v=20260720-champion-3"></script>
-<script src="app/share.js?v=20260720-champion-3"></script>
-<script src="app/store.js?v=20260720-champion-3"></script>
-<script type="text/babel" src="app/wheesht-mascot.jsx?v=20260720-champion-3"></script>
-<script type="text/babel" src="app/ui.jsx?v=20260720-champion-3"></script>
-<script type="text/babel" src="app/knockout-bracket.jsx?v=20260720-champion-3"></script>
-<script type="text/babel" src="tweaks-panel.jsx?v=20260720-champion-3"></script>
-<script type="text/babel" src="app/screens-hub.jsx?v=20260720-champion-3"></script>
-<script type="text/babel" src="app/screens-hub2.jsx?v=20260720-champion-3"></script>
-<script type="text/babel" src="app/screens-onboarding.jsx?v=20260720-champion-3"></script>
-<script type="text/babel" src="app/screens-dashboard.jsx?v=20260720-champion-3"></script>
-<script type="text/babel" src="app/screens-competition.jsx?v=20260720-champion-3"></script>
-<script type="text/babel" src="app/screens-predictions.jsx?v=20260720-champion-3"></script>
-<script type="text/babel" src="app/screens-games.jsx?v=20260720-champion-3"></script>
-<script type="text/babel" src="app/screens-match-centre.jsx?v=20260720-champion-3"></script>
-<script type="text/babel" src="app/screens-what-if.jsx?v=20260720-champion-3"></script>
-<script type="text/babel" src="app/screens-admin.jsx?v=20260720-champion-3"></script>
-<script type="text/babel" src="app/screens-chat.jsx?v=20260720-champion-3"></script>
-<script type="text/babel" src="app/screens-dev.jsx?v=20260720-champion-3"></script>
-<script type="text/babel" src="app/app.jsx?v=20260720-champion-3"></script>
-<script type="text/babel" src="app/stage.jsx?v=20260720-champion-3"></script>
+<!-- One built bundle: all 24 source files, transpiled + minified, in the
+     order declared by static/app/manifest.json. Filename carries a content
+     hash, so it is cache-immutable. Rebuild with `npm run build`. -->
+<script src="/<!-- WC_BUNDLE -->"></script>
 <script>
 (function(){
   var secure = location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1';

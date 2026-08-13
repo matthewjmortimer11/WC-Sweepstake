@@ -55,6 +55,15 @@
   cursor: pointer;
   box-shadow: var(--wc-shadow-sm);
 }
+@media (min-width: 561px) {
+  body.deck .wc-demo-banner {
+    position: fixed !important;
+    height: 52px;
+    box-sizing: border-box;
+    flex-wrap: nowrap;
+    flex: 0 0 52px;
+  }
+}
 
 /* Knockout bracket tree */
 .ko-bracket-scroll {

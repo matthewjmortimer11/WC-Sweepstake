@@ -13,6 +13,7 @@ Select the active tournament with the WC_TOURNAMENT env var
 import datetime as _dt
 import os
 import tomllib
+from functools import lru_cache
 from pathlib import Path
 
 _TOURNAMENTS_DIR = Path(__file__).resolve().parent / "tournaments"
@@ -34,9 +35,32 @@ def _initials(name: str) -> str:
     return i.upper()
 
 
+def default_tournament() -> str:
+    """The tournament used when a league does not name one of its own."""
+    return os.environ.get("WC_TOURNAMENT", _DEFAULT_TOURNAMENT)
+
+
+def available_tournaments() -> list[str]:
+    """Every tournament id with a config file, sorted, default first.
+
+    A league stores one of these ids, so this is the set an organiser may
+    choose from. Adding a competition means adding a TOML — no code change.
+    """
+    ids = sorted(p.stem for p in _TOURNAMENTS_DIR.glob("*.toml"))
+    default = default_tournament()
+    if default in ids:
+        ids.remove(default)
+        ids.insert(0, default)
+    return ids
+
+
+def tournament_exists(tournament: str) -> bool:
+    return bool(tournament) and (_TOURNAMENTS_DIR / f"{tournament}.toml").exists()
+
+
 def load_config(tournament: str | None = None) -> dict:
     """Load and return the raw tournament config dict."""
-    name = tournament or os.environ.get("WC_TOURNAMENT", _DEFAULT_TOURNAMENT)
+    name = tournament or default_tournament()
     path = _TOURNAMENTS_DIR / f"{name}.toml"
     if not path.exists():
         raise FileNotFoundError(f"Tournament config not found: {path}")
@@ -190,6 +214,9 @@ def generate_wc_data(tournament: str | None = None) -> dict:
     meta = {
         "id": cfg["id"],
         "competitionCode": cfg.get("competition_code", "WC"),
+        # Provider season id (its starting year). Distinct from "season" above,
+        # which is the human subtitle. Empty means "the current season".
+        "providerSeason": str(cfg.get("provider_season") or ""),
         "name": cfg["sweepstake_name"],
         "season": cfg["season"],
         "stageLabel": m["stage_label"],
@@ -247,3 +274,17 @@ def get_league_seed(tournament: str | None = None) -> dict:
         "password": league_cfg.get("password", ""),
         "seeded": bool(league_cfg.get("seeded", True)),
     }
+
+
+@lru_cache(maxsize=None)
+def tournament_data(tournament: str) -> dict:
+    """Cached app payload for one tournament.
+
+    Building a payload parses a TOML and generates the whole fixture list, so
+    it must not happen per request once leagues span several competitions.
+
+    The returned dict is SHARED, not copied — exactly as the single module-level
+    payload was before leagues could pick a tournament. Callers already treat it
+    as read-only and shallow-copy before mutating; keep doing that.
+    """
+    return generate_wc_data(tournament)

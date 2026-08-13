@@ -19,6 +19,7 @@ See scripts/vendor/README.md for how to fetch them.
 Run:  python scripts/build_snapshot.py && python scripts/build_standalone.py
 """
 
+import json
 import re
 import subprocess
 import sys
@@ -30,30 +31,15 @@ STATIC = ROOT / "static"
 APP = STATIC / "app"
 VENDOR = Path(__file__).resolve().parent / "vendor"
 
-# Plain JS, load order matters: data snapshot → data layer → store.
-PLAIN_JS = ["wc-snapshot.js", "data.js", "store.js"]
+# Script load order comes from static/app/manifest.json — the SAME list the live
+# app's bundle is built from (scripts/build_frontend.mjs). Previously this file
+# kept its own hand-maintained copy "in lockstep" with templates/index.html; it
+# drifted, and the standalone builds silently shipped without knockout-bracket.jsx.
+# One list, one place. Paths in the manifest are relative to static/.
+_MANIFEST = json.loads((APP / "manifest.json").read_text(encoding="utf-8"))["scripts"]
+PLAIN_JS = [p for p in _MANIFEST if not p.endswith(".jsx")]
+JSX_FILES = [p for p in _MANIFEST if p.endswith(".jsx")]
 
-# JSX components, load order matters (mascot/ui before screens, app last).
-# Keep this in lockstep with the <script> order in templates/index.html.
-JSX = [
-    ("app", "wheesht-mascot.jsx"),
-    ("app", "ui.jsx"),
-    ("..", "tweaks-panel.jsx"),
-    ("app", "screens-hub.jsx"),
-    ("app", "screens-hub2.jsx"),
-    ("app", "screens-onboarding.jsx"),
-    ("app", "screens-dashboard.jsx"),
-    ("app", "screens-competition.jsx"),
-    ("app", "screens-predictions.jsx"),
-    ("app", "screens-games.jsx"),
-    ("app", "screens-match-centre.jsx"),
-    ("app", "screens-what-if.jsx"),
-    ("app", "screens-admin.jsx"),
-    ("app", "screens-chat.jsx"),
-    ("app", "screens-dev.jsx"),
-    ("app", "app.jsx"),
-    ("app", "stage.jsx"),
-]
 
 
 def read(p: Path) -> str:
@@ -112,11 +98,10 @@ def build_offline() -> Path:
     out += f"\n<script>\n{read(VENDOR / 'react.development.js')}\n</script>\n"
     out += f"\n<script>\n{read(VENDOR / 'react-dom.development.js')}\n</script>\n"
     out += scaler_script()
-    for name in PLAIN_JS:
-        out += f"\n<script>\n{read(APP / name)}\n</script>\n"
-    for sub, name in JSX:
-        path = (STATIC if sub == ".." else APP) / name
-        out += f"\n<script>\n{compile_jsx(read(path), name)}\n</script>\n"
+    for rel in PLAIN_JS:
+        out += f"\n<script>\n{read(STATIC / rel)}\n</script>\n"
+    for rel in JSX_FILES:
+        out += f"\n<script>\n{compile_jsx(read(STATIC / rel), rel)}\n</script>\n"
     out += tail
 
     dest = STATIC / "standalone-offline.html"
@@ -135,11 +120,10 @@ def build_online() -> Path:
     head, tail = html[:body_close], html[body_close:]
 
     out = head
-    for name in PLAIN_JS:
-        out += f"\n<script>\n{read(APP / name)}\n</script>\n"
-    for sub, name in JSX:
-        path = (STATIC if sub == ".." else APP) / name
-        out += f'\n<script type="text/babel">\n{read(path)}\n</script>\n'
+    for rel in PLAIN_JS:
+        out += f"\n<script>\n{read(STATIC / rel)}\n</script>\n"
+    for rel in JSX_FILES:
+        out += f'\n<script type="text/babel">\n{read(STATIC / rel)}\n</script>\n'
     out += tail
 
     dest = STATIC / "standalone.html"

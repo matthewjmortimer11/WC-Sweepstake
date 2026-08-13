@@ -97,6 +97,7 @@ function overallRank(me) {
 
 function ProfileHeader(props) {
   const me = (props.me && Sd.getSync && Sd.getSync(props.me.id)) || props.me;
+  const readOnly = Sd.isReadOnly ? Sd.isReadOnly() : false;
   const includeDept = Sd.includeDepartment ? Sd.includeDepartment() : true;
   const includeLocation = Sd.includeLocation ? Sd.includeLocation() : true;
   const includeLtMember = Sd.includeLtMember ? Sd.includeLtMember() : true;
@@ -127,9 +128,9 @@ function ProfileHeader(props) {
   return (
     <Cd bordered className="pop">
       <div style={{ display: 'flex', alignItems: 'center', gap: 13 }}>
-        <button onClick={props.onEdit} aria-label="Edit profile" style={{ position: 'relative', border: 'none', background: 'none', padding: 0, cursor: 'pointer', borderRadius: '50%', flex: '0 0 auto' }}>
+        <button onClick={props.onEdit} disabled={readOnly} aria-label={readOnly ? 'Sample profile' : 'Edit profile'} style={{ position: 'relative', border: 'none', background: 'none', padding: 0, cursor: readOnly ? 'default' : 'pointer', borderRadius: '50%', flex: '0 0 auto' }}>
           <Ad person={Object.assign({}, me, { isYou: false })} size={56} />
-          <span aria-hidden="true" style={{ position: 'absolute', right: -2, bottom: -2, width: 22, height: 22, borderRadius: '50%', background: 'var(--ink)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid var(--bg)', fontSize: 11 }}>✎</span>
+          {!readOnly && <span aria-hidden="true" style={{ position: 'absolute', right: -2, bottom: -2, width: 22, height: 22, borderRadius: '50%', background: 'var(--ink)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid var(--bg)', fontSize: 11 }}>✎</span>}
         </button>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
@@ -140,7 +141,7 @@ function ProfileHeader(props) {
             {shownChips.map((c, i) => <Chd key={i} tone={c.tone}>{c.text}</Chd>)}
           </div>}
         </div>
-        <button onClick={props.onEdit} className="wc-btn wc-btn--sm" style={{ padding: '8px 12px', boxShadow: '0 4px 0 var(--shadow)', flex: '0 0 auto' }}>Edit</button>
+        {!readOnly && <button onClick={props.onEdit} className="wc-btn wc-btn--sm" style={{ padding: '8px 12px', boxShadow: '0 4px 0 var(--shadow)', flex: '0 0 auto' }}>Edit</button>}
       </div>
       {window.Badges && <div style={{ marginTop: 12 }}>
         <window.Badges person={me} max={4} />
@@ -644,7 +645,12 @@ function ActivityFeed(props) {
   const me = props.me; const t = dashTeam(me.team);
   const pre = PRE();
   const items = [];
-  if (pre) {
+  if (Sd.isDemoMode && Sd.isDemoMode()) {
+    items.push({ m: 'nervous', t: 'Brazil 1–1 Scotland', d: 'Level on the pitch. Rory is currently refusing to blink.', when: 'live' });
+    items.push({ m: 'happy', t: 'Scotland beat Haiti 2–0', d: 'A clean sheet, three points, and absolutely no overreaction in the group chat.', when: '4d ago' });
+    items.push({ m: 'mischievous', t: 'Priya leads the predictions', d: '55 points sets the pace. You are fifth on 42.', when: 'today' });
+    items.push({ m: 'broadcast', t: 'You entered the sweepstake', d: 'Buy-in confirmed. ' + money_d(WCd.FEE) + ' in the pot. Welcome aboard.', when: 'on joining' });
+  } else if (pre) {
     const submitted = Sd.madeVisiblePredictions ? Sd.madeVisiblePredictions(me) : (me.picks ? Object.keys(me.picks).length : 0);
     const markets = Sd.visiblePredictions ? Sd.visiblePredictions() : (WCd.predictions || Sd.PREDICTIONS);
     const totalMkts = dashCountableMarkets(me, markets).length;
