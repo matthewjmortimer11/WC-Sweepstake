@@ -214,6 +214,9 @@ def generate_wc_data(tournament: str | None = None) -> dict:
     meta = {
         "id": cfg["id"],
         "competitionCode": cfg.get("competition_code", "WC"),
+        # Provider season id (its starting year). Distinct from "season" above,
+        # which is the human subtitle. Empty means "the current season".
+        "providerSeason": str(cfg.get("provider_season") or ""),
         "name": cfg["sweepstake_name"],
         "season": cfg["season"],
         "stageLabel": m["stage_label"],

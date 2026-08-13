@@ -18,6 +18,7 @@
 
 id = "euro-2028"
 competition_code = "EC"                       # Football-Data.org competition code
+provider_season = 2028                        # provider season id (its starting year)
 sweepstake_name = "The Euro Sweepstake"       # app title (meta.name)
 season = "Euro 2028"                          # subtitle (meta.season)
 phase = "pre"                                 # pre | live | done

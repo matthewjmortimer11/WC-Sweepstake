@@ -11,6 +11,7 @@
 
 id = "world-cup-2026"
 competition_code = "WC"                      # Football-Data.org competition code
+provider_season = 2026                       # provider season id (its starting year)
 sweepstake_name = "The Office Sweepstake"   # app title (meta.name)
 season = "World Cup 2026"                    # subtitle (meta.season)
 phase = "live"                               # pre | live | done

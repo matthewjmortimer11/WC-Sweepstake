@@ -336,3 +336,31 @@ async def test_non_leader_workers_still_refresh_their_cache_from_the_db(monkeypa
 
     assert fetched == [], "a non-leader must not call the provider"
     assert loaded, "a non-leader must still refresh its cache from the database"
+
+
+def test_each_tournament_gets_an_adapter_bound_to_its_own_season():
+    """The season travels config -> meta -> adapter and is only observable at
+    the provider call, so a break here would be silent. Drives the real
+    main.sync_worker_spec rather than reconstructing what it does."""
+    import main
+
+    wc_adapter, wc_code = main.sync_worker_spec("world-cup-2026", "test-key")
+    eu_adapter, eu_code = main.sync_worker_spec("euro-2028", "test-key")
+
+    assert (wc_code, eu_code) == ("WC", "EC")
+    assert wc_adapter._season == "2026"
+    assert eu_adapter._season == "2028"
+    # Separate instances: team-name matching is per competition.
+    assert wc_adapter is not eu_adapter
+
+
+def test_unknown_tournament_has_no_sync_worker():
+    import main
+    assert main.sync_worker_spec("not-a-real-cup", "test-key") is None
+
+
+def test_provider_season_is_separate_from_the_display_season():
+    """`season` is the human subtitle; the provider needs the starting year."""
+    wc = wc_data.tournament_data("world-cup-2026")["meta"]
+    assert wc["season"] == "World Cup 2026"
+    assert wc["providerSeason"] == "2026"

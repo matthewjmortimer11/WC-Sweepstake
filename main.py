@@ -1178,6 +1178,30 @@ async def _migrate_legacy_json(session, league: League) -> None:
 
 
 
+
+def sync_worker_spec(tournament_id: str, api_key: str):
+    """Adapter + competition code for one tournament, or None if unknown.
+
+    Each tournament needs its OWN adapter: the provider adapter matches team
+    names against that tournament's team list, and is bound to that
+    tournament's season. Sharing one across competitions would mis-map fixtures
+    and request the wrong season.
+    """
+    if not wc_data_module.tournament_exists(tournament_id):
+        return None
+    data = wc_data_module.tournament_data(tournament_id)
+    comp_code = data["meta"]["competitionCode"]
+    if api_key:
+        from adapters.football_data_org import FootballDataOrgAdapter
+        return FootballDataOrgAdapter(
+            api_key,
+            known_teams=data.get("teams") or [],
+            season=data["meta"].get("providerSeason"),
+        ), comp_code
+    from adapters.mock import MockAdapter
+    return MockAdapter(), comp_code
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Schema is owned by Alembic and applied by scripts/db_upgrade.py as a
@@ -1201,28 +1225,14 @@ async def lifespan(app: FastAPI):
 
     api_key = os.environ.get("FOOTBALL_DATA_API_KEY", "")
     if api_key:
-        from adapters.football_data_org import FootballDataOrgAdapter
         sync.set_sync_adapter("football-data.org")
         log.info("Using FootballDataOrgAdapter")
     else:
-        from adapters.mock import MockAdapter
         sync.set_sync_adapter("mock")
         log.warning("FOOTBALL_DATA_API_KEY not set — using MockAdapter (no live data)")
 
     def _make_worker(tournament_id: str):
-        """Adapter + competition code for one tournament, or None if unknown.
-
-        Each tournament needs its OWN adapter: the provider adapter matches
-        provider team names against the tournament's team list, so sharing one
-        across competitions would mis-map fixtures.
-        """
-        if not wc_data_module.tournament_exists(tournament_id):
-            return None
-        data = wc_data_module.tournament_data(tournament_id)
-        comp_code = data["meta"]["competitionCode"]
-        if api_key:
-            return FootballDataOrgAdapter(api_key, known_teams=data.get("teams") or []), comp_code
-        return MockAdapter(), comp_code
+        return sync_worker_spec(tournament_id, api_key)
 
     # Background jobs are singletons per deployment, elected through Redis. With
     # several workers and no Redis there is nothing to elect through, so every
