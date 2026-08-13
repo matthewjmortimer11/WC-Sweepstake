@@ -31,6 +31,23 @@ fixture_cache: list[dict] = []
 # can invalidate their own derived caches without hashing fixture rows.
 fixture_cache_revision: int = 0
 
+# Which tournament fixture_cache actually holds. Leagues can now be for
+# different competitions, so a reader must not assume the cache is theirs —
+# serving World Cup fixtures to a Euros league would be silently wrong.
+# One sync loop runs per process today, so this is a single id rather than a
+# dict; fixtures_for() is the seam to widen when several loops run at once.
+synced_tournament: str | None = None
+
+
+def fixtures_for(tournament_id: str) -> list[dict]:
+    """Live fixtures for one tournament, or [] if the cache is not for it.
+
+    Callers fall back to the tournament's own generated fixtures on [].
+    """
+    if not tournament_id or tournament_id != synced_tournament:
+        return []
+    return fixture_cache
+
 # Read by main.py for organiser/admin health UI.
 sync_status: dict[str, Any] = {
     "adapter": "mock",
@@ -215,6 +232,8 @@ async def start_sync(adapter, tournament_id: str, comp_code: str) -> None:
       2. Upsert to Postgres + rebuild in-memory cache.
       3. Sleep 60 s (live), 3600 s (quiet), 300 s (error).
     """
+    global synced_tournament
+    synced_tournament = tournament_id
     log.info("Sync worker starting for %s (%s)", tournament_id, comp_code)
 
     # Warm the cache from DB so we're never empty between restarts.

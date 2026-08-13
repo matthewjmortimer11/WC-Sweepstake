@@ -63,3 +63,45 @@ async def test_unknown_tournament_is_rejected(client):
 
 async def test_omitted_tournament_falls_back_for_older_clients(client):
     assert (await _make(client, "TRNC")).status_code == 200
+
+
+# ── tournament isolation in state assembly ──────────────────────────────────
+#
+# The sync cache holds exactly one competition's fixtures. Before leagues could
+# choose a tournament, every reader took it unconditionally — which would hand
+# a Euros league the World Cup schedule.
+
+import main
+import sync
+
+
+def test_data_for_falls_back_on_unknown_tournament():
+    """A league naming a tournament whose config has been removed should degrade
+    to the default rather than 500."""
+    assert main._data_for("deleted-cup")["meta"]["id"] == wc_data.default_tournament()
+    assert main._data_for(None)["meta"]["id"] == wc_data.default_tournament()
+
+
+def test_fixtures_for_refuses_another_tournaments_cache(monkeypatch):
+    monkeypatch.setattr(sync, "fixture_cache", [{"id": "live-1"}])
+    monkeypatch.setattr(sync, "synced_tournament", "world-cup-2026")
+
+    assert sync.fixtures_for("world-cup-2026") == [{"id": "live-1"}]
+    # A different competition must not see them.
+    assert sync.fixtures_for("euro-2028") == []
+    assert sync.fixtures_for("") == []
+
+
+def test_base_fixtures_uses_live_cache_only_for_its_own_tournament(monkeypatch):
+    monkeypatch.setattr(sync, "fixture_cache", [{"id": "live-1"}])
+    monkeypatch.setattr(sync, "synced_tournament", "world-cup-2026")
+
+    wc = wc_data.tournament_data("world-cup-2026")
+    assert main._base_fixtures(wc) == [{"id": "live-1"}]
+
+    # Same payload shape, different competition -> falls back to generated
+    # fixtures instead of borrowing the World Cup's live ones.
+    other = dict(wc)
+    other["meta"] = dict(wc["meta"], id="euro-2028")
+    assert main._base_fixtures(other) == other["fixtures"]
+    assert main._base_fixtures(other) != [{"id": "live-1"}]

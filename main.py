@@ -68,13 +68,12 @@ import knockout_predictions
 log = logging.getLogger(__name__)
 
 # Generate the tournament scenario once at startup (teams, fixtures, markets…).
-_wc_data = generate_wc_data()
-_ROSTER: List[Dict[str, Any]] = _wc_data["people"]  # seeded league base roster
-_CONFIG_LEAGUE_CODE: str = _wc_data["league"]["code"]
-# Valid team codes a member may pick as their FAVOURITE team (distinct from the
-# team they were drawn). Used to validate profile writes.
-_TEAM_CODES: set = {t["code"] for t in _wc_data.get("teams", [])}
-
+# Payload for the DEFAULT tournament only. Per-league state must go through
+# _data_for(league.tournament_id); this backs the seeded config league, the
+# pre-league landing payload and the single sync loop.
+_DEFAULT_DATA = generate_wc_data()
+_ROSTER: List[Dict[str, Any]] = _DEFAULT_DATA["people"]  # seeded league base roster
+_CONFIG_LEAGUE_CODE: str = _DEFAULT_DATA["league"]["code"]
 # Avatar bytes are resized/cropped on the client to a small square before upload;
 # this ceiling is a generous backstop against an oversized or hand-crafted body.
 _MAX_AVATAR_BYTES = 600 * 1024
@@ -635,11 +634,34 @@ async def _guard_account_write(
 
 # ── State assembly ────────────────────────────────────────────────────────────
 
-def _base_fixtures() -> List[Dict[str, Any]]:
-    return sync.fixture_cache if sync.fixture_cache else _wc_data["fixtures"]
+def _data_for(tournament_id: Optional[str]) -> Dict[str, Any]:
+    """The cached payload for a tournament, falling back to the default.
+
+    A league stores the competition it plays, so every piece of state assembly
+    below is parameterised by the resulting payload rather than reading one
+    process-wide global. The fallback covers rows written before leagues
+    carried a tournament, and any id whose config file has since been removed —
+    both should degrade to the default rather than 500.
+    """
+    tid = tournament_id or wc_data_module.default_tournament()
+    if not wc_data_module.tournament_exists(tid):
+        log.warning("League references unknown tournament %r; using default", tid)
+        tid = wc_data_module.default_tournament()
+    return wc_data_module.tournament_data(tid)
 
 
-def _resolve(league_people: List[Dict[str, Any]], admin: Dict[str, Any]):
+def _base_fixtures(data: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """Live fixtures for this tournament if sync holds them, else generated ones.
+
+    Guarded by tournament: the sync cache belongs to exactly one competition,
+    so an unguarded read would hand a Euros league the World Cup schedule.
+    """
+    live = sync.fixtures_for((data.get("meta") or {}).get("id") or "")
+    return live if live else data["fixtures"]
+
+
+def _resolve(league_people: List[Dict[str, Any]], admin: Dict[str, Any],
+             data: Dict[str, Any]):
     """Resolve a league's full state from the GLOBAL baseline + its own overrides.
 
     Composition (per league):
@@ -655,12 +677,12 @@ def _resolve(league_people: List[Dict[str, Any]], admin: Dict[str, Any]):
     admin_teams = admin.get("teams") or {}
     admin_fixtures = admin.get("fixtures") or {}
     admin_preds = admin.get("predictions") or {}
-    phase = (admin.get("meta") or {}).get("phase") or _wc_data["meta"]["phase"]
-    ladder = _wc_data["meta"]["stageLadder"]
+    phase = (admin.get("meta") or {}).get("phase") or data["meta"]["phase"]
+    ladder = data["meta"]["stageLadder"]
 
     # 1. fixtures = baseline + explicit overrides (others untouched)
     fixtures = []
-    for f in _base_fixtures():
+    for f in _base_fixtures(data):
         o = admin_fixtures.get(f["id"])
         if o:
             f = dict(f)
@@ -673,7 +695,7 @@ def _resolve(league_people: List[Dict[str, Any]], admin: Dict[str, Any]):
         fixtures.append(f)
 
     # 2. rules engine from this league's results, then manual team overrides
-    teams = standings.compute_team_status(_wc_data["teams"], fixtures, ladder)
+    teams = standings.compute_team_status(data["teams"], fixtures, ladder)
     for t in teams:
         o = admin_teams.get(t["code"])
         if o:
@@ -686,7 +708,7 @@ def _resolve(league_people: List[Dict[str, Any]], admin: Dict[str, Any]):
     people = standings.apply_to_people(league_people, teams)
 
     # 4. auto-grade predictions, then apply manual answers on top
-    predictions = standings.grade_predictions(_wc_data["predictions"], teams, fixtures, ladder)
+    predictions = standings.grade_predictions(data["predictions"], teams, fixtures, ladder)
 
     # 4b. inject dynamic fixture markets (auto-grade from this league's results)
     dm_list = admin.get("dynamicMarkets") or []
@@ -780,15 +802,17 @@ def _resolve(league_people: List[Dict[str, Any]], admin: Dict[str, Any]):
 
 
 def _league_state(league: League, league_people: List[Dict[str, Any]], admin: Dict[str, Any]) -> Dict[str, Any]:
-    teams, fixtures, people, predictions, phase = _resolve(league_people, admin)
+    # Everything below is built from THIS league's tournament, not a global.
+    tdata = _data_for(league.tournament_id)
+    teams, fixtures, people, predictions, phase = _resolve(league_people, admin, tdata)
     admin_meta = admin.get("meta") or {}
-    fee = _wc_data["fee"]
+    fee = tdata["fee"]
     try:
         if admin_meta.get("entryFee") is not None:
             fee = max(0, float(admin_meta.get("entryFee")))
     except (TypeError, ValueError):
-        fee = _wc_data["fee"]
-    data = dict(_wc_data)
+        fee = tdata["fee"]
+    data = dict(tdata)
     data["fee"] = fee
     data["teams"] = teams
     data["fixtures"] = fixtures
@@ -799,11 +823,12 @@ def _league_state(league: League, league_people: List[Dict[str, Any]], admin: Di
     # from the server (keeps admin actions consistent across devices).
     data["adminOverrides"] = admin
 
-    meta = dict(_wc_data["meta"])
+    meta = dict(tdata["meta"])
     meta.pop("adminPin", None)
     meta["phase"] = phase
-    stage_labels = dict(_wc_data["meta"].get("stageLabels") or {})
-    meta.update(_tournament_fixture_meta(fixtures, teams, phase, stage_labels))
+    stage_labels = dict(tdata["meta"].get("stageLabels") or {})
+    meta.update(_tournament_fixture_meta(
+        fixtures, teams, phase, stage_labels, tdata["meta"]["stageLadder"]))
     meta["groupSize"] = len(people)
     meta["stillIn"] = sum(1 for p in people if p.get("alive"))
     meta["out"] = sum(1 for p in people if not p.get("alive"))
@@ -924,6 +949,7 @@ def _tournament_fixture_meta(
     teams: List[Dict[str, Any]],
     phase: str,
     stage_labels: Dict[str, str],
+    stage_ladder: List[str],
 ) -> Dict[str, Any]:
     """Fixture inventory + group/knockout phase signals for client and admin."""
     codes = {t["code"] for t in teams}
@@ -955,7 +981,7 @@ def _tournament_fixture_meta(
     r32_published = standings.opening_knockout_draw_complete(
         fixtures or [],
         codes,
-        _wc_data["meta"]["stageLadder"],
+        stage_ladder,
     )
 
     ko_order = ["r32", "r16", "qf", "sf", "final"]
@@ -1008,11 +1034,12 @@ def _tournament_fixture_meta(
 def _base_state() -> Dict[str, Any]:
     """League-agnostic payload injected at first paint / used before a league is
     chosen. No participants, no pot — just the shared tournament scaffolding."""
-    data = dict(_wc_data)
-    data["fixtures"] = _base_fixtures()
+    tdata = _data_for(None)
+    data = dict(tdata)
+    data["fixtures"] = _base_fixtures(tdata)
     data["people"] = []
     data["league"] = None
-    meta = dict(_wc_data["meta"])
+    meta = dict(tdata["meta"])
     meta.pop("adminPin", None)
     meta["groupSize"] = 0
     meta["stillIn"] = 0
@@ -1020,13 +1047,14 @@ def _base_state() -> Dict[str, Any]:
     meta["currency"] = "£"
     meta.update(_fixture_health(data.get("fixtures") or []))
     meta.update(_sync_meta())
-    stage_labels = dict(_wc_data["meta"].get("stageLabels") or {})
+    stage_labels = dict(tdata["meta"].get("stageLabels") or {})
     phase = meta.get("phase") or "pre"
     meta.update(_tournament_fixture_meta(
         data.get("fixtures") or [],
-        _wc_data.get("teams") or [],
+        tdata.get("teams") or [],
         phase,
         stage_labels,
+        tdata["meta"]["stageLadder"],
     ))
     data["meta"] = meta
     data["pot"] = 0
@@ -1167,7 +1195,7 @@ async def lifespan(app: FastAPI):
     api_key = os.environ.get("FOOTBALL_DATA_API_KEY", "")
     if api_key:
         from adapters.football_data_org import FootballDataOrgAdapter
-        adapter = FootballDataOrgAdapter(api_key, known_teams=_wc_data.get("teams") or [])
+        adapter = FootballDataOrgAdapter(api_key, known_teams=_DEFAULT_DATA.get("teams") or [])
         sync.set_sync_adapter("football-data.org")
         log.info("Using FootballDataOrgAdapter")
     else:
@@ -1177,7 +1205,7 @@ async def lifespan(app: FastAPI):
         log.warning("FOOTBALL_DATA_API_KEY not set — using MockAdapter (no live data)")
 
     task = asyncio.create_task(
-        sync.start_sync(adapter, _wc_data["meta"]["id"], _wc_data["meta"]["competitionCode"])
+        sync.start_sync(adapter, _DEFAULT_DATA["meta"]["id"], _DEFAULT_DATA["meta"]["competitionCode"])
     )
     yield
     task.cancel()
@@ -1415,12 +1443,12 @@ async def _backfill_pro_leagues() -> None:
 
 
 def _entry_fee_pence(admin: Dict[str, Any]) -> int:
-    fee = _wc_data["fee"]
+    fee = _DEFAULT_DATA["fee"]
     try:
         if (admin.get("meta") or {}).get("entryFee") is not None:
             fee = max(0.0, float((admin.get("meta") or {}).get("entryFee")))
     except (TypeError, ValueError):
-        fee = _wc_data["fee"]
+        fee = _DEFAULT_DATA["fee"]
     return max(0, int(round(float(fee) * 100)))
 
 
@@ -2023,7 +2051,7 @@ async def export_predictions_csv(
         people = _league_people(league, rows, profile_map)
         admin = await _get_admin_data(session, league)
         hidden = set((admin.get("meta") or {}).get("hiddenPredictions") or [])
-        _, _, _, predictions, _ = _resolve(people, admin)
+        _, _, _, predictions, _ = _resolve(people, admin, _data_for(league.tournament_id))
         dyn = [
             {"key": m["key"], "q": m.get("q") or m["key"]}
             for m in predictions
@@ -2117,7 +2145,7 @@ async def league_analytics(
         admin = await _get_admin_data(session, league)
         hidden = set((admin.get("meta") or {}).get("hiddenPredictions") or [])
         markets = [
-            m for m in (_wc_data.get("predictions") or [])
+            m for m in (_data_for(league.tournament_id).get("predictions") or [])
             if isinstance(m, dict) and m.get("key") and m["key"] not in hidden
         ]
         for k in (admin.get("predictions") or {}):
@@ -2127,7 +2155,7 @@ async def league_analytics(
             (admin.get("meta") or {}).get("knockoutPredictions"),
         )
         if kp.get("enabled"):
-            _, _, _, preds, _ = _resolve(people, admin)
+            _, _, _, preds, _ = _resolve(people, admin, _data_for(league.tournament_id))
             for m in preds:
                 if str(m.get("key", "")).startswith("ko_") and m["key"] not in hidden:
                     markets.append({"key": m["key"], "q": m.get("q") or m["key"]})
@@ -2593,7 +2621,7 @@ async def set_pick(
         key = str(payload.key or "")
         if key.startswith("ko_") or key.startswith("dm_"):
             admin = await _get_admin_data(session, league)
-            _, fixtures, _, predictions, _ = _resolve([], admin)
+            _, fixtures, _, predictions, _ = _resolve([], admin, _data_for(league.tournament_id))
             market = next((m for m in predictions if isinstance(m, dict) and m.get("key") == key), None)
             if market is None:
                 raise HTTPException(status_code=400, detail="Unknown prediction market")
@@ -2711,7 +2739,11 @@ async def put_profile(
         fav = payload.favouriteTeam
         if fav is not None:
             fav = (fav or "").strip().upper()
-            if fav and fav not in _TEAM_CODES:
+            # Valid FAVOURITE team codes (distinct from the team they were
+            # drawn), taken from THIS league's competition — a global set would
+            # reject a legitimate pick in any non-default tournament.
+            team_codes = {t["code"] for t in _data_for(league.tournament_id).get("teams", [])}
+            if fav and fav not in team_codes:
                 raise HTTPException(status_code=400, detail="unknown team")
 
         prof = await session.get(Profile, participant_id)
@@ -3324,7 +3356,7 @@ async def create_match_prediction(
         fix = next((f for f in _base_fixtures() if f["id"] == payload.fixture_id), None)
         if fix is None:
             raise HTTPException(status_code=404, detail="fixture not found")
-        team_map = {t["code"]: t for t in _wc_data["teams"]}
+        team_map = {t["code"]: t for t in _data_for(league.tournament_id)["teams"]}
         ta = team_map.get(fix["a"], {}); tb = team_map.get(fix["b"], {})
         na = ta.get("name", fix["a"]); nb = tb.get("name", fix["b"])
         fa = ta.get("flag", ""); fb = tb.get("flag", "")

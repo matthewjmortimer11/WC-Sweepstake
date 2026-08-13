@@ -36,6 +36,10 @@ def _fx(
 
 
 LADDER = ["group", "r32", "r16", "qf", "sf", "final", "winner"]
+# The stage progression is per-tournament, so callers now pass it in rather
+# than the function reading a process-wide default.
+LADDER = ["group", "r32", "r16", "qf", "sf", "final", "winner"]
+
 LABELS = {
     "r32": "Round of 32",
     "r16": "Round of 16",
@@ -56,7 +60,7 @@ def test_tournament_phase_group_complete():
         _fx("A2", "A4", group="A", score=[1, 0]),
         _fx("A3", "A4", group="A", score=[1, 0]),
     ]
-    meta = _tournament_fixture_meta(fixtures, teams, "live", LABELS)
+    meta = _tournament_fixture_meta(fixtures, teams, "live", LABELS, LADDER)
     assert meta["groupsComplete"] is True
     assert meta["tournamentPhase"] == "group_complete"
 
@@ -64,7 +68,7 @@ def test_tournament_phase_group_complete():
 def test_tournament_phase_knockout():
     fixtures = [_fx("AAA", "BBB", stage="r32", group=None, status="upcoming", score=None)]
     teams = [_team("AAA"), _team("BBB")]
-    meta = _tournament_fixture_meta(fixtures, teams, "live", LABELS)
+    meta = _tournament_fixture_meta(fixtures, teams, "live", LABELS, LADDER)
     assert meta["tournamentPhase"] == "knockout"
 
 
@@ -75,7 +79,7 @@ def test_knockouts_in_feed_without_full_r32():
         _fx("CCC", "DDD", stage="qf", group=None, status="upcoming", score=None),
     ]
     teams = [_team("AAA"), _team("BBB"), _team("CCC"), _team("DDD")]
-    meta = _tournament_fixture_meta(fixtures, teams, "live", LABELS)
+    meta = _tournament_fixture_meta(fixtures, teams, "live", LABELS, LADDER)
     assert meta["r32Published"] is False
     assert meta["knockoutsInFeed"] is True
     assert meta["knockoutRound"] == "qf"
@@ -84,7 +88,7 @@ def test_knockouts_in_feed_without_full_r32():
 def test_r32_published_requires_sixteen_paired_ties():
     fixtures = [_fx(f"A{i}", f"B{i}", stage="r32", group=None) for i in range(8)]
     teams = [_team(f"A{i}") for i in range(8)] + [_team(f"B{i}") for i in range(8)]
-    meta = _tournament_fixture_meta(fixtures, teams, "live", LABELS)
+    meta = _tournament_fixture_meta(fixtures, teams, "live", LABELS, LADDER)
     assert meta["r32Published"] is False
     assert meta["knockoutsInFeed"] is True
 
