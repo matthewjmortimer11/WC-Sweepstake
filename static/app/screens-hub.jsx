@@ -2,7 +2,10 @@
    HUB SCREENS — Dashboard · Tracker · Side Bets · Weekly Summary
    =========================================================================== */
 const WC = window.WC;
-const { Card, Btn, Flag, Avatar, Chip, Stamp, ProgressRing, SegmentBar, WheeshtSays, SectionHead } = window;
+// `var`, not `const`: these names are also top-level function declarations in
+// ui.jsx. Separate <script> tags tolerate that, but the built bundle is one
+// script, where a lexical redeclaration is a SyntaxError. `var` re-binds legally.
+var { Card, Btn, Flag, Avatar, Chip, Stamp, ProgressRing, SegmentBar, WheeshtSays, SectionHead } = window;
 const W = window.Wheesht;
 const { useState: uState, useMemo: uMemo } = React;
 

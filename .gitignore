@@ -21,3 +21,9 @@ World Cup Sweepstake.zip
 # Debug page
 static/diag.html
 .claude/
+
+# Frontend build outputs (regenerate with `npm run build`)
+node_modules/
+static/app/bundle.*.js
+static/app/build-manifest.json
+static/app/vendor/

@@ -16,6 +16,13 @@ jobs:
           python-version: "3.11"
       - name: Install dependencies
         run: pip install -r requirements-dev.txt
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      # Builds the JS bundle, which also type-checks nothing but *does* catch
+      # JSX syntax errors and cross-file redeclaration clashes before deploy.
+      - name: Build frontend
+        run: npm ci && npm run build
       - name: Run tests
         run: pytest tests/ -q
       - name: Check Dethrone JS syntax

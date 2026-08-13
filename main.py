@@ -21,6 +21,7 @@ import hmac
 import html
 import io
 import json
+from functools import lru_cache
 import logging
 import os
 import re
@@ -37,6 +38,7 @@ from typing import Any, Dict, List, Optional
 from zoneinfo import ZoneInfo
 
 from fastapi import FastAPI, Header, HTTPException, Request
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse, Response
 from pydantic import BaseModel, Field
 from sqlalchemy import delete, func, select, text
@@ -80,6 +82,30 @@ _MAX_DISPLAY_NAME = 40
 
 _HTML_TEMPLATE = Path("templates/index.html").read_text(encoding="utf-8")
 _JOIN_TEMPLATE = Path("templates/join.html").read_text(encoding="utf-8")
+
+
+# bundle.<hash>.js, and the pinned React UMD builds under app/vendor/.
+_IMMUTABLE_ASSET = re.compile(r"^(bundle\.[0-9a-f]{8,}\.js|react(-dom)?\.production\.min\.js)$")
+
+
+@lru_cache(maxsize=1)
+def _frontend_bundle() -> str:
+    """Hashed filename of the built JS bundle (see scripts/build_frontend.mjs).
+
+    The name carries a content hash, so the file can be cached forever and a
+    rebuild busts it automatically.
+
+    Resolved lazily rather than at import: the test suite imports this module
+    without a Node toolchain, and coupling 493 backend tests to `npm run build`
+    buys nothing. Serving HTML *does* need it, so that path fails loudly.
+    """
+    manifest = Path("static/app/build-manifest.json")
+    if not manifest.exists():
+        raise RuntimeError(
+            "static/app/build-manifest.json is missing — run `npm run build` "
+            "before serving the app."
+        )
+    return json.loads(manifest.read_text(encoding="utf-8"))["bundle"]
 _OG_IMAGE_PATH = "/og/wheesht-og.png"
 
 # Master developer key for the hidden cross-league dev console. It must come
@@ -1016,7 +1042,8 @@ def _build_html() -> str:
     # The hidden dev console is only reachable when a dev key is configured.
     parts.append("window.WC_DEV_ENABLED = " + ("true" if _DEV_KEY else "false") + ";")
     injection = "<script>" + "".join(parts) + "</script>"
-    return _HTML_TEMPLATE.replace("<!-- WC_DATA_INJECTION -->", injection)
+    html = _HTML_TEMPLATE.replace("<!-- WC_DATA_INJECTION -->", injection)
+    return html.replace("<!-- WC_BUNDLE -->", _frontend_bundle())
 
 
 # ── Startup: seed the config league + migrate any legacy JSON ──────────────────
@@ -1113,6 +1140,8 @@ async def _migrate_legacy_json(session, league: League) -> None:
 
 # ── Lifespan ──────────────────────────────────────────────────────────────────
 
+
+
 async def _ensure_schema() -> None:
     """Idempotent column adds for tables that shipped in an earlier deploy.
 
@@ -1186,6 +1215,11 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Wheesht — World Cup Sweepstake 2026", lifespan=lifespan)
+
+# Compress the JS bundle, the injected league state, and every JSON API response.
+# The bundle alone drops from ~548KB to well under a third of that on the wire.
+# minimum_size skips payloads too small for compression to be worth the CPU.
+app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 # Cipher — a customisable, real-time word-association party game served from
 # /play. Fully self-contained (in-memory rooms + WebSockets); see codenames/.
@@ -3533,7 +3567,12 @@ async def tweaks_panel():
 async def app_static(filename: str):
     path = _safe_static_path(_STATIC / "app", filename)
     mt = _JS_TYPES.get(path.suffix, "application/octet-stream")
-    return FileResponse(path, media_type=mt)
+    headers = None
+    # Content-hashed bundles and pinned vendor builds never change under a given
+    # name, so they can be cached indefinitely — a rebuild produces a new name.
+    if _IMMUTABLE_ASSET.match(path.name):
+        headers = {"Cache-Control": "public, max-age=31536000, immutable"}
+    return FileResponse(path, media_type=mt, headers=headers)
 
 
 # Shared theme (design tokens + components) used by the dashboard and every game.

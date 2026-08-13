@@ -1,0 +1,39 @@
+{
+  "_comment": [
+    "Single source of truth for frontend script load order. Paths are relative",
+    "to static/. Order matters: the app has no module system — every file shares",
+    "one global scope, exactly as sibling <script> tags do. Concatenating them in",
+    "this order is semantically identical to loading them separately.",
+    "",
+    "Consumed by scripts/build_frontend.mjs (live app bundle) and",
+    "scripts/build_standalone.py (standalone HTML builds). Add a file HERE, once.",
+    "",
+    ".jsx entries are transpiled; .js entries are passed through untouched."
+  ],
+  "scripts": [
+    "app/wc-snapshot.js",
+    "app/data.js",
+    "app/demo-data.js",
+    "app/copy.js",
+    "app/share.js",
+    "app/store.js",
+    "app/wheesht-mascot.jsx",
+    "app/ui.jsx",
+    "app/knockout-bracket.jsx",
+    "tweaks-panel.jsx",
+    "app/screens-hub.jsx",
+    "app/screens-hub2.jsx",
+    "app/screens-onboarding.jsx",
+    "app/screens-dashboard.jsx",
+    "app/screens-competition.jsx",
+    "app/screens-predictions.jsx",
+    "app/screens-games.jsx",
+    "app/screens-match-centre.jsx",
+    "app/screens-what-if.jsx",
+    "app/screens-admin.jsx",
+    "app/screens-chat.jsx",
+    "app/screens-dev.jsx",
+    "app/app.jsx",
+    "app/stage.jsx"
+  ]
+}
