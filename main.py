@@ -61,6 +61,7 @@ from models import (
     Profile,
     ProfileAsset,
 )
+import wc_data as wc_data_module
 from wc_data import _initials, generate_wc_data, get_admin_pin, get_league_seed
 import knockout_predictions
 
@@ -1580,6 +1581,9 @@ class LeagueCreate(BaseModel):
     code: str
     password: str
     organiserCode: Optional[str] = None
+    # Which competition this league plays. Omitted by older clients, which
+    # predate the picker, so it falls back to the deployment default.
+    tournamentId: Optional[str] = None
     purpose: str = "work"
     includeDepartment: bool = True
     includeLocation: bool = True
@@ -1678,6 +1682,27 @@ def _clean_custom_answers(values: Dict[str, Any], fields: List[Dict[str, Any]]) 
     return out
 
 
+@app.get("/api/tournaments")
+async def list_tournaments():
+    """Competitions a new league can be created against.
+
+    Backed by the files in tournaments/, so adding a competition is a config
+    file rather than a deploy of new code.
+    """
+    out = []
+    for tid in wc_data_module.available_tournaments():
+        data = wc_data_module.tournament_data(tid)
+        meta = data.get("meta") or {}
+        out.append({
+            "id": tid,
+            "name": data.get("sweepstakeName") or meta.get("name") or tid,
+            "season": meta.get("season") or "",
+            "teams": len(data.get("teams") or []),
+            "isDefault": tid == wc_data_module.default_tournament(),
+        })
+    return {"tournaments": out}
+
+
 @app.post("/api/leagues")
 async def create_league(payload: LeagueCreate, request: Request):
     _rate_limit(request, "league:create", 20, 10 * 60)
@@ -1692,6 +1717,12 @@ async def create_league(payload: LeagueCreate, request: Request):
         raise HTTPException(status_code=400, detail="Organiser code must be at least 4 characters")
     if payload.organiserCode is not None and hmac.compare_digest(organiser_code, payload.password or ""):
         raise HTTPException(status_code=400, detail="Use a different organiser code from the member password")
+    # Reject an unknown tournament rather than silently falling back: a league
+    # created against the wrong competition would draw the wrong teams, and that
+    # is not recoverable once entrants have been assigned.
+    tournament_id = (payload.tournamentId or "").strip() or wc_data_module.default_tournament()
+    if not wc_data_module.tournament_exists(tournament_id):
+        raise HTTPException(status_code=400, detail="Unknown tournament")
     purpose = "friends" if payload.purpose == "friends" else "work"
     try:
         entry_fee = max(0.0, round(float(payload.entryFee), 2))
@@ -1722,6 +1753,7 @@ async def create_league(payload: LeagueCreate, request: Request):
             raise HTTPException(status_code=409, detail="That code is already taken")
         league = League(
             id=uuid.uuid4().hex, code=code, slug=_slugify(name), name=name,
+            tournament_id=tournament_id,
             password_hash=_hash_password(payload.password),
             organiser_hash=_hash_password(organiser_code),
             seeded=False, created_at=_now(),
