@@ -6,6 +6,7 @@ competition.
 """
 
 import wc_data
+from conftest import add_participant
 
 
 def test_registry_lists_configured_tournaments():
@@ -105,3 +106,69 @@ def test_base_fixtures_uses_live_cache_only_for_its_own_tournament(monkeypatch):
     other["meta"] = dict(wc["meta"], id="euro-2028")
     assert main._base_fixtures(other) == other["fixtures"]
     assert main._base_fixtures(other) != [{"id": "live-1"}]
+
+
+# ── a real second tournament ────────────────────────────────────────────────
+#
+# euro-2028 exists to prove the config drives the app rather than the code. It
+# is deliberately a different SHAPE: 24 teams in 6 groups, and a ladder with no
+# round of 32. If bracket depth were hardcoded anywhere, these would fail.
+
+def test_second_tournament_has_a_different_shape():
+    wc = wc_data.tournament_data("world-cup-2026")
+    eu = wc_data.tournament_data("euro-2028")
+
+    assert len(wc["teams"]) == 48 and len(eu["teams"]) == 24
+    # 12 groups of 4 -> 72 group games; 6 groups of 4 -> 36.
+    assert len(wc["fixtures"]) == 72 and len(eu["fixtures"]) == 36
+
+    assert "r32" in wc["meta"]["stageLadder"]
+    assert "r32" not in eu["meta"]["stageLadder"]
+    assert eu["meta"]["stageLadder"] == ["group", "r16", "qf", "sf", "final", "winner"]
+
+    groups = {t["group"] for t in eu["teams"]}
+    assert groups == set("ABCDEF")
+    for g in groups:
+        assert sum(1 for t in eu["teams"] if t["group"] == g) == 4
+
+
+def test_second_tournament_seeds_no_league():
+    """Only the DEFAULT tournament's [league] is seeded at startup. A second
+    config must not create a competing League row."""
+    seed = wc_data.get_league_seed("euro-2028")
+    assert seed["seeded"] is False
+    assert seed["code"] != wc_data.get_league_seed("world-cup-2026")["code"]
+
+
+async def test_two_leagues_on_different_tournaments_get_different_state(client):
+    """The point of the whole phase: one deployment, two competitions."""
+    assert (await _make(client, "WCUP", tournamentId="world-cup-2026")).status_code == 200
+    assert (await _make(client, "EURO", tournamentId="euro-2028")).status_code == 200
+
+    wc = (await client.get("/api/leagues/WCUP/state")).json()
+    eu = (await client.get("/api/leagues/EURO/state")).json()
+
+    assert wc["meta"]["season"] == "World Cup 2026"
+    assert eu["meta"]["season"] == "Euro 2028"
+    assert len(wc["teams"]) == 48 and len(eu["teams"]) == 24
+    assert len(wc["fixtures"]) == 72 and len(eu["fixtures"]) == 36
+    assert "r32" in wc["meta"]["stageLadder"]
+    assert "r32" not in eu["meta"]["stageLadder"]
+
+
+async def test_favourite_team_validated_against_the_leagues_own_tournament(client):
+    """WAL plays at the Euros but not this World Cup. A global team-code set
+    would reject a legitimate pick."""
+    assert "WAL" not in {t["code"] for t in wc_data.tournament_data("world-cup-2026")["teams"]}
+    assert "WAL" in {t["code"] for t in wc_data.tournament_data("euro-2028")["teams"]}
+
+    lg = (await _make(client, "EURO2", tournamentId="euro-2028")).json()
+    token = lg["adminToken"]
+    ent = await add_participant(client, "EURO2", "Gwen")
+
+    r = await client.put(
+        f"/api/leagues/EURO2/participants/{ent['id']}/profile",
+        json={"favouriteTeam": "WAL"},
+        headers={"X-Wheesht-Admin-Token": token},
+    )
+    assert r.status_code == 200, r.text
