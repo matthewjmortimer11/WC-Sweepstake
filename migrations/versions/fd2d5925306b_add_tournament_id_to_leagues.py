@@ -31,9 +31,16 @@ def upgrade() -> None:
     # production. The model's `default=` is applied by SQLAlchemy on INSERT; it
     # creates no database default and backfills nothing.
     #
-    # So: add WITH a server_default (which backfills existing rows atomically),
-    # then drop the default so the application stays the single source of truth
-    # for new rows rather than the database quietly supplying one.
+    # So: add WITH a server_default, which backfills existing rows atomically.
+    #
+    # The default is KEPT rather than dropped afterwards. Dropping it would make
+    # the application the only source of the value, which is tidier — but it
+    # also makes the release one-way: rolled back to the previous version, the
+    # old code knows nothing about this column and every league INSERT would
+    # fail on a NOT NULL with no default. Keeping it means an older release
+    # still writes valid rows (as World Cup leagues, which is what they were).
+    # The application supplies the value in practice; this is a safety net for
+    # the rollback path, not the normal one.
     with op.batch_alter_table("leagues", schema=None) as batch_op:
         batch_op.add_column(
             sa.Column(
@@ -46,9 +53,6 @@ def upgrade() -> None:
         batch_op.create_index(
             batch_op.f("ix_leagues_tournament_id"), ["tournament_id"], unique=False
         )
-
-    with op.batch_alter_table("leagues", schema=None) as batch_op:
-        batch_op.alter_column("tournament_id", server_default=None)
 
 
 def downgrade() -> None:
