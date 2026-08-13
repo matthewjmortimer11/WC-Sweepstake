@@ -1312,9 +1312,22 @@ async def _request_context(request: Request, call_next):
 
 @app.get("/healthz")
 async def healthz():
-    """Liveness: the process is up and serving. Deliberately touches nothing
-    external — a database blip must not cause the platform to kill a process
-    that is otherwise fine."""
+    """Liveness: the process is up and able to serve the app.
+
+    Touches nothing external — a database blip must not kill a process that is
+    otherwise fine — but it DOES check the frontend bundle exists. Without it
+    every HTML request 500s while the process looks perfectly healthy, so the
+    platform would happily keep a dead site in rotation instead of rolling the
+    deploy back. A failed frontend build should fail the deploy.
+    """
+    try:
+        _frontend_bundle()
+    except Exception as exc:
+        log.error("Health check failed — frontend bundle missing: %s", exc)
+        return JSONResponse(
+            {"status": "error", "detail": "frontend bundle missing; build did not run"},
+            status_code=503,
+        )
     return {"status": "ok"}
 
 

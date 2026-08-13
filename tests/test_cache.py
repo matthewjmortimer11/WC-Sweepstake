@@ -214,3 +214,24 @@ async def test_leadership_passes_on_when_the_leader_stops_renewing():
     import asyncio
     await asyncio.sleep(1.2)  # worker-a "dies": no renewal
     assert await cache.try_lead("sync", "worker-b", ttl=60) is True
+
+
+# ── deploy safety ───────────────────────────────────────────────────────────
+
+async def test_healthz_fails_when_the_frontend_build_did_not_run(client, monkeypatch):
+    """A missing bundle 500s every HTML request while the process looks fine.
+    Health has to fail, or the platform keeps a dead site in rotation instead
+    of rolling the deploy back."""
+    def missing():
+        raise RuntimeError("build-manifest.json is missing")
+
+    monkeypatch.setattr(main, "_frontend_bundle", missing)
+    r = await client.get("/healthz")
+    assert r.status_code == 503
+    assert "bundle" in r.json()["detail"]
+
+
+async def test_healthz_passes_when_the_bundle_is_present(client):
+    r = await client.get("/healthz")
+    assert r.status_code == 200
+    assert r.json()["status"] == "ok"

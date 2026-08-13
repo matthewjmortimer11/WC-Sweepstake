@@ -1,0 +1,5 @@
+# The repo has both requirements.txt and package.json. Nixpacks picks ONE
+# language provider by detection, which means adding a frontend build to a
+# Python service can silently produce an image with no Python (or no Node).
+# Declaring both is what keeps the build reproducible.
+providers = ["python", "node"]
