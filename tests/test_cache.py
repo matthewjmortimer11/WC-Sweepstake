@@ -28,6 +28,8 @@ def isolate_cache(monkeypatch):
     deployments from colliding on one Redis.
     """
     monkeypatch.setenv("WHEESHT_CACHE_NAMESPACE", f"test-{os.getpid()}-{id(object()):x}")
+    # Clients are keyed per event loop in cache.LeagueCache, so no reset is
+    # needed here — each test's loop gets its own.
 
 
 # ── ETags (no Redis required) ───────────────────────────────────────────────
@@ -172,3 +174,43 @@ async def test_second_request_is_served_from_redis(client):
     third = await client.get("/api/leagues/OI/state")
     assert third.headers["X-Wheesht-Cache"] == "miss"
     assert any(p["id"] == "redis-1" for p in json.loads(third.text)["people"])
+
+
+# ── leader election ─────────────────────────────────────────────────────────
+
+async def test_without_redis_every_process_leads(monkeypatch):
+    """No shared state to coordinate through, so the single-worker default must
+    still run its background jobs."""
+    monkeypatch.setattr(cache.league_cache, "url", "")
+    assert await cache.try_lead("sync", "worker-a", ttl=60) is True
+    assert await cache.try_lead("sync", "worker-b", ttl=60) is True
+
+
+@pytest.mark.skipif(
+    not (os.environ.get("WHEESHT_REDIS_URL") or os.environ.get("REDIS_URL")),
+    reason="needs a running Redis; set WHEESHT_REDIS_URL",
+)
+async def test_only_one_worker_leads_and_the_holder_can_renew():
+    """With `--workers 4` every process runs lifespan. Unguarded, that polls the
+    provider four times over and blows its rate limit."""
+    assert await cache.try_lead("sync", "worker-a", ttl=60) is True
+    assert await cache.try_lead("sync", "worker-b", ttl=60) is False
+    assert await cache.try_lead("sync", "worker-c", ttl=60) is False
+
+    # The holder renews its own claim rather than losing it.
+    assert await cache.try_lead("sync", "worker-a", ttl=60) is True
+
+
+@pytest.mark.skipif(
+    not (os.environ.get("WHEESHT_REDIS_URL") or os.environ.get("REDIS_URL")),
+    reason="needs a running Redis; set WHEESHT_REDIS_URL",
+)
+async def test_leadership_passes_on_when_the_leader_stops_renewing():
+    """A dead leader must not stop syncing forever — the lock expires and
+    another worker picks the job up."""
+    assert await cache.try_lead("sync", "worker-a", ttl=1) is True
+    assert await cache.try_lead("sync", "worker-b", ttl=1) is False
+
+    import asyncio
+    await asyncio.sleep(1.2)  # worker-a "dies": no renewal
+    assert await cache.try_lead("sync", "worker-b", ttl=60) is True

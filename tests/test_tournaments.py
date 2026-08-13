@@ -210,7 +210,7 @@ async def test_supervisor_starts_one_worker_per_tournament(client, monkeypatch):
 
     started = []
 
-    async def fake_start_sync(adapter, tournament_id, comp_code):
+    async def fake_start_sync(adapter, tournament_id, comp_code, is_leader=None):
         started.append((tournament_id, comp_code))
         await asyncio.sleep(3600)  # stand in for the real polling loop
 
@@ -234,7 +234,7 @@ async def test_supervisor_skips_a_tournament_with_no_config(client, monkeypatch)
 
     started = []
 
-    async def fake_start_sync(adapter, tournament_id, comp_code):
+    async def fake_start_sync(adapter, tournament_id, comp_code, is_leader=None):
         started.append(tournament_id)
         await asyncio.sleep(3600)
 
@@ -254,7 +254,7 @@ async def test_supervisor_skips_a_tournament_with_no_config(client, monkeypatch)
 async def test_supervisor_cancels_its_workers_on_shutdown(client, monkeypatch):
     cancelled = []
 
-    async def fake_start_sync(adapter, tournament_id, comp_code):
+    async def fake_start_sync(adapter, tournament_id, comp_code, is_leader=None):
         try:
             await asyncio.sleep(3600)
         except asyncio.CancelledError:
@@ -303,3 +303,36 @@ async def test_mock_fixture_ids_do_not_collide_across_tournaments():
 
     assert len(wc) == 72 and len(eu) == 36
     assert not (wc & eu), f"colliding fixture ids: {sorted(wc & eu)[:5]}"
+
+
+async def test_non_leader_workers_still_refresh_their_cache_from_the_db(monkeypatch):
+    """The fixture cache is process-local and only the leader talks to the
+    provider. If non-leaders skipped the whole cycle they would hold no
+    fixtures at all, and the same league would answer differently depending on
+    which web worker replied."""
+    fetched = []
+    loaded = []
+
+    class Adapter:
+        async def get_fixtures(self, tid, comp):
+            fetched.append(tid)
+            return []
+
+    async def fake_load(tid):
+        loaded.append(tid)
+
+    monkeypatch.setattr(sync, "_load_from_db", fake_load)
+
+    async def not_leader():
+        return False
+
+    task = asyncio.create_task(
+        sync.start_sync(Adapter(), "world-cup-2026", "WC", is_leader=not_leader)
+    )
+    await asyncio.sleep(0.05)
+    task.cancel()
+    with contextlib.suppress(asyncio.CancelledError):
+        await task
+
+    assert fetched == [], "a non-leader must not call the provider"
+    assert loaded, "a non-leader must still refresh its cache from the database"

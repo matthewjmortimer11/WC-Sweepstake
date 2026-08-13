@@ -40,7 +40,7 @@ from zoneinfo import ZoneInfo
 from fastapi import FastAPI, Header, HTTPException, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.middleware.gzip import GZipMiddleware
-from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse, Response
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTextResponse, Response
 from pydantic import BaseModel, Field
 from sqlalchemy import delete, func, select, text
 from sqlalchemy.exc import IntegrityError
@@ -63,10 +63,13 @@ from models import (
     ProfileAsset,
 )
 from cache import league_cache
+import ops
 import wc_data as wc_data_module
 from wc_data import _initials, generate_wc_data, get_admin_pin, get_league_seed
 import knockout_predictions
 
+ops.configure_logging()
+ops.init_sentry()
 log = logging.getLogger(__name__)
 
 # Generate the tournament scenario once at startup (teams, fixtures, markets…).
@@ -1221,16 +1224,32 @@ async def lifespan(app: FastAPI):
             return FootballDataOrgAdapter(api_key, known_teams=data.get("teams") or []), comp_code
         return MockAdapter(), comp_code
 
+    # Background jobs are singletons per deployment, elected through Redis. With
+    # several workers and no Redis there is nothing to elect through, so every
+    # worker would sync — multiplying provider calls by the worker count.
+    workers = int(os.environ.get("WEB_CONCURRENCY") or 1)
+    if workers > 1 and not league_cache.enabled:
+        log.warning(
+            "WEB_CONCURRENCY=%d without Redis: every worker will run its own "
+            "sync loop and poll the provider %dx. Set REDIS_URL, or run one worker.",
+            workers, workers,
+        )
+
     # One loop per tournament a league actually plays, added as leagues appear.
     task = asyncio.create_task(
         sync.start_all_syncs(_make_worker, _DEFAULT_DATA["meta"]["id"])
     )
     yield
+    # Shutdown must be bounded. A background task cancelled mid-query can leave
+    # the pool busy, and waiting on it indefinitely wedges the process — the
+    # platform would eventually SIGKILL, losing a clean database close.
     task.cancel()
     try:
-        await task
-    except asyncio.CancelledError:
+        await asyncio.wait_for(asyncio.shield(task), timeout=5)
+    except (asyncio.CancelledError, asyncio.TimeoutError):
         pass
+    except Exception as exc:
+        log.warning("Sync supervisor did not stop cleanly: %s", exc)
     await engine.dispose()
 
 
@@ -1240,6 +1259,77 @@ app = FastAPI(title="Wheesht — World Cup Sweepstake 2026", lifespan=lifespan)
 # The bundle alone drops from ~548KB to well under a third of that on the wire.
 # minimum_size skips payloads too small for compression to be worth the CPU.
 app.add_middleware(GZipMiddleware, minimum_size=1000)
+
+@app.middleware("http")
+async def _request_context(request: Request, call_next):
+    """Tag each request with an id, and log one line per request.
+
+    Outermost middleware, so the duration covers everything inside it. Replaces
+    uvicorn's access log (disabled in ops.configure_logging) with a line that
+    carries status, duration and the request id — the fields you actually
+    filter on when something is slow at 3am.
+    """
+    rid = ops.new_request_id(request.headers.get("x-request-id"))
+    token = ops.request_id_var.set(rid)
+    started = time.perf_counter()
+    try:
+        response = await call_next(request)
+    except Exception:
+        # Log before re-raising so the failing request is attributable even if
+        # the exception handler cannot run.
+        log.exception(
+            "request failed",
+            extra={"wh_method": request.method, "wh_path": request.url.path,
+                   "wh_durationMs": round((time.perf_counter() - started) * 1000, 1)},
+        )
+        ops.request_id_var.reset(token)
+        raise
+
+    duration_ms = round((time.perf_counter() - started) * 1000, 1)
+    response.headers["X-Request-Id"] = rid
+    # Health probes fire constantly and would drown everything else.
+    if request.url.path not in ("/healthz", "/readyz"):
+        log.log(
+            logging.WARNING if response.status_code >= 500 else logging.INFO,
+            "%s %s %s %sms", request.method, request.url.path,
+            response.status_code, duration_ms,
+            extra={"wh_method": request.method, "wh_path": request.url.path,
+                   "wh_status": response.status_code, "wh_durationMs": duration_ms},
+        )
+    ops.request_id_var.reset(token)
+    return response
+
+
+@app.get("/healthz")
+async def healthz():
+    """Liveness: the process is up and serving. Deliberately touches nothing
+    external — a database blip must not cause the platform to kill a process
+    that is otherwise fine."""
+    return {"status": "ok"}
+
+
+@app.get("/readyz")
+async def readyz():
+    """Readiness: this instance can actually serve requests, i.e. the database
+    answers. Returns 503 when it cannot, so a broken instance is taken out of
+    rotation instead of serving errors."""
+    checks: Dict[str, Any] = {"database": "ok", "cache": "disabled"}
+    status_code = 200
+    try:
+        async with AsyncSessionLocal() as session:
+            await session.execute(text("SELECT 1"))
+    except Exception as exc:
+        checks["database"] = f"error: {type(exc).__name__}"
+        status_code = 503
+
+    if league_cache.enabled:
+        # A degraded cache costs speed, not correctness, so it never fails
+        # readiness — it is reported for visibility only.
+        checks["cache"] = "ok" if await league_cache.ping() else "unreachable"
+
+    return JSONResponse({"status": "ok" if status_code == 200 else "degraded",
+                         "checks": checks}, status_code=status_code)
+
 
 # Matches /api/leagues/<CODE> and anything under it.
 _LEAGUE_PATH = re.compile(r"^/api/leagues/([A-Za-z0-9]{2,12})(?:/|$)")

@@ -13,12 +13,15 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
+import uuid
 from datetime import datetime, timezone, timedelta
 from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
+from cache import try_lead
 from db import AsyncSessionLocal, engine
 from models import Fixture, League
 from provider import CanonicalFixture
@@ -261,14 +264,21 @@ async def _load_from_db(tournament_id: str) -> None:
     log.info("Loaded %d fixtures from DB into cache for %s", len(canonical), tournament_id)
 
 
-async def start_sync(adapter, tournament_id: str, comp_code: str) -> None:
+async def start_sync(adapter, tournament_id: str, comp_code: str, is_leader=None) -> None:
     """
     Async sync loop. Intended to run as a background asyncio task.
 
     Flow per cycle:
-      1. Fetch fixtures from the adapter.
-      2. Upsert to Postgres + rebuild in-memory cache.
+      1. FETCHING is leader-only — one process per deployment talks to the
+         provider, or several workers would multiply its rate limit.
+      2. REFRESHING from the database happens in EVERY worker. The in-memory
+         cache is process-local, so without this the non-leader workers would
+         hold no fixtures at all and serve generated ones instead — the same
+         league answering differently depending on which worker replied.
       3. Sleep 60 s (live), 3600 s (quiet), 300 s (error).
+
+    `is_leader` is an async predicate; None means "always fetch" (single
+    process, and the path tests take).
     """
     log.info("Sync worker starting for %s (%s)", tournament_id, comp_code)
     status = _statuses.setdefault(tournament_id, _new_status())
@@ -284,16 +294,20 @@ async def start_sync(adapter, tournament_id: str, comp_code: str) -> None:
     while True:
         sleep_seconds = 300  # default on error
         try:
-            log.info("Fetching fixtures from adapter …")
-            fixtures = await adapter.get_fixtures(tournament_id, comp_code)
-            log.info("Received %d fixtures", len(fixtures))
+            leading = True if is_leader is None else await is_leader()
+            fixtures: list[CanonicalFixture] = []
+            if leading:
+                log.info("Fetching fixtures from adapter …")
+                fixtures = await adapter.get_fixtures(tournament_id, comp_code)
+                log.info("Received %d fixtures", len(fixtures))
 
-            async with AsyncSessionLocal() as session:
-                await _upsert(fixtures, session)
+                async with AsyncSessionLocal() as session:
+                    await _upsert(fixtures, session)
 
+            # Every worker refreshes from the database, leader or not.
             await _load_from_db(tournament_id)
 
-            sleep_seconds = _next_sleep(fixtures)
+            sleep_seconds = _next_sleep(fixtures) if leading else 60
             status["lastSyncAt"] = datetime.now(tz=timezone.utc).isoformat()
             status["lastError"] = None
             status["sleepSeconds"] = sleep_seconds
@@ -353,7 +367,17 @@ async def start_all_syncs(make_worker, default_id: str, poll_seconds: int = 300)
     global default_tournament_id
     default_tournament_id = default_id
     workers: dict[str, asyncio.Task] = {}
+    # Identifies this process in the leader lock, so the holder can renew its
+    # own claim and only its own.
+    holder = f"{os.getpid()}-{uuid.uuid4().hex[:8]}"
     try:
+        # Fetching from the provider is leader-only; refreshing each worker's
+        # cache from the database is not. Passing the predicate down (rather
+        # than gating the whole supervisor) is what keeps every worker's
+        # fixtures warm while only one process talks to the provider.
+        async def is_leader() -> bool:
+            return await try_lead("sync", holder, ttl=poll_seconds * 3)
+
         while True:
             for tid in sorted(await tournaments_in_use(default_id)):
                 existing = workers.get(tid)
@@ -369,15 +393,20 @@ async def start_all_syncs(make_worker, default_id: str, poll_seconds: int = 300)
                     log.warning("No sync config for tournament %s — skipping", tid)
                     continue
                 adapter, comp_code = spec
-                workers[tid] = asyncio.create_task(start_sync(adapter, tid, comp_code))
+                workers[tid] = asyncio.create_task(
+                    start_sync(adapter, tid, comp_code, is_leader=is_leader)
+                )
                 log.info("Started sync worker for %s (%s)", tid, comp_code)
             await asyncio.sleep(poll_seconds)
     except asyncio.CancelledError:
+        # Bounded: a worker cancelled mid-query can take a while to unwind, and
+        # a shutdown that waits on it forever blocks the whole process from
+        # stopping. Losing a poll cycle on the way down costs nothing.
         for task in workers.values():
             task.cancel()
         for task in workers.values():
             try:
-                await task
-            except (asyncio.CancelledError, Exception):
+                await asyncio.wait_for(asyncio.shield(task), timeout=2)
+            except (asyncio.CancelledError, asyncio.TimeoutError, Exception):
                 pass
         raise

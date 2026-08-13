@@ -22,8 +22,10 @@ wrong. The TTL is only there to stop superseded keys accumulating.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
+import weakref
 from typing import Any, Optional
 
 log = logging.getLogger(__name__)
@@ -50,7 +52,8 @@ def _namespace() -> str:
 class LeagueCache:
     def __init__(self) -> None:
         self.url = os.environ.get("WHEESHT_REDIS_URL") or os.environ.get("REDIS_URL") or ""
-        self._client: Any = None
+        # Keyed by event loop; weak so finished loops do not pile up.
+        self._clients: "weakref.WeakKeyDictionary[Any, Any]" = weakref.WeakKeyDictionary()
         self._warned = False
 
     @property
@@ -60,16 +63,33 @@ class LeagueCache:
     async def _redis(self):
         if not self.url:
             return None
-        if self._client is not None:
-            return self._client
+
+        # A redis-py client binds its connection pool to the event loop that
+        # created it, and awaiting it from a different loop hangs rather than
+        # errors. One shared client is therefore not safe when two loops are
+        # live at once — which happens whenever a lifespan runs on its own
+        # thread alongside the caller's loop. Keeping a client PER loop means
+        # neither can take the other's.
+        #
+        # Production has one loop per worker, so this holds exactly one entry.
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:  # pragma: no cover - no loop, nothing to cache
+            return None
+
+        client = self._clients.get(loop)
+        if client is not None:
+            return client
+
         try:
             from redis import asyncio as redis_asyncio  # type: ignore
         except Exception as exc:  # pragma: no cover - optional dependency
             self._warn("redis package unavailable: %s", exc)
             self.url = ""
             return None
-        self._client = redis_asyncio.from_url(self.url, decode_responses=True)
-        return self._client
+        client = redis_asyncio.from_url(self.url, decode_responses=True)
+        self._clients[loop] = client
+        return client
 
     def _warn(self, msg: str, *args) -> None:
         """Log a cache problem once. A degraded cache is not an incident — the
@@ -77,6 +97,17 @@ class LeagueCache:
         if not self._warned:
             self._warned = True
             log.warning("League cache disabled — " + msg, *args)
+
+    async def ping(self) -> bool:
+        """Whether Redis is actually reachable (readiness reporting only)."""
+        client = await self._redis()
+        if client is None:
+            return False
+        try:
+            await client.ping()
+            return True
+        except Exception:  # pragma: no cover - network dependent
+            return False
 
     # ── versioning ──────────────────────────────────────────────────────────
 
@@ -136,3 +167,41 @@ class LeagueCache:
 
 
 league_cache = LeagueCache()
+
+
+# ── leader election ─────────────────────────────────────────────────────────
+
+_LEADER_KEY = "wheesht:{ns}leader:{name}"
+
+
+async def try_lead(name: str, holder: str, ttl: int) -> bool:
+    """Whether this process should run the named singleton job.
+
+    Background work must run once per deployment, not once per web worker: with
+    `--workers 4` every process runs lifespan, so an unguarded sync loop would
+    poll the provider four times over and blow its rate limit.
+
+    Acquired with SET NX EX and renewed by the holder each cycle. If the leader
+    dies the key simply expires and another worker takes over within one TTL.
+
+    Without Redis there is no shared state to coordinate through, so this
+    returns True — correct for the single-worker default, and the reason
+    running several workers requires Redis.
+    """
+    client = await league_cache._redis()
+    if client is None:
+        return True
+    key = _LEADER_KEY.format(ns=_namespace(), name=name)
+    try:
+        if await client.set(key, holder, nx=True, ex=ttl):
+            return True
+        # Already held — renew only if it is ours.
+        if await client.get(key) == holder:
+            await client.expire(key, ttl)
+            return True
+        return False
+    except Exception as exc:  # pragma: no cover - network dependent
+        # A Redis blip must not stop syncing altogether; prefer doing the work
+        # twice over not at all.
+        log.warning("Leader check failed for %s (%s) — proceeding", name, exc)
+        return True
