@@ -344,8 +344,27 @@ function CreateLeague(props) {
   const [currency, setCurrency] = oState('£');
   const [charitySplit, setCharitySplit] = oState(0.5);
   const [customFields, setCustomFields] = oState([]);
+  const [tournaments, setTournaments] = oState([]);
+  const [tournamentId, setTournamentId] = oState('');
   const [err, setErr] = oState('');
   const [busy, setBusy] = oState(false);
+
+  // Which competitions this deployment can run. Fetched rather than baked in,
+  // so adding a tournament config surfaces here with no client change. On
+  // failure (or offline builds) the list stays empty, the picker stays hidden,
+  // and the server falls back to its default — creating a league still works.
+  oEffect(function () {
+    if (!window.WC_LIVE) return;
+    var alive = true;
+    fetch('/api/tournaments').then(function (r) { return r.json(); }).then(function (j) {
+      if (!alive) return;
+      var list = (j && j.tournaments) || [];
+      setTournaments(list);
+      var def = list.filter(function (t) { return t.isDefault; })[0] || list[0];
+      if (def) setTournamentId(def.id);
+    }).catch(function () { /* picker simply does not appear */ });
+    return function () { alive = false; };
+  }, []);
   const cleanCode = code.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
   const ok = name.trim().length > 0 && cleanCode.length >= 2 && pw.length >= 4 && organiserCode.length >= 4 && organiserCode !== pw;
   const toggleRow = (onClick, on, title, text) => <button onClick={onClick} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 11, textAlign: 'left', border: '2px solid var(--line)', borderRadius: 13, background: '#fff', padding: '11px 12px', cursor: 'pointer' }}>
@@ -375,6 +394,8 @@ function CreateLeague(props) {
       organiserCode: organiserCode,
       customFields: customFields.filter(f => (f.label || '').trim()),
     };
+    // Omitted when unknown, so the server applies its own default.
+    if (tournamentId) opts.tournamentId = tournamentId;
     So.createLeague(name.trim(), cleanCode, pw, opts).then(function (res) {
       setBusy(false);
       props.onCreated(res.league);
@@ -396,6 +417,37 @@ function CreateLeague(props) {
           </div>
         </div>
         <div style={{ marginTop: 20, display: 'flex', flexDirection: 'column', gap: 14 }}>
+          {/* Only worth asking when there is a genuine choice. One tournament
+              means one answer, and the server defaults to it anyway. */}
+          {tournaments.length > 1 && <div>
+            <Lab>Which tournament?</Lab>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 6 }}>
+              {tournaments.map(function (t) {
+                const on = tournamentId === t.id;
+                return <button key={t.id} onClick={() => { setTournamentId(t.id); setErr(''); }}
+                  aria-pressed={on}
+                  style={{
+                    width: '100%', display: 'flex', alignItems: 'center', gap: 11, textAlign: 'left',
+                    border: on ? '2.5px solid var(--ink)' : '2px solid var(--line)', borderRadius: 13,
+                    background: on ? 'var(--yellow)' : '#fff', padding: '11px 12px', cursor: 'pointer',
+                    boxShadow: on ? '0 4px 0 var(--ink)' : 'none',
+                  }}>
+                  <span style={{ width: 20, height: 20, borderRadius: '50%', border: '2.5px solid var(--ink)', background: '#fff', flex: '0 0 auto', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    {on && <span style={{ width: 9, height: 9, borderRadius: '50%', background: 'var(--ink)' }} />}
+                  </span>
+                  <span style={{ flex: 1, minWidth: 0 }}>
+                    <span className="dh" style={{ display: 'block', fontSize: 15 }}>{t.season || t.name}</span>
+                    <span style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--ink2)', marginTop: 2, lineHeight: 1.3 }}>
+                      {t.teams} teams
+                    </span>
+                  </span>
+                </button>;
+              })}
+            </div>
+            <div style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--ink2)', marginTop: 4 }}>
+              Sets the teams and fixtures everyone is drawn from. This can't be changed once the league exists.
+            </div>
+          </div>}
           <div>
             <Lab>League name</Lab>
             <input autoFocus style={inp} value={name} onChange={e => { setName(e.target.value); setErr(''); }} placeholder="e.g. The Pub Quiz Crew" maxLength={60} />

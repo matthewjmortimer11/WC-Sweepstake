@@ -656,7 +656,12 @@
       options.customFields = cleanCustomFields(options.customFields || []);
       var organiserCode = options.organiserCode || '';
       delete options.organiserCode;
+      // A league property, not an organiser setting — keep it out of the admin
+      // meta blob that `options` becomes below.
+      var tournamentId = options.tournamentId || '';
+      delete options.tournamentId;
       var body = Object.assign({ name: name, code: code, password: password, organiserCode: organiserCode }, options);
+      if (tournamentId) body.tournamentId = tournamentId;
       if (!LIVE) {
         var L = { id: 'mock-' + code, code: (code || '').toUpperCase(), name: name || 'Sweepstake', seeded: false };
         admin.meta = Object.assign({}, admin.meta || {}, options);
