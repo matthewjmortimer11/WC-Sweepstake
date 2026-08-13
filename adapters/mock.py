@@ -16,7 +16,7 @@ from datetime import timezone, timedelta
 from typing import Any
 
 from provider import CanonicalFixture
-from wc_data import generate_wc_data
+from wc_data import tournament_data
 
 _BST = timezone(timedelta(hours=1))
 
@@ -31,7 +31,13 @@ def _parse_kickoff(date_iso: str, time_str: str) -> _dt.datetime:
 def _fixture_to_canonical(f: dict[str, Any], tournament_id: str) -> CanonicalFixture:
     kickoff_utc = _parse_kickoff(f["dateISO"], f["time"])
     return CanonicalFixture(
-        id=f"mock-{f['id']}",
+        # Fixture.id is the primary key and is NOT scoped by tournament, so
+        # ids must be unique across competitions. Every tournament's generated
+        # fixtures are numbered f0..fN, so without the tournament in the key
+        # two sync workers write the same rows and clobber each other's
+        # tournament_id — the second tournament then loads nothing. (The real
+        # provider adapter is safe: it uses the provider's own match ids.)
+        id=f"mock-{tournament_id}-{f['id']}",
         tournament_id=tournament_id,
         stage=f.get("stage", "group"),
         group_name=f.get("group"),
@@ -57,7 +63,12 @@ class MockAdapter:
         tournament_id: str,
         comp_code: str,
     ) -> list[CanonicalFixture]:
-        data = generate_wc_data()
+        # Generate the fixtures of the tournament being ASKED about. This used
+        # to ignore tournament_id and always build the default tournament, then
+        # stamp the rows with whatever id it was given — harmless when only one
+        # tournament ever synced, but it would now fill a Euros league's cache
+        # with World Cup fixtures.
+        data = tournament_data(tournament_id)
         fixtures = data.get("fixtures", [])
         return [_fixture_to_canonical(f, tournament_id) for f in fixtures]
 

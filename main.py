@@ -854,7 +854,7 @@ def _league_state(league: League, league_people: List[Dict[str, Any]], admin: Di
     )
     meta.update(_pro_meta(league))
     meta.update(_fixture_health(fixtures))
-    meta.update(_sync_meta())
+    meta.update(_sync_meta(tdata["meta"]["id"]))
     data["meta"] = meta
     data["pot"] = len(people) * fee
     data["charitySplit"] = meta["charitySplit"]
@@ -904,8 +904,10 @@ def _fixture_pick_open(f: Optional[Dict[str, Any]]) -> bool:
     return True
 
 
-def _sync_meta() -> Dict[str, Any]:
-    st = sync.sync_status
+def _sync_meta(tournament_id: str) -> Dict[str, Any]:
+    """Sync health for the tournament this league plays — an organiser looking
+    at a Euros league should not be shown the World Cup's last sync time."""
+    st = sync.status_for(tournament_id)
     return {
         "syncAdapter": st.get("adapter"),
         "syncLastAt": st.get("lastSyncAt"),
@@ -1046,7 +1048,7 @@ def _base_state() -> Dict[str, Any]:
     meta["out"] = 0
     meta["currency"] = "£"
     meta.update(_fixture_health(data.get("fixtures") or []))
-    meta.update(_sync_meta())
+    meta.update(_sync_meta(tdata["meta"]["id"]))
     stage_labels = dict(tdata["meta"].get("stageLabels") or {})
     phase = meta.get("phase") or "pre"
     meta.update(_tournament_fixture_meta(
@@ -1195,17 +1197,31 @@ async def lifespan(app: FastAPI):
     api_key = os.environ.get("FOOTBALL_DATA_API_KEY", "")
     if api_key:
         from adapters.football_data_org import FootballDataOrgAdapter
-        adapter = FootballDataOrgAdapter(api_key, known_teams=_DEFAULT_DATA.get("teams") or [])
         sync.set_sync_adapter("football-data.org")
         log.info("Using FootballDataOrgAdapter")
     else:
         from adapters.mock import MockAdapter
-        adapter = MockAdapter()
         sync.set_sync_adapter("mock")
         log.warning("FOOTBALL_DATA_API_KEY not set — using MockAdapter (no live data)")
 
+    def _make_worker(tournament_id: str):
+        """Adapter + competition code for one tournament, or None if unknown.
+
+        Each tournament needs its OWN adapter: the provider adapter matches
+        provider team names against the tournament's team list, so sharing one
+        across competitions would mis-map fixtures.
+        """
+        if not wc_data_module.tournament_exists(tournament_id):
+            return None
+        data = wc_data_module.tournament_data(tournament_id)
+        comp_code = data["meta"]["competitionCode"]
+        if api_key:
+            return FootballDataOrgAdapter(api_key, known_teams=data.get("teams") or []), comp_code
+        return MockAdapter(), comp_code
+
+    # One loop per tournament a league actually plays, added as leagues appear.
     task = asyncio.create_task(
-        sync.start_sync(adapter, _DEFAULT_DATA["meta"]["id"], _DEFAULT_DATA["meta"]["competitionCode"])
+        sync.start_all_syncs(_make_worker, _DEFAULT_DATA["meta"]["id"])
     )
     yield
     task.cancel()
