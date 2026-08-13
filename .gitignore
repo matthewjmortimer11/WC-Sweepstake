@@ -31,3 +31,6 @@ static/app/vendor/
 # Alembic local scratch databases
 .ci_migration_check.db*
 .alembic_gen.db*
+
+# Local cache-test scratch database
+.cachetest.db*

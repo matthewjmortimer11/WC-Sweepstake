@@ -38,6 +38,7 @@ from typing import Any, Dict, List, Optional
 from zoneinfo import ZoneInfo
 
 from fastapi import FastAPI, Header, HTTPException, Request
+from fastapi.encoders import jsonable_encoder
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse, Response
 from pydantic import BaseModel, Field
@@ -61,6 +62,7 @@ from models import (
     Profile,
     ProfileAsset,
 )
+from cache import league_cache
 import wc_data as wc_data_module
 from wc_data import _initials, generate_wc_data, get_admin_pin, get_league_seed
 import knockout_predictions
@@ -1239,6 +1241,29 @@ app = FastAPI(title="Wheesht — World Cup Sweepstake 2026", lifespan=lifespan)
 # minimum_size skips payloads too small for compression to be worth the CPU.
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 
+# Matches /api/leagues/<CODE> and anything under it.
+_LEAGUE_PATH = re.compile(r"^/api/leagues/([A-Za-z0-9]{2,12})(?:/|$)")
+
+
+@app.middleware("http")
+async def _invalidate_league_cache(request: Request, call_next):
+    """Bump a league's cache version after any successful write to it.
+
+    Done centrally rather than in each handler on purpose: there are 25
+    league-scoped write endpoints, and an invalidation you forget to add is a
+    cache serving stale data — the failure mode that makes caches infamous.
+    Here it cannot be forgotten, and it covers endpoints added later for free.
+
+    Only 2xx responses invalidate: a rejected write changed nothing.
+    """
+    response = await call_next(request)
+    if request.method == "GET" or not (200 <= response.status_code < 300):
+        return response
+    match = _LEAGUE_PATH.match(request.url.path)
+    if match:
+        await league_cache.bump_league(match.group(1))
+    return response
+
 # Cipher — a customisable, real-time word-association party game served from
 # /play. Fully self-contained (in-memory rooms + WebSockets); see codenames/.
 from codenames import router as cipher_router  # noqa: E402
@@ -2221,16 +2246,53 @@ async def league_analytics(
         }
 
 
+def _etag_response(request: Request, body: str, extra_headers: Optional[Dict[str, str]] = None) -> Response:
+    """Return `body` as JSON with an ETag, or 304 if the client already has it.
+
+    Weak (`W/`) deliberately: responses are gzipped downstream, and a strong
+    ETag is required to be unique per content-coding. Weak means "semantically
+    the same payload", which is what a poller actually cares about.
+
+    Every member of a league polls the same endpoint every 30 s and usually
+    gets an identical answer; this turns those into empty 304s.
+    """
+    etag = 'W/"' + hashlib.sha256(body.encode("utf-8")).hexdigest()[:32] + '"'
+    headers = {"ETag": etag, "Cache-Control": "no-cache"}
+    if extra_headers:
+        headers.update(extra_headers)
+    if request.headers.get("if-none-match") == etag:
+        return Response(status_code=304, headers=headers)
+    return Response(content=body, media_type="application/json", headers=headers)
+
+
 @app.get("/api/leagues/{code}/state")
-async def league_state(code: str):
+async def league_state(code: str, request: Request):
+    code = code.upper()
+
+    # The cache key carries the league version and this tournament's fixture
+    # revision, so a superseded entry is unreachable rather than stale. Reading
+    # the version needs the league's tournament, which we only know after the
+    # league row — but that lookup is a single indexed hit, unlike the four
+    # queries plus standings/prediction engines that building the state costs.
     async with AsyncSessionLocal() as session:
-        league = await _get_league_by_code(session, code.upper())
+        league = await _get_league_by_code(session, code)
         if league is None:
             raise HTTPException(status_code=404, detail="league not found")
+
+        revision = sync.status_for(league.tournament_id).get("cacheRevision", 0)
+        version = await league_cache.league_version(code)
+        cached = await league_cache.get_state(code, version, revision)
+        if cached is not None:
+            return _etag_response(request, cached, {"X-Wheesht-Cache": "hit"})
+
         rows = await _participant_rows(session, league)
         admin = await _get_admin_data(session, league)
         profiles = await _profiles_for(session, league)
-    return _league_state(league, _league_people(league, rows, profiles), admin)
+
+    state = _league_state(league, _league_people(league, rows, profiles), admin)
+    body = json.dumps(jsonable_encoder(state), ensure_ascii=False, separators=(",", ":"))
+    await league_cache.set_state(code, version, revision, body)
+    return _etag_response(request, body, {"X-Wheesht-Cache": "miss"})
 
 
 # ── Participants (league-scoped) ──────────────────────────────────────────────
