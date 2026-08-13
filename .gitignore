@@ -27,3 +27,7 @@ node_modules/
 static/app/bundle.*.js
 static/app/build-manifest.json
 static/app/vendor/
+
+# Alembic local scratch databases
+.ci_migration_check.db*
+.alembic_gen.db*

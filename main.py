@@ -1142,43 +1142,16 @@ async def _migrate_legacy_json(session, league: League) -> None:
 
 
 
-async def _ensure_schema() -> None:
-    """Idempotent column adds for tables that shipped in an earlier deploy.
-
-    `create_all` only ever CREATEs missing tables — it never ALTERs an existing
-    one. The `profiles` table was deployed before `display_name` existed, so on
-    any database where that table already exists the column would be missing.
-    `ADD COLUMN IF NOT EXISTS` is a no-op when create_all already made the table
-    fresh (with the column) and a clean add when it pre-existed without it.
-    """
-    if DATABASE_URL.startswith("sqlite"):
-        return
-
-    statements = [
-        "ALTER TABLE profiles ADD COLUMN IF NOT EXISTS display_name VARCHAR NOT NULL DEFAULT ''",
-        "ALTER TABLE leagues ADD COLUMN IF NOT EXISTS organiser_hash VARCHAR",
-        "ALTER TABLE participants ADD COLUMN IF NOT EXISTS password_hash VARCHAR",
-        "ALTER TABLE profiles ADD COLUMN IF NOT EXISTS google_id VARCHAR",
-        "ALTER TABLE participants ADD COLUMN IF NOT EXISTS custom_fields JSON NOT NULL DEFAULT '{}'::json",
-        "ALTER TABLE participants ADD COLUMN IF NOT EXISTS payment_status VARCHAR NOT NULL DEFAULT 'unpaid'",
-        "ALTER TABLE leagues ADD COLUMN IF NOT EXISTS pro_status VARCHAR NOT NULL DEFAULT 'free'",
-        "ALTER TABLE leagues ADD COLUMN IF NOT EXISTS pro_purchased_at TIMESTAMPTZ",
-        "CREATE INDEX IF NOT EXISTS ix_profiles_google_id ON profiles (google_id) WHERE google_id IS NOT NULL",
-    ]
-    async with engine.begin() as conn:
-        for stmt in statements:
-            await conn.execute(text(stmt))
-
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-
-    try:
-        await _ensure_schema()
-    except Exception as exc:  # never let a migration crash boot
-        log.error("Schema ensure failed: %s", exc)
+    # Schema is owned by Alembic and applied by scripts/db_upgrade.py as a
+    # deploy step, so a bad migration fails the deploy instead of a live boot.
+    # SQLite (tests, local dev) still builds the schema in-process: it is always
+    # a throwaway database, and create_all is verified to produce a schema
+    # identical to `alembic upgrade head`.
+    if DATABASE_URL.startswith("sqlite"):
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
 
     try:
         await _seed_and_migrate()

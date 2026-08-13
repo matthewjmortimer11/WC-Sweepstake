@@ -23,6 +23,14 @@ jobs:
       # JSX syntax errors and cross-file redeclaration clashes before deploy.
       - name: Build frontend
         run: npm ci && npm run build
+      # Fails if models.py changed without a matching migration, so the schema
+      # and the models can never silently drift apart.
+      - name: Check for un-migrated model changes
+        env:
+          DATABASE_URL: sqlite+aiosqlite:///./.ci_migration_check.db
+        run: |
+          python scripts/db_upgrade.py
+          alembic check
       - name: Run tests
         run: pytest tests/ -q
       - name: Check Dethrone JS syntax
