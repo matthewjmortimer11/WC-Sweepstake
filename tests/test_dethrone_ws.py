@@ -2090,6 +2090,7 @@ def test_dirty_blow_second_consequence_and_rep_loss(client):
     _strip_royal_guards(g)
     _strip_royal_knights(g)
     _strip_queens(g)
+    _strip_spies(g)
     g.duel_apply_consequence(
         att_id, def_id, 3, 0, False, "disarm", random.Random(0),
         second_consequence="shame",
