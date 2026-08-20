@@ -750,6 +750,9 @@ def test_loyal_bot_can_call_out_cursed(client):
     manager.begin_game(room, "random", 0)
     cursed = next(p for p in g.players if g.bot_is_cursed(p))
     loyal = next(p for p in g.players if p.is_bot and not g.bot_is_cursed(p))
+    # A reaction card in the Cursed One's hand would park the call-out in a
+    # pending reaction instead of resolving it, so the win never lands.
+    cursed.action_card_ids = []
     g.corruption = 4
 
     class _Rng:
