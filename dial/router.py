@@ -315,9 +315,8 @@ def _dispatch(room, player, mtype: str, msg: dict) -> bool:
             raise MoveError("Only the host can advance.")
         if game.status != STATUS_PLAYING or game.phase != PHASE_REVEAL:
             raise MoveError("Wait for the reveal.")
-        game.next_round(room.rng)
-        if game.status == STATUS_PLAYING and game.settings.mode == MODE_TEAMS:
-            game.psychic_id = room.pick_team_psychic()
+        resolver = room.pick_team_psychic if game.settings.mode == MODE_TEAMS else None
+        game.next_round(room.rng, psychic_resolver=resolver)
         return True
 
     if mtype == "ping":
